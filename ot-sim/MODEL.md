@@ -24,16 +24,16 @@ only writer of its slice (`DESIGN.md`, the model loop):
 | Owner | Fields others read |
 |---|---|
 | `patient` | `age, sex, weightKg, heightCm, bmi, lbm, bsa, ibw, frc0, bloodVol0, ihr, q` (sensitivity quantile), PK multipliers |
-| `pk` | `pk[drug].{cp, ce, ceHaemo}`, `pk.roc.{ceThumb, ceDiaphragm, ceAirway, ceLarynx}`, `pk.sgx.free`, `pump[drug].{predCp, predCe, rate}` |
+| `pk` | `pk[drug].{cp, ce, ceHaemo}`, `pk.roc.{ceThumb, ceDiaphragm, ceUpperAirway, ceLarynx}`, `pk.sgx.free`, `pump[drug].{predCp, predCe, rate}` |
 | `volatile` | `vol.fi[agent]` (circuit inspired), `vol.ce[agent]`, `vol.mac` (age-adjusted MAC fraction, immobility), `vol.pv[agent]` (mixed venous partial pressure) |
 | `pd` | `pd.{asleep, pAsleep, bisLike, pNoMove[stim], auto, ventDrug, nmb:{t1, tofCount, tofr, ptc, diaphragm, upperAirway, larynx}}` |
 | `rhythm` | `rh.{rhythm, events[]}` (timed atrial and ventricular events in this step) |
 | `cardio` | `cv.{hr, sv, co, map, sbp, dbp, cvp, svr, bloodVol, rbcMass, hb, ppv, pi, beatSV[]}` |
 | `resp` | `resp.{mode, vt, rr, mv, va, ppeak, pplat, peep, autoPeep, compliance, resistance, spont, pplMmHg, breaths[]}` |
 | `gas` | `gas.{fa[species], fio2, pao2, sao2, paco2, etco2, pvo2, svo2, ph, hco3, be, lactate, k, ica, shunt, vdAlvFrac, uptake[agent]}` |
-| `airway` | `aw.{device, patent, obstruction, seal, leak, cuff, position, view, laryngospasm}` |
+| `airway` | `aw.{device, patent, obstruction, seal, leak, cuff, position, view}` (glottic closure is owned by `cond.laryngospasm.level`; `airway.js` reads it as obstruction) |
 | `temp` | `t.{core, periph, ambient, warming}` |
-| `cond` | `cond[name].{level, ...}` (the disease processes, section 11), `cond.haem.coag.{fibrinogen, platelets}` |
+| `cond` | `cond[name].{level, ...}` (the disease processes, section 11), `cond.haemorrhage.coag.{fibrinogen, platelets}` |
 | `resus` | `rs.{cpr, quality, coFraction, lastShock, paced, capture}` |
 | `monitor` | `mon.{shown values, alarms[], nibp state, probe states}` |
 
@@ -87,7 +87,7 @@ Details and cross-checks: `research/pk.md`.
 | Rocuronium | **Kleijn** 2011 PK (2 compartments, holds the sugammadex binding) with **directional effect sites** | V1 4.73·(W/70), V2 6.76·(W/70) L; CL 0.269·(W/70)^0.75, Q2 0.279·(W/70)^0.75 L/min. Thumb (adductor pollicis): ke0 0.3/min while Ce rises, 1.2/min while it falls; Ce50 0.95 mcg/mL (bromide); Hill 3.5; under sevoflurane Ce50 × 0.605 (Kleijn). Diaphragm Ce50 × 1.9 (rocuronium ED50 0.26 vs 0.14 mg/kg, Cantineau 1994), recovers sooner. Upper-airway dilator muscles Ce50 × 0.7 (more sensitive than the thumb). Larynx (intubating conditions) Ce50 × 1.73 with faster equilibration (Plaud 1995: 1.42 vs 0.82 mcg/mL, t½ke0 2.7 vs 4.4 min) | PK [V]; one symmetric ke0 could not meet both onset and sugammadex reversal in the prototype, so the directional ke0, Ce50 and Hill are [D] tuned to the label; site ratios [V] (diaphragm, larynx) and [D] (upper airway) |
 | Suxamethonium | Roy 2002 1-compartment | V 0.038 L/kg; hydrolysis k 0.97/min; ke0 **0.29** (Roy's 0.058 gives T1 90% at about 22 min, twice the Lee 2009 time); Ce50 825 ng/mL; Hill 4; cholinesterase variants scale k: heterozygous × 0.5 (about 15 min), homozygous × 0.01 (about 8 h); phase II block (fade) after 3–5 mg/kg total; potassium +0.5 mmol/L | PK [V]; ke0, Ce50, Hill [D] tuned; K+ [S] (Thapa & Brull 2000); phase II [V] Lee 1975 |
 | Sugammadex | Kleijn 2011 | 1:1 complex with free rocuronium, KD 0.0559 µM, **solved as equilibrium each step** (quadratic for free rocuronium from totals and KD, written in its numerically stable form); complex cleared like free sugammadex (CL about 88 mL/min, t½ about 2 h); MW rocuronium bromide 609.7, sugammadex 2178 | [V]; equilibrium method [D] (an explicit reaction blew up at realistic on-rates) |
-| Neostigmine | Effect model | Peak antagonism about 5 min (4.6 min warm, 5.6 min mildly cold; Heier 2002), a ceiling (no effect on deep block); raises the effective rocuronium Ce50 by up to about × 3 [D]; usual 40–50 mcg/kg, never over 5 mg (label maximum 50 mcg/kg UK, 70 mcg/kg US); muscarinic slowing of HR and secretions unless glycopyrrolate about 10 mcg/kg (0.2 mg per 1 mg neostigmine) or atropine 15–20 mcg/kg | [V] timing, labels; size [D] calibrated to Kopman 2005 and Naguib 1993 (below) |
+| Neostigmine | Effect model | Peak antagonism 5–10 min (4.6 min warm, 5.6 min mildly cold in Heier 2002; 7–10 min in clinical reviews; ASA 2023 waits at least 10 min with qualitative monitoring), a ceiling (no effect on deep block); raises the effective rocuronium Ce50 by up to about × 3 [D]; usual 40–50 mcg/kg, never over 5 mg (label maximum 50 mcg/kg UK, 70 mcg/kg US); muscarinic slowing of HR and secretions unless glycopyrrolate about 10 mcg/kg (0.2 mg per 1 mg neostigmine) or atropine 15–20 mcg/kg | [V] timing, labels; size [D] calibrated to Kopman 2005 and Naguib 1993 (below) |
 | Local anaesthetics | 2-compartment plus an absorption compartment per block site; intravascular injection goes to the central compartment | lidocaine, bupivacaine, ropivacaine. **Gap: volumes, clearances, absorption rates and free fractions (bupivacaine about 0.05, ropivacaine about 0.06, lidocaine about 0.3 [U]) need a research step before the LAST scenario PR.** Thresholds must be compared on the same basis (free or total) | [U] |
 | Vasoactive drugs | Section 5 | — | — |
 
@@ -102,7 +102,8 @@ when the target is lowered the pump stops until the prediction falls to it. Defa
 remifentanil 50 mcg/mL, maximum 1200 mL/h (confirm with NUH pumps). Different pumps run the "same" model differently
 (Alaris derives Schnider's ke0 from a 1.6 min time to peak; others fix 0.456) [S].
 
-**PK calibration targets** (tests; the prototype reached all of these with the parameters above):
+**PK calibration targets** (tests; tolerance ±20% unless stated; the prototype met all but rocuronium 1.2 mg/kg onset,
+0.79 vs 1.0 min, and sugammadex 4 mg/kg, 2.0 vs 2.9 min, which are listed as known misses):
 
 | Check | Target | Prototype |
 |---|---|---|
@@ -163,7 +164,7 @@ Fuchs-Buder 1995) prolong the block [V]; volatiles potentiate it [S].
 | Order | wash-in iso < sevo < des; washout des < sevo < iso | yes |
 | Wash-in at 1 / 5 / 10 min | regression values only (Yasuda's figures could not be read): des 0.63/0.84/0.89, sevo 0.55/0.74/0.81, iso 0.40/0.57/0.66 [D] | — |
 | Low flow, sevoflurane dial 2%, 120 min (Johansson 2002) | Et/FI 0.88 ± 0.03 at 1 and 2 L/min; FI/dial and Et/dial about 0.09 higher at 2 than at 1 L/min; absolute FI/dial 0.73 / 0.82 and Et/dial 0.64 / 0.73 within ±0.10 (the model reads about 0.09 high) | 0.89–0.90; gap 0.09; 0.82 / 0.91 |
-| Teaching check | holding Et at 1 MAC at 1 L/min after a 6 L/min wash-in needs the dial about 2.9% at 30–60 min [D] | — |
+| Teaching check | holding Et at 1 MAC at 1 L/min after a 6 L/min wash-in needs the dial about 2.9% at 30–60 min at MAC 2.05%; recompute for the 1.80% default (roughly 2.5%) [D] | — |
 
 Yasuda gave the potent agents with 65–70% N2O; with that the model overshoots (sevoflurane 0.89–0.91), so the tests
 use the plain wash-in [V for the protocol].
@@ -202,7 +203,7 @@ use the plain wash-in [V for the protocol].
     mcg/mL (Kazama Cp50 17.4) [D check]; remifentanil 32 ng/mL reduces MAC about 96% (Lang 91%); the fentanyl ceiling
     (Katoh about 76% at 10 ng/mL) is not captured [D].
 - **BIS-like index** (only when a scenario has processed EEG): Bouillon 2004 surface, U = CeP/4.47 + CeS/2.14 +
-  CeR/19.3; index = 97.4/(1 + U^1.43) [S: Bouillon's values via the PAS transcription; the sevoflurane C50 2.14 is
+  CeR_eq/19.3; index = 97.4/(1 + U^1.43) [S: Bouillon's values via the PAS transcription; the sevoflurane C50 2.14 is
   Mourisse's 1.29 rescaled by Bouillon's propofol C50 over Mourisse's own propofol EC50, D]. Smoothing 15 s (the
   monitor's default) plus a processing delay of 20–60 s, longer for large jumps (independent measurements: 14–155 s,
   Pilge 2006; 24–122 s, Zanner 2009) [V]. Arousal adds +3 to +11 (van den Berg 2021) [V]. Targets: propofol 2 / 3 / 4 /
@@ -223,19 +224,22 @@ Hybrid design (`research/cardio.md` section 1, prototyped in `research/prototype
   end-diastolic relation at the atrial transmural pressure; it is delivered as constant flow SV/RR until the next beat
   [V, Sunagawa 1983; Kelly 1992; Chen 1998; form D]. Right atrial pressure then follows from venous return:
   Pra = Psv − Rvr·Q_rv, floored at the collapse pressure (0 breathing spontaneously, about Ppl under positive pressure);
-  with no output (arrest, PEA, asystole) Pra = Psv. Left side likewise from the pulmonary compartment. Filling-time loss
+  with no output (arrest, PEA, asystole) Pra = Psv with no solve. Where a nonlinear venous return needs a solve:
+  bisection on [collapse pressure, Psv], 20 iterations; the filling (transmural) pressure is clamped above −0.9·A before
+  the end-diastolic log so it can never be NaN. Left side likewise from the pulmonary compartment. Filling-time loss
   at short RR; atrial kick (share of filling when a P wave precedes the QRS) about 0.20 at 25 y rising to about 0.37 at
   70 y (Pearson 1991, Doppler mitral inflow) [V], so older patients lose more in AF or junctional rhythm.
 - **Defaults** (inputs: MAP 90, CO 5.4 L/min, HR 72, CVP 4, LAP 8, pulmonary compartment 12 mmHg; compliances
   arterial 1.5, venous 122.5, pulmonary 25 mL/mmHg; LV Ees 1.58 mmHg/mL; RV V0d 40, β 0.025, V0 50, Ees 0.6) [S/D].
-  Derived at creation: unstressed volumes and end-diastolic constants (A_lv 0.181, A_rv 0.312), stressed volume 1310 mL
-  systemic (1550 with the pulmonary bed), systemic mean filling pressure 10.4, venous compartment 9.4 mmHg, Rvr =
+  Derived at creation: unstressed volumes and end-diastolic constants (A_lv 0.181, A_rv 0.312), stressed volume about 1290 mL
+  systemic (about 1590 with the pulmonary bed), systemic mean filling pressure 10.4, venous compartment 9.4 mmHg, Rvr =
   (Psv − CVP)/CO, systemic resistance 0.896 mmHg·s/mL; displayed SVR (MAP − CVP)/CO = 15.9 Wood units (1270
   dyn·s·cm⁻⁵; 1000–1200 dyn is 12.5–15 Wood units). Prototype: HR 72.0, SV 75.0, CO 5.40, 120/75, CVP 4.0, LAP 8.0.
 - **Critical closing pressure** [D, not yet prototyped]: Q_sys = (Psa − max(Psv, Pcrit))/R with Pcrit about 20 mmHg
-  engaging only at low flow, plus a small leak so pressures still equalise over minutes. Target (after VF starts):
-  arterial pressure falls with τ about 3 s to about 24 mmHg at 13 s while CVP rises to about 11, then both converge on
-  the mean filling pressure (Schipke 2003) [V]. Without it the model decays with τ 1.4 s towards about 11 mmHg.
+  engaging only at low flow, plus a small leak so pressures still equalise over minutes. A closing pressure changes
+  where arterial pressure settles, not how fast: after VF starts it falls with τ ≈ R·C (about 1.4 s) towards Pcrit,
+  reading about 24 mmHg at 13 s while CVP rises to about 11, then both converge on the mean filling pressure (Schipke
+  2003: the level is the test, not his τ of 2.9 s) [V]. Without it the model settles near 11 mmHg.
 - **Baroreflex** (Ursino 1998 structure, simplified) [V for the HR and Ees limbs; D for the rest]: filtered MAP (τ 2 s)
   → one sigmoid (width k 12 mmHg) → sympathetic s and vagal v = 1 − s → effectors, each a delay plus a first-order lag:
   heart period vagal (0.2 s, τ 1.5 s) and sympathetic (2 s, τ 2 s); SVR (2 s, τ 6 s, gain 1.0); venous unstressed
@@ -258,7 +262,7 @@ Hybrid design (`research/cardio.md` section 1, prototyped in `research/prototype
     Prototype: 2 mg/kg gives SBP −17.9 mmHg at 2 min with HR +3 (Rolly 1985: −13 to −19, HR little changed); steady
     Ce 1 mcg/mL MAP −11.4% (Nieuwenhuijs: −9.9%). An age term is still needed so the elderly fall further as well as
     later (Kazama 1999) [D, to tune].
-  - Remifentanil: raises vagal tone upstream of the baroreflex, saturating (no linear extrapolation); calibrate to HR
+  - Remifentanil (and fentanyl through CeR_eq): raises vagal tone upstream of the baroreflex, saturating (no linear extrapolation); calibrate to HR
     about 60 at 4–8 ng/mL with propofol at P_TOL 0.9 (van den Berg 2021) [V target]; a small direct MAP effect (−3.7%
     per ng/mL at low doses, Nieuwenhuijs 2003) [V], saturating; the propofol-remifentanil induction target (SAP −32%,
     HR −22% at 5 min, Sjøen 2026 placebo arm) [V] is checked once both drives exist. Garraza-Obaldia 2024 (Emax 0.69,
@@ -300,7 +304,7 @@ Hybrid design (`research/cardio.md` section 1, prototyped in `research/prototype
 | Adrenaline | 10–200 mcg boluses (anaphylaxis ladder); 1 mg (arrest); infusion 3–40 mcg/min | β at low doses (HR up, DBP down), α at high | Clutter 1980; SmPC; ANZAAG 2022 [V] |
 | Vasopressin | 0.5–1 unit (ACE-inhibitor vasoplegia), 1–2 units then 2 units/h (refractory anaphylaxis) | V1 vasoconstriction, not blunted by ACE inhibitors; avoid in LAST | Stanford manual; ANZAAG 2022 [V] |
 | Atropine | 0.6 mg boluses to 2.4 mg (SRFAC 2021; 0.5 mg ERC, 1 mg AHA as configurable alternatives); 0.3–0.6 mg routine | peak HR at 2–4 min, lasts hours; under about 0.4 mg a brief, small slowing first | SRFAC 2021; SmPC [V]; size [S/D] |
-| Glycopyrrolate | 0.2–0.4 mg; 10 mcg/kg with neostigmine | slower than atropine (t½ke0 about 18 min vs 3.8) | Scheinin 1999 [V] |
+| Glycopyrrolate | 0.2–0.4 mg; 10 mcg/kg with neostigmine | onset within 1 min, peak HR effect about 2–5 min, lasts 2–3 h (Scheinin's t½ke0 18 min is for heart-rate variability, not used for HR) | SmPC; Scheinin 1999 [V] |
 | Esmolol | 0.5 mg/kg over 1 min, then 50–200 mcg/kg/min | t½ 9 min | SmPC [V] |
 | Labetalol | 10–20 mg, then 5–10 mg increments (hypotensive anaesthesia); severe hypertension 50 mg over 1 min, to 200 mg | maximum by 5 min; 20–25 mg lasts about 50 min under anaesthesia | SmPC [V] |
 | GTN | 50–100 mcg bolus (off-label); infusion 10–200 mcg/min | onset 1–3 min, offset 5–10 min, preload falls first | Stengert 1978; SmPC [V] |
@@ -338,7 +342,7 @@ Hybrid design (`research/cardio.md` section 1, prototyped in `research/prototype
   poorly seated LMA; disconnection and obstruction alarms [V for the formulas]. Breath events (start, Ti, Vt, pressures)
   for display; gas exchange uses continuous alveolar ventilation (section 8).
 - **Conditions** change C and R as relative changes of the model's own values [V sources, D sizes]: pneumoperitoneum
-  12 mmHg lowers static compliance about 30–45%, so Pplat rises about 5–7 cmH2O at Vt 8 mL/kg (Suh 2010 measured −12
+  12 mmHg lowers static compliance about 35–45%, so Pplat rises about 5–7.5 cmH2O at Vt 8 mL/kg (Suh 2010 measured −12
   mL/cmH2O dynamic from its own baseline, Ppeak +6, Pplat +7); head-down about −20%, with pneumoperitoneum −30% more
   (Hirvonen 1995); obesity (Pelosi 1996); bronchospasm (R up several-fold, auto-PEEP); endobronchial intubation (one
   lung: C halves, shunt rises); tension pneumothorax (rising pressures, falling Vt in PC). Pneumoperitoneum's CO2 load
@@ -371,8 +375,9 @@ Prototyped (`research/prototypes.md`): one alveolar store, arterial and venous O
 - **Blood:** end-capillary content from PAO2 by **Severinghaus 1979** (S = 1/(23400/(P³ + 150P) + 1)) [V] with the
   Okada 1977 virtual-PO2 shift for pH, temperature and base excess (check the sign convention) [V]; dissolved 0.03
   mL/L/mmHg; shunt mixes venous blood in; Fick for the venous pool.
-- **Defaults** [V/S/D]: VO2 3.5 mL/kg/min awake, about −25 to −35% under GA (Jakobsson 2021), about 210–230 mL/min
-  in apnoea under GA; RQ 0.8; shunt 2–5% awake, 0.08 under GA (atelectasis; up to 0.17; Tokics 1987, Hedenstierna 2010),
+- **Defaults** [V/S/D]: VO2 3.5 mL/kg/min awake, about −25 to −35% under GA (Jakobsson 2021; about 160–185 mL/min at 70 kg, which
+  lengthens healthy apnoea to about 9 min); the apnoea tests use 210–230 mL/min (prototype) [D]; obese 290 mL/min with CO
+  6.0 L/min, term pregnant 280 with CO 6.5 [D]; RQ 0.8; shunt 2–5% awake, 0.08 under GA (atelectasis; up to 0.17; Tokics 1987, Hedenstierna 2010),
   lowered by PEEP and recruitment [D]; obese 0.15, term pregnant 0.10 [D]; effective venous and tissue O2 store 5200
   mL [D]; anatomical dead space 2 mL/kg; alveolar dead-space fraction 0.06–0.09 (PaCO2 − EtCO2 2.4–3.6 mmHg) [D].
 - **CO2:** a fast store with capacitance 0.84 mL/kg/mmHg (59 mL/mmHg), which gives +3.4 mmHg/min in apnoea at VCO2
@@ -494,6 +499,9 @@ and timings are [D] unless stated, calibrated so the scenario's correct course w
 | Lipid emulsion 20% | LAST free fraction (sink) and clearance | QRH 3-10 regimen |
 | Cefazolin, other antibiotics, rocuronium, chlorhexidine | anaphylaxis trigger | culprit list in `SCENARIOS.md` |
 | Steroid, antihistamine | no acute effect | logged as "first-line" errors when given before adrenaline |
+| Verapamil, diltiazem, metoprolol | negative inotropy and rate; worsen LAST and MH arrhythmias | wrong-action drugs (scenarios 7, 8) |
+| Lidocaine IV | adds to the LAST level; antiarrhythmic otherwise | wrong in LAST (scenario 8) |
+| Atracurium | non-depolarising block (benzylisoquinolinium) that sugammadex does not reverse | wrong-action check (scenario 12) |
 
 ## 13. Resuscitation (`resus.js`, PR M2.8)
 
@@ -513,6 +521,7 @@ renal and hepatic drug handling beyond the fixed models, coagulation beyond a si
 scenario, cerebral physiology, the EEG (the BIS page does that), cardiac output monitors, transfusion reactions, drug
 errors other than the scripted awareness scenario, the surgeon, the Eleveld propofol model, and obese pharmacodynamics
 beyond the capped Schnider covariates. Known misses of the planned structure, kept visible rather than tuned away:
-desflurane washout faster than measured, N2O at 30 min slightly low, phenylephrine wearing off more slowly than "about
+desflurane washout faster than measured, N2O at 30 min slightly low, rocuronium 1.2 mg/kg onset and sugammadex 4 mg/kg
+reversal faster than published, phenylephrine wearing off more slowly than "about
 5 min", the closed-loop pressor-test baroreflex slope about half the awake human value. Each scenario's debrief lists
 what it simplifies.

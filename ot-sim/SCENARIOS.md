@@ -25,7 +25,7 @@ adrenaline doses with an arterial line); airway by DAS 2025 (details from DAS's 
 of Anaesthetists 2024 blood components guideline; malignant hyperthermia 2.5 mg/kg dantrolene then 1 mg/kg every 5 min
 to the QRH end points (Dantrium 20 mg vials assumed: no dantrolene product is on the HSA register); local anaesthetic
 toxicity by the QRH 2023 lipid regimen; needle decompression in the 4th/5th intercostal space just anterior to the
-mid-axillary line (ATLS 10). Metaraminol is off by default (not on the HSA register).
+mid-axillary line (ATLS 10 [U: not open]). Metaraminol is off by default (not on the HSA register).
 
 ## Scenario module format
 
@@ -40,7 +40,8 @@ export default {
   start: { preset: 'maintenance', agent: 'sevoflurane', minutesIn: 10, device: 'ETT' },
   steps: [                                   // what happens to the patient, in model terms (MODEL.md section 11)
     { id: 'ask', at: 30, say: 'Surgeon: "Can we have the antibiotic?"' },
-    { id: 'trigger', when: { type: 'bolus', drug: 'cefazolin' }, orAt: 90, autoGive: { drug: 'cefazolin', dose: 2, unit: 'g' } },
+    { id: 'trigger', when: { type: 'bolus', drug: 'cefazolin' }, orAt: 90,
+      autoGive: { type: 'bolus', drug: 'cefazolin', dose: 2, unit: 'g', route: 'iv' } },
     { id: 'onset', after: 'trigger', delay: 90, cond: 'anaphylaxis', set: { level: 0.8, rise: 120 } },
   ],
   recognisable: { after: 'onset', when: 'first alarm or MAP 20% below baseline' },
@@ -61,7 +62,8 @@ export default {
   from there, not from the hidden onset.
 - A trigger the trainee is expected to perform (giving the antibiotic) has an `orAt` time and an `autoGive`, so the
   untreated course still runs if the trainee never gives it.
-- Matching is generous (dose ranges, any listed route) and order-free unless `after` is given; the debrief shows what
+- Matchers compare after converting the action's dose to the pattern's unit (1 mg matches 1000 mcg). Matching is
+  generous (dose ranges, any listed route) and order-free unless `after` is given; the debrief shows what
   was done, when, and what was expected, never a score (`NOTES.md`: teach, don't test).
 - Start presets (`DESIGN.md`, "Start presets"): `awake`, `preoxygenated`, `sedation`, `induced`, `maintenance`,
   `emergence`, with parameters (device, agent or TIVA, minutes in, surgery type, relaxant timing).
@@ -161,7 +163,7 @@ export default {
 - **Patient:** 60-year-old man, 75 kg, 172 cm, open abdominal surgery. **Start:** `maintenance` (sevoflurane, ETT, 30
   min in); a vessel injury at minute 2 bleeds 150–300 mL/min [D].
 - **Reference timeline** [D]: the surgeon is told within 2 min, packing halves the rate, control at about 10 min;
-  intended loss before control 1.5–2 L (class III); the correct course's lowest MAP stays above a stated floor at both
+  intended loss before control about 0.8–1.8 L across the rate range (class II–III); the correct course's lowest MAP stays above a stated floor at both
   ends of the rate range (tested).
 - **Model:** the `haemorrhage` bleed rate (`MODEL.md` section 5): HR up, pulse pressure narrower, PPV up, pleth smaller,
   EtCO2 falls, hypotension early under GA; Hb lags until dilution; lactate and base deficit rise; ionised calcium falls
@@ -238,8 +240,8 @@ export default {
 - **Expected:** stop injecting (and any infusion); call for help and the lipid kit within about 30 s [D]; 100% O2,
   airway, avoid hypercapnia; seizures: midazolam 2–4 mg (small propofol doses only if stable); lipid 20% 1.5 mL/kg over
   2–3 min (about 80 mL here) within about 2–3 min of serious toxicity [D], then 15 mL/kg/h; if still unstable repeat the
-  bolus at 5 and 10 min **and** double the infusion to 30 mL/kg/h after 5 min (QRH 3-10; ASRA 2020 allows repeat or
-  double, so the matcher accepts either and the debrief cites the default); maximum 12 mL/kg; in arrest, adrenaline
+  bolus at 5 and 10 min **and** double the infusion to 30 mL/kg/h after 5 min (QRH 3-10; ASRA 2020 likewise does
+  both): the matcher expects both, and one alone is noted as incomplete; maximum 12 mL/kg; in arrest, adrenaline
   ≤ 1 mcg/kg, no vasopressin, no lidocaine, prolonged CPR, call for ECMO.
 - **Wrong:** standard 1 mg adrenaline; vasopressin; lidocaine for VT; β-blocker or calcium channel blocker; propofol as
   the "lipid"; a large propofol dose for seizures in an unstable patient; lipid only after arrest; over 12 mL/kg.
@@ -260,7 +262,7 @@ export default {
 - **Expected:** 100% O2, call for help, hand-ventilate to feel the pressure; quick exclusions (tube depth and breath
   sounds for endobronchial placement, suction catheter for a blocked tube, brief disconnection for auto-PEEP); if
   unstable, decompress without waiting for imaging within 1–2 min of suspicion [D]: 4th/5th intercostal space just
-  anterior to the mid-axillary line (needle 14–16 G, or finger thoracostomy in a ventilated adult, which observational
+  anterior to the mid-axillary line [U: ATLS 10, not open] (needle 14–16 G, or finger thoracostomy in a ventilated adult, which observational
   data and the WSES-AAST 2025 guideline favour because needles kink or fall short [S]); chest drain within about 10–15
   min [D]; lower Vt and PEEP; stop N2O.
 - **Wrong:** waiting for a chest X-ray; treating it as bronchospasm or with pressors only; raising PEEP or Vt; the wrong
@@ -283,7 +285,7 @@ export default {
 - **Expected (arrest):** declare it and note the time; compressions within 10 s of pulselessness, or of SBP staying under
   50 mmHg (RCUK/ERC 2025) [time D]; first shock within 2 min (aim under 1 min for monitored VF) [D]; pauses under 5 s
   [D]; adrenaline 1 mg every 3–5 min, given early (SRFAC 2021: not tied to a shock number; ERC after the 3rd shock and
-  AHA after the 2nd are configurable alternatives); with an arterial line start with 50–100 mcg (RCUK 2025); amiodarone
+  AHA after the 2nd [U for 2025] are configurable alternatives); with an arterial line start with 50–100 mcg (RCUK 2025); amiodarone
   300 mg then 150 mg for VF after 3 shocks (SRFAC); turn the anaesthetic off, 100% O2, 500 mL fluid; the 4 Hs and 4 Ts
   plus theatre causes (vagal, drug error, LAST, anaphylaxis, bleeding, embolism, tamponade, tension pneumothorax,
   auto-PEEP, high spinal, MH); use EtCO2 and the arterial line to guide CPR (typical compressions about 10–20 mmHg,
@@ -328,8 +330,9 @@ export default {
 - **Expected:** quantitative TOF at the adductor pollicis before reversal and before extubation; reverse by depth:
   sugammadex 2 mg/kg at TOF count ≥ 2, 4 mg/kg at PTC 1–2, 16 mg/kg for immediate reversal; neostigmine 40–50 mcg/kg
   (never over 5 mg) with glycopyrrolate about 10 mcg/kg (0.2 mg per 1 mg neostigmine; or atropine 15–20 mcg/kg) only at
-  minimal block: TOFR ≥ 0.4 (ASA 2023) or > 0.2 (ESAIC 2023), peak effect about 5 min later (Heier 2002); extubate at
-  TOFR ≥ 0.9; recheck within 2–3 min of sugammadex [D]; if extubated and weak: O2, airway support, measure, sugammadex,
+  minimal block: TOFR ≥ 0.4 (ASA 2023) or > 0.2 (ESAIC 2023), peak effect 5–10 min later (about 5 min in Heier 2002;
+  7–10 min in clinical teaching), so wait and measure; extubate at TOFR ≥ 0.9 (ASA 2023: at least 10 min after
+  neostigmine if only qualitative monitoring is available); recheck within 2–3 min of sugammadex [D]; if extubated and weak: O2, airway support, measure, sugammadex,
   reassure, reintubate if needed.
 - **Wrong:** extubating on clinical signs or time since the dose; neostigmine at deep block; neostigmine over 5 mg or
   without an anticholinergic; under-dosed sugammadex (recurarisation); sugammadex for atracurium; monitoring at the eye.

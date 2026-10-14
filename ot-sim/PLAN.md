@@ -23,7 +23,8 @@ record the choice in the decisions log, go on.
 BP, SpO2, RR, EtCO2, temperature as plain numbers; monitor page with ECG, pleth, capnogram and numerics drawn on canvas;
 speed control (1x, 5x, 20x, pause); model test proving same seed gives identical run at 1x and 20x.
 
-**M1 - Pharmacology.** Compartmental PK with effect-site (Ce) for propofol (Marsh and Schnider), remifentanil (Minto),
+**M1 - Pharmacology.** (`DESIGN.md` moves volatile uptake, the haemodynamic effects and breathing to M2, where the
+circulation and lungs exist; its PR table rules.) Compartmental PK with effect-site (Ce) for propofol (Marsh and Schnider), remifentanil (Minto),
 fentanyl, rocuronium and suxamethonium (simple), plus volatile uptake (sevoflurane, desflurane; FA/FI approach with
 age-adjusted MAC). Hill-curve PD for hypnosis (BIS-like index, reuse the idea from `bis-dsa/app.js`), analgesia, MAP/HR
 effect, respiratory depression, neuromuscular block (TOF count). Controls: boluses, infusions, TCI-style target,

@@ -975,7 +975,7 @@ Cardiac arrest:
 | | ERC 2021/2025 [V] | AHA 2020/2025 [U/S] | SRFAC 2021 [V/U] |
 |---|---|---|---|
 | Adrenaline, non-shockable | 1 mg **as soon as possible**, then every 3–5 min | 1 mg as soon as feasible, then every 3–5 min | 1 mg every 3–5 min; text stresses **early adrenaline** |
-| Adrenaline, VF/pVT | **After the 3rd shock** | After initial shocks fail (algorithm: **after the 2nd shock**) [U for 2025] | Exact shock number **not verified**. The 2006 SG guideline gave it after the 1st failed shock [S] |
+| Adrenaline, VF/pVT | **After the 3rd shock** | After initial shocks fail (algorithm: **after the 2nd shock**) [U for 2025] | Not tied to a shock number: one 2-min loop with drugs in a side box (adrenaline 1 mg every 3–5 min, early; amiodarone 300 mg then 150 mg for VF after 3 or more shocks) [V: text and Fig. 1 read in the source check, PMC8804484] |
 | Antiarrhythmic | Amiodarone **300 mg after 3 shocks, 150 mg after 5**; or lidocaine 100 mg (+50 mg) | Amiodarone 300 / 150 mg, or lidocaine 1–1.5 then 0.5–0.75 mg/kg | Amiodarone 300 then 150 mg (after ≥ 3 shocks); lidocaine 1–1.5 then 0.5–0.75 mg/kg |
 | Defibrillation | Biphasic ≥ 150 J first; up to 3 stacked shocks in monitored settings (cath lab, cardiac surgery) | Manufacturer dose (120–200 J) | Manufacturer dose; 150 J biphasic if unknown; single-shock strategy; double sequential defibrillation not recommended |
 | CPR monitoring | Waveform capnography; physiology-guided targets **DBP ≥ 30 mmHg** and **EtCO2 ≥ 25 mmHg (3.3 kPa)**; low EtCO2 alone never decides termination | EtCO2 low or falling: improve CPR; Stanford uses **EtCO2 > 10 mmHg and DBP > 20 mmHg** | Waveform capnography; no numeric target given |
@@ -1232,8 +1232,9 @@ doses as labelled.
 2. **First adrenaline in VF/pVT:**
    - ERC: after the 3rd shock;
    - AHA: after initial shocks fail (2nd shock in the algorithm);
-   - SRFAC 2021 stresses early adrenaline, but **the shock number is unverified**.
-   - Make it configurable, and verify against the SRFAC 2021 figure.
+   - SRFAC 2021 does not tie it to a shock number: adrenaline every 3–5 min, early (checked against Fig. 1 later in the
+     planning session).
+   - Default SRFAC; ERC and AHA timings configurable.
 3. **Adrenaline in arrest when an arterial line is in place:** RCUK/ERC 2025 now suggest 50–100 µg first; ALS
    otherwise uses 1 mg; NAP7 found 1 mg was usual. Teaching default: the theatre layer with small doses.
 4. **EtCO2 targets in CPR:** ERC 2025 physiology-guided ≥ 25 mmHg with DBP ≥ 30 mmHg; Stanford > 10 mmHg with

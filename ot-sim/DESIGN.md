@@ -21,7 +21,7 @@ questions are at the end, each with the default a build session uses if there is
   model (anaphylaxis lowers vascular tone, narrows the airways and leaks fluid), and the trainee's drugs act on the same
   model, so a sensible unscripted response works and a wrong one has consequences.
 - **The build:** 7 milestones (M0 skeleton and monitor, M1 drugs, M2 heart, lungs and ventilator, M3 a whole elective
-  GA, M4 the crisis engine and 12 scenarios, M5 debrief, M6 sound and polish) as about 35 small PRs, each tested and
+  GA, M4 the crisis engine and 12 scenarios, M5 debrief, M6 sound and polish) as about 30 small PRs, each tested and
   merged before the next. The first thing a resident can use is the end of M3; the first crisis is the first scenario
   PR of M4.
 - **Changes from the brief:** the Marsh example test is corrected (it mixed two versions of the model); waveforms are
@@ -98,9 +98,11 @@ step and no dependencies (`NOTES.md`). Each module stays under about 400 lines s
   temperature -> resus -> monitor -> log. Every subsystem reads **the previous step's** values of the others from a
   frozen copy taken at the start of the step and writes only its own slice (a Jacobi step: the order changes nothing,
   so no hidden lag depends on where a subsystem sits). The few loops that must close within a step are solved inside
-  one subsystem (the atrial pressures inside `cardio.js`; the sugammadex binding inside `pk.js`).
-- **Stability.** The fastest stepped time constants are about 1.4–1.5 s (the arterial compartment and the vagal limb
-  of the baroreflex), so dt/τ is at most about 0.07; everything else is slower (effect sites are minutes). Explicit
+  one subsystem (the atrial pressures inside `cardio.js`; the sugammadex binding inside `pk.js`). Exception for events:
+  `rhythm.js` and `resp.js` know their next event times ahead, so they publish the events falling in the *coming* step,
+  and `cardio.js` and `gas.js` read them for the step they integrate (splitting it at beat times).
+- **Stability.** The fastest stepped time constants are about 1.1–1.5 s (the pulmonary compartment, the arterial
+  compartment and the vagal limb of the baroreflex), so dt/τ is at most about 0.09; everything else is slower (effect sites are minutes). Explicit
   Euler is accurate there: the prototypes matched 0.01 s steps to 0.0002 (volatile uptake), 2–3 decimals (all drugs)
   and 0.64 mmHg (circulation during bleeding with positive-pressure ventilation). Within-breath mechanics (pressure and
   flow during one breath) use the closed-form ventilator formulas, not steps; beats and breaths are events with exact
@@ -169,7 +171,7 @@ shape drives the UI, the scenario triggers and expected actions, the tests and r
 
 Scenario matchers are patterns over these keys, with a range allowed in place of a number
 (`{ type: 'bolus', drug: 'adrenaline', route: 'iv', unit: 'mcg', dose: [10, 200] }`). Doses are stored in the unit
-given and converted by `drugs.js`.
+given and converted by `drugs.js`; matchers compare after converting to the pattern's unit.
 
 ### Start presets
 
@@ -277,10 +279,10 @@ what it models, so every model PR is usable and testable in the browser.
 |---|---|---|---|
 | M0.1 | Model loop | `rng.js`, `fmath.js`, `sim.js` (state rules, Jacobi step, action queue, event ring, log, snapshot and restore), `patient.js` (covariates, default patient), a placeholder patient with steady vitals and small seeded noise | Determinism (1x vs 200-step chunks, replay), snapshot and restore, `fmath` accuracy and golden bits, the ban check, covariates against worked examples (MODEL.md section 1) |
 | M0.2 | First monitor | Theatre shell, hash routing, `?seed`, `?test`, `loop.js`, `lanes.js` with history refill, `synth.js` (sinus ECG, pleth, capnogram), `monitor.js` (averaging, display), `numerics.js`, speed keys, fonts, the old-address forward | e2e: lanes draw and refill after pause, numerics present, speed keys, axe, 3x density, forward script inert on the subdomain |
-| M1.1 | IV PK | `pk.js` (compartments, effect sites, bolus, infusion), `drugs.js`: propofol (Schnider; Eleveld for BMI over 35/42), remifentanil (Minto), fentanyl, alfentanil, midazolam, ketamine, between-patient PK variation | MODEL.md section 2 PK targets |
+| M1.1 | IV PK | `pk.js` (compartments, effect sites, bolus, infusion), `drugs.js`: propofol (Schnider, covariates capped at the James LBM peak above BMI 35 women / 42 men), remifentanil (Minto), fentanyl, alfentanil, midazolam, ketamine, between-patient PK variation | MODEL.md section 2 PK targets |
 | M1.2 | Pump and TCI | Syringe pump with its own predicted model (Marsh 1.2 and 0.26, Schnider, Minto), plasma and effect-site TCI, maximum rate, step-down by stopping; Drugs tab (boluses, infusions, TCI) and "Behind the monitor" | Effect-site target 4 mcg/mL reached about 1.3 min, plasma overshoot reported; 10 s and 1 s updates agree; e2e: give propofol, Ce rises |
 | M1.3 | Neuromuscular block | Rocuronium (directional effect site), suxamethonium (retuned), sugammadex (equilibrium binding), neostigmine with glycopyrrolate; thumb, diaphragm, upper-airway and laryngeal sites; TOF count, TOFR, PTC; TOF on the monitor | Label onset and duration; sugammadex reversal times; suxamethonium 7.1 / 10.9 min; dt invariance of the binding |
-| M1.4 | Hypnosis and stimulus | `pd.js`: one hypnosis rule (asleep or not, age-scaled), BIS-like index, the stimulus surface (age-scaled, volatile term tied to MAC), movement, autonomic drive `pd.auto` (0–1), one per-patient sensitivity quantile | Schnider LOC C50 by age; P_TOL 0.9 isobole; BIS-like table; sevoflurane 1 MAC gives no movement at incision in half (once M2.4 lands) |
+| M1.4 | Hypnosis and stimulus | `pd.js`: one hypnosis rule (asleep or not, age-scaled), BIS-like index, the stimulus surface (age-scaled, volatile term tied to MAC), movement, autonomic drive `pd.auto` (0–1), one per-patient sensitivity quantile | Schnider LOC C50 by age; P_TOL 0.9 isobole; BIS-like table; sevoflurane 1 MAC gives no movement at incision in half (once M2.5 lands) |
 | M2.1 | Circulation | `cardio.js` (compartments, venous return, atrial solve, stroke volume, critical closing pressure, baroreflex with age-solved gains, empty-ventricle decompensation), `rhythm.js` sinus only, propofol and remifentanil drives, `pd.auto` into sympathetic drive, NIBP cycle | Steady state; volume drift; dt check; baroreflex slope; propofol induction SBP; laryngoscopy response at P_TOL 0.9 |
 | M2.2 | Fluids and bleeding | Crystalloid and colloid kinetics as flows, blood products, Hb and red-cell mass, haemorrhage; Circulation tab (fluids, blood) | Haemorrhage tables awake and under GA; 1 L crystalloid Hb target |
 | M2.3 | Vasoactive drugs | Receptor-effect model: phenylephrine, ephedrine, noradrenaline, adrenaline, vasopressin, atropine, glycopyrrolate, esmolol, labetalol, GTN; metaraminol (off by default) | Bolus effect size and duration per drug (MODEL.md section 5) |
@@ -294,7 +296,7 @@ what it models, so every model PR is usable and testable in the browser.
 | M3.3 | Alarms | `monitor.js` limits, priorities, silence, technical alarms, alarm entries in the log; Log tab | Alarm onset times identical at 1x and 20x |
 | M4.0 | Scenario drugs | The drugs and products the crises need (MODEL.md section 12): glucagon, salbutamol, magnesium, amiodarone, calcium, insulin with glucose, bicarbonate, tranexamic acid, FFP, platelets, cryoprecipitate, dantrolene, lipid emulsion, cefazolin and other triggers, steroid and antihistamine (as "wrong first" choices) | Each drug's effect on its target and its timing |
 | M4.1 | Crisis engine + scenario 1 | `conditions.js`, `events.js`, scenario format, expected-action matching, `?case` and `?at`; hypotension after induction | Three courses for scenario 1; deep link screenshot |
-| M4.2-M4.7 | Scenarios 2-12 | Two per PR (the last PR has one), in the `PLAN.md` order unless the owner reorders; each adds its condition from MODEL.md section 11 | Three courses each |
+| M4.2-M4.7 | Scenarios 2-12 | Two per PR (the last PR has one), in the `PLAN.md` order unless the owner reorders; each adds its condition from MODEL.md section 11; the LAST PR starts with the local anaesthetic PK research step (MODEL.md section 2 gap) | Three courses each |
 | M5.1 | Debrief | Timeline, actions vs expected, time to treatment, teaching points with sources | e2e: debrief after scenario 1 |
 | M5.2 | Hints, rewind, share | Hint ladder (off by default), rewind to a snapshot, share a run as a relative link | Replay equality from a link |
 | M6.1 | Sound | SpO2 tone, alarm tones (off by default) | e2e: no audio until turned on |
@@ -346,7 +348,7 @@ subsystem (M1.4 runs before the circulation exists, so `pd.auto` is tested on it
    about 280 mL, haematocrit about 0.6"). Default: common dilutions, labelled as such.
 7. **Sevoflurane MAC at age 40.** 1.80% (Mapleson's pooled value; Japanese adults 1.68–1.71%, the closest data to a
    mostly Chinese population; no Singapore study found) or 2.05% (US label)? Default 1.80%, changed from the first draft.
-8. **Fentanyl effect-site speed.** ke0 0.147/min (time to peak 3.2 min) or 0.12 (closer to the published 3.6 min)?
+8. **Fentanyl effect-site speed.** ke0 0.147/min (time to peak 3.2 min) or 0.117 (time to peak 3.6 min, as published)?
    Default 0.147, flagged.
 9. **Scenario order.** Default: the `PLAN.md` order.
 10. **Scores.** None by default (teach, don't test): the debrief shows what was done and when, not a mark. Keep?

@@ -308,7 +308,7 @@ PEEP/over-distension, age, COPD, position. EtCO₂ tracks cardiac output when ve
 | Cst, morbidly obese (GA) | lung 55.3 ± 15.3; chest wall 112.4 ± 47.4 mL/cmH₂O (both markedly reduced) | Pelosi 1996 |
 | Airway resistance Rmin,L, normal GA | 1.0 ± 0.8 cmH₂O·L⁻¹·s | Pelosi 1996 |
 | Rmin,L, obese GA | 4.7 ± 3.1 cmH₂O·L⁻¹·s | Pelosi 1996 |
-| ETT resistance (Rohrer K₂, nonlinear term) | 9.0 mm 2.42; 8.5 mm 3.05; 8.0 mm 4.65; 7.5 mm 6.01; 7.0 mm 9.17; 6.5 mm 12.80 cmH₂O·L⁻¹·s | Flevari 2011 (Anaesth Intensive Care 39:410, PMID 21675060) |
+| ETT resistance (Rohrer K₂, nonlinear term) | 9.0 mm 2.42; 8.5 mm 3.05; 8.0 mm 4.65; 7.5 mm 6.01; 7.0 mm 9.17; 6.5 mm 12.80 cmH₂O·L⁻²·s² | Flevari 2011 (Anaesth Intensive Care 39:410, PMID 21675060) |
 
 - A reasonable teaching default: **total respiratory-system compliance ~50–80 mL/cmH₂O under GA** (your figure is
   fine; Westbrook 1973 (J Appl Physiol 34:81, PMID 4697382) first showed the fall in compliance with anaesthesia +
