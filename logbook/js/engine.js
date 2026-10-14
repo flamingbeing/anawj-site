@@ -3,6 +3,7 @@
 
 import { CATEGORIES, BY_CODE, R_YEARS, codeOf, DEFAULT_NAMES } from './categories.js';
 import { KEYWORDS, STOP } from './keywords.js';
+import { labelOf, plainLabels } from './parts.js';
 const STOP_WORDS = new Set(STOP);
 
 // ---------- ids and dates ----------
@@ -340,29 +341,56 @@ function leadingDate(line, now) {
   return { date, rest };
 }
 
+// A suggestion this sure is "confident" (logging.js re-exports it; it lives here so parseBulk can use it
+// without an import cycle).
+export const STRONG = 0.5;
+
 // Cases are separated by blank lines (one or more empty or whitespace-only lines), so a case can span
 // several lines (kept in its details), e.g. "AB 45F" on one line and the procedure on the next.
 // List markers ("1.", "-", "•") are dropped.
 // An optional date at the start of a case's first line sets its date.
 // Leading patient initials are split off as in splitInitials. suggestFn(text) -> [{ code, score }];
-// codes scoring 0.5+ are kept.
-export function parseBulk(text, suggestFn, now = new Date()) {
+// confident codes (STRONG) are kept.
+// opts.labels (Labelled parts on, parts.js; with it off everything above stays exactly as it was):
+// - a bold heading line ("**AB 45F lap chole**", as notes apps write one) starts a case and loses its stars; inside a
+//   case only a wholly bold line does, so a bold word for emphasis ("**Difficult airway** grade 3") stays in its case
+// - a block that starts with a labelled line ("lp: …") after a blank line belongs to the case above, unless the case
+//   above already has that label or the label is dt (case details: a list of "dt: …" blocks is a list of cases)
+// - a bold label ("**Plan:** …") is kept plain ("Plan: …")
+export function parseBulk(text, suggestFn, now = new Date(), { labels = null } = {}) {
   const blocks = [];
-  let cur = null;
+  let cur = null, gap = true;
   for (const raw of String(text || '').split(/\r?\n/)) {
-    const line = raw.replace(/\t+/g, ' ').trim().replace(/^(?:\d{1,2}[.)]|[-•*·])\s+/, '');
-    if (!line) { cur = null; continue; }
+    let line = raw.replace(/\t+/g, ' ').trim().replace(/^(?:\d{1,2}[.)]|[-•*·])\s+/, '');
+    if (!line) { cur = null; gap = true; continue; }
+    const on = !!(labels && labels.length), lab = on ? labelOf(line, labels) : null;
+    const bold = on && !lab ? boldHead(line, !cur) : null;
+    if (bold != null) { cur = null; line = bold; }
+    else if (!cur && gap && lab && blocks.length && lab.label.k !== 'dt') {
+      const above = blocks[blocks.length - 1];
+      if (!above.some(l => labelOf(l, labels)?.label.k === lab.label.k)) cur = above;
+    }
     if (!cur) blocks.push(cur = []);
     cur.push(line);
+    gap = false;
   }
   return blocks.map(([first, ...more]) => {
     const ld = leadingDate(first, now);
-    const whole = [(ld ? ld.rest : first).trim(), ...more].filter(Boolean).join('\n');
+    let whole = [(ld ? ld.rest : first).trim(), ...more].filter(Boolean).join('\n');
+    if (labels && labels.length) whole = plainLabels(whole, labels);
     const { initials, details } = splitInitials(whole);
     const sugg = typeof suggestFn === 'function' && details ? suggestFn(details) || [] : [];
-    const cats = withParents(sugg.filter(s => s.score >= 0.5).map(s => s.code));
+    const cats = withParents(sugg.filter(s => s.score >= STRONG).map(s => s.code));
     return { date: ld ? ld.date : null, initials, details, cats };
   });
+}
+// "**AB 45F lap chole**" (or __…__) -> the line without the stars; null when the line doesn't start bold, or the bold
+// is a label ("**Plan:** …", "**Plan**: …"). first: a case's first line, where text may follow the bold; elsewhere
+// the whole line must be bold
+function boldHead(line, first) {
+  const m = /^(\*\*|__)(.+?)\1(.*)$/.exec(line);
+  if (!m || /:\s*$/.test(m[2]) || /^\s*:/.test(m[3]) || (!first && m[3].trim())) return null;
+  return (m[2].trim() + (m[3].trim() ? ' ' + m[3].trim() : '')).trim();
 }
 
 // ---------- search helpers (Logbook) ----------

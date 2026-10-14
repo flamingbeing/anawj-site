@@ -3,11 +3,14 @@
 // account or share a setup with a colleague. Never cases, reflections or portfolio details. Pure, tested.
 
 import { cleanTagSet } from './tags.js';
-import { cleanTemplate } from './demo-backend.js';
+import { cleanTemplate } from './clean.js';
 import { cleanFormat } from './share-format.js';
 import { storedMarkdown } from './markdown.js';
 import { cleanExportOpts } from './export-opts.js';
 import { cleanDestinations } from './destinations.js';
+import { SWITCH_KEYS } from './profiles.js';
+import { cleanSync } from './sync-md.js';
+import { cleanLabels, cleanCaseTemplate } from './parts.js';
 
 export const SETTINGS_KIND = 'apmes-logbook-settings';
 // account-specific bookkeeping that shouldn't travel with the file (your residency year is yours, not a colleague's)
@@ -22,18 +25,26 @@ const OBJECTS = {
   markdown: v => { try { return storedMarkdown(v); } catch { return null; } },
   excelExport: v => cleanExportOpts(v),
   destinations: v => cleanDestinations(v),
+  sync: v => cleanSync(v),   // where to sync (Settings → Sync); tokens are never in settings
+  partLabels: v => (v == null ? null : cleanLabels(v)),
+  caseTpl: v => (v == null ? null : cleanCaseTemplate(v)),
   catOrder: strs,
   caseHide: v => strs(v).slice(0, 20),
   basicOn: v => strs(v).slice(0, 30),
+  // the profile switches (profiles.js): known keys, true or false
+  show: v => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([k, x]) => SWITCH_KEYS.includes(k) || /^case:[a-z]{1,20}$/.test(k)).filter(([, x]) => typeof x === 'boolean')) : null),
   tabOrder: v => strs(v).slice(0, 10),
   tabHidden: v => strs(v).slice(0, 10),
   subcats: v => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).slice(0, 100).map(([k, x]) => [String(k).slice(0, 10), strs(x)])) : {}),
   savedSearches: v => (Array.isArray(v) ? v : []).filter(x => x && typeof x === 'object' && !Array.isArray(x) && typeof x.name === 'string').slice(0, 20)
     .map(x => ({ id: str(x.id, 20) || Math.random().toString(36).slice(2, 8), name: str(x.name, 40), q: str(x.q), has: strs(x.has), not: strs(x.not), from: str(x.from, 10), to: str(x.to, 10), flag: str(x.flag, 20), scope: str(x.scope, 20) || 'all' })),
 };
-const PLAIN = new Set(['accent', 'boxLines', 'catView', 'compact', 'compactTags', 'defaultDate', 'detectAgeSex', 'firstField', 'enterMode', 'enterSaves', 'hideTips', 'lbCase', 'lbFuzzy', 'lbScope', 'logbookView',
+const PLAIN = new Set(['dayNoteOnCase', 'pasteClean', 'shareAsk', 'noteToolbar', 'accent', 'boxLines', 'catView', 'compact', 'compactTags', 'defaultDate', 'detectAgeSex', 'firstField', 'enterMode', 'enterSaves', 'hideTips', 'lbCase', 'lbFuzzy', 'lbScope', 'logbookView',
   'reflExport', 'reflNotes', 'searchOps', 'startTab', 'suggestions', 'tagEditorView', 'textSize', 'zoom', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'autoFocus', 'appTitle', 'weeklyDigest',
-  'basic', 'mode', 'weekStart', 'afterSave', 'undoSecs', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'borders', 'reflPoints', 'round', 'shadows', 'bigTaps', 'swipeTabs', 'rowMenu', 'reflToolbar']);
+  'basic', 'mode', 'weekStart', 'afterSave', 'undoSecs', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'borders', 'reflPoints', 'round', 'shadows', 'bigTaps', 'swipeTabs', 'rowMenu', 'reflToolbar', 'autoTick', 'recentCount',
+  // device keys added later (they were dropped on import until 13 Oct 2026; settings-file.test.mjs checks DISPLAY_KEYS)
+  'rowCopy', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy', 'hideTabsTyping',
+  'labelParts', 'caseTplOn']);
 const MAX_JSON = 400 * 1024;
 
 export function settingsFile(logbook, { theme } = {}) {

@@ -1,7 +1,8 @@
 // Firestore rules checks against the local emulator (fake accounts only). Not run by plain node:
 // needs firebase-tools, @firebase/rules-unit-testing and firebase; see logbook/README.md, "Tests".
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, deleteDoc, getDocs, collection, query, where, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, getDocs, collection, query, where, writeBatch, FieldPath } from 'firebase/firestore';
+import { mergePaths } from '../js/profiles.js';
 import fs from 'node:fs';
 const env = await initializeTestEnvironment({ projectId: 'demo-logbook', firestore: { rules: fs.readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8085 } });
 const as = (email, verified = true) => env.authenticatedContext(email, { email, email_verified: verified }).firestore();
@@ -22,6 +23,18 @@ const c = id => ({ id, date: '2026-01-02', details: 'AB 5yo tonsil', cats: ['10'
 const a = as(A), b = as(B), adm = as(ADMIN), own = as(OWNER), anon = env.unauthenticatedContext().firestore(), unv = as(A, false);
 const AU = as('Alice@Example.com');
 await t('own logbook create', assertSucceeds(setDoc(doc(a, 'logbooks', A), { email: A, name: 'A', rid: null, settings: {}, templates: [], updatedAt: 1 })));
+// the app's settings write (cloud.saveLogbook): a settings map replaced whole, `show` merged key by key
+{
+  const save = patch => { const d = { ...patch, email: A, updatedAt: Date.now() }; return setDoc(doc(a, 'logbooks', A), d, { mergeFields: mergePaths(d).map(p => new FieldPath(...p)) }); };
+  await t('settings write: markdown replaced, show merged', (async () => {
+    await save({ settings: { markdown: { dayTpl: 'CUSTOM', caseLine: 'X' }, show: { grid: false } } });
+    await save({ settings: { markdown: { caseLine: 'Y' }, show: { analytics: false } } });
+    const st = (await getDoc(doc(a, 'logbooks', A))).data().settings;
+    if (JSON.stringify(st.markdown) !== JSON.stringify({ caseLine: 'Y' })) throw new Error('markdown kept old keys: ' + JSON.stringify(st.markdown));
+    if (st.show.grid !== false || st.show.analytics !== false) throw new Error('show not merged: ' + JSON.stringify(st.show));
+    await save({ settings: { markdown: null, show: null } });
+  })());
+}
 await t('mixed-case token email ok', assertSucceeds(getDoc(doc(AU, 'logbooks', A))));
 await t('other logbook read', assertFails(getDoc(doc(b, 'logbooks', A))));
 await t('other logbook write', assertFails(setDoc(doc(b, 'logbooks', A), { email: A })));

@@ -48,6 +48,15 @@ test('duplicate tabs clone reload draft but own independent storage keys', () =>
   const a=createDraftSlot('draft','a',storage,session);a.save({details:'A'});const b=createDraftSlot('draft','a',storage,session);assert.equal(b.initial.details,'A');b.save({details:'B'});a.save({details:'AA'});assert.notEqual(a.key,b.key);assert.equal(JSON.parse(m.get(b.key)).details,'B');
 });
 
+test('a reload takes the draft slot over instead of leaving a copy behind; a duplicated tab leaves it', () => {
+  const m=new Map(),sm=new Map();const storage={getItem:k=>m.has(k)?m.get(k):null,setItem:(k,v)=>m.set(k,v),removeItem:k=>m.delete(k)},session={getItem:k=>sm.get(k)||null,setItem:(k,v)=>sm.set(k,v)};
+  const drafts=()=>[...m.keys()].filter(k=>k.startsWith('draft:a:'));
+  let s=createDraftSlot('draft','a',storage,session,{move:true});s.save({details:'QQ stale'});
+  for(let i=0;i<5;i++){s.release();s=createDraftSlot('draft','a',storage,session,{move:true});}
+  assert.equal(drafts().length,1);assert.equal(s.initial.details,'QQ stale');
+  // not released (still open in another tab): the copy and the original both stay
+  const dup=createDraftSlot('draft','a',storage,session,{move:true});assert.equal(dup.initial.details,'QQ stale');assert.equal(drafts().length,2);
+});
 test('edits arriving during an in-flight write drain without an online event or manual flush', async () => {
   const f=fixture();let finish,started;const called=new Promise(r=>started=r),first={id:'1',details:'one'},second={...first,details:'two'};
   const backend=f.config.backend;let calls=0;f.config.backend=async (...args)=>{if(++calls===1){started();await new Promise(r=>finish=r);}return backend(...args);};
@@ -68,4 +77,12 @@ test('canonical offline versions do not conflict when the backend removes empty/
  const q=createWriteQueue(f.config);const first=await q.save('case','a',{id:'normal',details:'one',tags:[],reflectTag:false});
  assert.equal(first.tags,undefined);assert.equal(first.reflectTag,undefined);
  await q.save('case','a',{...first,details:'two'},first);f.online(true);assert.equal(await q.flush(),true);assert.equal(f.remote.get('normal').details,'two');
+});
+
+test('sign-out check sees another tab’s unsynced change in the shared store', async () => {
+  // two tabs (or the browser and the home-screen app) share the recovery store: tab B saves offline
+  const f=fixture();f.online(false);const A=createWriteQueue(f.config),B=createWriteQueue(f.config);
+  await A.activate('a');await B.save('case','a',{id:'tabB',details:'Fake case from tab B'});
+  assert.equal(await A.flush(50),false,'not synced yet: the sign-out prompt shows');
+  f.online(true);assert.equal(await B.flush(),true);assert.equal(await A.flush(50),true,'once B has synced it');
 });

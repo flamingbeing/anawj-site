@@ -29,9 +29,9 @@
   })();
 </script>
 <script>
-  // back from Google or Dropbox after a Save to Drive / Dropbox sign-in (cloud-save.js): keep the answer for the
-  // app (it finishes the save after sign-in) and tidy the address back to the Backup page
-  try { var cq = new URLSearchParams(location.search), cf = new URLSearchParams(location.hash.slice(1)); if (/^dbx-/.test(cq.get('state') || '') || /^gdr-/.test(cf.get('state') || '')) { sessionStorage.setItem('apmes-logbook-cloud-return', JSON.stringify({ search: location.search, hash: location.hash })); var cp = JSON.parse(localStorage.getItem('apmes-logbook-cloud-pending') || '{}') || {}; history.replaceState(null, '', location.pathname + (cp.demo ? '?demo' : '') + '#data'); } } catch (e) {}
+  // back from Google or Dropbox after a Save to Drive / Dropbox or Sync sign-in (cloud-save.js): keep the answer for
+  // the app (it finishes the save after sign-in) and tidy the address back to the Backup page (or the page Sync left)
+  try { var cq = new URLSearchParams(location.search), cf = new URLSearchParams(location.hash.slice(1)); if (/^dbx-/.test(cq.get('state') || '') || /^gdr-/.test(cf.get('state') || '')) { sessionStorage.setItem('apmes-logbook-cloud-return', JSON.stringify({ search: location.search, hash: location.hash })); var cp = JSON.parse(localStorage.getItem('apmes-logbook-cloud-pending') || '{}') || {}; history.replaceState(null, '', location.pathname + (cp.demo ? '?demo' : '') + '#' + (/^[a-z]{1,20}$/.test(cp.back || '') ? cp.back : 'data')); } } catch (e) {}
   // this device's display choices that change the layout, before the first paint (ui-settings.js applyLook)
   try { var dd = JSON.parse(localStorage.getItem('apmes-logbook-display') || '{}') || {}, dc = document.documentElement.classList; if (dd.lineWidth === 'narrow' || dd.lineWidth === 'wide' || dd.lineWidth === 'full') dc.add('lw-' + dd.lineWidth); dc.add(dd.contrast === 'high' ? 'hc' : dd.contrast === 'normal' ? 'hc-off' : 'hc-auto'); dc.add(dd.motion === 'reduce' ? 'rm' : dd.motion === 'full' ? 'rm-off' : 'rm-auto'); if (dd.tabIcons) dc.add('tab-icons'); if (dd.tabBar === 'top' || dd.tabBar === 'bottom') dc.add('tabs-' + dd.tabBar); if (dd.hideHeader) dc.add('no-header', 'who-alert'); if (dd.caseInverted) dc.add('case-inverted'); if (dd.autoFocus === false) dc.add('no-autofocus'); if (dd.lineHeight) document.documentElement.style.setProperty('--lh', dd.lineHeight); if ([0, 1, 2, 3].indexOf(dd.borders) >= 0) { dc.add('edges'); if (dd.borders <= 1) dc.add('edges-fill'); document.documentElement.style.setProperty('--edge-mix', [0, 25, 50, 75][dd.borders] + '%'); } if ([0, 1, 3].indexOf(dd.round) >= 0) document.documentElement.style.setProperty('--round', String([0, 0.5, 1, 1.7][dd.round])); if (dd.shadows !== false) dc.add('shadows'); if (dd.bigTaps) dc.add('big-taps'); } catch (e) {}
   // this device's theme before the first paint (Settings → Display → Theme; light unless chosen)
@@ -40,7 +40,8 @@
   try { var css = localStorage.getItem('apmes-logbook-accent-css'); if (css && css.length < 8000) { var st = document.createElement('style'); st.id = 'accent-css'; st.textContent = css; document.head.appendChild(st); } } catch (e) {}
 </script>
 <link rel="stylesheet" href="style.css">
-<!-- fetch every module and the Firebase SDK at once instead of one import at a time -->
+<!-- fetch the Case tab's modules at once instead of one import at a time (the other pages load on first use, app.js);
+     then the Firebase SDK, or in the demo its stand-in instead -->
 <link rel="modulepreload" href="js/app.js">
 <link rel="modulepreload" href="js/ui-core.js">
 <link rel="modulepreload" href="js/categories.js">
@@ -48,27 +49,46 @@
 <link rel="modulepreload" href="js/keywords.js">
 <link rel="modulepreload" href="js/cloud.js">
 <link rel="modulepreload" href="js/firebase-config.js">
-<link rel="modulepreload" href="js/demo-backend.js">
+<link rel="modulepreload" href="js/clean.js">
 <link rel="modulepreload" href="js/reflections.js">
 <link rel="modulepreload" href="js/profile.js">
 <link rel="modulepreload" href="js/ui-log.js">
 <link rel="modulepreload" href="js/suggest.js">
-<link rel="modulepreload" href="js/ui-settings.js">
+<link rel="modulepreload" href="js/display.js">
+<link rel="modulepreload" href="js/ui-notepad.js">
+<link rel="modulepreload" href="js/tags.js">
+<link rel="modulepreload" href="js/sync.js">
+<link rel="modulepreload" href="js/paste-clean.js">
 <link rel="modulepreload" href="js/bin.js">
-<link rel="modulepreload" href="js/ui-logbook.js">
-<link rel="modulepreload" href="js/importer.js">
-<link rel="modulepreload" href="js/xlsxio.js">
-<link rel="modulepreload" href="js/ui-reflect.js">
-<link rel="modulepreload" href="js/portfolio.js">
-<link rel="modulepreload" href="js/ui-progress.js">
-<link rel="modulepreload" href="js/ui-account.js">
-<link rel="modulepreload" href="js/ui-admin.js">
-<link rel="modulepreload" href="js/share.js">
-<link rel="modulepreload" href="js/backup.js">
-<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" crossorigin>
-<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" crossorigin>
-<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" crossorigin>
-<!-- the font loads without holding up the first paint (system font until it arrives) -->
+<link rel="modulepreload" href="js/notepad.js">
+<link rel="modulepreload" href="js/merge3.js">
+<link rel="modulepreload" href="js/profiles.js">
+<link rel="modulepreload" href="js/store.js">
+<link rel="modulepreload" href="js/writes.js">
+<link rel="modulepreload" href="js/colors.js">
+<link rel="modulepreload" href="js/fonts.js">
+<link rel="modulepreload" href="js/logging.js">
+<link rel="modulepreload" href="js/recovery-store.js">
+<link rel="modulepreload" href="js/share-in.js">
+<link rel="modulepreload" href="js/fmt-bar.js">
+<link rel="modulepreload" href="js/navigation.js">
+<link rel="modulepreload" href="js/transients.js">
+<link rel="modulepreload" href="js/custom-css.js">
+<link rel="modulepreload" href="js/drafts.js">
+<link rel="modulepreload" href="js/settings-rows.js">
+<link rel="modulepreload" href="js/more-cards.js">
+<link rel="modulepreload" href="js/sync-forget.js">
+<link rel="modulepreload" href="js/parts.js">
+<link rel="modulepreload" href="js/device-presets.js">
+<link rel="modulepreload" href="js/eval-link.js">
+<script>
+  (function () {
+    var pre = function (href, cors) { var l = document.createElement('link'); l.rel = 'modulepreload'; l.href = href; if (cors) l.crossOrigin = 'anonymous'; document.head.appendChild(l); };
+    if (/[?&]demo\b/.test(location.search)) pre('js/demo-backend.js');   // the demo's stand-in for Firebase (cloud.js)
+    else ['app', 'auth', 'firestore'].forEach(function (f) { pre('https://www.gstatic.com/firebasejs/10.12.2/firebase-' + f + '.js', true); });
+  })();
+</script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">

@@ -23,6 +23,12 @@ const hash = id => async p => { await p.evaluate(h => { location.hash = '#' + h;
 const SCREENS = [
   ['Case', hash('log'), true],
   ['Logbook calendar', hash('logbook'), true],
+  ['Paste a list review', async p => {
+    await p.locator('.datebar button[data-mode="bulk"]').click();
+    await p.locator('textarea.details').fill('AB 30F\nLSCS spinal\n\nCD 40M\nlap chole GA');
+    await p.getByRole('button', { name: 'Review', exact: true }).click();
+    await p.waitForSelector('table.bulk');
+  }, false],
   ['Logbook list', async p => { await hash('logbook')(p); await p.locator('main .seg button', { hasText: /^List$/ }).first().click(); }, false],
   ['Reflections', hash('reflect'), true],
   ['Analytics', hash('progress'), true],
@@ -32,8 +38,12 @@ const SCREENS = [
   ['Settings', hash('settings'), false],
   ['Display', hash('display'), true],
   ['Advanced display', hash('displayadv'), false],
+  ['Accessibility', hash('access'), false],
   ['Logging', hash('logging'), false],
-  ['Profiles or hide items', hash('showhide'), false],
+  ['Profile', hash('showhide'), false],
+  ['Profile dialog', async p => { await hash('showhide')(p); await p.locator('.profile-card input[value=personal]').check(); await p.waitForSelector('dialog[open]'); }, false],
+  // the targets switched off (in memory only: the demo store is shared by the next screens)
+  ['Analytics without targets', async p => { await hash('progress')(p); await p.evaluate(async () => { const { S, hooks } = await import('./js/ui-core.js'); S.logbook.settings = { ...S.logbook.settings, show: { targets: false, totals: false, year: false } }; hooks.render(); }); await p.locator('.an-sec summary', { hasText: 'Tags' }).waitFor(); }, false],
   ['Advanced logging', hash('loggingadv'), false],
   ['Tag editor', hash('tags'), false],
   ['Reflection settings', hash('reflset'), false],
@@ -51,6 +61,28 @@ const SCREENS = [
     await p.evaluate(async () => { const { openSend } = await import('./js/ui-send.js'); openSend({ text: 'Fake day', date: '2026-10-10' }); });
     await p.waitForSelector('dialog[open]');
   }, true],
+  ['Sync', async p => {
+    await hash('sync')(p);
+    await p.getByLabel('Add a place to sync to').selectOption('github');
+    await p.getByLabel('Add a place to sync to').selectOption('drive');
+  }, true],
+  ['Sync run', async p => {
+    await hash('logbook')(p);
+    await p.evaluate(async () => {
+      const { patchLogbook } = await import('./js/ui-core.js');
+      await patchLogbook({ settings: { sync: { targets: [{ id: 'gh1', kind: 'github', owner: 'fake-user', repo: 'fake-notes' }] } } });
+      localStorage.setItem('apmes-logbook-cloud-gh:demo:demo@example.com:gh1', 'FAKE');
+    });
+    // GitHub answers from here, no network: every day is new, every write accepted
+    await p.route('https://api.github.com/**', route => route.request().method() === 'OPTIONS'
+      ? route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } })
+      : route.request().method() === 'GET'
+      ? route.fulfill({ status: 404, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' })
+      : route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ content: { sha: 'fake' } }) }));
+    await hash('settings')(p); await hash('logbook')(p);
+    await p.locator('button.lb-sync').click();
+    await p.getByText(/^Synced \d+ of/).waitFor();
+  }, true],
   ['Export / Import', hash('data'), false],
   ['Recover drafts', hash('recovery'), false],
   ['Admin portal', hash('admin'), false],
@@ -60,6 +92,7 @@ const SCREENS = [
   ['Case log', async p => { await hash('caselogs')(p); await p.locator('.caselog-list a').first().click(); await p.locator('table.totals').waitFor(); }, false],
   ['Edit case dialog', async p => {
     await hash('logbook')(p);
+    await p.waitForFunction(() => Number(document.body.dataset.cases) > 0);   // the demo's cases load after the first drawing
     await p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); const { editCaseDialog } = await import('./js/ui-log.js'); editCaseDialog(S.cases[0]); });
     await p.waitForSelector('dialog[open]');
   }, true],
@@ -79,11 +112,73 @@ const SCREENS = [
     await p.getByRole('menuitem', { name: 'Preview' }).click();
     await p.waitForSelector('.note-view:not([hidden])');
   }, false],
+  ['Note editor menu (long title)', async p => {
+    await hash('notes')(p);
+    await p.getByRole('button', { name: '+ New note' }).click();
+    await p.getByLabel('Note title').fill('Fake long title that wraps onto a second line on a phone screen');
+    await p.getByRole('button', { name: 'More options' }).click();
+    await p.locator('.note-menu:not([hidden])').waitFor();
+  }, false],
+  ['Note settings', hash('notesset'), false],
+  ['Daily note on the Logbook', async p => {
+    await hash('logbook')(p);
+    await p.locator('main .seg button', { hasText: /^Calendar$/ }).first().click();   // an earlier screen left the list on
+    await p.locator('.lb-calbar').getByRole('button', { name: 'Today', exact: true }).click();
+    await p.getByRole('button', { name: '+ Daily note' }).click();
+    await p.getByLabel('Note text').fill('Fake day\n- [ ] fake to-do\n*fake italic*');
+    await p.waitForFunction(async () => (await import('./js/ui-core.js')).S.notes?.some(n => n.id.startsWith('day-')), null, { timeout: 8000 });
+    await p.getByRole('button', { name: 'Done' }).click();
+    await p.locator('.lb-daynote').waitFor();
+  }, true],
+  ['Note editor with formatting buttons', async p => {
+    await p.evaluate(async () => { const m = await import('./js/ui-settings.js'); m.setDisplay({ noteToolbar: true }); });
+    await hash('notes')(p);
+    await p.getByRole('button', { name: '+ New note' }).click();
+    await p.getByRole('toolbar', { name: 'Formatting' }).waitFor();
+  }, false],
+  ['Case tab daily note', async p => {
+    await p.evaluate(async () => { const { patchLogbook, hooks } = await import('./js/ui-core.js'); await patchLogbook({ settings: { dayNoteOnCase: true } }); hooks.render(); });
+    await p.locator('.day-note-box summary').click();
+    await p.waitForSelector('.day-note-text:not([disabled])');
+  }, false],
+  ['Shared with the app', async p => {
+    await p.evaluate(() => sessionStorage.setItem('logbook-shared', 'AB 40M fake lap chole\nFake second line'));
+    await hash('share')(p);
+    await p.locator('.share-preview').waitFor();
+  }, true],
+  // Labelled parts on (Settings → Advanced logging): the label editor and case template, bold labels on Logbook rows,
+  // the Learning points page
+  ['Advanced logging, labelled parts', async p => {
+    await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { labelParts: true, caseTplOn: true, caseTpl: 'ASA :\nPlan :' } }); });
+    await hash('loggingadv')(p);
+    await p.locator('.label-editor:not([hidden])').waitFor();
+  }, false],
+  ['Logbook list, labelled parts', async p => {
+    await p.evaluate(async () => { const { patchLogbook, createCase, todayISO } = await import('./js/ui-core.js'); await patchLogbook({ settings: { labelParts: true } }); await createCase({ date: todayISO(), details: 'Fake a11y case\nPlan: GA\nlp: fake learning point', cats: ['13'] }); });
+    await hash('logbook')(p); await p.locator('main .seg button', { hasText: /^List$/ }).first().click();
+    await p.locator('ul.cases .part-l').first().waitFor();
+  }, true],
+  ['Learning points', async p => {
+    await p.evaluate(async () => { const { patchLogbook, createCase, todayISO } = await import('./js/ui-core.js'); await patchLogbook({ settings: { labelParts: true } }); await createCase({ date: todayISO(), details: 'Fake a11y case\nlp: fake learning point', cats: ['13'] }); });
+    await hash('points')(p);
+    await p.locator('.point-row').first().waitFor();
+  }, true],
   ['Reflection editor', async p => {
     await hash('reflect')(p);
     await p.evaluate(async () => { const { reflectOnCase } = await import('./js/ui-reflect.js'); await reflectOnCase({ id: 'fake-a11y', date: '2026-10-10', initials: 'ZZ', details: 'Fake case for the accessibility check', cats: ['13'] }); });
     await p.waitForSelector('.refl-editor');
   }, true],
+  // last: it turns on the row menu and Request an evaluation for the rest of the run
+  ['Case menu with Request an evaluation', async p => {
+    await p.evaluate(async () => {
+      const { setShown } = await import('./js/ui-core.js'); await setShown('evalRequest', true);
+      const m = await import('./js/ui-settings.js'); m.applyDisplay(m.setDisplay({ rowMenu: true }));
+    });
+    await hash('logbook')(p);
+    await p.locator('main .seg button', { hasText: /^List$/ }).first().click();
+    await p.locator('ul.cases li[data-date] .row-more').first().click();
+    await p.locator('dialog[open] .row-menu-list').waitFor();
+  }, false],
 ];
 
 const runs = [];

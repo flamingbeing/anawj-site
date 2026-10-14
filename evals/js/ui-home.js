@@ -52,5 +52,8 @@ export function renderHome() {
     !S.loaded.mine ? h('p', { class: 'e-loading' }, 'Loading…')
       : recent.length ? h('div', { class: 'e-list' }, recent.map(ev => requestRow(ev, now)))
       : action.length ? h('p', { class: 'e-small' }, 'Nothing else yet.')
-      : h('div', { class: 'e-card' }, empty('No requests yet', 'Pick an item, choose your assessor and show them the QR code.')));
+      : h('div', { class: 'e-card' }, empty('No requests yet', 'Pick an item, choose your assessor and show them the QR code.',
+          h('div', { class: 'e-actions' },
+            h('button', { type: 'button', class: 'n-btn e-go', onclick: () => go('new') }, icon('plus'), 'Request your first evaluation'),
+            h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#how' }, 'How evals work')))));
 }

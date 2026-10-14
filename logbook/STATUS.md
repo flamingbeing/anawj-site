@@ -6,7 +6,7 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-13 by Claude Code, Logbook 1 (log1).
+Last updated: 2026-10-13 (evening) by Claude Code, Logbook 1 (log1), during the 6-hour build.
 
 ## Now
 
@@ -14,6 +14,10 @@ Each session keeps its own line in `status/<session>.md` (`log1.md`, `log2.md`, 
 its own file), so sessions never edit the same lines. Read them all before starting; edit only yours.
 
 ## Waiting on the owner
+
+- **Try the 6-hour build** (13–14 Oct): Settings → Profile → Personal; Logbook day → + Daily note; Settings → Advanced
+  logging → Labelled parts; Settings → Sync (GitHub / Drive / Dropbox); Send to. Everything new is off until switched on.
+  Notes with text open in Preview (⋯ → Edit to type): say if they should open ready to type instead.
 
 - Answer the questions in `logbook/PLAN-personal-log.md` and `logbook/PLAN-labelled-parts.md` (13 Oct), then say go.
 - Get the Obsidian vault into the private repo `flamingbeing/life` (Obsidian Git plugin or GitHub Desktop; steps on request).
@@ -54,6 +58,14 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Recently done
 
+- #485 Bug hunt: 35 confirmed bugs fixed (sync engine data safety, settings merges, daily-note merges, paste cleaner, sync files, logging).
+- #484 Late dialog "back" no longer pulls you off a page opened meanwhile (Safari); settings search scrolls to the option; phone polish.
+- #483 Rarely used screens load on demand: case box ~35% sooner on a phone connection.
+- #482 Cross-browser fixes: settings search keeps typed text, profile Cancel, Sync page redraws, blocked storage.
+- #481 Labelled parts (`lp:` etc., off), case templates, pasted case lists, phone fixes (keyboard, tap targets, Safari menu), Request an evaluation (off), Hide the tab bar while typing (Personal).
+- #474 Wave 1 of the 6-hour build: cheap-read sync engine (local store + filtered listeners, deletes from the bin, `tools/test-reads.sh`), faster logging (Save takes the suggested tags, Case-tab 'quick' split into suggestions / Same as last, optional auto-tick), Sync to Drive / Dropbox / GitHub (one Markdown file per day, managed block, three-way merge), profiles as presets of visible switches with a new Personal profile and APMES switches, daily note (+ Today's note, paste cleaner, receive shares on Android).
+- #402 Send to… (Obsidian, WhatsApp, UpNote or any link).
+
 - #204 The top band's third quarter is the NUHS site's blue `#178fd7`, not cyan; Reflections' NUH tab colour too (`logbook-v26`).
 - #396, #395 Personal-log plan: written (#395), then made public-safe with the personal version moved to the private repo `flamingbeing/life` and a rule in `AGENTS.md` (#396).
 - #392 (site) The old `/design/` path retired; `/nuhsdesign/` is the one shared folder every subdomain serves.
@@ -65,6 +77,15 @@ its own file), so sessions never edit the same lines. Read them all before start
 - #289 Polish 6a: settings pages use switches, ✓ lists and one-line help (ⓘ for more); Advanced pages under headings.
 
 ## Decisions log
+
+- 2026-10-13: 6-hour build process that worked: map the code with parallel readers, build independent tracks in separate git
+  worktrees, review each with independent lenses, fix, integrate with a merge agent, then a find → double-verify → fix bug
+  hunt; real devices / other browsers via the home-computer session (firetop). Full suite on main after: ALL PASSED.
+
+- 2026-10-13: The owner's own main profile is the new generic Personal profile; residents keep Basic / Advanced. Every
+  difference between profiles is a visible switch; picking a profile only applies a preset (owner). Storage: Firestore stays
+  the main store with a local copy and filtered listeners for cheap reads (no rules change). Daily note = a note with id
+  `day-YYYY-MM-DD`. Notes cap 2,000 (app-side).
 
 - 2026-10-13: A private GitHub repo `flamingbeing/life` holds the owner's personal notes (daily log, knowledge notes, plans with
   personal details); cloud sessions may attach it only when he asks. Split rule (`AGENTS.md`): personal material goes

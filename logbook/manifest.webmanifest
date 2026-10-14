@@ -31,7 +31,7 @@
     {
       "name": "Log a case",
       "short_name": "Log",
-      "url": "./#log",
+      "url": "./#quicklog",
       "icons": [
         {
           "src": "icons/icon-192.png",
@@ -43,6 +43,17 @@
       "name": "Logbook",
       "short_name": "Logbook",
       "url": "./#logbook",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Today's note",
+      "short_name": "Today",
+      "url": "./#today",
       "icons": [
         {
           "src": "icons/icon-192.png",
@@ -63,12 +74,25 @@
     }
   ],
   "share_target": {
-    "action": "./",
-    "method": "GET",
+    "action": "./share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
     "params": {
-      "title": "share_title",
-      "text": "share_text",
-      "url": "share_url"
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "files",
+          "accept": [
+            "text/plain",
+            "text/markdown",
+            ".md",
+            ".markdown",
+            ".txt"
+          ]
+        }
+      ]
     }
   }
 }

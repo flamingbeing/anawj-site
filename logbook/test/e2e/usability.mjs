@@ -6,7 +6,7 @@ const b=await chromium.launch(process.env.CHROMIUM_PATH?{executablePath:process.
 try { for (const width of [390,1280]) {
  const ctx=await b.newContext({viewport:{width,height:844},serviceWorkers:'block'});await ctx.addInitScript(()=>localStorage.setItem('apmes-logbook-demo-small','1'));
  const p=await ctx.newPage(), errors=[];p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
- await p.goto(base+'?demo#log');await p.waitForSelector('textarea.details');
+ await p.goto(base+'?demo#log');await p.waitForSelector('textarea.details');await p.waitForFunction(()=>Number(document.body.dataset.cases)>0);
  const tags=p.getByRole('combobox',{name:'Search tags'});await tags.focus();await tags.press('ArrowDown');await tags.press('Enter');
  assert.equal(await p.locator('.picker [data-code="01"]').getAttribute('aria-selected'),'true');assert.equal(await p.getByRole('listbox',{name:'Tags'}).getAttribute('aria-multiselectable'),'true');
  await tags.press('Tab');assert.equal(await p.evaluate(()=>document.activeElement.getAttribute('role')),'option');await p.keyboard.press('Space');assert.equal(await p.locator('.picker [data-code="01"]').getAttribute('aria-selected'),'false');await p.keyboard.press('ArrowDown');assert.equal(await p.evaluate(()=>document.activeElement.dataset.code),'02');

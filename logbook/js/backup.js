@@ -3,9 +3,9 @@
 // left out (they are for the Word portfolio only); older backups that have them still restore them.
 
 import { S, h, toast, modal, cloud, writes, download, fileButton, saveMany, patchLogbook, todayISO, displayName, catName } from './ui-core.js';
-import { cleanCase } from './demo-backend.js';
+import { cleanCase } from './clean.js';
 import { cleanReflection } from './reflections.js';
-import { cleanNote, MAX_NOTES } from './notepad.js';
+import { cleanNote, MAX_NOTES, isDayNote, cappedNotes } from './notepad.js';
 import { backupToCsv, csvToBackup, looksLikeBackupCsv } from './backup-csv.js';
 import { HEADING_BY_ID } from './reflections.js';
 import { ensureNotes } from './ui-notepad.js';
@@ -65,12 +65,13 @@ async function restoreBackup(file) {
   const cases = data.cases.filter(c => c && c.id && !haveCases.has(c.id)).map(c => cleanCase(c, c.updatedAt || Date.now()));
   const refl = (data.reflections || []).filter(r => r && r.id && !haveRefl.has(r.id)).map(r => cleanReflection(r));
   const imgIds = new Set(refl.flatMap(r => (r.figures || []).map(f => f.id)));
-  // notes: only missing ones, and never past the 100-note limit
+  // notes: only missing ones, and never past the 100-note limit (daily notes don't count, so they always fit)
   const haveNotes = await ensureNotes().catch(() => null) || [];
   const haveNoteIds = new Set(haveNotes.map(n => n.id));
-  const room = Math.max(0, MAX_NOTES - haveNotes.length);
+  const room = Math.max(0, MAX_NOTES - cappedNotes(haveNotes).length);
   const missingNotes = (Array.isArray(data.notes) ? data.notes : []).filter(n => n && n.id && !haveNoteIds.has(n.id));
-  const notes = missingNotes.slice(0, room).map(n => cleanNote(n, n.updatedAt || Date.now()));
+  const missingDaily = missingNotes.filter(isDayNote), missingOther = cappedNotes(missingNotes);
+  const notes = [...missingDaily, ...missingOther.slice(0, room)].map(n => cleanNote(n, n.updatedAt || Date.now()));
   const images = Object.values(data.images || {}).filter(img => img && imgIds.has(img.id));
   const tpl = (data.logbook && Array.isArray(data.logbook.templates) ? data.logbook.templates : []);
   const haveTpl = new Set(((S.logbook && S.logbook.templates) || []).map(t => t.id));

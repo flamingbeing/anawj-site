@@ -4,9 +4,12 @@ import { COL_WIDTHS } from './layout.js';
 
 const hex = argb => '#' + String(argb).slice(-6);
 
-export function buildRosterCanvas(layout, width = 1400) {
+// spans: which sheet rows to draw, as [[from, to], …] (default: all of it). Used to send the sheet in two parts
+// that each stay readable on a phone: the title and date, then either the calls and lists or the OT rooms.
+export function buildRosterCanvas(layout, width = 1400, spans = [[2, layout.rows]]) {
   const colW = COL_WIDTHS.map(w => (w * 7 + 5) * 0.75);
-  const rowH = r => layout.heights[r] || 13;
+  const shown = new Set(spans.flatMap(([a, b]) => Array.from({ length: Math.max(0, b - a + 1) }, (_, i) => a + i)));
+  const rowH = r => shown.has(r) ? layout.heights[r] || 13 : 0;
   const first = 2, margin = 16;
   const totalW = colW.reduce((a, b) => a + b, 0);
   let totalH = 0;
@@ -23,7 +26,8 @@ export function buildRosterCanvas(layout, width = 1400) {
   const font = (bold, px) => { ctx.font = `${bold ? 'bold ' : ''}${px}px Arial, Helvetica, sans-serif`; };
 
   for (const c of layout.cells) {
-    if (c.r < first) continue;
+    // a cell runs over several rows (the comments box): draw it only if all of them are shown
+    if (c.r < first || ![...Array(c.r2 - c.r + 1).keys()].every(i => shown.has(c.r + i))) continue;
     const x = xAt(c.c1), y = yAt(c.r);
     const w = xAt(c.c2 + 1) - x, h = yAt(c.r2 + 1) - y;
     if (c.fill) { ctx.fillStyle = hex(c.fill); ctx.fillRect(x, y, w, h); }
@@ -64,6 +68,8 @@ export function buildRosterCanvas(layout, width = 1400) {
       }
       return out;
     };
+    // a single line that runs past the sheet's edge (long free text in the last column) shrinks to fit
+    if (!wrap) { const room = Math.max(w, xAt(13) - x) - 2 * pad; while (size > 4 && Math.max(...String(c.text).split('\n').map(l => ctx.measureText(l).width)) > room) { size -= 0.25; font(c.bold, size); } }
     let lines = split(c.text, w - 2 * pad);
     while (wrap && size > 4 && lines.length * size * 1.15 > h - pad) { size -= 0.25; font(c.bold, size); lines = split(c.text, w - 2 * pad); }
     const lh = size * 1.15;

@@ -11,10 +11,11 @@ export const SITES = {
   'hand.anawj.com': { prefixes: { '/cmcj/': 'cmcj/', '/babies/': 'hand-babies/', '/handlog/': 'hand-log/' } },
   'prewarmstudy.anawj.com': { root: 'prewarm/' },
   'nuhroster.anawj.com': { root: 'nuh-roster/' },
+  // /people/ is the shared people lists (residents, faculty, PDs) the logbook and evals both use.
   // /apmes/guidebook/ is the programme guidebook text the evals app reads (just that folder of apmes/).
   // /__/auth/ and /__/firebase/ are Firebase's sign-in helper pages (the auth domain of logbook and evals). The helper
   // scripts are the same files anawj.com serves; init.json is this host's own copy (authDomain apmes.anawj.com).
-  'apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth/firebase/' } },
+  'apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/people/': 'people/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth/firebase/' } },
 };
 
 // The one folder every host serves as it is: the shared design files (styles only, no data), so a subdomain's apps can

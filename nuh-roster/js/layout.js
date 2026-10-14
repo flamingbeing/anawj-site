@@ -99,6 +99,7 @@ export function buildLayout({ date, rows, lists = {}, general = {}, box = '', co
   grid('Leave', lists.leave || []);
   r++;
 
+  const otFrom = r; // where the OT rooms start (AH OT), for an image sent in two parts
   label(r, 'AH OT : ', { bold: true, color: BLUE });
   put(r, 3, 11, short(special('ahot').senior), { box: true, color: BLUE });
   r++;
@@ -113,7 +114,7 @@ export function buildLayout({ date, rows, lists = {}, general = {}, box = '', co
     put(r, 9, 11, short(row.premed), { box: true, bold: true, runs: cellRuns(row.premed, colourOf, null, shortOf) });
     r++;
   });
-  return { cells, heights, rows: r - 1, cols: 12 };
+  return { cells, heights, rows: r - 1, cols: 12, otFrom };
 }
 
 const key = n => n.toLowerCase().replace(/\s+/g, ' ').trim();

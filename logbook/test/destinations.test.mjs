@@ -54,4 +54,22 @@ assert.equal(sentState(l, 'obsidian', '2026-10-13', 'two'), 'same');
 assert.equal(JSON.stringify(l).includes('two'), false);
 assert.deepEqual(cleanLedger({ a: { 'not-a-date': 'x', '2026-01-01': 'ok' }, b: 5 }), { a: { '2026-01-01': 'ok' } });
 assert.deepEqual(cleanLedger('x'), {});
+// a single case: its day names the file (not "Logbook/"), and the ledger is not marked by sendLink
+{
+  const ob = cleanDestination({ ...PRESETS[0], id: 'ob' });
+  const r = sendLink(ob, { content: '- AB lap chole', title: '2026-10-13', fileDate: '2026-10-13' });
+  assert.equal(r.file, 'Logbook/2026-10-13'); assert.ok(r.url.includes('file=Logbook%2F2026-10-13'));
+  assert.equal(sendLink(ob, { content: 'x', title: 'Case' }).file, 'Logbook/Case');
+}
+// the ledger: a 41st place still remembered; places removed dropped; the latest days kept, a re-send included
+{
+  let l = {};
+  for (let i = 0; i < 41; i++) l = markSent(l, 'd' + i, '2026-10-13', 't');
+  assert.equal(sentState(l, 'd40', '2026-10-13', 't'), 'same');
+  assert.deepEqual(Object.keys(cleanLedger(l, ['d40', 'gone'])), ['d40']);
+  let m = {};
+  for (let i = 0; i < 801; i++) m = markSent(m, 'a', new Date(Date.UTC(2020, 0, 1 + i)).toISOString().slice(0, 10), 't');
+  m = markSent(m, 'a', '2020-01-01', 'again');
+  assert.equal(sentState(m, 'a', new Date(Date.UTC(2020, 0, 801)).toISOString().slice(0, 10), 't'), 'same');
+}
 console.log('destinations tests passed');

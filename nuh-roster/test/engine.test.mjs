@@ -78,6 +78,9 @@ assert.match(out, /Paeds list/);
   // double cover with no junior in one of the rooms
   let t = texts([r('r3', 'MCOR 2', 'Senior General', ''), r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')]);
   assert.ok(t.some(x => /^error\|fill\|MCOR 2: no junior, and the senior is double covering/.test(x)), t.join('\n'));
+  // AH OT is its own job, not a second room: a senior on AH OT and one room isn't double covering
+  t = texts([{ roomId: 'ahot', label: 'AH OT', complex: 'Clinic', senior: 'Senior General', junior: '', premed: '', notes: '' }, r('r3', 'MCOR 2', 'Senior General', '')]);
+  assert.ok(!t.some(x => /double covering|rooms \(/.test(x)), t.join('\n'));
   assert.ok(!t.some(x => /MCOR 3: no junior/.test(x)));
   // a cover from another room counts as a junior
   t = texts([r('r3', 'MCOR 2', 'Senior General', 'Junior Mopex C'), r('r4', 'MCOR 3', 'Senior General', 'Junior Resident')]);
@@ -354,4 +357,142 @@ console.log('engine tests passed');
   assert.ok(stamped && stamped.r === 4, 'the stamp sits above the date row');
   assert.ok(!buildLayout({ date: '2026-10-14', rows: [] }).cells.some(x => x.r === 4), 'no stamp on a first send');
   console.log('sent changes tests passed');
+}
+
+{
+  // clashes the monthly rosters show before the day
+  const { monthIssues } = await import('../js/monthly.js');
+  const people = { A: { id: 'a', name: 'A' }, B: { id: 'b', name: 'B' }, C: { id: 'c', name: 'C' } };
+  const personOf = t => people[t] || null;
+  const monthly = { '2026-10': {
+    junior: { rows: { 1: { r1: 'A', nf: 'A' }, 2: { df: 'A', r1: 'B' }, 3: { r1: 'C', r2: '' } } },
+    liver: { rows: { 2: { otj: 'B' } } },
+    pain: { rows: { 3: { 'acute.a': 'B' } } },
+    leave: { entries: [{ name: 'C', from: '2026-10-03', to: '2026-10-03', type: 'Annual Leave' }] },
+  } };
+  const t = monthIssues(monthly, '2026-10', personOf).map(i => `${i.date.slice(8)} ${i.level} ${i.text}`);
+  assert.ok(t.includes('01 error A has two overnight duties (R1 and Night Float).'), t.join('\n'));
+  assert.ok(t.some(x => /^02 error A has Day Float the morning after /.test(x)), t.join('\n'));
+  assert.ok(!t.some(x => /B has OT \(Junior\)/.test(x)), 'liver duties are on call, not a clash with a night before');
+  assert.ok(t.some(x => /^03 error B has Acute Pain \(Junior\) the morning after R1/.test(x)), t.join('\n'));
+  assert.ok(t.includes('03 error C is on leave but has R1.'), t.join('\n'));
+  assert.ok(t.some(x => /^03 warn R2 is empty/.test(x)), t.join('\n'));
+  // the made-up department starts (nearly) clean
+  const { makeDemo } = await import('../js/demo.js');
+  const d = makeDemo('2026-03-17');
+  const byName = new Map(d.staff.map(p => [p.name, p]));
+  assert.equal(monthIssues(d.monthly, '2026-03', n => byName.get(n) || null).filter(i => i.level === 'error').length, 0, 'demo month has no clashes');
+  console.log('monthly clash tests passed');
+}
+
+{
+  // seniority: complex lists, double covers and Baby MO / MOPEX rooms prefer SC and C
+  const room = (id, name, notes, extra = {}) => ({ id, name, complex: 'MOR', running: true, notes, flags: suggestFlags(notes), session: 'full', ...extra });
+  const st = [
+    P('a', 'Senior Associate', 'senior', { grade: 'AC' }), P('b', 'Senior Consultant', 'senior', { grade: 'SC' }),
+    P('j', 'Junior Mopex', 'junior', { grade: 'MOPEX' }), P('k', 'Junior Resident', 'junior'),
+  ];
+  let complexToSC = 0, mopexWithSC = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const g = generate({ staff: st, day: { rooms: [room('r1', 'MOR 1', 'laparotomy', { flags: { subspecs: [], complex: true, long: false } }), room('r2', 'MOR 2', 'hernia')], staff: {} }, seed });
+    const r1 = g.rows.find(r => r.label === 'MOR 1');
+    if (/Senior Consultant/.test(r1.senior)) complexToSC++;
+    // two plain lists: the MOPEX goes with the SC
+    const g2 = generate({ staff: st, day: { rooms: [room('r1', 'MOR 1', 'hernia'), room('r2', 'MOR 2', 'hernia')], staff: {} }, seed });
+    if (g2.rows.some(r => /Senior Consultant/.test(r.senior) && /Junior Mopex/.test(r.junior))) mopexWithSC++;
+  }
+  assert.equal(complexToSC, 20, 'the complex list goes to the SC every time');
+  assert.ok(mopexWithSC >= 15, `MOPEX mostly with the SC (${mopexWithSC}/20)`);
+  // one senior short: the double cover goes to the SC
+  const st2 = [P('a', 'Senior Associate', 'senior', { grade: 'AC' }), P('b', 'Senior Consultant', 'senior', { grade: 'SC' }), P('c', 'Senior Visiting', 'senior', { grade: 'VC' })];
+  let dblSC = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const g = generate({ staff: st2, day: { rooms: [room('r1', 'MOR 1', ''), room('r2', 'MOR 2', ''), room('r3', 'MOR 3', ''), room('r4', 'MOR 4', '')], staff: {} }, seed });
+    const n = {}; g.rows.forEach(r => String(r.senior).split(/\s*\/\s*/).filter(Boolean).forEach(x => { n[x] = (n[x] || 0) + 1; }));
+    if (Object.entries(n).some(([k, v]) => v > 1 && /Consultant/.test(k))) dblSC++;
+  }
+  assert.ok(dblSC >= 15, `double cover mostly by the SC (${dblSC}/20)`);
+  console.log('seniority tests passed');
+}
+
+{
+  const { buildIcs } = await import('../js/ics.js');
+  const t = buildIcs([{ date: '2026-10-31', title: 'MOR 4, Senior', details: 'with A; cases: lap chole\nleaving 4pm', uid: '2026-10-31-p1@nuhroster' }], { now: new Date('2026-10-13T10:00:00Z') });
+  assert.match(t, /^BEGIN:VCALENDAR\r\n/);
+  assert.match(t, /DTSTART;VALUE=DATE:20261031\r\nDTEND;VALUE=DATE:20261101\r\n/, 'all-day event ending the next day, across a month end');
+  assert.match(t, /SUMMARY:MOR 4\\, Senior/);
+  assert.match(t.replace(/\r\n /g, ''), /DESCRIPTION:with A\\; cases: lap chole\\nleaving 4pm/);
+  assert.ok(t.split('\r\n').every(l => l.length <= 75), 'lines folded');
+  // folded by UTF-8 bytes, never splitting a character (· and emoji are several bytes)
+  const u = buildIcs([{ date: '2026-10-31', title: 'MOR 4', details: 'with A · B → C 🙂 '.repeat(12), uid: 'x' }]);
+  const enc = new TextEncoder();
+  assert.ok(u.split('\r\n').every(l => enc.encode(l).length <= 75), 'lines at most 75 octets');
+  assert.ok(!/[\ud800-\udfff]/.test(u.replace(/\p{Extended_Pictographic}/gu, '')), 'no split emoji');
+  assert.ok(u.replace(/\r\n /g, '').includes('with A · B → C 🙂 with A'), 'unfolds to the same text');
+  console.log('calendar tests passed');
+}
+
+{
+  const { dateFromText } = await import('../js/xlsxio.js');
+  assert.equal(dateFromText('2026-10-14'), '2026-10-14');
+  assert.equal(dateFromText('14/10/2026'), '2026-10-14');
+  assert.equal(dateFromText('1.2.26'), '2026-02-01');
+  assert.equal(dateFromText('14 Oct 2026'), '2026-10-14');
+  assert.equal(dateFromText('Wednesday, 14 October 2026'), '2026-10-14');
+  assert.equal(dateFromText('WEDNESDAY, 14 OCTOBER 2026'), '2026-10-14', 'capitals');
+  const { cellText } = await import('../js/xlsxio.js');
+  assert.equal(cellText({ formula: 'TODAY()+1', result: new Date('2026-10-14T00:00:00Z') }), '2026-10-14', 'a formula date');
+  assert.equal(dateFromText('31/02/2026'), null, 'no 31 February');
+  assert.equal(dateFromText(''), null);
+  console.log('draft date tests passed');
+}
+
+{
+  // saved data from the first versions of the app comes up to date
+  const { mergeSaved, migrateRooms } = await import('../js/store.js');
+  const { DEFAULT_SETTINGS } = await import('../js/engine.js');
+  const v1 = { staff: [], settings: { premedCap: 2 }, roomTemplate: [{ complex: 'Other', name: 'Remote Case' }, { complex: 'KROR', name: 'KROR 2' }, { complex: 'MCOR', name: 'MCOR 8' }, { complex: 'MCOR', name: 'MCOR 10' }, { complex: 'MOR', name: 'MOR 1' }],
+    day: { rooms: [{ name: 'Remote Case' }] }, roster: { rows: [{ label: 'Remote Case' }] } };
+  const st = mergeSaved({ settings: {}, roomTemplate: [] }, JSON.parse(JSON.stringify(v1)), DEFAULT_SETTINGS);
+  assert.equal(st.roomsVersion, 1);
+  assert.equal(st.settings.premedCap, 2, 'saved settings kept');
+  assert.equal(st.settings.subspecs.length, DEFAULT_SETTINGS.subspecs.length, 'new settings get their defaults');
+  migrateRooms(st);
+  const names = st.roomTemplate.map(r => r.name);
+  assert.equal(st.roomsVersion, 4);
+  assert.deepEqual(names, ['Remote 1', 'Remote 2', 'KROR PACU', 'KROR 1', 'KROR 2', 'MCOR PACU', 'MCOR 8', 'MCOR 9', 'MCOR 10', 'ECT', 'MBOR PACU', 'MOR 1']);
+  assert.equal(st.day.rooms[0].name, 'Remote 1'); assert.equal(st.roster.rows[0].label, 'Remote 1');
+  assert.equal(st.roomTemplate.find(r => r.name === 'MOR 1').defaultOn, true);
+  assert.equal(st.roomTemplate.find(r => r.name === 'KROR 1').defaultOn, false);
+  const again = JSON.stringify(st); migrateRooms(st); assert.equal(JSON.stringify(st), again, 'running it twice changes nothing');
+  assert.equal(mergeSaved('blank', null, DEFAULT_SETTINGS), 'blank');
+  console.log('saved data migration tests passed');
+}
+
+{
+  // help texts: every mark the printable guide explains is in the in-app key too; What's new is dated, newest first
+  const { SYMBOLS, HOW, WHATS_NEW } = await import('../js/help.js');
+  const fs = await import('node:fs');
+  const guide = fs.readFileSync(new URL('../guide.html', import.meta.url), 'utf8');
+  const marks = [...guide.matchAll(/<th>([^<]+)<\/th>/g)].map(m => m[1].replace('&amp;', '&'));
+  const keyText = SYMBOLS.map(([k, v]) => k + ' ' + v).join(' | ');
+  for (const m of marks) assert.ok(keyText.includes(m.split(' ')[0].replace(/…$/, '')), `guide mark "${m}" is also in the in-app key`);
+  assert.ok(HOW.length >= 8 && HOW.every(([q, a]) => q.endsWith('?') && a.length > 20));
+  const dates = WHATS_NEW.map(([d]) => new Date(d));
+  assert.ok(dates.every(d => !isNaN(d)) && dates.every((d, i) => !i || d <= dates[i - 1]), "What's new is dated, newest first");
+  console.log('help text tests passed');
+}
+
+{
+  // AOCC leaves the last free consultant for AIC
+  const room = (id, name) => ({ id, name, complex: 'MOR', running: true, notes: '', flags: suggestFlags(''), session: 'full' });
+  const st = [P('a', 'Senior Busy', 'senior', { grade: 'AC' }), P('b', 'Senior Assoc', 'senior', { grade: 'AC' }), P('c', 'Senior Cons', 'senior', { grade: 'C' })];
+  let ok = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const g = generate({ staff: st, day: { rooms: [room('r1', 'MOR 1')], staff: {} }, seed });
+    const by = Object.fromEntries(g.rows.map(r => [r.label, r]));
+    if (/Senior Cons/.test(by.AIC.senior) && by.AOCC.senior && !/Senior Cons/.test(by.AOCC.senior)) ok++;
+  }
+  assert.ok(ok >= 15, `AIC keeps the consultant (${ok}/20)`);
+  console.log('AOCC/AIC tests passed');
 }

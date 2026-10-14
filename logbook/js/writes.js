@@ -104,7 +104,14 @@ export function createWriteQueue({ store, backend, getOwner = () => null, normal
     onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     entries: () => copy(ordered().reverse()),
     pending: () => jobs.filter(x => !terminal.has(x.state)).length,
-    async flush(ms = 4000) { kick(); await Promise.race([Promise.all([...running.values()]), delay(ms)]); return !jobs.some(x => !terminal.has(x.state)); },
+    async flush(ms = 4000) {
+      kick(); await Promise.race([Promise.all([...running.values()]), delay(ms)]);
+      if (jobs.some(x => !terminal.has(x.state))) return false;
+      // changes another tab (or the home-screen app) has not synced yet are in the same store: signing out deletes them
+      if (!owner) return true;
+      try { const mine = new Set(jobs.map(x => x.key)); return !(await store.list(owner)).some(x => !mine.has(x.key) && !terminal.has(x.state)); }
+      catch { return true; }
+    },
     error: () => storageError,
     status(kind, id) { return [...ordered()].reverse().find(x => x.kind === kind && x.record.id === id)?.state || ''; },
   };

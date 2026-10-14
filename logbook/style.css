@@ -131,7 +131,7 @@ dialog .bar .grow { min-width: 0; }   /* keep Cancel / Save on one row in dialog
 .row { display: flex; gap: 8px; align-items: center; }
 .empty { text-align: center; color: var(--muted); padding: 32px 16px; }
 
-input[type="text"], input[type="search"], input[type="email"], input:not([type]), input[type="date"], input[type="number"], select, textarea {
+input[type="text"], input[type="password"], input[type="search"], input[type="email"], input:not([type]), input[type="date"], input[type="number"], select, textarea {
   padding: 8px 10px; border: 1px solid var(--edge, var(--line)); border-radius: calc(10px * var(--round, 1)); background: var(--panel);
   font-size: max(16px, calc(16px * var(--fs, 1))); /* 16px+ stops iOS zooming on focus */ min-height: 40px; max-width: 100%;
 }
@@ -424,7 +424,7 @@ body.compact button.small, body.compact .btn.small, body.compact .seg button { m
 body.compact button.big { min-height: 40px; font-size: calc(15px * var(--fs, 1)); padding: 6px 14px; }
 body.compact button.link { min-height: 0; padding: 0; }
 body.compact .actions { padding: 6px 0 4px; margin-top: 4px; gap: 6px; }
-body.compact input[type="text"], body.compact input[type="search"], body.compact input[type="email"], body.compact input:not([type]),
+body.compact input[type="text"], body.compact input[type="password"], body.compact input[type="search"], body.compact input[type="email"], body.compact input:not([type]),
 body.compact input[type="date"], body.compact input[type="number"], body.compact select {
   font-size: max(16px, calc(16px * var(--fs, 1))); min-height: 34px; padding: 4px 8px;
 }
@@ -630,6 +630,12 @@ body { zoom: var(--ui-zoom, 1); }   /* Interface zoom (Settings → Display): le
 .more-list .mt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .more-list .mt small { color: var(--muted); font-size: calc(13px * var(--fs, 1)); }
 .more-list .chev { color: var(--muted); font-size: calc(22px * var(--fs, 1)); }
+/* Settings menu: its pages under group headings (Profile, Look, Logging…) */
+.settings-menu h3 { margin: 16px 4px 0; text-transform: uppercase; letter-spacing: .04em; font-size: calc(12px * var(--fs, 1)); }
+.settings-menu h2 + h3 { margin-top: 4px; }
+/* Profile: what picking one changes (the dialog, and "Custom" on the card) */
+.profile-changes { margin: 4px 0 8px; padding-left: 18px; }
+.profile-changes li { margin: 2px 0; }
 
 /* folded extras ("More tools") */
 details.more-tools > summary { cursor: pointer; font-weight: 600; color: var(--accent); min-height: 40px; line-height: 40px; }
@@ -1135,7 +1141,7 @@ html.colourful body[data-bar="progress"] { --heading: var(--t-progress); }
 html.colourful body[data-bar="more"] { --heading: var(--t-more); }
 /* parts of the Case tab people hide (Settings → Logging → Case tab; ui-log.js CASE_PARTS) */
 .log-card.hide-interesting .reflect-tag, .log-card.hide-parsed .parsed, .log-card.hide-groupsave .group-save,
-.log-card.hide-quick .quick-label, .log-card.hide-quick .sugg-row, .log-card.hide-quick .quick-rest { display: none; }
+.log-card.hide-sugg .sugg-row, .log-card.hide-recent .quick-rest, .log-card.hide-sugg.hide-recent .quick-label { display: none; }
 /* pinned while scrolling (Settings → Display, per device): the case box on the Case tab, the search card on the
    Logbook. --pin-top = what is already stuck at the top (the tab bar when it sits at the top of a phone) */
 :root { --pin-top: 0px; }
@@ -1153,7 +1159,7 @@ html.pin-search .refl-topics .refl-h.open > .refl-hrow { position: sticky; top: 
    element so it follows the --line in force there (themes, contrast, colours). Borderless and Faint give fields,
    buttons and chips a light fill so they can still be seen */
 html.edges * { --edge: color-mix(in srgb, var(--line) var(--edge-mix, 100%), transparent); }
-html.edges-fill :is(input[type="text"], input[type="search"], input[type="email"], input:not([type]), input[type="date"], input[type="number"], select, textarea),
+html.edges-fill :is(input[type="text"], input[type="password"], input[type="search"], input[type="email"], input:not([type]), input[type="date"], input[type="number"], select, textarea),
 html.edges-fill :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.search-x),
 html.edges-fill .chip:not(.on) { background: color-mix(in srgb, var(--ink) 6%, var(--panel)); }
 input[type="range"] { accent-color: var(--accent); width: 100%; min-height: 32px; }
@@ -1473,3 +1479,92 @@ html.row-hold ul.cases li:not(.monthhead) { -webkit-user-select: none; user-sele
 .notes-download { margin: 12px 0 0; }
 .case-links { margin-top: 8px; }
 .case-links .bar { justify-content: flex-start; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- daily notes, formatting bar, shared to the app (ui-notepad.js, fmt-bar.js, ui-share-in.js) ---------- */
+.notes-daily { margin: 4px 0 0; gap: 8px; }
+button.chip-toggle[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+/* the Logbook's day: its daily note under the heading, a preview that opens the editor */
+.lb-daynote { margin: 8px 0 4px; padding: 8px 10px; border: 1px solid var(--edge, var(--line)); border-radius: calc(10px * var(--round, 1)); }
+.lb-daynote-head { display: flex; align-items: center; gap: 8px; }
+.lb-daynote-head h4 { margin: 0; flex: 1; font-size: calc(14px * var(--fs, 1)); color: var(--muted); }
+.lb-daynote-view { min-height: 0; max-height: 14em; overflow: hidden; cursor: pointer; padding: 0;
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 2em), transparent); mask-image: linear-gradient(#000 calc(100% - 2em), transparent); }
+.lb-daynote-view > :first-child { margin-top: 4px; }
+.lb-daynote-add { margin: 6px 0 2px; }
+.lb-daynote-add .linkish { background: none; border: 0; padding: 0 2px; min-height: 32px; color: var(--accent); font-weight: 600; }
+/* the Case tab's box for today's note (Settings → Notes) */
+details.day-note-box { margin: 10px 0 0; }
+details.day-note-box > summary { cursor: pointer; color: var(--muted); font-weight: 600; min-height: 32px; line-height: 32px; width: fit-content; }
+.day-note-box .day-note-text { width: 100%; font-family: var(--font-log, inherit); }
+.day-note-bar { margin: 2px 0 0; }
+.day-note-bar .linkish { background: none; border: 0; color: var(--accent); font-weight: 600; }
+/* the note editor's full formatting bar: one row, scrolls sideways if it must */
+.fmt-full { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 4px; padding: 2px 0; }
+.fmt-full::-webkit-scrollbar { display: none; }
+.fmt-full button { flex: 0 0 auto; min-width: 36px; padding-inline: 8px; }
+@media (max-width: 600px) {
+  /* typing in the note on a phone: the bar rides on the keyboard, just above the tab bar */
+  body.typing .note-fmt.on { position: fixed; left: 0; right: 0; bottom: calc((var(--kb, 0px) + var(--tabbar-h)) / var(--ui-zoom, 1)); z-index: 29; margin: 0; padding: 4px 8px; background: var(--panel); border-top: 1px solid var(--edge, var(--line)); }
+}
+/* shared to the app: what came, and where it goes */
+.share-preview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; margin: 0 0 10px; padding: 8px 10px; font: inherit; font-size: calc(14px * var(--fs, 1)); background: var(--row-alt); border-radius: calc(8px * var(--round, 1)); }
+.share-choices { display: flex; flex-direction: column; gap: 8px; }
+.share-choices button { width: 100%; }
+
+/* Labelled parts (parts.js, ui-parts.js): labels in bold on Logbook rows and marked in the case box; the Learning
+   points page; the label editor and case template in Advanced logging */
+ul.cases .t .part-l, .points-list .part-l { font-weight: 700; }
+.box-wrap .box-marks mark.m-lab { background: color-mix(in srgb, var(--ok, #1a7f37) 18%, transparent); }
+.too-long { margin: 4px 2px; }
+.lb-points { margin: 8px 0 0; font-size: calc(14px * var(--fs, 1)); }
+ul.points-list { list-style: none; margin: 0; padding: 0; }
+ul.points-list li.point-row { border-bottom: 1px solid var(--edge, var(--line)); }
+ul.points-list .point-btn { display: grid; gap: 2px; width: 100%; padding: 10px 4px; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; min-height: 0; }
+ul.points-list .point-btn:hover { background: var(--row-alt); }
+.point-row .pt-head { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; font-size: calc(13px * var(--fs, 1)); color: var(--muted); }
+.point-row .pt-head .ini { color: var(--ink); }
+.point-row .t { white-space: pre-wrap; word-break: break-word; font-family: var(--font-log); }
+ul.points-list li.empty-li { cursor: default; }
+.label-editor { margin: 4px 0 8px; }
+.label-card { border: 1px solid var(--edge, var(--line)); border-radius: 10px; padding: 8px 10px; margin: 6px 0; }
+.label-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: 8px; align-items: end; }
+.label-bottom { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin-top: 6px; }
+.label-card label.field { margin: 0; min-width: 0; }
+.label-card input[type="text"], .label-add input { width: 100%; box-sizing: border-box; }
+.label-add { margin: 6px 0 2px; }
+.tpl-field textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, Consolas, monospace; }
+/* ---------- phone batch (13 Oct 2026): typing room, the note editor's top bar, case rows, tap targets ---------- */
+/* Accessibility → Hide the tab bar while typing (app.js sets body.typing-nobar only while the bar is at the bottom and
+   the keyboard is up): no bar, and everything that sat above it (Save bar, formatting bar, page padding) drops down */
+body.typing-nobar { --tabbar-h: 0px; }
+body.typing-nobar .tabs { display: none; }
+/* the note editor: its top bar (‹ Notes, Saved, ⋯, Done) stays at the top while the note scrolls under the keyboard;
+   on iOS the visible area itself moves down the page when the keyboard is up (--vvt, app.js); it sits under a tab
+   bar that is stuck at the top (--pin-top) */
+.note-editor .note-top { position: sticky; top: var(--pin-top, 0px); z-index: 15; background: var(--panel); margin: -4px 0 0; padding: 4px 0; }
+/* typing in the note: the browser keeps the caret's line clear of the sticky bar above (about 52px) when it scrolls to it */
+html:has(.note-editor .note-top) { scroll-padding-top: calc(var(--pin-top, 0px) + 64px); }
+body.typing .note-editor .note-top { top: calc(var(--vvt, 0px) + var(--pin-top, 0px)); }
+/* the title wraps onto more lines when it's long (a one-row box that grows with it) */
+.note-editor textarea.note-title { display: block; resize: none; overflow: hidden; min-height: 0; line-height: 1.3; font-family: inherit; overflow-wrap: anywhere; }
+/* case rows: tags wrap onto a second line rather than run under the note button and the row's buttons (Shorter
+   Logbook rows keep their one grey line, which scrolls sideways inside the row as before) */
+html:not(.rows-short) ul.cases .c-tags { flex-wrap: wrap; overflow-x: visible; -webkit-mask-image: none; mask-image: none; padding-right: 0; row-gap: 4px; }
+html:not(.rows-short) ul.cases .c-tags > * { max-width: 100%; }
+/* the row menu's links look like its buttons (Request an evaluation) */
+.row-menu-list a.btn { justify-content: flex-start; min-height: 48px; text-decoration: none; color: inherit; }
+.row-menu-list a.btn .ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.case-links a.btn { text-decoration: none; }
+/* touch screens: the small targets reach 44px (the calendar's arrows, the view switches, the header's back link, the
+   demo chip, the Case tab's sync link), with padding rather than a new look; Compact mode keeps its tighter sizes */
+@media (pointer: coarse), (max-width: 600px) {
+  body:not(.compact) button.icon-btn { min-width: 44px; }
+  body:not(.compact) .back-row .back-link, body:not(.compact) .note-editor .note-back { min-height: 44px; }
+  body:not(.compact) button.demo-flag { min-height: 44px; min-width: 44px; }
+  body:not(.compact) a.sync.wait, body:not(.compact) a.draft-note { min-height: 44px; }
+  body:not(.compact) .tag-row { min-height: 44px; }
+  body:not(.compact) .lb-daynote-add .linkish, body:not(.compact) .note-meta .linkish, body:not(.compact) .note-meta .note-date { min-height: 44px; }
+  /* the view switches (Case | List, List | Pills) and the date chips beside them, so the row stays even */
+  body:not(.compact) .datebar .chip, body:not(.compact) .datebar .mode-seg button, body:not(.compact) .datebar input[type="date"], body:not(.compact) .cat-view button { min-height: 44px; }
+  body:not(.compact) .lb-monthpick input[type="month"] { min-height: 44px; }
+}

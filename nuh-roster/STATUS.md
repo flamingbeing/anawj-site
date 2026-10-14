@@ -5,7 +5,7 @@ Lasting rules and lessons go in `NOTES.md`. "Recently done" is updated at save-s
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision
 is made, or before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-13 by Claude Code, NUH Roster session (roster).
+Last updated: 2026-10-13 (evening) by Claude Code, NUH Roster session (roster).
 
 ## Now
 
@@ -14,39 +14,40 @@ sessions never edit the same lines. Read them all before starting; edit only you
 
 ## Waiting on the owner
 
-- Try the viewer role once with a test account (Settings › members › Viewer): it should see only My day and the roster
-  saved for the team, and saving should be refused. The rules are live; this path can't be tested without signing in.
-- Check the header's "Saved to the team" / "Changes not saved to the team" state once while signed in (untested for
-  the same reason).
-- Real staff names in Google Cloud: approval (PDPA, hospital policy) before the team uses real data. Until then the
-  roster holds no live data.
-- Send a real rotation Excel file when there is one, so the importer (`js/rotations.js`) can be checked against it.
-  It expects names down the first column and each week's Monday across the top.
-- When a specific flow between the roster and APMES is wanted, decide how people are linked across the apps: work
-  emails on the roster's staff records, or a mapping kept on the APMES side.
+- **Approve the rules PR** (role allowlist, member shape, stamped writes, date ids, staff-list history): the last PR of
+  the 13 Oct session. It deploys live on merge; 56 emulator checks pass (17 fail on today's rules). After merging,
+  check the "Deploy Firestore rules" run, then sign in and press Save for the team once.
+- Try the viewer role once with a test account (Settings › Team members › Viewer, and "On the staff list as"): it
+  should see only My day (its own day, "your account") and the roster saved for the team; saving is refused.
+- Check the header's "Saved to the team" state and "Save for the team" once while signed in (both untested live).
+- On a real phone: Add to Home Screen, then open it with mobile data off (offline shell, #467); the person box above
+  the keyboard (#419).
+- Real staff names in Google Cloud: approval (PDPA, hospital policy) before the team uses real data.
+- Send a real rotation Excel file and a real HMS monthly PDF when there is one, to check the importers again.
+- Decide on per-person history and fairness (review Batch I: "who did what" report, a fairness term in the generator):
+  needs the PDPA view first.
 
 ## Next (agreed queue)
 
-Nothing agreed. The 13 Oct review (`REVIEW-2026-10.md`) ranks about 60 ideas in batches A–I, safety first
-(silent save failure, live checks, a role allowlist in the rules with emulator tests, team-doc conflicts); the owner
-picks from it. Parked, only if asked:
-1. A read-only bridge to APMES (owner's question, 13 Oct): residents and supervisors as roster viewers, and APMES pages
-   reading `rosters/{date}` (room, consultant, case notes for a logbook entry; who supervised whom for evaluations;
-   the week's posting from `team/rotations`). Each app keeps its own Firebase project and rules.
-2. UX ideas from the 11 Oct checklist that weren't picked: shorter help text with "How do I…?" links, words for the
-   symbols plus a key, gentler labels, a printable quick guide, a "What changed" note after updates.
-3. Known limits in `NOTES.md` (lone-time comments read as leaving times; AOH and liver duties don't make anyone post call).
+The 13 Oct review (`REVIEW-2026-10.md`) is mostly built (its "Done" section lists what). Left, only if asked:
+1. Batch I (history and fairness): owner and PDPA decision first.
+2. Team documents: a "restore a staff-list version" screen once the rules PR is in (the versions are written by then).
+3. Splitting `app.js` (4,350 lines) one tab per PR; `store.js` and `help.js` were the first steps.
+4. A read-only bridge to APMES (owner's question, 13 Oct); "Copy for logbook" on My day is the first, safe step.
+5. Known limits in `NOTES.md`.
 
 ## Recently done
 
-- #361 Moved to `nuhroster.anawj.com` (subdomains step 4); the old address redirects, with "Download everything" for a browser with saved data. Sign-in checked by the owner.
-- #349 Viewer members (read-only, in the rules) and My day (`#myday`).
-- #348 Phone room cards, bottom-sheet person box, image for WhatsApp, one-page print, learning from hand changes.
-- #346 Tap to move or swap, ranked + picker, Select several, keyboard shortcuts, Practice mode with a tour.
-- #343 Weekly junior rotations in Monthly › Rotations (Excel in and out, one-day "Posting today").
-- #110 Steps strip, Problems card with fix buttons, Do it all, Undo instead of "are you sure?".
-- #109 Person chips on Calls and clinics (blank a monthly name; "↺ monthly").
-- #108 Fuller demo: every monthly roster, real-sized department.
+13 Oct: about 30 PRs from the review (#407–#473); the full list is in `REVIEW-2026-10.md` › Done on 13 Oct. The main ones:
+- #476 / #477 / #478 Twenty bugs from a last review of the day's work: AH OT read as double cover, a hand change lost to a carried status, Monthly too wide on phones, and smaller ones.
+- #473 / #446 Generate prefers SC/C for complex lists and double covers, says why, keeps a consultant for AIC.
+- #467 Installable on a phone's home screen; opens with poor signal.
+- #466 / #449 Start a day from the last roster; several-day statuses; save then send.
+- #458 / #465 / #471 Key and help, printable guide, What's new.
+- #453 The browser test in the repo and in CI.
+- #425 / #459 Team saves check for a newer save; a second tab can't write over the first.
+- #414 / #450 My day opens on today, My week, add to calendar, copy for logbook.
+- #407 / #408 A warning when the browser stops saving; live checks for double cover with no junior and more.
 
 ## Decisions log
 
@@ -58,3 +59,6 @@ picks from it. Parked, only if asked:
 - 2026-10-13 The roster stays separate from APMES (own Firebase project and rules). Data flows later through a narrow read-only bridge, not a merge.
 - 2026-10-13 The roster moved to its own subdomain, `nuhroster.anawj.com` (owner: other rosters may get their own later).
 - 2026-10-13 Twenty read-only reviews ranked improvements into `REVIEW-2026-10.md`; recommended order: safety (Batch A) before new features.
+- 2026-10-13 The review was built in one evening, PR by PR (owner: "spend the next 5 hours improving this app"); the rules change is the last PR and waits for the owner.
+- 2026-10-13 Generate prefers SC/C seniors for complex lists, double covers and rooms with a Baby MO or MOPEX; AOCC leaves the last free consultant for AIC.
+- 2026-10-13 My day opens on today until 2pm, then tomorrow.

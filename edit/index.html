@@ -85,9 +85,11 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
     <button id="mBrowse" aria-pressed="false">Browse</button><button id="mEdit" aria-pressed="true">Edit</button>
   </div>
   <button id="review"><span class="wide">Changes </span>(<span id="count">0</span>)</button>
+  <button id="share" aria-label="Share this page for comments">Share</button>
   <button id="send" class="primary">Send</button>
 </div>
 <div class="hint" id="hint" role="status"></div>
+<div class="hint" id="live" hidden></div>
 <iframe id="frame" title="Page being edited"></iframe>
 <div class="actions" id="actions" role="toolbar" aria-label="Selected item">
   <span class="whatrow"><span class="what" id="what"></span><button id="aCancel" class="x" aria-label="Cancel" title="Cancel">✕</button></span>
@@ -116,6 +118,14 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
   <p class="muted">Saved in this browser until you send them. Changes on every page are sent together.</p>
   <div class="list" id="list"></div>
   <div class="row"><button id="clearAll">Clear all</button><button id="listClose" class="primary">Close</button></div>
+</dialog>
+
+<dialog id="shareDlg">
+  <h2>Share this page for comments</h2>
+  <p class="muted">Colleagues scan this to open the editor on this page and suggest changes from their own phones.</p>
+  <div id="qr" style="width:min(240px,70vw);margin:8px auto"></div>
+  <p style="text-align:center;overflow-wrap:anywhere"><code id="shareLink"></code></p>
+  <div class="row"><button id="shareCopy">Copy link</button><button id="shareClose" class="primary">Close</button></div>
 </dialog>
 
 <dialog id="sendDlg">
@@ -192,7 +202,7 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
     if (/^\/edit\//.test(pageOf() || '')) { $('hint').textContent = 'That’s this editor. Use Open to go to a page.'; return; }
     // The figures redraw many times a second; stop them so they can be selected and commented on.
     try { frame.contentWindow.handFigs?.pauseAll?.(); } catch (e) {}
-    syncPath();
+    syncPath(); liveLink();
     frame.contentWindow.addEventListener('hashchange', syncPath);
     if (/\.pdf$/i.test(pageOf())) { $('hint').textContent = 'PDFs can’t be edited here. Go back to the page that links to it and comment on the link instead.'; return; }
     const st = doc.createElement('style');
@@ -237,6 +247,30 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
     restoreMarks(); setTimeout(restoreMarks, 800); setTimeout(restoreMarks, 2500);
     setMode(mode);
   });
+
+  // Pages that now live on a subdomain: the feedback button comments on them where they really are (the live app
+  // signed in, not its demo), so offer it. (The real addresses: worker/routes.js SITES.)
+  const LIVE = { '/logbook/': 'https://apmes.anawj.com/logbook/', '/evals/': 'https://apmes.anawj.com/evals/', '/nuh-roster/': 'https://nuhroster.anawj.com/',
+    '/prewarm/': 'https://prewarmstudy.anawj.com/', '/hand-babies/': 'https://hand.anawj.com/babies/', '/cmcj/': 'https://hand.anawj.com/cmcj/' };
+  function liveLink() {
+    const p = pageOf() || '', dir = Object.keys(LIVE).find(d => p.startsWith(d));
+    $('live').hidden = !dir;
+    if (!dir) return;
+    const url = LIVE[dir] + p.slice(dir.length).split('?')[0] + '?feedback=1';
+    $('live').innerHTML = 'This page lives at its own address too: <a target="_blank" rel="noopener"></a> opens it with a feedback button, for commenting on the real thing.';
+    $('live').querySelector('a').href = url; $('live').querySelector('a').textContent = new URL(url).host + new URL(url).pathname;
+  }
+
+  // ---- sharing: a QR code of the short address (edit.anawj.com/<page> opens this editor on that page)
+  $('share').onclick = async () => {
+    const link = 'https://edit.anawj.com' + (pageOf() || '/') + viewOf();
+    $('shareLink').textContent = link; $('qr').textContent = ''; $('shareCopy').textContent = 'Copy link';
+    $('shareDlg').showModal();
+    try { const { qrSvg } = await import('/feedback/qr.js'); $('qr').appendChild(qrSvg(link, 'QR code of the link to this page in the editor')); }
+    catch (e) { $('qr').textContent = 'QR code unavailable: use Copy link.'; }
+    $('shareCopy').onclick = () => { try { navigator.clipboard.writeText(link).catch(() => {}); } catch (e) {} $('shareCopy').textContent = 'Copied'; };
+  };
+  $('shareClose').onclick = () => $('shareDlg').close();
 
   // ---- choosing what was tapped
   const BLOCK = 'h1,h2,h3,h4,h5,h6,p,li,dt,dd,td,th,caption,figcaption,blockquote,summary,label,button,a,img,svg,figure,video,canvas,pre';
@@ -373,7 +407,7 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
   // ---- speaking a comment (the browser's own speech recognition, where there is one; the text is what's kept)
   const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
   let rec = null;
-  function stopSpeech() { if (rec) { try { rec.stop(); } catch (e) {} rec = null; } $('speakBtn').setAttribute('aria-pressed', 'false'); $('speakBtn').textContent = '🎤 Speak'; }
+  function stopSpeech() { if (rec) { try { rec.abort(); } catch (e) {} rec = null; } $('speakBtn').setAttribute('aria-pressed', 'false'); $('speakBtn').textContent = '🎤 Speak'; }
   if (Speech) {
     $('speakBtn').hidden = false;
     $('speakHint').textContent = 'Tap Speak and say what should change; check the words before saving (drug names and doses get misheard).';
@@ -381,8 +415,9 @@ code{font-size:13px;background:var(--inset);padding:2px 4px;word-break:break-all
       if (rec) { stopSpeech(); return; }
       const box = $('noteText'), start = box.value ? box.value.replace(/\s*$/, ' ') : '';
       try {
-        rec = new Speech(); rec.lang = navigator.language || 'en-GB'; rec.interimResults = true; rec.continuous = true;
-        rec.onresult = e => { let t = ''; for (const r of e.results) t += r[0].transcript; box.value = start + t.trim(); };
+        const me = rec = new Speech(); rec.lang = navigator.language || 'en-GB'; rec.interimResults = true; rec.continuous = true;
+        // (a recognizer stopped for an earlier comment can still deliver words: ignore it)
+        rec.onresult = e => { if (rec !== me) return; let t = ''; for (const r of e.results) t += r[0].transcript; box.value = start + t.trim(); };
         rec.onerror = e => { stopSpeech(); if (e.error === 'not-allowed' || e.error === 'service-not-allowed') $('speakHint').textContent = 'The microphone is blocked for this page. Use your keyboard’s microphone instead.'; };
         rec.onend = () => { if (rec) stopSpeech(); };
         rec.start();

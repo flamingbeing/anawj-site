@@ -6,18 +6,22 @@ import { flagCase } from './importer.js';
 import { exportWorkbook, readSheetGrid } from './xlsxio.js';
 import { cleanExportOpts, exportTables, rangeText, CASE_COLS, REFL_COLS } from './export-opts.js';
 import { inExport } from './reflections.js';
-import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator } from './search-ops.js';
+import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator, FIELDS, FIELDS_NO_HAS } from './search-ops.js';
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
   updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon, ic, ib, emptyState, reveal, basicHides } from './ui-core.js';
-import { dayHasNotes, caseHasNotes, openNotes, ensureNotes } from './ui-notepad.js';
+import { dayHasNotes, caseHasNotes, openNotes, ensureNotes, dayNoteCard } from './ui-notepad.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
 import { reflectOnCase } from './ui-reflect.js';
 import { moveToBin } from './bin.js';
 import { destinations, openSend } from './ui-send.js';
+import { syncButton } from './ui-sync.js';
 import { shareText, copyText, caseText as shareCaseText, dayTextWithNotes } from './share.js';
+import { labelsOn, parseParts, rowSegments, findLabel, takeHas } from './parts.js';
+import { cloud, shows } from './ui-core.js';
+import { evalRequestUrl, evalsBase } from './eval-link.js';
 
 // has: tags a case must all have; not: tags it must have none of ('c:16' or a personal tag key); from/to: dates
 const FRESH = () => ({ q: '', has: [], not: [], from: '', to: '', flag: '', mode: null, limit: 150, month: null, day: null });
@@ -41,6 +45,29 @@ function tagChoices() {
   for (const c of S.cases || []) for (const k of c.tags || []) if (!known.has(k)) gone.set(k, (gone.get(k) || 0) + 1);
   for (const [k, n] of gone) out.push({ k, depth: 0, label: `${tagName(k)} (${n} case${n === 1 ? '' : 's'})` });
   return out;
+}
+// Labelled parts (Settings → Advanced logging; off by default): which parts a case has and its row text, worked out
+// once per version of the case and list of labels
+let partMemo = new WeakMap(), partFor = null;
+function partInfo(c, labels) {
+  if (partFor !== labels) { partMemo = new WeakMap(); partFor = labels; }
+  let m = partMemo.get(c);
+  if (!m) {
+    const text = caseParts(c).details;
+    m = { keys: new Set(parseParts(text, labels).parts.filter(p => p.text.trim()).map(p => p.k)), segs: rowSegments(text, labels) };
+    partMemo.set(c, m);
+  }
+  return m;
+}
+// a row's text with each part's label in bold ("Plan: GA"), on lines of their own; parts hidden in lists left out
+function partsText(c, labels) {
+  const out = [];
+  for (const seg of partInfo(c, labels).segs) {
+    if (out.length) out.push('\n');
+    if (seg.label) out.push(h('b', { class: 'part-l' }, seg.label + ':'), seg.text ? ' ' + seg.text : '');
+    else out.push(seg.text);
+  }
+  return out.length ? out : null;
 }
 // The text a case is searched by, worked out once per version of the case (logbooks run to thousands)
 // (and again when your tags change: renamed tags are searched by their new names)
@@ -70,8 +97,14 @@ export function renderLogbook() {
     // case sensitive (off by default) keeps capitals apart ("GA" doesn't find "gastrectomy")
     const scope = settings().lbScope || 'all', fuzzy = !!settings().lbFuzzy, cs = !!settings().lbCase;
     const low = t => (cs ? t : t.toLowerCase());
-    const words = low(win ? win.rest : view.q).split(/\s+/).filter(Boolean);
-    const ops = opsOn() && words.length ? parseQuery(win ? win.rest : view.q, { keepCase: cs }) : null;
+    // has:lp (Labelled parts on): cases with that part; a plain search takes it here, Advanced search as an operator
+    const labels = labelsOn(settings());
+    let q = win ? win.rest : view.q;
+    const has = labels && !opsOn() ? takeHas(q, labels) : null;
+    if (has) q = has.rest;
+    const words = low(q).split(/\s+/).filter(Boolean);
+    const ops = opsOn() && words.length ? parseQuery(q, { keepCase: cs, fields: labels ? FIELDS : FIELDS_NO_HAS }) : null;
+    const partHas = c => t => { const l = labels && findLabel(t, labels); return !!l && partInfo(c, labels).keys.has(l.k); };
     if (hayFor !== settings().tagSet || hayNames !== categoryNamesRevision) { hayCache = new WeakMap(); hayFor = settings().tagSet; hayNames = categoryNamesRevision; }
     const hayOf = c => {
       let m = hayCache.get(c);
@@ -83,12 +116,13 @@ export function renderLogbook() {
       return m[key];
     };
     return S.cases.filter(c => {
-      if (view.flag && !(view.flag === 'interesting' ? c.reflectTag : flagsOf(c).includes(view.flag))) return false;
+      if (view.flag && !(view.flag === 'interesting' ? c.reflectTag : view.flag.startsWith('part:') ? !!labels && partInfo(c, labels).keys.has(view.flag.slice(5)) : flagsOf(c).includes(view.flag))) return false;
       if (view.has.length && !view.has.every(k => hasTag(c, k))) return false;
       if (view.not.length && view.not.some(k => hasTag(c, k))) return false;
       if ((view.from || view.to) && !(c.date && (!view.from || c.date >= view.from) && (!view.to || c.date <= view.to))) return false;
       if (win && !(c.date && c.date >= win.from && c.date <= win.to)) return false;
-      if (ops) return matchQuery(ops, k => (k === 'all' ? hayOf(c) : partsOf(c, cs)[k]), t => tagHas(c, t), (hay, w, f) => textHas(hay, w, fuzzy && f !== 'initials' && (f || scope !== 'initials')));
+      if (has && has.keys.length && !has.keys.every(k => k && partInfo(c, labels).keys.has(k))) return false;
+      if (ops) return matchQuery(ops, k => (k === 'all' ? hayOf(c) : partsOf(c, cs)[k]), t => tagHas(c, t), (hay, w, f) => textHas(hay, w, fuzzy && f !== 'initials' && (f || scope !== 'initials')), partHas(c));
       if (!words.length) return true;
       const hay = hayOf(c);
       return words.every(w => textHas(hay, w, fuzzy && scope !== 'initials'));
@@ -113,7 +147,11 @@ export function renderLogbook() {
   const paintSoon = debounce(() => { view.limit = 150; paint(); }, 150);
 
   const nFlag = f => S.cases.filter(c => flagsOf(c).includes(f)).length;
-  const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Upcoming (${nFlag('future')})`], ...(basicHides('reflect') ? [] : [['interesting', `Interesting (${S.cases.filter(c => c.reflectTag).length})`]])];
+  // with Labelled parts on, one more for each label: "Has learning point (12)"
+  const labelList = labelsOn(settings()) || [];
+  const flagOpts = [['', 'All cases'], ['needsDate', `Needs a date (${nFlag('needsDate')})`], ['duplicate', `Possible duplicates (${nFlag('duplicate')})`], ['future', `Upcoming (${nFlag('future')})`], ...(basicHides('reflect') ? [] : [['interesting', `Interesting (${S.cases.filter(c => c.reflectTag).length})`]]),
+    ...labelList.map(l => ['part:' + l.k, `Has ${l.n.toLowerCase()} (${S.cases.filter(c => partInfo(c, labelList).keys.has(l.k)).length})`])];
+  if (view.flag && !flagOpts.some(([v]) => v === view.flag)) view.flag = '';   // a label since taken off, or the setting off
   const counter = h('span', { class: 'muted', style: 'font-size:calc(13px * var(--fs, 1))' });
 
   // the two filters fold behind a Filter button (shown open while one is in use)
@@ -165,7 +203,8 @@ export function renderLogbook() {
   const filters = h('div', { class: 'lb-filters', hidden: !(view.showFilters || active()) },
     h('div', { class: 'lb-grid' }, cell('Show', flagSel), cell('Search in', searchIn)),
     h('div', { class: 'bar lb-folds' }, dateBtn, tagBtn, moreBtn, resetBtn),
-    datePanel, tagPanel, morePanel);
+    datePanel, tagPanel, morePanel,
+    labelList.length ? h('p', { class: 'lb-points' }, h('a', { href: '#points' }, 'All learning points ›')) : null);
   // everything back to how it starts: search text, tag and date filters, search options
   function resetLink() {
     return h('button', { class: 'small linkish', style: 'margin-left:auto', onclick: () => {
@@ -229,9 +268,10 @@ export function renderLogbook() {
   function setBox(v) { searchBox.value = v; searchWrap.classList.toggle('has-text', !!v); paintOpsNote(); }
   const opsNote = h('p', { class: 'hint lb-opsnote', hidden: true });
   const paintOpsNote = () => {
-    const u = opsOn() && view.q ? parseQuery(view.q).unknown : [];
-    opsNote.hidden = !u.length;
-    opsNote.textContent = u.map(x => `“${x.op}” isn’t an operator (searched as text): did you mean ${x.suggest}?`).join(' ');
+    const on = !!labelsOn(settings()), u = opsOn() && view.q ? parseQuery(view.q, { fields: on ? FIELDS : FIELDS_NO_HAS }).unknown.filter(x => on || x.op.toLowerCase() !== 'has:') : [];
+    const needs = opsOn() && !on && /(^|\s)-?has:/i.test(view.q || '');
+    opsNote.hidden = !u.length && !needs;
+    opsNote.textContent = [...u.map(x => `“${x.op}” isn’t an operator (searched as text): did you mean ${x.suggest}?`), ...(needs ? ['has: needs Labelled parts (Settings → Advanced logging): searched as text.'] : [])].join(' ');
   };
   const helpBtn = opsOn() ? h('button', { type: 'button', class: 'small icon-btn', title: 'Search operators', 'aria-label': 'Search operators', onclick: () => opsHelp(searchBox, v => { view.q = v; searchWrap.classList.toggle('has-text', !!v); paintOpsNote(); refresh(); }) }, '?') : null;
   paintFilterBtn(); repaintFilters(); paintSaved(); paintOpsNote();
@@ -244,7 +284,9 @@ export function renderLogbook() {
     savedRow,
     filters,
     h('div', { class: 'bar', style: 'margin-bottom:0' },
-      counter, h('span', { class: 'grow' }),
+      // Sync (Settings → Sync): only once a place to sync to is set up; it says how many days wait (and then the
+      // gap may shrink, so the view switch stays on this row on a phone)
+      ...(sb => [counter, h('span', { class: 'grow', style: sb ? 'min-width:0' : null }), sb])(syncButton()),
       h('div', { class: 'seg' }, modes().map(([m, l]) =>
         h('button', { 'aria-pressed': String(view.mode === m), onclick: () => setMode(m) }, l)))));
   // pinned (Settings → Display): the month headings in List stick just under it
@@ -330,8 +372,10 @@ function openRowMenu(c) {
   const has = (S.reflections || []).some(r => r.caseId === c.id);
   const m = modal(caseText(c).slice(0, 60) || 'Case', h('div', { class: 'row-menu-list' },
     h('button', { onclick: () => { m.close(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), ' Copy'),
-    destinations().length ? h('button', { onclick: () => { m.close(); openSend({ text: shareCaseText(c), title: c.date || 'Case' }); } }, rowIcon('copy'), ' Send to…') : null,
+    destinations().length ? h('button', { onclick: () => { m.close(); openSend({ text: shareCaseText(c), title: c.date || 'Case', fileDate: c.date || '' }); } }, rowIcon('copy'), ' Send to…') : null,
     basicHides('reflect') ? null : h('button', { class: has ? 'has-refl' : '', onclick: () => { m.close(); reflectOnCase(c); } }, rowIcon(has ? 'done' : 'reflect'), has ? ' Open the reflection' : ' Write a reflection'),
+    // APMES → Request an evaluation (off by default): the evaluations app, with this case's date and initials
+    shows('evalRequest') ? h('a', { class: 'btn eval-req', href: evalRequestUrl({ date: c.date, initials: caseParts(c).initials }, { today: todayISO(), demo: cloud.demo, base: evalsBase(location.href) }), target: '_blank', rel: 'noopener', onclick: () => m.close() }, rowIcon('reflect'), ' Request an evaluation') : null,
     h('button', { onclick: () => { m.close(); editCaseDialog(c); } }, ' Edit the case'),
     h('button', { class: 'linkish', onclick: () => m.close() }, 'Cancel')));
 }
@@ -383,7 +427,7 @@ function caseRow(c, flagsOf) {
       // the left column: the initials on top, the date on one line under them (like Reflections; owner, 13 Oct 2026)
       h('span', { class: 'd' }, p.initials ? h('b', { class: 'ini' }, p.initials) : null,
         h('span', { class: 'dt' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '')] : (c.dateText || '—'))),
-      h('span', { class: 't' }, p.details || h('i', { class: 'muted' }, 'no details')),
+      h('span', { class: 't' }, (labelsOn(settings()) ? partsText(c, labelsOn(settings())) : p.details) || h('i', { class: 'muted' }, 'no details')),
       // tags on the left (wrapping), Copy and Reflect on the right, the same size whatever they say
       h('span', { class: 'c' }, tagRow(h('span', { class: 'c-tags' }, catTags(c.cats),
         flags.includes('needsDate') ? h('span', { class: 'flag err' }, 'needs date') : null,
@@ -444,13 +488,15 @@ function calendarView(rows, flagsOf, repaint) {
     add(grid, h('button', {
       class: `lb-day t${tint} ${iso === today ? 'today' : ''} ${iso === view.day ? 'sel' : ''}`,
       'aria-label': `${d} ${MONTHS[m - 1]}: ${cs.length} case${cs.length === 1 ? '' : 's'}${dayHasNotes(iso) ? ', has notes' : ''}`, 'aria-pressed': String(iso === view.day),
-      onclick: () => { view.day = view.day === iso ? null : iso; repaint(); },
+      onclick: () => { view.day = view.day === iso ? null : iso; repaint(); if (view.day) showDay(); },
     }, h('span', { class: 'n' }, d), h('span', { class: 'lb-count' + (cs.length ? '' : ' none'), 'aria-hidden': cs.length ? null : 'true' }, cs.length || ''), flagged ? h('i', { class: 'lb-dot', title: 'Has a flagged case' }) : null,
       dayHasNotes(iso) ? h('i', { class: 'lb-note', title: 'Has notes' }) : null));
   }
   const dayCases = view.day ? (byDay.get(view.day) || []) : [];
   const dayNotes = dayHasNotes(view.day);
-  if (dayNotes) ensureNotes();   // the day's Copy includes its notes: have them ready before the tap
+  // the day's Copy includes its notes, and its daily note shows under the heading: have them ready (drawn again once
+  // they arrive)
+  if (dayNotes && !Array.isArray(S.notes)) ensureNotes().then(() => { if (S.tab === 'logbook') hooks.render(); });
   return h('div', {},
     h('div', { class: 'bar lb-calbar' },
       h('button', { class: 'small icon-btn', 'aria-label': 'Previous month', onclick: () => shift(-1) }, '‹'),
@@ -462,7 +508,7 @@ function calendarView(rows, flagsOf, repaint) {
       h('button', { class: 'small icon-btn', 'aria-label': 'Next month', onclick: () => shift(1) }, '›'),
       h('button', { class: 'small', onclick: () => { view.month = today.slice(0, 7); view.day = today; repaint(); } }, 'Today')),
     grid,
-    view.day ? h('div', { style: 'margin-top:12px' },
+    view.day ? h('div', { class: 'lb-daydetail', style: 'margin-top:12px' },
       // the day, then its buttons together on one row (none left alone on a line of its own)
       h('div', { class: 'lb-dayhead' },
         h('h3', { style: 'margin:0' }, `${fmtDate(view.day)} (${dayCases.length})`),
@@ -475,11 +521,46 @@ function calendarView(rows, flagsOf, repaint) {
           dayNotes ? h('button', { class: 'small ib', title: 'Notes', onclick: () => openNotes({ day: view.day }) }, ic('note'), h('span', { class: 'ib-l' }, 'Notes')) : null,
           // log on this day (the Log page opens with the date already picked): last, at the right like a main action
           h('button', { class: 'small primary', title: 'Log a case on this day', 'aria-label': 'Log a case on this day', onclick: () => logOnDate(view.day) }, '+ Add'))),
+      dayNoteCard(view.day),
       dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : emptyState('calendar', view.day === today ? 'No cases yet today' : 'No cases on this day'))
       : h('p', { class: 'hint help', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
     undated.length ? h('details', { style: 'margin-top:12px' },
       h('summary', {}, `No date (${undated.length})`),
       h('ul', { class: 'cases' }, undated.map(c => caseRow(c, flagsOf)))) : null);
+}
+
+// A tapped day's cases come into view when they'd start below the screen (or under the tab bar): enough of them to
+// see the day's heading and first cases, never so far that the calendar's own row goes off the top. Smoothly, unless
+// Reduce motion is on.
+function showDay() {
+  requestAnimationFrame(() => {
+    const el = document.querySelector('.lb-daydetail');
+    if (!el) return;
+    // the day's button was drawn again: keep the keyboard's place on it
+    const sel0 = document.querySelector('.lb-day.sel');
+    if (sel0 && (!document.activeElement || document.activeElement === document.body)) sel0.focus({ preventScroll: true });
+    const r = el.getBoundingClientRect();
+    const bar = document.getElementById('tabs'), br = bar && !bar.hidden ? bar.getBoundingClientRect() : null;
+    const bottom = Math.min(window.visualViewport ? window.visualViewport.height : window.innerHeight, br && br.top > window.innerHeight / 2 ? br.top : Infinity) - 8;
+    const want = r.top + Math.min(r.height, 220);   // the heading and about two cases
+    if (want <= bottom) return;
+    const sel = document.querySelector('.lb-day.sel'), top = sel ? sel.getBoundingClientRect().top - 8 : r.top - 8;
+    const by = Math.min(want - bottom, Math.max(0, top));
+    if (by <= 0) return;
+    const c = document.documentElement.classList;
+    const still = c.contains('rm') || (c.contains('rm-auto') && matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const to = window.scrollY + by, behavior = still ? 'auto' : 'smooth';
+    window.scrollTo({ top: to, behavior });
+    // a page drawn again meanwhile (the day's notes arriving) puts the scroll back where it was: finish the move,
+    // unless the finger has moved the page since
+    let moved = false;
+    const mark = () => { moved = true; };
+    for (const ev of ['touchstart', 'wheel', 'keydown']) window.addEventListener(ev, mark, { once: true, passive: true });
+    setTimeout(() => {
+      for (const ev of ['touchstart', 'wheel', 'keydown']) window.removeEventListener(ev, mark);
+      if (!moved && S.tab === 'logbook' && document.querySelector('.lb-daydetail') && Math.abs(window.scrollY - to) > 4) window.scrollTo({ top: to, behavior });
+    }, still ? 50 : 500);
+  });
 }
 
 // ---------- grid ----------

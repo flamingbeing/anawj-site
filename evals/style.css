@@ -204,6 +204,8 @@ body.typing .e-bottomnav { padding-bottom: 0; }
 .e-row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .e-row__title { font-weight: var(--n-semibold); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .e-row__meta { font-size: var(--n-text-sm); color: var(--n-muted); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* on the hover background the usual grey is 4.4:1; the darker grey keeps 4.5:1 */
+.e-row:hover .e-row__meta { color: var(--e-muted-on-grey); }
 .e-row__chev { width: 20px; height: 20px; color: var(--n-muted); }
 .e-row .e-chip { flex: none; }
 .e-row--stacked .e-row__title { -webkit-line-clamp: 3; }
@@ -614,3 +616,35 @@ body { background: var(--e-bg-group); }
 .e-flaggroup > summary { padding: 12px 16px; cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .e-flaggroup > summary .e-flag-why { flex-basis: 100%; }
 .e-qrbox { display: block; width: min(280px, 80vw); aspect-ratio: 1; background: #fff; }
+
+/* How evals work */
+.e-how { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.e-how__step { display: flex; gap: 12px; align-items: flex-start; }
+.e-how__step p { margin: 2px 0 0; }
+.e-how__n { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--e-accent-soft, #e6eef8); color: var(--n-navy); font-weight: var(--n-bold); }
+
+/* My record (#summary): screen and print */
+.e-sum-epa + .e-sum-epa { margin-top: 16px; }
+.e-sum-table { width: 100%; font-size: var(--n-text-sm); }
+.e-sum-table td, .e-sum-table th { vertical-align: top; }
+@media print {
+  .e-summary .e-card { border: 0; box-shadow: none; padding: 0; margin: 0 0 12px; }
+  .e-sum-epa { break-inside: avoid; }
+}
+
+/* On/off settings: a switch at the row's end, as in the logbook's Settings (13 Oct 2026) */
+.e-check.e-switch { justify-content: space-between; align-items: center; border: 0; padding: 4px 0; background: none; box-shadow: none; }
+.e-check.e-switch:has(input:checked) { background: none; border: 0; box-shadow: none; }
+.e-check.e-switch > input[type=checkbox] {
+  appearance: none; -webkit-appearance: none; order: 2; margin: 0 0 0 auto; flex: none; position: relative; cursor: pointer;
+  width: 46px; height: 28px; min-height: 0; padding: 0; border: 0; border-radius: 14px;
+  background: color-mix(in srgb, var(--n-muted) 45%, var(--e-surface)); transition: background .2s ease;
+}
+.e-check.e-switch > input[type=checkbox]::before {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform .2s ease;
+}
+.e-check.e-switch > input[type=checkbox]:checked { background: var(--e-select); }
+.e-check.e-switch > input[type=checkbox]:checked::before { transform: translateX(18px); }
+.e-check.e-switch > input[type=checkbox]:focus-visible { outline: 2px solid var(--n-navy); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .e-check.e-switch > input, .e-check.e-switch > input::before { transition: none; } }

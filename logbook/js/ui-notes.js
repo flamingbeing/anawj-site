@@ -3,9 +3,9 @@
 // Progress.md, and the figures in images/ if wanted.
 // The layout is the user's (Settings → Markdown, markdown.js); this file only gathers the data and zips it.
 
-import { S, h, toast, modal, download, todayISO, cloud, rYear, myYearName, catName, catShort, tagName } from './ui-core.js';
+import { S, h, toast, modal, download, todayISO, cloud, rYear, myYearName } from './ui-core.js';
 import { exportNotes } from './markdown.js';
-import { mdFormat } from './share.js';
+import { mdFormat, mdCtx } from './share.js';
 import { progress } from './engine.js';
 import { reflectionProgress } from './reflections.js';
 import { needZip } from './portfolio.js';
@@ -34,7 +34,7 @@ export async function makeNotesZip(opts = {}) {
     }
   }
   const files = exportNotes({
-    cases: S.cases || [], reflections: list, notes, m: mdFormat(), ctx: { catName, catShort, tagName }, images,
+    cases: S.cases || [], reflections: list, notes, m: mdFormat(), ctx: mdCtx(), images,
     progress: { rows: progress(S.counts || {}, rYear()), refl: reflectionProgress(refls), year: myYearName(), today: todayISO() },
     opts: { cases: o.cases, reflections: o.reflections, progress: o.progress, notes: o.notes },
   });
