@@ -656,10 +656,13 @@ function home() {
 }
 // chart-review days (14 Oct 2026): POD1 / POD2 are due the first and second calendar day after surgery, until their
 // Complete tick. Surgery date = the Surgery date field, else the day the patient was started on this phone.
-function podDue(p) {
-  if (isGone(p) || status(p) === 'Not started') return '';
+function podDays(p) {
+  if (isGone(p) || status(p) === 'Not started') return null;
   const od = val(p, 'op_date'), start = od && /^\d{4}-\d{2}-\d{2}$/.test(od) ? new Date(od + 'T00:00:00') : new Date(new Date(p.created || Date.now()).toDateString());
-  const days = Math.round((new Date(new Date().toDateString()) - start) / 864e5);
+  return Math.round((new Date(new Date().toDateString()) - start) / 864e5);
+}
+function podDue(p) {
+  const days = podDays(p); if (days == null) return '';
   const out = [];
   for (const [n, sign] of [[1, 'sign_pod1'], [2, 'sign_pod2']]) if (days >= n && !val(p, sign)) out.push(`POD${n} ${days > n ? 'overdue' : 'due today'}`);
   return out.join(' · ');
@@ -1378,6 +1381,13 @@ function gaps(p) {
   const unanswered = ids => ids.map(field).filter(f => f && isShown(f, get) && get(f.id) == null).map(f => f.label);
   if (get('io_done')) add('Intra-op details unanswered', unanswered(INTRAOP_Q), `#/p/${p.id}/form/intraop`);
   if (get('pacu_in')) add('PACU unanswered', unanswered(PACU_Q), `#/p/${p.id}/form/pacu`);
+  // chart review: POD1 / POD2 once due and not ticked complete (how many of the questions have an answer)
+  const days = podDays(p);
+  for (const [n, sign, pages] of [[1, 'sign_pod1', ['pod1', 'pod1an']], [2, 'sign_pod2', ['pod2', 'pod2an', 'dc']]]) {
+    if (days == null || days < n || get(sign)) continue;
+    const all = pages.flatMap(pg => FORM[pg].map(([k]) => k)), done = all.filter(k => get(k) != null).length;
+    add(`POD${n} chart review ${days > n ? 'overdue' : 'due today'}`, [`${done} of ${all.length} answered`], at('data/day' + n));
+  }
   if (get('ev_ot') && get('sat_pre') == null) add('Comfort not asked', ['Before surgery'], '#/p/' + p.id);
   if (get('pacu_in') && get('sat_post') == null) add('Comfort not asked', ['After surgery'], '#/p/' + p.id);
   return out;
@@ -1964,10 +1974,27 @@ function simpleForm(p, id, note = '') {
 }
 
 // ---------- settings
+// Ready for a case? (14 Oct 2026): everything that has gone wrong before a case, in one list
+function readyHtml() {
+  if (!cloud.enabled) return '';
+  const rows = [
+    ['Online', navigator.onLine, 'no signal: readings are kept and sent later'],
+    ['Initials set', !!settings.me, 'add them below'],
+    ['On a team', !!sharing(), 'join your hospital’s team below'],
+    ['Hospital set', !!(shared.member?.site || settings.site), 'choose it below'],
+    ['Nothing waiting or refused', !Object.keys(pending).some(id => patients[id] && !isGone(patients[id])) && !Object.keys(failed).some(id => patients[id] && !isGone(patients[id])), 'tap the chip at the top of a patient for why'],
+    ['Synced in the last 15 minutes', !!lastSync && Date.now() - lastSync < 15 * 60e3, 'tap Refresh now below'],
+    ['App is up to date', !swReg?.waiting, 'tap “Update available” at the top'],
+  ];
+  const bad = rows.filter(r => !r[1]).length;
+  return `<h2>Ready for a case?</h2><ul class="ready" role="list" aria-label="Checks before a case">${rows.map(([l, ok, fix]) => `<li class="${ok ? 'ok' : 'no'}"><span aria-hidden="true">${ok ? '✓' : '✗'}</span><span><b>${esc(l)}</b>${ok ? '' : `<small>${esc(fix)}</small>`}</span></li>`).join('')}</ul>
+    <small class="muted">${bad ? `${bad} to fix before a case.` : 'All good.'} Also make a fresh PACU link per patient and test it once on a phone that is not on the team.</small>`;
+}
 route(/^\/settings$/, () => {
   header('Settings', '#/');
   const tog = (grp, k, l, d = '') => `<label class="tog"><input type="checkbox" data-g="${grp}" data-k="${k}" ${grp === 'hide' ? (settings.hide[k] ? '' : 'checked') : settings[grp][k] ? 'checked' : ''}><span>${l}${d ? `<small>${d}</small>` : ''}</span></label>`;
   paint(`<div class="stack">
+    ${readyHtml()}
     <label class="lab" for="me">Your initials</label><input id="me" value="${esc(settings.me)}" maxlength="6" autocapitalize="characters" autocomplete="off">
     <small class="muted">Saved with each reading as “entered by”.</small>
     <h2>Screen size</h2>

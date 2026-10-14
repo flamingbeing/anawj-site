@@ -400,3 +400,10 @@ The list shows "POD1 due today / overdue" and "POD2 ..." from the Surgery date f
 started on this phone) until the section's Complete tick. A Subject ID search box appears above 5 patients (hides rows,
 no redraw). A patient waiting to send, or whose save was refused, has a red "Not sent yet" / "Not saved to the team"
 line. `RUNBOOK.md` is the one-page study-day routine for the team; `PLAN.md` is marked old.
+
+### Ready for a case? card (14 Oct 2026)
+Top of Settings (when sharing is available): ✓ / ✗ rows for online, initials, on a team, hospital set, nothing waiting
+or refused, synced in the last 15 minutes, app up to date, each with what to do. It only reads state the app already
+keeps; it does not test the PACU link (do that by hand, see `RUNBOOK.md`). Checked in the sync emulator test.
+Still to fill (patient screen) also lists "POD1 / POD2 chart review due today / overdue" with how many questions have an answer,
+once due and not ticked complete.
