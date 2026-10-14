@@ -66,4 +66,13 @@ assert.match(entryFrom('r 3', 'a@example.com', 1, answers).skip, /response id/);
   assert.equal(e.labels.length, 40);
 }
 
+// every top-level name is prefixed, so the script can sit beside another one (e.g. a sheet script with its own
+// onFormSubmit) in the same Apps Script project without replacing or clashing with anything
+{
+  const names = [...src.matchAll(/^(?:function\s+(\w+)|(?:var|let|const)\s+(\w+))/gm)].map(m => m[1] || m[2]);
+  assert.ok(names.length >= 10, 'found the top-level names');
+  for (const n of names) assert.match(n, /^(LOGBOOK_|logbookInbox)/, `unprefixed top-level name: ${n}`);
+  assert.doesNotMatch(src, /function onFormSubmit\b|function onOpen\b/);
+}
+
 console.log('form-script tests passed');
