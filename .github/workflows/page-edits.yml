@@ -84,6 +84,12 @@ jobs:
                "Needs the owner's decision" section when anything was left out. "Wants options" comments: follow
                edit/NOTES.md (2–3 versions behind a ?variant= switch).
             4. Comment on the issue with the PR link, and say the preview link will appear on the PR in a minute or two.
+      - name: Say so on the issue if drafting failed
+        if: failure() && steps.token.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --repo "${{ github.repository }}" --body "Drafting didn't work this time ([run log](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})). If it stopped within seconds, the CLAUDE_CODE_OAUTH_TOKEN secret is probably expired or revoked (edit/NOTES.md, \"Instant page edits\"). To try again: re-run the workflow, or remove and re-add the \`go\` label. The daily 8:58 routine will also pick this issue up."
 
   revise:
     # The owner's comment on a PR: always on a page-edits/… PR this workflow drafted; on any other PR only when the
@@ -144,3 +150,9 @@ jobs:
             Make the changes on this branch, run `node tools/check.mjs` and the tests AGENTS.md lists for what you
             touched, commit and push to `${{ steps.pr.outputs.ref }}`. Then reply on the PR in a few lines: what changed,
             what you left and why, and that the preview will update in a minute or two.
+      - name: Say so on the PR if revising failed
+        if: failure() && steps.pr.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment ${{ github.event.issue.number }} --repo "${{ github.repository }}" --body "Revising didn't work this time ([run log](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})). If it stopped within seconds, the CLAUDE_CODE_OAUTH_TOKEN secret is probably expired or revoked (edit/NOTES.md)."
