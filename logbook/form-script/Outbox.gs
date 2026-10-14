@@ -21,7 +21,10 @@ var LOGBOOK_OUTBOX_SITE = 'https://apmes.anawj.com/';                      // se
 var LOGBOOK_OUTBOX_CASE_SHEET = 'Case';
 var LOGBOOK_OUTBOX_RESIDENTS_SHEET = 'Residents';
 var LOGBOOK_OUTBOX_MARK_COL = 10;      // column J
-var LOGBOOK_OUTBOX_BATCH = 10;         // entries per run; the rest wait for the next one (one lock hold each: see logbookOutboxRun)
+var LOGBOOK_OUTBOX_BATCH = 12;         // entries per run; the rest wait for the next one
+var LOGBOOK_OUTBOX_CHUNK = 3;          // entries added per hold of the document lock (rows, Database, one sort)
+var LOGBOOK_OUTBOX_BUDGET_MS = 270000; // stop starting new work after 4.5 minutes (Apps Script stops a run at 6)
+var LOGBOOK_OUTBOX_PENDING_KEY = 'LOGBOOK_OUTBOX_PENDING';   // report rebuilds still to do: {"rids":[],"ays":[]}
 var LOGBOOK_OUTBOX_DATE_FORMAT = 'dd/mm/yyyy', LOGBOOK_OUTBOX_STAMP_FORMAT = 'dd/mm/yyyy hh:mm:ss';
 
 // The category labels exactly as the Form (and logbook/js/categories.js) write them. Tested against categories.js
@@ -113,31 +116,76 @@ function logbookOutboxRow_(entry, residentText) {
     new Date(Number(entry.createdAt) || 0), String(entry.email || ''), 'app:' + entry.id];
 }
 
-// The whole pass over a list of entries, with the sheet and the existing script behind io (so it is tested with fakes):
+// Phase 1, under the document lock: add each entry to the Case tab and the Database (the sheet's own updateDatabase, with
+// the new row's number, so before the sort), then sort once. The slow rebuilds (the resident's report, the AY totals) are
+// NOT done here: they are returned (rids, ays) for phase 2, each under a lock hold of its own.
+// io (the sheet and the existing script; faked in the tests):
 //   io.markers (an object: 'app:<id>' -> true, read from column J), io.residentOk(rid), io.residentText(rid),
-//   io.appendRow(row) -> the new row's number, io.database(rowNumber, first8Values), io.reports(rids[], ays[]), io.sort()
-// -> { done: [ids whose entry can be deleted], skipped: [{ id, reason }], errors: [text] }
-function logbookOutboxProcess_(entries, io) {
-  var done = [], skipped = [], errors = [], rids = {}, ays = {}, added = 0;
+//   io.appendRow(row) -> the new row's number, io.database(rowNumber, first8Values), io.sort()
+// -> { done: [ids whose entry can be deleted], skipped: [{ id, reason }], errors: [text], rids: [..], ays: [..] }
+function logbookOutboxAdd_(entries, io) {
+  var done = [], skipped = [], errors = [], rids = {}, ays = {}, added = 0, ms = { append: 0, database: 0, sort: 0 }, t;
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i], mark = 'app:' + e.id;
-    if (io.markers[mark]) { done.push(e.id); continue; }   // already in the sheet (a run that stopped before the delete)
     var rid = String(e.rid || '');
+    if (io.markers[mark]) {   // already in the sheet (a run that stopped before the delete): make sure its reports are rebuilt too
+      done.push(e.id); if (/^\d{6}$/.test(rid)) { rids[rid] = true; ays['AY' + rid.slice(0, 4)] = true; }
+      continue;
+    }
     if (!/^\d{6}$/.test(rid)) { skipped.push({ id: e.id, reason: 'resident id is not 6 digits: ' + rid }); continue; }
     if (!io.residentOk(rid)) { skipped.push({ id: e.id, reason: 'no resident ' + rid + ' on the Residents sheet' }); continue; }
     var row = logbookOutboxRow_(e, io.residentText(rid));
-    var rowNumber = io.appendRow(row);
+    t = Date.now(); var rowNumber = io.appendRow(row); ms.append += Date.now() - t;
     io.markers[mark] = true; added++;
     done.push(e.id);
+    t = Date.now();
     try { io.database(rowNumber, row.slice(0, 8)); } catch (err) { errors.push('Database for ' + e.id + ': ' + err.message); }
+    ms.database += Date.now() - t;
     rids[rid] = true; ays['AY' + rid.slice(0, 4)] = true;
   }
-  if (added) {
-    try { io.reports(Object.keys(rids), Object.keys(ays)); } catch (err) { errors.push('Reports: ' + err.message); }
-    try { io.sort(); } catch (err) { errors.push('Sort: ' + err.message); }
-  }
-  return { done: done, skipped: skipped, errors: errors };
+  if (added) { t = Date.now(); try { io.sort(); } catch (err) { errors.push('Sort: ' + err.message); } ms.sort = Date.now() - t; }
+  return { done: done, skipped: skipped, errors: errors, rids: Object.keys(rids), ays: Object.keys(ays), ms: ms };
 }
+
+// One run, with its surroundings behind env (so the order of everything is tested with fakes):
+//   env.list() -> entries, env.remove(id), env.io, env.locked(fn) (runs fn holding the document lock, then lets go),
+//   env.getPending() / env.setPending({rids, ays}), env.now() (ms), env.pause(ms), env.log(text)
+// Why in pieces: the sheet's own onFormSubmit waits only 10 seconds for the document lock, and a resident's report or the
+// AY totals take 10-40 seconds to rebuild on the real data. So the lock is held for a few entries at a time (rows,
+// Database, one sort), then once per rebuild, with a pause between: a Form response that arrives meanwhile waits at most
+// one piece. Rebuilds still owed are kept (env.setPending) before the entries are deleted, so a run that stops half way
+// loses nothing: the next run does them first.
+function logbookOutboxCycle_(env) {
+  var start = env.now(), over = function () { return env.now() - start > LOGBOOK_OUTBOX_BUDGET_MS; };
+  var pending = env.getPending();
+  var entries = env.list();
+  var summary = { added: 0, skipped: [], errors: [], rebuilt: 0, left: 0 };
+  for (var i = 0; i < entries.length && !over(); i += LOGBOOK_OUTBOX_CHUNK) {
+    var r;
+    var t0 = env.now();
+    env.locked(function () { r = logbookOutboxAdd_(entries.slice(i, i + LOGBOOK_OUTBOX_CHUNK), env.io); });
+    env.log('hold: ' + r.done.length + ' entries added in ' + (env.now() - t0) + ' ms (append ' + r.ms.append + ', Database ' + r.ms.database + ', sort ' + r.ms.sort + ')');
+    pending.rids = logbookOutboxUnion_(pending.rids, r.rids); pending.ays = logbookOutboxUnion_(pending.ays, r.ays);
+    env.setPending(pending);                       // before the entries go
+    r.done.forEach(env.remove);
+    summary.added += r.done.length; summary.skipped = summary.skipped.concat(r.skipped); summary.errors = summary.errors.concat(r.errors);
+    env.pause(2000);
+  }
+  var jobs = pending.rids.map(function (rid) { return { kind: 'rid', id: rid }; }).concat(pending.ays.map(function (ay) { return { kind: 'ay', id: ay }; }));
+  for (var j = 0; j < jobs.length && !over(); j++) {
+    var t1 = env.now();
+    try { env.locked(function () { env.io[jobs[j].kind === 'rid' ? 'residentReport' : 'aySummary'](jobs[j].id); }); summary.rebuilt++; }
+    catch (err) { summary.errors.push('Rebuild ' + jobs[j].id + ': ' + err.message); }
+    env.log('hold: rebuilt ' + jobs[j].id + ' in ' + (env.now() - t1) + ' ms');
+    // done (or failed: the menu's Rebuild commands fix it; don't retry forever)
+    pending[jobs[j].kind === 'rid' ? 'rids' : 'ays'] = pending[jobs[j].kind === 'rid' ? 'rids' : 'ays'].filter(function (x) { return x !== jobs[j].id; });
+    env.setPending(pending);
+    env.pause(1000);
+  }
+  summary.left = pending.rids.length + pending.ays.length;
+  return summary;
+}
+function logbookOutboxUnion_(a, b) { var o = {}; (a || []).concat(b || []).forEach(function (x) { o[x] = true; }); return Object.keys(o); }
 
 // ---------- Firestore (REST), signing in as the bot ----------
 
@@ -226,10 +274,8 @@ function logbookOutboxIo_(ss) {
       return n;
     },
     database: function (rowNumber, first8) { updateDatabase(caseSheet, rowNumber, first8); },
-    reports: function (rids, ays) {
-      rids.forEach(function (rid) { updateResidentReport(rid); });
-      ays.forEach(function (ay) { updateAYSummaryReport(ay); });
-    },
+    residentReport: function (rid) { updateResidentReport(rid); },
+    aySummary: function (ay) { updateAYSummaryReport(ay); },
     sort: function () { sortByTimestampDescending_(caseSheet); },
   };
 }
@@ -239,26 +285,27 @@ function logbookOutboxIo_(ss) {
 // The time trigger (every 5 minutes: logbookOutboxSetup adds it). Failures show in Apps Script → Executions, and Google
 // emails the trigger's owner a daily summary; entries that failed stay in the outbox for the next run.
 function logbookOutboxRun() {
-  var entries = logbookOutboxList_();
-  if (!entries.length) return;
-  var io = logbookOutboxIo_(SpreadsheetApp.getActiveSpreadsheet());
-  var added = 0, skipped = [], errors = [];
-  // One entry per hold of the document lock, with a pause between: the sheet's own onFormSubmit waits only 10 seconds
-  // for that lock, and a resident's report can take several seconds to rebuild, so a long hold could make it miss a
-  // Form response.
-  for (var i = 0; i < entries.length; i++) {
-    var lock = LockService.getDocumentLock();
-    lock.waitLock(30000);
-    var result;
-    try { result = logbookOutboxProcess_([entries[i]], io); }
-    finally { lock.releaseLock(); }
-    result.done.forEach(logbookOutboxDelete_);
-    added += result.done.length; skipped = skipped.concat(result.skipped); errors = errors.concat(result.errors);
-    if (i < entries.length - 1) Utilities.sleep(2000);
-  }
-  console.log('Outbox: ' + added + ' added, ' + skipped.length + ' skipped, ' + errors.length + ' errors.');
-  skipped.forEach(function (s) { console.warn('Skipped ' + s.id + ': ' + s.reason); });
-  if (errors.length) throw new Error(errors.join('; '));
+  var props = PropertiesService.getScriptProperties();
+  var env = {
+    list: logbookOutboxList_,
+    remove: logbookOutboxDelete_,
+    io: null,
+    locked: function (fn) { var lock = LockService.getDocumentLock(); lock.waitLock(30000); try { fn(); } finally { lock.releaseLock(); } },
+    getPending: function () { try { var p = JSON.parse(props.getProperty(LOGBOOK_OUTBOX_PENDING_KEY) || '{}'); return { rids: p.rids || [], ays: p.ays || [] }; } catch (e) { return { rids: [], ays: [] }; } },
+    setPending: function (p) { if (p.rids.length || p.ays.length) props.setProperty(LOGBOOK_OUTBOX_PENDING_KEY, JSON.stringify(p)); else props.deleteProperty(LOGBOOK_OUTBOX_PENDING_KEY); },
+    now: function () { return Date.now(); },
+    pause: function (ms) { Utilities.sleep(ms); },
+    log: function (t) { console.log(t); },
+  };
+  var pending = env.getPending();
+  var entries = env.list();
+  if (!entries.length && !pending.rids.length && !pending.ays.length) return;
+  env.io = logbookOutboxIo_(SpreadsheetApp.getActiveSpreadsheet());
+  env.list = function () { return entries; };   // (listed once, above)
+  var s = logbookOutboxCycle_(env);
+  console.log('Outbox: ' + s.added + ' added, ' + s.skipped.length + ' skipped, ' + s.rebuilt + ' rebuilt, ' + s.left + ' rebuilds waiting, ' + s.errors.length + ' errors.');
+  s.skipped.forEach(function (x) { console.warn('Skipped ' + x.id + ': ' + x.reason); });
+  if (s.errors.length) throw new Error(s.errors.join('; '));
 }
 
 // Run by hand to check the bot can sign in and read the outbox (changes nothing). Use this, not logbookOutboxSetup, on a COPY.
@@ -308,8 +355,12 @@ function logbookOutboxTryOne(rid) {
     initials: 'XY', details: '34F fake test case, ignore', cats: ['16', '20', '20iii', '26', '26i'], createdAt: Date.now() };
   var lock = LockService.getDocumentLock();
   lock.waitLock(30000);
-  try { console.log(JSON.stringify(logbookOutboxProcess_([entry], logbookOutboxIo_(SpreadsheetApp.getActiveSpreadsheet())))); }
-  finally { lock.releaseLock(); }
+  var io = logbookOutboxIo_(SpreadsheetApp.getActiveSpreadsheet()), r, t0 = Date.now(), times = {};
+  try { r = logbookOutboxAdd_([entry], io); times.addAndSortMs = Date.now() - t0; } finally { lock.releaseLock(); }
+  // the rebuilds, each in a hold of its own, timed: this is what the sheet's own Form handler has to wait out
+  r.rids.forEach(function (rid) { var t = Date.now(); lock = LockService.getDocumentLock(); lock.waitLock(30000); try { io.residentReport(rid); } finally { lock.releaseLock(); } times['report ' + rid + ' Ms'] = Date.now() - t; });
+  r.ays.forEach(function (ay) { var t = Date.now(); lock = LockService.getDocumentLock(); lock.waitLock(30000); try { io.aySummary(ay); } finally { lock.releaseLock(); } times['totals ' + ay + ' Ms'] = Date.now() - t; });
+  console.log(JSON.stringify({ result: r, holds: times }));
 }
 
-if (typeof module !== 'undefined') module.exports = { labels: LOGBOOK_OUTBOX_LABELS, categories: logbookOutboxCategories_, row: logbookOutboxRow_, process: logbookOutboxProcess_, entryOf: logbookOutboxEntryOf_, date: logbookOutboxDate_ };
+if (typeof module !== 'undefined') module.exports = { labels: LOGBOOK_OUTBOX_LABELS, categories: logbookOutboxCategories_, row: logbookOutboxRow_, add: logbookOutboxAdd_, cycle: logbookOutboxCycle_, chunk: LOGBOOK_OUTBOX_CHUNK, entryOf: logbookOutboxEntryOf_, date: logbookOutboxDate_ };
