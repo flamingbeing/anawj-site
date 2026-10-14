@@ -420,6 +420,7 @@ function drawVDsa(){const f=fitFill($('c2Dsa'));if(!f||!offV)return;const {ctx,w
  ctx.textAlign='left';ctx.fillStyle='#fff';ctx.fillText(sT,gx,fs*1.2);ctx.fillStyle='#5aa9ff';ctx.fillText(mT,gx+ctx.measureText(sT).width+fs*0.9,fs*1.2);
  const d0=new Date(T0+simT*1000),dt=`${d0.getDate()} ${MON3[d0.getMonth()]} ${String(d0.getFullYear()).slice(2)}  ${clk(simT)}`;
  ctx.textAlign='right';ctx.fillStyle='#cfd3da';ctx.fillText(dt,gx+gw,fs*1.2);
+ if(mon.dbLo!==DB_LO||mon.dbHi!==DB_HI){ctx.fillStyle='#ffb454';ctx.font=`600 ${fs*0.8}px Arimo, Arial, sans-serif`;ctx.fillText(`colour ${mon.dbLo} to ${mon.dbHi} dB`,gx+gw,fs*2.2);ctx.font=`600 ${fs}px Arimo, Arial, sans-serif`;}
  // DSA image, left-aligned: data grows from the left, then scrolls
  ctx.imageSmoothingEnabled=true;if(n)ctx.drawImage(offV,0,0,n,NB,gx,gy,dw,gh);
  const Yf=hz=>gy+gh*(1-hz/30);
@@ -732,7 +733,7 @@ const MENU=[
  ['EEG sweep',()=>(mon.sweep==='auto'?8:mon.sweep)+' s',()=>$('kSweep').click()],
  ['Trend window',()=>mon.trend+' min',()=>$('kTrend').click()],
  ['Bottom trend',()=>mon.bottom==='emg'?'BIS + EMG':mon.bottom==='sr'?'BIS + SR':'BIS',()=>$('kBottom').click()],
- ['DSA colour range',()=>`${mon.dbLo} to ${mon.dbHi} dB`,()=>{let i=RANGES.findIndex(r=>r[0]===mon.dbLo&&r[1]===mon.dbHi);[mon.dbLo,mon.dbHi]=RANGES[(i+1)%RANGES.length];dispUI();saveDisp();}],
+ ['DSA colour range',()=>`${mon.dbLo} to ${mon.dbHi} dB`+(mon.dbLo===DB_LO&&mon.dbHi===DB_HI?' (default)':''),()=>{let i=RANGES.findIndex(r=>r[0]===mon.dbLo&&r[1]===mon.dbHi);[mon.dbLo,mon.dbHi]=RANGES[(i+1)%RANGES.length];dispUI();saveDisp();}],
  ['BIS alarm low',()=>String(mon.alo),()=>{mon.alo=mon.alo>=50?20:mon.alo+5;dirty=true;}],
  ['BIS alarm high',()=>String(mon.ahi),()=>{mon.ahi=mon.ahi>=80?50:mon.ahi+5;dirty=true;}],
  ['Alarm audio',()=>silenced?'Paused':'On',()=>$('kSilent').click()],
