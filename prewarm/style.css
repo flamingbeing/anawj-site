@@ -471,12 +471,16 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 .ready li.no { color: var(--err); }
 .ready small { display: block; color: var(--muted); font-weight: 400; }
 
-/* less scrolling on the sub-pages (owner, 14 Oct 2026): a question with a box, or with short answers (Yes / No, 0 1 2), puts
-   its label on the left and the answer on the right, so each takes one row instead of two; longer answer lists stay full
-   width. The Temp and BP, HR, BIS screens are not .fld cards and are unchanged. */
-.fld:has(> input), .fld.short, .fld:has(> .seg > .chip:nth-child(2):last-child):not(.longopt) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: center; column-gap: 10px; row-gap: 0; padding: 6px 10px; }
-.fld:has(> input) > .lab, .fld:has(> input) > small, .fld.short > .lab, .fld.short > small, .fld:has(> .seg > .chip:nth-child(2):last-child):not(.longopt) > .lab, .fld:has(> .seg > .chip:nth-child(2):last-child):not(.longopt) > small { grid-column: 1; }
-.fld:has(> input) > input, .fld.short > .seg, .fld:has(> .seg > .chip:nth-child(2):last-child):not(.longopt) > .seg { grid-column: 2; grid-row: 1 / span 2; min-width: 0; }
-.fld.short > .seg .chip, .fld:has(> .seg > .chip:nth-child(2):last-child):not(.longopt) > .seg .chip { min-height: 40px; }
-.fld:has(> input) > input { min-height: 40px; }
-.stack:has(> .fld) { gap: 8px; }
+/* less scrolling on the sub-pages (owner, 14 Oct 2026): on a phone the questions sit two to a row (label above its answer);
+   a question with 3 or more answers, or long ones, and everything that is not a question (headings, tables, buttons) takes
+   the full row. No extra taps: nothing is hidden. The Temp and BP, HR, BIS screens are not .fld cards and are unchanged. */
+@media (max-width: 699px) {
+  .stack:has(> .fld) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
+  .stack:has(> .fld) > :not(.fld) { grid-column: 1 / -1; }
+  .stack:has(> .fld) > .fld { padding: 6px 8px 8px; gap: 4px; align-content: space-between; min-width: 0; }
+  .stack:has(> .fld) > .fld > .lab { font-size: 14px; line-height: 1.2; }
+  .stack:has(> .fld) > .fld > small { font-size: 11px; line-height: 1.2; }
+  .stack:has(> .fld) > .fld > input { min-height: 40px; min-width: 0; width: 100%; box-sizing: border-box; padding-left: 8px; padding-right: 8px; }
+  .stack:has(> .fld) > .fld > .seg .chip { min-height: 40px; font-size: 14px; padding: 2px 4px; }
+  .stack:has(> .fld) > .fld.longopt, .stack:has(> .fld) > .fld:has(> .seg > .chip:nth-child(3)):not(.short), .stack:has(> .fld) > .fld:has(> .seg.many) { grid-column: 1 / -1; }
+}
