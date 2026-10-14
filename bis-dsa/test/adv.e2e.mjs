@@ -17,6 +17,14 @@ try {
     page.on('console', m => { if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)/.test(m.text())) errors.push(m.text()); });
     await page.goto(BASE);
     await page.click('#skinSeg [data-skin="advance"]');
+    // start-up: modal messages first (then the sensor check by itself); Skip start-up under the screen starts the case with 35 minutes of earlier trend
+    assert.ok(await page.evaluate(() => !!ADV.boot), 'the monitor starts with its boot messages');
+    assert.match(await page.$eval('#advBoot', e => e.textContent), /Connect BISx to start monitoring/);
+    await page.waitForFunction(() => /Initializing BISx/.test(document.querySelector('#advBoot').textContent), null, { timeout: 4000 });
+    await page.waitForFunction(() => /Connect sensor to start monitoring/.test(document.querySelector('#advBoot').textContent) && document.querySelector('#advBoot [data-a="alarms"]'), null, { timeout: 5000 });
+    await page.waitForFunction(() => ADV.sensor && document.querySelector('#advOv .th'), null, { timeout: 6000 }); // the sensor check opens by itself
+    await page.click('#advSkip'); assert.equal(await page.evaluate(() => ADV.boot), null); assert.equal(await page.$eval('#advBoot', e => e.hidden), true);
+    assert.ok(await page.evaluate(() => ADV.t0 < simT - 1800 && ADV.pre.L.length >= 400 && ADV.pre.R.length >= 400), 'the case starts with 35 minutes of earlier trend');
     assert.equal(await page.$eval('#advWrap', e => e.hidden), false); assert.equal(await page.$eval('#vistaWrap', e => e.hidden), true); assert.equal(await page.$eval('#bilatWrap', e => e.hidden), true);
     // the screen is 16:10 and scales as a unit
     { const r = await page.$eval('#advS', e => { const q = e.getBoundingClientRect(); return q.width / q.height; }); assert.ok(Math.abs(r - 1.6) < 0.02, `16:10 screen (${r})`); }
@@ -33,6 +41,7 @@ try {
     assert.match(await txt(page, '#aDate'), /^\d{1,2} [A-Z]{3} \d{4}$/); assert.match(await txt(page, '#aTime'), /^\d\d:\d\d$/);
     await page.evaluate(() => { ADV.msgI = 0; ADV.msgT = Date.now() + 60000; }); await page.waitForTimeout(150);
     assert.equal(await txt(page, '#aMsgT'), 'Audio reminder is off'); assert.equal(await txt(page, '#aMbd'), '2'); assert.match(await txt(page, '#aMc'), /^1\/2$/);
+    { const t = await page.evaluate(() => { const d = ADV.d; return { bis: d.bis.filter(p => p[1] != null).length, asym: d.asym.filter(p => p[1] != null).length }; }); assert.ok(t.bis >= 200 && t.asym >= 200, `trends start filled (${JSON.stringify(t)})`); }
     await page.click('#aNext'); await page.evaluate(() => { ADV.msgT = Date.now() + 60000; }); await page.waitForTimeout(150); assert.equal(await txt(page, '#aMsgT'), 'Institutional settings restored'); await page.click('#aCheck'); await page.waitForFunction(() => document.querySelector('#aMbd').textContent === '1');
     // L | R pill: the BIS trend, the SEF and MF panel and the badge follow the side
     assert.equal(await page.evaluate(() => ADV.hemi), 'L'); await page.click('#aLr'); assert.equal(await page.evaluate(() => ADV.hemi), 'R'); assert.equal(await txt(page, '#aBadgeLow'), 'R');
@@ -40,13 +49,14 @@ try {
     // graph / chart toggle: the chart is a table with the real column heads
     await page.click('#aGt'); assert.equal(await page.$eval('#advChart', e => e.hidden), false);
     assert.match(await txt(page, '#advChart thead'), /Time\s*BIS L\s*BIS R\s*EMG L dB\s*EMG R dB\s*SR L %\s*SR R %\s*ASYM %\s*SQI L %\s*SQI R %/);
-    assert.ok(await page.$$eval('#advChart tbody tr', e => e.length) >= 2, 'chart rows'); assert.match(await txt(page, '#advChart .hdr'), /BEGIN: \d+ [A-Z]{3} \d{4} \d\d:\d\d:\d\d.*Chart Interval: 15 min/);
+    assert.ok(await page.$$eval('#advChart tbody tr', e => e.length) >= 2, 'chart rows'); assert.match(await txt(page, '#advChart .hdr'), /BEGIN: \d+ [A-Z]{3} \d{4} \d\d:\d\d:\d\d.*Chart Interval: 1 min/); assert.ok(await page.$$eval('#advChart tbody tr', e => e.length) >= 30, 'the chart lists the case back to its start');
     await page.click('#aGt'); assert.equal(await page.$eval('#advChart', e => e.hidden), true);
     // the main menu: six tiles in the real order; ALARMS is dimmed while monitoring; Escape closes
     await page.click('#aMenu'); assert.equal(await page.$eval('#advOv .mm', e => !!e), true);
     assert.deepEqual(await page.$$eval('#advOv .mm button', bs => bs.map(x => x.textContent.replace(/\s+/g, ' ').trim())), ['ALARMS', 'DISPLAY SETTINGS', 'SETTINGS & MAINTENANCE', 'DOWNLOAD', 'INFO', 'CASE REVIEW']);
-    assert.equal(await page.$eval('#advOv .mm button', e => e.getAttribute('aria-disabled')), 'true');
-    await page.keyboard.press('Escape'); assert.equal(await page.$$eval('#advOv .mm', e => e.length), 0);
+    assert.equal(await page.$$eval('#advOv .mm button[aria-disabled="true"]', e => e.length), 0, 'every tile is white and usable');
+    await page.click('#aMenu'); assert.equal(await page.$$eval('#advOv .mm', e => e.length), 0, 'the hamburger stays active over the menu and toggles it');
+    await page.click('#aMenu'); await page.evaluate(() => document.activeElement && document.activeElement.blur()); await page.keyboard.press('Escape'); assert.equal(await page.$$eval('#advOv .mm', e => e.length), 0, 'Escape closes the menu wherever the focus is');
     // Display Settings: the 4-channel layouts; choosing BIS, DSA, ASYM redraws with the DSA pair and the ASYM strip between; Secondary
     await page.click('#aMenu'); await page.click('[data-a="m_display"]');
     assert.deepEqual(await page.$$eval('#advOv .rail.lay button span', e => e.map(x => x.textContent)), ['BIS, EEG', 'BIS', 'BIS, ASYM, EEG', 'BIS, DSA, ASYM', 'DSA, ASYM, EEG', 'EEG', 'DSA, ASYM']);
@@ -64,7 +74,7 @@ try {
     await page.click('#aSw'); assert.deepEqual(await page.$$eval('#advPop button', e => e.map(x => x.textContent)), ['6.25 mm/sec', '12.5 mm/sec', '25 mm/sec', '50 mm/sec']); await page.click('#advPop button:nth-child(4)');
     assert.equal(await page.evaluate(() => ADV.sweep), 50); await page.click('#aSw'); await page.click('#advPop button:nth-child(3)');
     // Alarm Settings: BIS range 40-60 off by default; enable, APPLY; label shows the range; the message "BIS alarm enabled"
-    await page.click('#aAlarms'); assert.match(await txt(page, '#advOv .rail'), /BIS\s*\[--\]\s*OFF/); assert.equal(await txt(page, '#advOv .drum .cu'), '40');
+    await page.click('#aAlarms'); assert.match(await txt(page, '#advOv .rail'), /BIS\s*\[40 - 60\]\s*OFF/); assert.equal(await txt(page, '#advOv .drum .cu'), '40');
     await page.click('[data-a="dtog"][data-v="bis"]'); await page.click('[data-a="dapply"]');
     assert.equal(await page.$eval('#aBisLblL', e => e.textContent.replace(/\s+/g, '')), 'BIS40-60'); assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'BIS alarm enabled')), true);
     assert.equal(await page.evaluate(() => mon.alo + '-' + mon.ahi), '40-60');
@@ -76,19 +86,19 @@ try {
     assert.equal(await page.$eval('#aBisL', e => e.classList.contains('box')), true, 'digits on a red box');
     await page.waitForFunction(() => ADV.sounding === true && ADV.beeps > 0, null, { timeout: 4000 });
     await page.click('#aAcnt'); assert.equal(await page.$eval('#aAlist', e => e.hidden), false); assert.match(await txt(page, '#aAlist'), /START\s*ALARM\s*\d\d:\d\d\s*BIS ALARM/); await page.click('#aAcnt');
-    await page.click('#aSilent'); assert.equal(await page.evaluate(() => ADV.audio), 1); assert.match(await txt(page, '#aPillT'), /^[12]:\d\d$/); assert.equal(await page.evaluate(() => ADV.sounding), false);
-    await page.click('#aSilent'); assert.equal(await txt(page, '#aPillT'), 'SILENT'); assert.equal(await page.$eval('#aAbar', e => e.hidden), false, 'the bar stays while the audio is off');
-    await page.click('#aDrop'); assert.equal(await page.$$eval('#aCtl button', e => e.length), 4); await page.click('#aCt0'); assert.equal(await page.evaluate(() => ADV.audio), 0);
+    await page.click('#aSilent'); assert.equal(await page.evaluate(() => ADV.audio), 1); await page.waitForTimeout(120); assert.equal(await txt(page, '#aMsgT'), 'Alarm Pause Mode On', 'the pill answers at once'); assert.match(await txt(page, '#aPillT'), /^[12]:\d\d$/); assert.equal(await page.evaluate(() => ADV.sounding), false);
+    await page.click('#aSilent'); assert.equal(await txt(page, '#aPillT'), 'SILENT'); await page.waitForTimeout(120); assert.equal(await txt(page, '#aMsgT'), 'Alarm Silent Mode On'); assert.equal(await page.evaluate(() => ADV.msgs.filter(m => /^Alarm (Pause|Silent) Mode/.test(m.text)).length), 1, 'only the newest audio message is kept'); assert.equal(await page.$eval('#aAbar', e => e.hidden), false, 'the bar stays while the audio is off');
+    await page.click('#aDrop'); assert.equal(await page.$$eval('#aCtl button', e => e.length), 4); await page.click('#aCt0'); assert.equal(await page.evaluate(() => ADV.audio), 0); await page.waitForTimeout(120); assert.equal(await txt(page, '#aMsgT'), 'Alarm Silent Mode Off');
     // alarm off again: bar goes
     await page.click('#aAlarms'); await page.click('[data-a="dtog"][data-v="bis"]'); await page.click('[data-a="dapply"]');
     await page.waitForFunction(() => document.querySelector('#aAbar').hidden, null, { timeout: 5000 });
     // Snapshot: dialog with a name; OK makes the message
     await page.click('#aSnap'); assert.equal(await page.$eval('#advSnapName', e => e.value), 'Snapshot 1'); await page.click('[data-a="dok"]');
-    assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'Snapshot created')), true);
+    assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'Snapshot created')), true); await page.waitForTimeout(120); assert.equal(await txt(page, '#aMsgT'), 'Snapshot created');
     // Settings and maintenance: smoothing rate drives the monitor; logs without USB say so; Administrator mode asks for a password
     await page.click('#aMenu'); await page.click('[data-a="m_settings"]'); await page.click('[data-a="dsel"][data-v="advanced"]'); await page.click('[data-a="st_smooth"][data-v="10"]');
-    assert.equal(await page.evaluate(() => mon.smooth), 10); assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'Smoothing rate changed to 10 seconds')), true);
-    await page.click('[data-a="st_nch"][data-v="1"]'); assert.equal(await page.evaluate(() => ADV.nch[4]), 1); await page.click('[data-a="st_nch"][data-v="2"]');
+    assert.equal(await page.evaluate(() => mon.smooth), 10); assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'Smoothing rate changed to 10 seconds')), true); await page.waitForTimeout(120); assert.equal(await txt(page, '#aMsgT'), 'Smoothing rate changed to 10 seconds');
+    await page.click('[data-a="st_nch"][data-v="1"]'); assert.equal(await page.evaluate(() => ADV.nch[4]), 2, 'EEG Trends are staged until APPLY'); await page.click('[data-a="eeg_apply"]'); assert.equal(await page.evaluate(() => ADV.nch[4]), 1); await page.click('[data-a="st_nch"][data-v="2"]'); await page.click('[data-a="eeg_apply"]'); assert.equal(await page.evaluate(() => ADV.nch[4]), 2);
     await page.click('[data-a="dsel"][data-v="logs"]'); await page.click('[data-a="st_dl"]'); assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'Export failed - USB drive removed')), true);
     await page.click('[data-a="dsel"][data-v="advanced"]'); await page.click('[data-a="st_admin"]'); await page.fill('#advPw', 'x'); await page.click('[data-a="dok"]'); assert.match(await txt(page, '#advOv [role="alert"]'), /Incorrect/);
     await page.fill('#advPw', '1234'); await page.click('[data-a="dok"]'); assert.equal(await page.evaluate(() => ADV.admin), true); assert.match(await txt(page, '#advOv .pane'), /Erase Trend Data/); await page.click('[data-a="st_logout"]');
@@ -96,10 +106,19 @@ try {
     // Info help and Download without a USB drive
     await page.click('#aInfo'); await page.click('[data-a="dsel"][data-v="ASYM"]'); assert.match(await txt(page, '#advOv .help'), /Asymmetry/); await page.click('[data-a="dclose"]');
     await page.click('#aMenu'); await page.click('[data-a="m_download"]'); await page.click('[data-a="dl_rec"]'); await page.click('[data-a="dclose"]');
+    // ID: a read-only window that closes itself
+    await page.click('#aId'); assert.match(await txt(page, '#advOv .dlg'), /Case ID\s*[A-Z0-9]{4}/); assert.equal(await page.$$eval('#advOv .dlg input', e => e.length), 0); await page.click('[data-a="dclose"]');
     // sensor check: window with the six bilateral electrodes that resolve from the live SQI, closes itself and gives a new case ID
     const id0 = await page.evaluate(() => ADV.caseId);
     await page.click('#aSensor'); assert.match(await txt(page, '#advOv .th'), /SENSOR TYPE: BILATERAL/); assert.match(await page.$eval('#advOv svg.sk', e => e.textContent), /LT.*LE.*G.*C.*RE.*RT/);
-    await page.waitForFunction(() => !document.querySelector('#advOv .dlg'), null, { timeout: 15000 }); assert.notEqual(await page.evaluate(() => ADV.caseId), id0);
+    await page.waitForFunction(() => !document.querySelector('#advOv .dlg'), null, { timeout: 15000 }); assert.equal(await page.evaluate(() => ADV.caseId), id0, 'a check mid-case keeps the case ID');
+    // sensor disconnected (Simulate row): yellow bar, BIS blank, POOR CONTACT in a sensor check
+    await page.click('[data-sim="disc"]'); await page.waitForFunction(() => /SENSOR DISCONNECTED/.test(document.querySelector('#aAl1').textContent) && document.querySelector('#aBisL').textContent === '', null, { timeout: 5000 });
+    assert.equal(await txt(page, '#aAl2'), 'Connect sensor or cable'); await page.click('#aSensor'); await page.waitForFunction(() => /POOR CONTACT/.test(document.querySelector('#advOv svg.sk').textContent), null, { timeout: 10000 });
+    await page.waitForFunction(() => /TEMPORARILY UNABLE TO MEASURE ELECTRODES/.test(document.querySelector('#aAl1').textContent), null, { timeout: 9000 }); await page.click('[data-a="sc_close"]'); await page.click('[data-sim="disc"]');
+    await page.waitForFunction(() => !document.querySelector('#aAbar') || document.querySelector('#aAbar').hidden || !/SENSOR DISCONNECTED/.test(document.querySelector('#aAl1').textContent), null, { timeout: 5000 });
+    await page.click('[data-sim="expired"]'); await page.waitForFunction(() => /SENSOR EXPIRED/.test(document.querySelector('#aAl1').textContent), null, { timeout: 5000 }); await page.click('[data-sim="expired"]');
+    await page.click('[data-sim="batt"]'); await page.waitForFunction(() => /BATTERY LOW/.test(document.querySelector('#aAl1').textContent), null, { timeout: 5000 }); await page.click('[data-sim="batt"]');
     // diathermy: SQI falls, the SQI alarm raises (yellow) and the BIS number goes blank under SQI 15
     await page.evaluate(() => { mods.diathermy = true; applyTarget(); }); await page.click('#speedSeg [data-speed="10"]');
     await page.waitForFunction(() => !document.querySelector('#aAbar').hidden && /SQI/.test(document.querySelector('#aAl1').textContent), null, { timeout: 30000 });
@@ -116,10 +135,12 @@ try {
     // demo mode for the unilateral sensor: 2-channel screen with one BIS panel, EEG selector shows one channel, SET RANGE, watermark, EXIT DEMO MODE
     await page.click('#aInfo'); await page.click('[data-a="demo"][data-v="2"]');
     assert.equal(await page.$$eval('#aBisR', e => e.length), 0); assert.equal(await page.evaluate(() => ADV.ch + '|' + ADV.layout[2]), '2|bis,eeg'); assert.match(await txt(page, '#advHdr'), /SET RANGE/);
-    assert.equal(await page.$$eval('#aLr', e => e.length), 0, 'no L|R pill with a unilateral sensor'); assert.ok(await page.evaluate(() => ADV.demo)); assert.equal(await txt(page, '#advLeft .rb:last-child .l'), 'EXIT DEMO MODE');
+    assert.equal(await page.$$eval('#aLr', e => e.length), 0, 'no L|R pill with a unilateral sensor'); assert.ok(await page.evaluate(() => ADV.demo));
+    { const h = await page.evaluate(() => ({ a: ADV.pre.L[0].bis, z: ADV.pre.L[ADV.pre.L.length - 1].bis, e0: ADV.pre.L[0].emg, e1: ADV.pre.L[ADV.pre.L.length - 1].emg, off: !ADV.alarm.bis.on && !ADV.alarm.sr.on && !ADV.alarm.sef.on, live: bisS })); assert.ok(h.a > 90 && h.z < 55 && h.e0 > 40 && h.e1 < 34 && h.off, `the demo case runs from BIS ~97 to the low 40s (${JSON.stringify(h)})`); }
+    assert.match(await txt(page, '#advHdr'), /SET RANGE/); assert.equal(await txt(page, '#advLeft .rb:last-child .l'), 'EXIT DEMO MODE');
     await page.click('#speedSeg [data-speed="10"]'); await page.waitForFunction(() => COLS[COLS.length - 1].sqi >= 60, null, { timeout: 60000 }); await page.click('#speedSeg [data-speed="1"]');
     await page.click('#aSensor'); assert.match(await txt(page, '#advOv .th'), /UNILATERAL/); assert.match(await page.$eval('#advOv svg.sk', e => e.textContent), /1.*2.*4.*3/); await page.waitForFunction(() => !document.querySelector('#advOv .dlg'), null, { timeout: 15000 });
-    await page.click('#aExitDemo'); assert.equal(await page.evaluate(() => ADV.ch), 4);
+    await page.click('#aExitDemo'); assert.equal(await page.evaluate(() => ADV.ch), 4); assert.ok(await page.evaluate(() => !!ADV.boot), 'exiting the demo restarts the monitor'); await page.click('#advSkip');
     // accessibility of the screen's chrome (the plots are canvases; contrast is left to the real monitor's colours)
     await page.addScriptTag({ path: AXE });
     { const r = await page.evaluate(() => axe.run(document.querySelector('#advS'), { runOnly: ['wcag2a', 'wcag2aa'], rules: { 'color-contrast': { enabled: false } } })); assert.deepEqual(r.violations.map(v => `${v.id}: ${v.nodes.length}`), [], 'axe on the BIS Advance screen'); }

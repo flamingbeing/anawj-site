@@ -4,7 +4,7 @@
 const aq=id=>document.getElementById(id);
 const ADV={
  built:false,ch:4,hemi:'L',view:'graphs',                    // channels 2 (unilateral sensor) or 4 (bilateral); selected side; graphs or chart
- layout:{2:'bis,eeg',4:'bis,asym,eeg'},sec:'emg',win:60,chartInt:15,
+ layout:{2:'bis,eeg',4:'bis,asym,eeg'},sec:'emg',win:60,chartInt:1,
  uvmm:{2:2,4:10},sweep:25,nch:{2:1,4:2},filters:true,imp:true,showVals:false,
  alarm:{bis:{on:false,lo:40,hi:60},sr:{on:false,hi:50},sef:{on:false,lo:12,hi:18}},vol:4,audioRem:false,
  audio:0,audioEnd:0,                                          // 0 audio on, 1 paused 120 s, 2 off (SILENT)
@@ -12,7 +12,7 @@ const ADV={
  menu:false,dlg:null,ctl:false,vol_:false,list:false,pop:null,focusBack:null,
  msgs:[],msgI:0,msgT:0,alarms:[],alarmI:0,alarmT:0,snaps:[],log:[],review:null,sensor:null,
  caseId:'ES8A',t0:0,beeps:0,sounding:false,nextBeep:0,nextRem:0,dsaCv:{},lay:null,d:null,full:true,dsaTest:null,
- dsc:null,usb:false};
+ dsc:null,usb:false,pre:null,cut:null,hc:null,boot:null,booted:false,disc:false,expired:false,batt:false};
 const AM=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'],apad=(n,w)=>String(n).padStart(w||2,'0');
 function advDate(t){const d=new Date(T0+t*1000);return ADV.dateFmt==='DD MMM YYYY'?`${d.getDate()} ${AM[d.getMonth()]} ${d.getFullYear()}`:`${AM[d.getMonth()]} ${apad(d.getDate())} ${d.getFullYear()}`;}
 function advClockS(t,secs){const d=new Date(T0+t*1000);let h=d.getHours();if(!ADV.hr24){const ap=h>=12?' PM':' AM';h=h%12||12;return apad(h)+':'+apad(d.getMinutes())+(secs?':'+apad(d.getSeconds()):'')+ap;}return apad(h)+':'+apad(d.getMinutes())+(secs?':'+apad(d.getSeconds()):'');}
@@ -22,7 +22,8 @@ const advEsc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 const IC={
  bell:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.4a1.9 1.9 0 0 0-1.9 1.9v.5C7.5 5.5 6 7.8 6 10.7v3.7L4.1 17v1h15.8v-1L18 14.4v-3.7c0-2.9-1.5-5.2-4.1-5.9v-.5A1.9 1.9 0 0 0 12 2.4zM9.9 19.4a2.1 2.1 0 0 0 4.2 0z" fill="currentColor"/></svg>',
  check:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.8l5 5L19.5 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
- flag:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h2v18H5z" fill="currentColor"/><path d="M8 4h12l-3 4 3 4H8z" fill="currentColor"/></svg>',
+ flag:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5h2.2v17H5z" fill="currentColor"/><path d="M8.6 4.2c2.2-1 4.4 1 6.6 0 1.4-.6 2.6-.5 3.8 0l-2.6 3.8 2.6 3.8c-1.2-.5-2.4-.6-3.8 0-2.2 1-4.4-1-6.6 0z" fill="currentColor"/></svg>',
+ infoL:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.3" r="2.6" fill="currentColor"/><path d="M9.6 9.4h4.8v10.4H9.6z" fill="currentColor"/></svg>',
  info:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor"/><path d="M12 10.2v7M12 6.2v1.8" stroke="#44546c" stroke-width="2.6" stroke-linecap="round"/></svg>',
  infoW:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#fff"/><path d="M12 10.2v7M12 6.2v1.8" stroke="#343c4c" stroke-width="2.6" stroke-linecap="round"/></svg>',
  graph:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="3.5" width="19" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 12.5l3.2-3 2.8 4.2 3-6 2.2 4h2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 21h8" stroke="currentColor" stroke-width="1.8"/></svg>',
@@ -44,10 +45,10 @@ const IC={
  silent:'<svg viewBox="0 0 34 34" aria-hidden="true"><path d="M17 5c-1.2 0-2 .8-2 1.8v.5C11.6 8.2 10 10.6 10 13.6V18l-2.4 3v1.2h18.8V21L24 18v-4.4c0-3-1.6-5.4-5-6.3v-.5c0-1-.8-1.8-2-1.8zM14.5 24.5a2.5 2.5 0 0 0 5 0z" fill="#3a4250"/><path d="M5 5l24 24M29 5L5 29" stroke="#e2392b" stroke-width="2.4" stroke-linecap="round"/></svg>',
  spk:'<svg viewBox="0 0 34 34" aria-hidden="true"><path d="M5 13h5l7-6v20l-7-6H5z" fill="#3a4250"/><path d="M21 12c2.5 2.7 2.5 7.3 0 10M25 9c4.2 4.5 4.2 11.5 0 16" fill="none" stroke="#3fb764" stroke-width="2.2" stroke-linecap="round"/></svg>',
  bellY:'<svg viewBox="0 0 34 34" aria-hidden="true"><path d="M17 5c-1.2 0-2 .8-2 1.8v.5C11.6 8.2 10 10.6 10 13.6V18l-2.4 3v1.2h18.8V21L24 18v-4.4c0-3-1.6-5.4-5-6.3v-.5c0-1-.8-1.8-2-1.8zM14.5 24.5a2.5 2.5 0 0 0 5 0z" fill="#3a4250"/></svg>',
- usb:'<svg viewBox="0 0 22 28" aria-hidden="true"><path d="M11 2v18M11 20a3 3 0 1 0 .01 0M11 12l-5-3v-3M11 15l5-3v-3" stroke="#9ca3ab" stroke-width="1.6" fill="none"/><rect x="14" y="5.5" width="4" height="3.6" fill="#9ca3ab"/><circle cx="6" cy="5.5" r="1.8" fill="#9ca3ab"/></svg>',
- serial:'<svg viewBox="0 0 30 20" aria-hidden="true"><path d="M2 2h26v11l-3 5H5l-3-5z" fill="none" stroke="#9ca3ab" stroke-width="1.6"/><path d="M8 7h2M12 7h2M16 7h2M20 7h2M9 12h2M13 12h2M17 12h2M21 12h0" stroke="#9ca3ab" stroke-width="1.6"/><path d="M3 18L27 2" stroke="#9ca3ab" stroke-width="1.6"/></svg>',
- batt:'<svg viewBox="0 0 28 14" aria-hidden="true"><rect x="1" y="1" width="23" height="12" rx="2" fill="#dce4ec"/><rect x="25" y="4.5" width="2.5" height="5" fill="#dce4ec"/></svg>',
- bolt:'<svg viewBox="0 0 12 22" aria-hidden="true"><path d="M8 0L1 12h4.5L4 22l7-12H6.5z" fill="#dce4ec"/></svg>',
+ usb:'<svg viewBox="0 0 22 28" aria-hidden="true"><path d="M11 2v18M11 20a3 3 0 1 0 .01 0M11 12l-5-3v-3M11 15l5-3v-3" stroke="#8fa0bb" stroke-width="1.8" fill="none"/><rect x="14" y="5.5" width="4" height="3.6" fill="#8fa0bb"/><circle cx="6" cy="5.5" r="1.8" fill="#8fa0bb"/></svg>',
+ serial:'<svg viewBox="0 0 30 18" aria-hidden="true"><path d="M3 1.5h24a1.8 1.8 0 0 1 1.8 1.8v6.2l-3.2 5.5a1.8 1.8 0 0 1-1.5.9H5.9a1.8 1.8 0 0 1-1.5-.9L1.2 9.5V3.3A1.8 1.8 0 0 1 3 1.5z" fill="#8fa0bb"/><path d="M7.5 5.2h1.6M11.2 5.2h1.6M14.9 5.2h1.6M18.6 5.2h1.6M22.3 5.2h1.6M9.4 9.6h1.6M13.1 9.6h1.6M16.8 9.6h1.6M20.5 9.6h1.6" stroke="#1c242c" stroke-width="1.9" stroke-linecap="round"/></svg>',
+ batt:'<svg viewBox="0 0 28 14" aria-hidden="true"><rect x=".8" y=".8" width="23.4" height="12.4" rx="2.4" fill="none" stroke="#dce4ec" stroke-width="1.6"/><rect x="3.4" y="3.4" width="18.2" height="7.2" rx="1.2" fill="#dce4ec"/><rect x="25.3" y="4.6" width="2.5" height="4.8" rx="1" fill="#dce4ec"/></svg>',
+ bolt:'<svg viewBox="0 0 14 24" aria-hidden="true"><path d="M9.6 0L1.2 13.2h5.2L4.2 24l8.6-13.4H7.4z" fill="#dce4ec"/></svg>',
  bubble:'<svg viewBox="0 0 26 22" aria-hidden="true"><path d="M2 2h22v14H12l-5 4v-4H2z" fill="none" stroke="#9aa6b6" stroke-width="1.6" stroke-linejoin="round"/></svg>'};
 // ----- helpers for placed text -----
 const advT=(id,x,y,fs,c,html,o)=>`<span ${id?`id="${id}" `:''}class="t ${o&&o.al||''} ${o&&o.cls||''}" style="--x:${x};--y:${y};--fs:${fs};--c:${c}${o&&o.fw?`;--fw:${o.fw}`:''}">${html}</span>`;
@@ -62,14 +63,16 @@ function advBuild(){if(ADV.built)return;ADV.built=true;
   <div class="left" id="advLeft"></div>
   <div id="advNum"></div>
   <div class="mbar" id="advMbar"><span class="mi" id="aMi" hidden>${IC.bubble}</span><span class="bd" id="aMbd" hidden></span><span class="xmt" id="aMsgT" role="status" aria-live="polite"></span><span class="mn" id="aMn" hidden><span id="aMc">1/1</span><button type="button" id="aNext" data-a="next"><u>NEXT</u></button><i></i></span><button type="button" class="ck" id="aCheck" data-a="check" aria-label="Clear message" hidden>${IC.check}</button></div>
-  <div id="advOv"></div><div id="advPop"></div>
- </div><div class="advbrand"><b>Medtronic</b></div></div></div>`;
+  <div id="advBoot" class="boot" hidden></div><div id="advOv"></div><div id="advPop"></div>
+ </div><div class="advbrand"><b>Medtronic</b></div></div></div>
+ <div class="advsim" id="advSim" role="group" aria-label="Simulator controls, outside the monitor"><button type="button" id="advSkip" data-sim="skip">Skip start-up</button><span class="sl">Simulate:</span>
+  <button type="button" data-sim="disc" aria-pressed="false">Sensor disconnected</button><button type="button" data-sim="expired" aria-pressed="false">Sensor expired</button><button type="button" data-sim="batt" aria-pressed="false">Battery low</button><button type="button" data-sim="usb" aria-pressed="false">USB drive</button><span class="nt">Administrator password: 1234</span></div>`;
  advTop();advChrome();advHeaders();
- const S=aq('advS');S.addEventListener('click',advClick);S.addEventListener('keydown',advKey);
+ const S=aq('advS');S.addEventListener('click',advClick);document.addEventListener('keydown',advKey);aq('advSim').addEventListener('click',advSimClick);
  aq('advCv').addEventListener('click',advCvClick);
  document.addEventListener('pointerdown',()=>advUnlock(),{once:true});
  // start-up messages like the monitor's: two latching messages, 1/2 and NEXT
- advMsg('Audio reminder is off',{latch:true});advMsg('Institutional settings restored',{latch:true});
+ advMsg('Audio reminder is off',{latch:true,bg:true});advMsg('Institutional settings restored',{latch:true,bg:true});
  ADV.t0=0;try{document.fonts&&document.fonts.load('400 16px Selawik').then(()=>{ADV.full=true;});}catch(e){}}
 function advTop(){aq('advTop').innerHTML=`
   <button type="button" class="hb" id="aMenu" data-a="menu" aria-label="Menu" aria-expanded="false" aria-haspopup="dialog"><span><i></i><i></i><i></i></span></button>
@@ -78,8 +81,8 @@ function advTop(){aq('advTop').innerHTML=`
   <div class="tdiv" style="left:calc(932*var(--u));top:0;height:calc(61*var(--u))"></div>
   <span class="dt" id="aDate">14 JAN 2020</span><span class="tm" id="aTime">09:45</span><button type="button" class="idl" id="aId" data-a="caseid" aria-label="Case ID"><u>ID</u><s></s></button>
   <div class="tdiv" style="left:calc(1058*var(--u));top:calc(10*var(--u));height:calc(42*var(--u))"></div>
-  <span class="ti" id="aUsb" style="left:calc(1083*var(--u))" hidden>${IC.usb}</span><span class="ti" style="left:calc(1118*var(--u))" aria-hidden="true">${IC.serial}</span>
-  <span class="t" style="--x:1140;--y:31;--fs:14;--c:#dce4ec" aria-label="Battery 100 percent">100%</span><span class="ti" style="left:calc(1196*var(--u))" aria-hidden="true">${IC.batt}</span><span class="ti" style="left:calc(1227*var(--u))" aria-hidden="true">${IC.bolt}</span>
+  <span class="ti" id="aUsb" style="left:calc(1083*var(--u));height:calc(21*var(--u))" hidden>${IC.usb}</span><span class="ti" style="left:calc(1118*var(--u));height:calc(15*var(--u))" aria-hidden="true">${IC.serial}</span>
+  <span class="t r" style="--x:1180;--y:31;--fs:15;--c:#9aa6b8" aria-label="Battery 100 percent">100%</span><span class="ti" style="left:calc(1195.5*var(--u));height:calc(10.5*var(--u))" aria-hidden="true">${IC.batt}</span><span class="ti" style="left:calc(1226*var(--u));height:calc(22*var(--u))" aria-hidden="true">${IC.bolt}</span>
   <div class="xctl" id="aCtl" hidden role="group" aria-label="Alarm audio"><button type="button" data-a="aud" data-v="0" id="aCt0" aria-label="Alarm audio on">${IC.bellY}</button><button type="button" data-a="aud" data-v="1" id="aCt1" aria-label="Pause alarm audio for 2 minutes">${IC.pause}</button><button type="button" data-a="aud" data-v="2" id="aCt2" aria-label="Alarm audio off">${IC.silent}</button><button type="button" data-a="vol" id="aCt3" aria-label="Alarm volume">${IC.spk}</button></div>
   <div class="xvol" id="aVol" hidden role="group" aria-label="Alarm volume">${[1,2,3,4,5,6,7].map(i=>`<button type="button" data-a="setvol" data-v="${i}" style="height:${28+i*7}%" aria-label="Volume ${i}"></button>`).join('')}</div>
   <div class="alist" id="aAlist" hidden></div>`;
@@ -91,7 +94,7 @@ function advChrome(){const ch=ADV.ch,rv=!!ADV.review,L=aq('advLeft');let y=ch===
  let h='';
  if(rv){h=tg(103)+rb('aCases',322,'CASES LIST',IC.list,'caselist')+rb('aLog',434,'CASE LOG',IC.table,'caselog')+rb('aExitRv',657,'EXIT',IC.exit,'exitrv');}
  else{if(ch===4)h+=`<button type="button" class="pill lr" id="aLr" data-a="lr" style="top:calc(${y[0]-17-61}*var(--u))" role="switch" aria-checked="${ADV.hemi==='R'}" aria-label="Side shown: ${ADV.hemi==='L'?'left':'right'}"><i class="L ${ADV.hemi==='L'?'on':''}">L</i><i class="R ${ADV.hemi==='R'?'on':''}">R</i></button>`;
-  h+=tg(y[1])+rb('aAlarms',y[2],'ALARM <br>SETTINGS',IC.bellW,'alarms')+rb('aSnap',y[3],'SNAPSHOT',IC.flag.replace('currentColor','#fff'),'snap')+rb('aSensor',y[4],'SENSOR <br>CHECK',IC.check.replace('currentColor','#fff'),'sensor')+rb('aInfo',y[5],'INFO',IC.infoW,'info');
+  h+=tg(y[1])+rb('aAlarms',y[2],'ALARM <br>SETTINGS',IC.bellW,'alarms')+rb('aSnap',y[3],'SNAPSHOT',IC.flag.replace(/currentColor/g,'#fff'),'snap')+rb('aSensor',y[4],'SENSOR <br>CHECK',IC.check.replace('currentColor','#fff'),'sensor')+rb('aInfo',y[5],'INFO',IC.infoL,'info');
   if(ADV.demo)h+=rb('aExitDemo',690,'EXIT DEMO <br>MODE',IC.exit,'exitdemo');}
  L.innerHTML=h;
  // numeric panels
@@ -102,30 +105,30 @@ function advNum2(){const c=AC.bisL;return `
  ${advT('',1106,105,20,AC.emg,'EMG',{cls:'cap'})}${advT('aEmgL',1105,143,50,AC.emg,'',{})}
  <div class="emgbar" id="aEmgBarL" style="left:calc(1183*var(--u));top:calc(77*var(--u));width:calc(15*var(--u));height:calc(83*var(--u))"><b></b></div>${advT('',1207,81,13,'#d4d4d4','55')}${advT('',1207,160,13,'#d4d4d4','30')}
  <div class="hline" style="left:calc(932*var(--u));top:calc(175*var(--u));width:calc(314*var(--u))"></div>
- ${advLblBis('aBisLbl',949,200,c)}<span class="bis" id="aBisL" style="left:calc(1087*var(--u));top:calc(318*var(--u));font-size:calc(210*var(--u));color:${c}" aria-label="BIS"></span>
+ ${advLblBis('aBisLbl',949,200,c)}<span class="bis" id="aBisL" style="left:calc(1087*var(--u));top:calc(318*var(--u));font-size:calc(205*var(--u));color:${c}" aria-label="BIS"></span>
  <div class="hline" style="left:calc(932*var(--u));top:calc(461*var(--u));width:calc(314*var(--u))"></div>
  ${advLblBis('aSrLbl',949,481,AC.sr)}${advT('aSrL',948,556,50,'#8c5c9c','')}
  ${advT('',1172,481,20,'#a494ac','ST',{cls:'cap'})}${advT('aStL',1232,556,50,'#ac9cbc','',{al:'r'})}${advT('aStU1',1139,585,13,'#d7dce4','min',{al:'c'})}${advT('aStU2',1210,585,13,'#d7dce4','sec',{al:'c'})}
  <div class="hline" style="left:calc(932*var(--u));top:calc(626*var(--u));width:calc(314*var(--u))"></div>
  ${advLblBis('aSefLbl',949,647,'#fcfcfc')}${advT('aSefL',949,707,50,'#dce4ec','')}
- ${advT('',1172,647,20,'#9c5c8c','MF',{cls:'cap'})}${advT('aMfL',1172,707,50,'#9c5c8c','')}`;}
+ ${advT('',1150,647,20,'#9c5c8c','MF',{cls:'cap'})}${advT('aMfL',1150,707,48,'#9c5c8c','')}`;}
 function advNum4(){const P=(s,oy,c)=>{const sid=s,B=ADV.hemi;return `
  ${advLblBis('aBisLbl'+s,950,81+oy,c)}${advT('',1114,82+oy,19,AC.sqi,'SQI',{cls:'cap'})}<div class="sqi" id="aSqi${s}" style="left:calc(1157*var(--u));top:calc(${70+oy}*var(--u));height:calc(20*var(--u));gap:calc(3.5*var(--u))">${[6,9,12,16,20].map(h=>`<i style="height:calc(${h}*var(--u));width:calc(5.5*var(--u))"></i>`).join('')}</div><span class="badge" style="left:calc(1223*var(--u));top:calc(${80+oy}*var(--u));--c:${c}">${s}</span>
- <span class="bis" id="aBis${s}" style="left:calc(1030*var(--u));top:calc(${172+oy}*var(--u));font-size:calc(156*var(--u));color:${c}" aria-label="BIS ${s==='L'?'left':'right'}"></span>
+ <span class="bis" id="aBis${s}" style="left:calc(1030*var(--u));top:calc(${172+oy}*var(--u));font-size:calc(150*var(--u));color:${c}" aria-label="BIS ${s==='L'?'left':'right'}"></span>
  ${advT('',1146,159+oy,18,AC.emg,'EMG',{cls:'cap'})}${advT('aEmg'+s,1146,192+oy,40,AC.emg,'')}<div class="emgbar" id="aEmgBar${s}" style="left:calc(1220*var(--u));top:calc(${135+oy}*var(--u));width:calc(16*var(--u));height:calc(100*var(--u))"><b></b></div>${advT('',1228,126+oy,12,'#d4d4d4','55',{al:'c'})}${advT('',1228,246+oy,12,'#d4d4d4','30',{al:'c'})}
  <div class="hline" style="left:calc(932*var(--u));top:calc(${250+oy}*var(--u));width:calc(314*var(--u))"></div>
  ${advLblBis('aSrLbl'+s,950,263+oy,AC.sr)}${advT('aSr'+s,950,302+oy,44,'#8c5c9c','')}
  ${advT('',1128,263+oy,19,'#a494ac','ST',{cls:'cap'})}${advT('aSt'+s,1207,294+oy,44,'#ac9cbc','',{al:'r'})}${advT('aStU1'+s,1142,320+oy,12.5,'#d7dce4','min',{al:'c'})}${advT('aStU2'+s,1186,320+oy,12.5,'#d7dce4','sec',{al:'c'})}
  ${advT('',1049,359+oy,17,AC.burst,'BURST',{al:'r',cls:'cap'})}${advT('aBc'+s,1056,358+oy,27,AC.burst,'',{al:'l'})}${advT('',1076,361+oy,13,AC.burst,'/min')}`;};
  return `${P('L',0,AC.bisL)}<div class="hline" style="left:calc(932*var(--u));top:calc(385*var(--u));width:calc(314*var(--u))"></div>${P('R',324,AC.bisR)}<div class="hline" style="left:calc(932*var(--u));top:calc(709*var(--u));width:calc(314*var(--u))"></div>
- ${advLblBis('aSefLbl',948,726,'#fcfcfc')}${advT('aSefL',948,750,36,'#dce4ec','')}${advT('',1114,726,19,'#9c5c8c','MF',{cls:'cap'})}${advT('aMfL',1114,750,36,'#9c5c8c','')}<span class="badge" id="aBadgeLow" style="left:calc(1223*var(--u));top:calc(735*var(--u));--c:${AC.bisL}">L</span>`;}
+ ${advLblBis('aSefLbl',948,722,'#fcfcfc')}${advT('aSefL',948,756,36,'#dce4ec','')}${advT('',1114,726,19,'#9c5c8c','MF',{cls:'cap'})}${advT('aMfL',1114,750,36,'#9c5c8c','')}<span class="badge" id="aBadgeLow" style="left:calc(1223*var(--u));top:calc(735*var(--u));--c:${AC.bisL}">L</span>`;}
 // ----- headers and selectors over the trend area -----
 function advHeaders(){const L=ADV.lay||(ADV.lay=advLay()),r=L.rect,two=L.two,H=[],bc=ADV.hemi==='R'?AC.bisR:AC.bisL;
  const ab=(x,y,cls,html,al)=>`<div class="hd ${cls||''}" style="left:calc(${x}*var(--u));top:calc(${y}*var(--u));transform:${al==='r'?'translate(-100%,-50%)':'translateY(-50%)'}">${html}</div>`;
  const cy=o=>o.y+o.h*.55,ttl=(txt,c)=>`<span class="ttl" style="color:${c}">${txt}</span>`;
  if(r.bis){const y=cy(r.bisH),sec=ADV.sec,nm={emg:'EMG',sr:'SR',sqi:'SQI',burst:'BURST',bisO:'BIS',none:'NONE'}[sec],col={emg:AC.emg,sr:AC.sr,sqi:AC.sqi,burst:AC.burst,bisO:ADV.hemi==='R'?AC.bisL:AC.bisR,none:'#d4d4d4'}[sec],un={emg:'dB',sr:'%',sqi:'%'}[sec]||'';
   H.push(ab(168,y,'',ttl('BIS',bc)),ab(two?218:209,y,'',`<button type="button" class="lnk" data-a="range"><u>${two?'SET RANGE':'SET TARGET'}</u><i></i></button>`),
-   ab(883,y,'',`<button type="button" class="sel" id="aSecB" data-a="secpop" aria-haspopup="listbox" aria-label="Secondary trend: ${nm}"><span style="color:${col}">${nm}</span><s></s><span style="color:#fff;font-size:calc(15*var(--u))">${un}</span></button>`,'r'));
+   ab(883,y,'',`<button type="button" class="sel sec" id="aSecB" data-a="secpop" aria-haspopup="listbox" aria-label="Secondary trend: ${nm}"><span style="color:${col}">${nm}</span><s></s><span style="color:#fff;font-size:calc(15*var(--u))">${un}</span></button>`,'r'));
   if(!two)H.push(`<span class="badge" style="left:calc(911*var(--u));top:calc(${y}*var(--u));--c:${bc}">${ADV.hemi}</span>`);}
  if(r.dsaH){const y=cy(r.dsaH),title=L.grp?`<span class="ttl" style="color:#fff">DSA</span> <span class="ttl sp" style="color:#9aa0a8">&amp;</span><span class="ttl" style="color:${AC.asym}">ASYM</span>`:ttl('DSA','#fff');
   H.push(ab(168,y,'',`${title}<span class="sq" style="background:#fff"></span><span class="cap2">SEF</span><span class="sq" style="background:#b44a9c"></span><span class="cap2">MF</span><span class="legend"><span>L</span><i></i><span>H</span></span>`));}

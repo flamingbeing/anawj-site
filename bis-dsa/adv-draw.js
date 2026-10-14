@@ -17,8 +17,8 @@ function advLay(){
  const grp=!two&&tr.includes('dsa')&&tr.includes('asym');if(grp)tr=tr.filter(p=>p!=='asym');
  const S=[];
  tr.forEach((p,i)=>{
-  if(p==='bis')S.push({k:'bisH',fix:two?36:37},{k:'bis',w:1});
-  else if(p==='dsa'){S.push({k:'dsaH',fix:two?36:37});if(grp)S.push({k:'dsaL',w:.286},{k:'asymP',w:.428},{k:'dsaR',w:.286});else S.push({k:'dsa',w:1});}
+  if(p==='bis')S.push({k:'bisH',fix:two?36:37},{k:'bis',w:grp?3.35:1});
+  else if(p==='dsa'){S.push({k:'dsaH',fix:two?36:37});if(grp)S.push({k:'dsaL',w:1.15},{k:'asymP',w:1.7},{k:'dsaR',w:1.15});else S.push({k:'dsa',w:1});}
   else if(p==='asym')S.push({k:'asymH',fix:24},{k:'asym',w:1});
   if(i<tr.length-1)S.push({k:'gap',fix:two?4:14});});
  if(tr.length)S.push({k:'axis',fix:two?36:22});
@@ -45,7 +45,7 @@ function advSeries(h,fn,tL,win,step){const out=[],n=Math.ceil(win/step);let i=ad
 function advWindow(){const win=ADV.win*60,now=advNow(),el=now-ADV.t0;return {win,tL:el<win?ADV.t0:now-win};}
 function advData(){
  const {win,tL}=advWindow(),W=ADV_PX,step=Math.max(10,win/(W/2)),D={win,tL,step,len:HIST.length,key:''};
- const hs={L:HIST,R:R.HIST},side=ADV.hemi;
+ const hs={L:advHist('L'),R:advHist('R')},side=ADV.hemi;
  const sec=ADV.sec;
  D.bis=advSeries(hs[side],c=>c.sqi<15?null:c.bis,tL,win,step);
  D.bisO=advSeries(hs[side==='L'?'R':'L'],c=>c.sqi<15?null:c.bis,tL,win,step);
@@ -55,11 +55,11 @@ function advData(){
  D.sqiS=advSeries(hs[side],c=>c.sqi,tL,win,step);
  D.bcS=advSeries(hs[side],c=>c.bc,tL,win,step);
  // ASYM: signed share of the power difference (L above the line, R below), over the same bins
- const pl=advSeries(HIST,c=>Math.pow(10,c.tp/10),tL,win,step),pr=advSeries(R.HIST,c=>Math.pow(10,c.tp/10),tL,win,step);
+ const pl=advSeries(hs.L,c=>Math.pow(10,c.tp/10),tL,win,step),pr=advSeries(hs.R,c=>Math.pow(10,c.tp/10),tL,win,step);
  D.asym=pl.map((p,i)=>{const q=pr[i];if(p[1]==null||q[1]==null)return [p[0],null];return [p[0],100*(p[1]-q[1])/(p[1]+q[1]+1e-9)];});
  // smooth ASYM a little (about 30 s)
  const k=Math.max(1,Math.round(30/step)),A=D.asym.map(x=>x[1]);D.asym=D.asym.map((p,i)=>{let s=0,c=0;for(let j=Math.max(0,i-k);j<=Math.min(A.length-1,i+k);j++)if(A[j]!=null){s+=A[j];c++;}return [p[0],p[1]==null||!c?null:s/c];});
- D.dsa={L:advDsa(HIST,tL,win,'L'),R:advDsa(R.HIST,tL,win,'R')};
+ D.dsa={L:advDsa(hs.L,tL,win,'L'),R:advDsa(hs.R,tL,win,'R')};
  ADV.d=D;ADV.full=true;}
 const ADV_CELL=3; // DSA cell width in virtual pixels
 function advDsa(h,tL,win,side){const cols=Math.floor(ADV_PX/ADV_CELL),spc=win/cols;let o=ADV.dsaCv[side];if(!o||o.cv.width!==cols){const cv=document.createElement('canvas');cv.width=cols;cv.height=NB;o=ADV.dsaCv[side]={cv,img:cv.getContext('2d').createImageData(cols,NB)};}
@@ -97,74 +97,87 @@ function advLine(ctx,pts,yf,D,col,lw,connect){ctx.beginPath();let pen=false;ctx.
 
 // ----- panels -----
 const ADV_SECAX={emg:{lo:30,hi:80,step:10,col:AC.emg},sr:{lo:0,hi:100,step:20,col:AC.sr},sqi:{lo:0,hi:100,step:20,col:AC.sqi},burst:{lo:0,hi:30,step:5,col:AC.burst},bis:{lo:0,hi:100,step:20,col:AC.bisR}};
+// vertical gridlines at the labelled times: all alike, every third one brighter
+function advGrid(ctx,D,y0,y1,dim){const tk=advTicks(D),s=({60:10,360:60,720:120,1440:240}[ADV.win]||10)*60,base=Math.floor(T0/1000);
+ for(const t of tk)advV(ctx,advXt(D,t),y0,y1,Math.round((t+base)/s)%3===0?'#6a6e76':dim||'#4a4e56');}
+// axis labels that must not overprint: keep them in the order given, drop one that comes within gap px of one already kept
+function advKeep(items,gap){const kept=[];for(const it of items)if(kept.every(k=>Math.abs(k.y-it.y)>=gap))kept.push(it);return kept;}
 function advDrawBis(ctx,L,D){const r=L.rect.bis,y0=r.y,h=r.h,Y=v=>y0+h*(1-v/100),bc=ADV.hemi==='R'?AC.bisR:AC.bisL;
  // target range band (only when the BIS range alarm is on)
  const A=ADV.alarm.bis;if(A.on){const g=ctx.createLinearGradient(ADV_X,0,ADV_X+ADV_PX,0);g.addColorStop(0,'rgba(190,190,190,.34)');g.addColorStop(.18,'rgba(190,190,190,.30)');g.addColorStop(1,'rgba(190,190,190,.07)');ctx.fillStyle=g;ctx.fillRect(ADV_X,Y(A.hi),ADV_PX,Y(A.lo)-Y(A.hi));}
- const ticks=advTicks(D);for(const t of ticks)advV(ctx,advXt(D,t),y0,y0+h,AC.grid);
+ advGrid(ctx,D,y0,y0+h);
  // stretches with no usable EEG (artefact, SQI under 15) as dark blue-grey bands, as the monitor marks a gap in the data
  ctx.fillStyle='rgba(43,53,71,.85)';for(const [t,v] of D.art)if(v!=null&&v>=.5){const x=advXt(D,t-D.step/2);ctx.fillRect(x,y0,Math.max(3,ADV_PX*D.step/D.win),h);}
  advFrame(ctx,y0,h);
- for(let v=0;v<=100;v+=20)advTx(ctx,String(v),ADV_X-7,Math.max(y0+7,Math.min(y0+h-5,Y(v))),15.5,AC.axis,'right');
+ const fs=L.two?15.5:15;
+ for(let v=0;v<=100;v+=20)advTx(ctx,String(v),ADV_X-7,Math.max(y0+7,Math.min(y0+h-5,Y(v))),fs,AC.axis,'right');
  const sec=ADV.sec,ax=ADV_SECAX[sec==='bisO'?'bis':sec];
- if(ax){const sy=v=>y0+h*(1-(v-ax.lo)/(ax.hi-ax.lo));for(let v=ax.lo;v<=ax.hi;v+=ax.step)advTx(ctx,String(v),ADV_X+ADV_PX+9,Math.max(y0+7,Math.min(y0+h-5,sy(v))),15.5,sec==='emg'?AC.emg:AC.axis,'left');
+ if(ax){const sy=v=>y0+h*(1-(v-ax.lo)/(ax.hi-ax.lo));for(let v=ax.lo;v<=ax.hi;v+=ax.step)advTx(ctx,String(v),ADV_X+ADV_PX+9,Math.max(y0+7,Math.min(y0+h-5,sy(v))),fs,sec==='emg'?AC.emg:AC.axis,'left');
   const pts=sec==='emg'?D.emg:sec==='sr'?D.srS:sec==='sqi'?D.sqiS:sec==='burst'?D.bcS:D.bisO;
   if(sec==='sr'&&ADV.alarm.sr.on){advH(ctx,ADV_X,ADV_X+ADV_PX,sy(ADV.alarm.sr.hi),AC.sr,[6,4]);}
   advLine(ctx,pts,sy,D,sec==='emg'?'#d8843a':sec==='bisO'?AC.bisR:ax.col,1.2);}
  advLine(ctx,D.bis,Y,D,bc,1.9);}
 function advDrawAxis(ctx,L,D){const r=L.rect.axis,y0=r.y,h=r.h;ctx.fillStyle='#000';ctx.fillRect(115,y0,817,h);
- advH(ctx,115,932,y0+h-.5,'#2a2f36');advH(ctx,ADV_X,ADV_X+ADV_PX,y0,AC.frame);
+ advH(ctx,115,932,y0+h-.5,'#2a2f36');advH(ctx,ADV_X,ADV_X+ADV_PX,y0,AC.frame);advV(ctx,160,y0,y0+h,'#2a2f36');
  const ticks=advTicks(D),fs=L.two?15.5:14.5;
- for(const t of ticks){const x=advXt(D,t);advV(ctx,x,y0,y0+h,'#6a6e76');advTx(ctx,advFmtT(t),x+4,y0+h-(L.two?15:10),fs,AC.axis,'left');}
+ for(const t of ticks){const x=advXt(D,t);advV(ctx,x,y0,y0+(L.two?9:7),'#8a8f98');advTx(ctx,advFmtT(t),x+4,y0+h-(L.two?15:10),fs,AC.axis,'left');}
  // case start (white triangle) and now (blue tick)
  if(ADV.t0>=D.tL-1){const x=advXt(D,ADV.t0);ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(x+1,y0+h-10);ctx.lineTo(x+1,y0+h-2);ctx.lineTo(x+9,y0+h-2);ctx.closePath();ctx.fill();}
  if(advNow()>=D.tL){const x=Math.round(advXt(D,advNow()))+.5;ctx.strokeStyle=AC.tick;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(x,y0+h-14);ctx.lineTo(x,y0+h);ctx.stroke();}
  for(const s of ADV.snaps){if(s.t>=D.tL&&s.t<=D.tL+D.win){const x=advXt(D,s.t);ctx.fillStyle='#8cc4ff';ctx.fillRect(x,y0+2,1.5,10);ctx.fillRect(x,y0+2,6,4);}}}
-function advDrawDsa(ctx,L,D,side,y0,h,mirror,title){const fs=h<130?12:15.5;const o=ADV.dsaCv[side],ds=D.dsa[side],hz=v=>mirror?y0+h*(v/30):y0+h*(1-v/30);
+function advDrawDsa(ctx,L,D,side,y0,h,mirror,title){const small=h<130,fs=small?11.5:15.5;const o=ADV.dsaCv[side],ds=D.dsa[side],hz=v=>mirror?y0+h*(v/30):y0+h*(1-v/30);
  ctx.fillStyle='#000';ctx.fillRect(ADV_X,y0,ADV_PX,h);
  const dw=ADV_PX*ds.nData/ds.cols;if(o&&ds.nData){ctx.imageSmoothingEnabled=false;ctx.save();if(mirror){ctx.translate(0,y0+h/2);ctx.scale(1,-1);ctx.translate(0,-(y0+h/2));}ctx.drawImage(o.cv,0,0,ds.nData,NB,ADV_X,y0,dw,h);ctx.restore();}
  for(const f of [13,8,4])advH(ctx,ADV_X,ADV_X+ADV_PX,hz(f),'#000');
- // SEF (white) and MF (purple) as stepped lines
+ // SEF (white, 2 px) and MF (purple, 2 px) as stepped lines
  const cw=ADV_PX/ds.cols,step=(arr,col,lw)=>{ctx.beginPath();ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.lineJoin='miter';let pen=false,py=0;
   for(let c=0;c<ds.nData;c++){const v=arr[c];if(v==null){pen=false;continue;}const x=ADV_X+c*cw,y=hz(Math.max(0,Math.min(30,v)));if(!pen){ctx.moveTo(x,y);}else{ctx.lineTo(x,py);ctx.lineTo(x,y);}ctx.lineTo(x+cw,y);pen=true;py=y;}ctx.stroke();};
- step(ds.mf,AC.mf,1.8);step(ds.sef,'#fff',2);
+ step(ds.mf,AC.mf,2);step(ds.sef,'#fff',2);
  advFrame(ctx,y0,h);
- const labs=mirror?[[0,'0'],[4,'4'],[8,'8'],[13,'13'],[30,'30']]:[[30,'30'],[13,'13'],[8,'8'],[4,'4'],[0,'0']];
- for(const [f,t] of labs){const y=Math.max(y0+7,Math.min(y0+h-6,hz(f)));if(f===30){const yy=mirror?y0+h-6:y0+7;advTx(ctx,'30',ADV_X-7,yy,fs,AC.axis,'right');advTx(ctx,'Hz',ADV_X-7-fs*1.6,yy,fs-1.5,AC.axis,'right');}else advTx(ctx,t,ADV_X-7,y,fs,AC.axis,'right');}
+ // Hz labels at 30, 13, 8, 4 (and 0 on a tall plot), none closer than 12 px: a short plot drops the 8 first, then the 4
+ const pos=f=>Math.max(y0+7,Math.min(y0+h-6,hz(f))),want=small?[30,13,4,8]:[30,13,8,4,0];
+ const items=advKeep(want.map(f=>({f,y:f===30?(mirror?y0+h-6:y0+7):pos(f)})),12);
+ for(const {f,y} of items){if(f===30){advTx(ctx,'30',ADV_X-7,y,fs,AC.axis,'right');advTx(ctx,'Hz',ADV_X-7-fs*1.55,y,fs-1.5,AC.axis,'right');}else advTx(ctx,String(f),ADV_X-7,y,fs,AC.axis,'right');}
  if(ADV.review&&ADV.review.t!=null&&!mirror)ADV.rvDsa={y0,h};}
-function advDrawAsym(ctx,L,D,y0,h,group){const fs=h<130?12:15.5;const Y=v=>y0+h/2-h/2*v/100;ctx.fillStyle='#000';ctx.fillRect(ADV_X,y0,ADV_PX,h);
+function advDrawAsym(ctx,L,D,y0,h,group){const small=h<130,fs=small?12:15.5;const Y=v=>y0+h/2-h/2*v/100;ctx.fillStyle='#000';ctx.fillRect(ADV_X,y0,ADV_PX,h);
  // hatched dead band +-20
- const b0=Y(20),b1=Y(-20);ctx.save();ctx.beginPath();ctx.rect(ADV_X,b0,ADV_PX,b1-b0);ctx.clip();ctx.strokeStyle='#2a2a2a';ctx.lineWidth=1.2;ctx.beginPath();for(let x=ADV_X-60;x<ADV_X+ADV_PX+60;x+=6){ctx.moveTo(x,b1);ctx.lineTo(x+(b1-b0),b0);}ctx.stroke();ctx.restore();
- for(const t of advTicks(D))advV(ctx,advXt(D,t),y0,y0+h,group?'#2a2e34':AC.grid);
- const edge=group?AC.asymRef:AC.frame;
- for(const v of [60,-60])advH(ctx,ADV_X,ADV_X+ADV_PX,Y(v),group?'#2a3a3a':AC.frame);
- advH(ctx,ADV_X,ADV_X+ADV_PX,Y(20),AC.frame);advH(ctx,ADV_X,ADV_X+ADV_PX,Y(-20),AC.frame);advH(ctx,ADV_X,ADV_X+ADV_PX,Y(0),'#c8c8c8');
+ const b0=Y(20),b1=Y(-20);ctx.save();ctx.beginPath();ctx.rect(ADV_X,b0,ADV_PX,b1-b0);ctx.clip();ctx.strokeStyle='#1c1c1c';ctx.lineWidth=1.4;ctx.beginPath();for(let x=ADV_X-60;x<ADV_X+ADV_PX+60;x+=6){ctx.moveTo(x,b1);ctx.lineTo(x+(b1-b0),b0);}ctx.stroke();ctx.restore();
+ advGrid(ctx,D,y0,y0+h,'#2a2e34');
+ // thin lines only at +-60 and at the edges of the +-20 band, a light line at 0
+ for(const v of [60,-60,20,-20])advH(ctx,ADV_X,ADV_X+ADV_PX,Y(v),'#333');
+ advH(ctx,ADV_X,ADV_X+ADV_PX,Y(0),'rgba(212,212,212,.6)');
  // filled areas where |ASYM| is 20 or more
- const side=(sg)=>{ctx.beginPath();let run=[];const flush=()=>{if(run.length>1){ctx.beginPath();run.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.lineTo(run[run.length-1][0],Y(20*sg));ctx.lineTo(run[0][0],Y(20*sg));ctx.closePath();ctx.fillStyle=AC.asymFill;ctx.fill();
+ const side=(sg)=>{let run=[];const flush=()=>{if(run.length>1){ctx.beginPath();run.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.lineTo(run[run.length-1][0],Y(20*sg));ctx.lineTo(run[0][0],Y(20*sg));ctx.closePath();ctx.fillStyle=AC.asymFill;ctx.fill();
     ctx.beginPath();run.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.strokeStyle=AC.asymLine;ctx.lineWidth=1.4;ctx.stroke();}run=[];};
   for(const [t,v] of D.asym){if(v==null||v*sg<20){flush();continue;}run.push([advXt(D,t),Y(Math.max(-100,Math.min(100,v)))]);}flush();};
  side(1);side(-1);
- if(group){ctx.strokeStyle=AC.asymRef;ctx.lineWidth=1.6;for(const yy of [y0,y0+h]){ctx.beginPath();ctx.moveTo(ADV_X,Math.round(yy)+.5);ctx.lineTo(ADV_X+ADV_PX,Math.round(yy)+.5);ctx.stroke();}}
+ if(group){ctx.strokeStyle=AC.asymRef;ctx.lineWidth=1.5;for(const yy of [y0,y0+h]){ctx.beginPath();ctx.moveTo(ADV_X,Math.round(yy)+.5);ctx.lineTo(ADV_X+ADV_PX,Math.round(yy)+.5);ctx.stroke();}}
  else advFrame(ctx,y0,h);
- const lab=[[100,'% 100'],[60,'60'],[20,'20'],[0,'0'],[-20,'20'],[-60,'60'],[-100,'% 100']];
- for(const [v,t] of lab){const y=Math.max(y0+7,Math.min(y0+h-6,Y(v)));advTx(ctx,t.replace('% ',''),ADV_X-7,y,fs,AC.axis,'right');if(t.startsWith('%'))advTx(ctx,'%',ADV_X-7-fs*1.8,y,fs-2,AC.axis,'right');}
+ const lab=[[100,'% 100'],[-100,'% 100'],[0,'0'],[60,'60'],[-60,'60'],[20,'20'],[-20,'20']];
+ for(const {v,t,y} of advKeep(lab.map(([v,t])=>({v,t,y:Math.max(y0+7,Math.min(y0+h-6,Y(v)))})),small?11:13)){advTx(ctx,t.replace('% ',''),ADV_X-7,y,fs,AC.axis,'right');if(t.startsWith('%'))advTx(ctx,'%',ADV_X-7-fs*1.8,y,fs-2,AC.axis,'right');}
  // L and R markers at the right edge
  for(const [t,yy,c] of [['L',Y(60),AC.bisL],['R',Y(-60),AC.bisR]]){const x=ADV_X+ADV_PX+31;ctx.beginPath();ctx.arc(x,yy,11.5,0,7);ctx.fillStyle='#44546c';ctx.fill();advTx(ctx,t,x,yy+.5,14,c,'center');}}
 function advEegSig(side){return side==='R'?{sig:R.SIG,prod:R.produced}:{sig:SIG,prod:produced};}
+// What the monitor shows of the EEG: the engine's signal through the display filter (a 5-tap smoother, a fifth of the fast residue kept as the fine
+// fuzz) at a display gain (the engine's awake EEG is about 11 uV RMS, the monitor's trace uses a quarter to a third of the +-50 uV frame), and a soft limit
+// that keeps even a big slow wave or an artefact inside the frame. Nothing is clipped.
+const ADV_EEG_GAIN=.55,ADV_EEG_FUZZ=.22;
+function advEegSoft(v,half){const T=.35*half,M=.62*half,a=Math.abs(v);let o=a<=T?a:T+(M-T)*Math.tanh((a-T)/(M-T));if(a>90)o+=.33*half*Math.tanh((a-90)/200);return Math.sign(v)*o;} // normal waves stay under 60 percent of the half height; a big artefact still reaches further
 function advDrawEeg(ctx,L){if(!L.eeg)return;const r=L.rect.eeg,secs=advSecs(),N=Math.round(secs*FS),two=L.two,uvmm=ADV.uvmm[ADV.ch],pxuv=ADV_MMPX/uvmm;
  ctx.fillStyle='#000';ctx.fillRect(115,r.y-1,817,r.h+2);
- L.strips.forEach((s,si)=>{const cy=s.y+s.h/2;
+ L.strips.forEach((s,si)=>{const cy=s.y+s.h/2,half=s.h/2/pxuv,X1=ADV_X+ADV_PX,{sig,prod}=advEegSig(s.side);
   advFrame(ctx,s.y,s.h);
-  // 1 s dotted gridlines, the zero line
-  for(let k=1;k<Math.round(secs);k++)advV(ctx,ADV_X+k*ADV_PX/secs,s.y+1,s.y+s.h-1,'#6a6e76',[1,3]);
-  advH(ctx,ADV_X+1,ADV_X+ADV_PX,cy,'#4a4e56');
-  const half=s.h/2/pxuv,lab=half>=100?Math.round(half/10)*10:Math.round(half/5)*5;
+  // 1 s dotted gridlines that scroll with the trace, the zero line
+  const k0=Math.floor((prod-1)/FS);for(let q=0;q<=Math.ceil(secs);q++){const x=X1-((prod-1)-(k0-q)*FS)/N*ADV_PX;if(x>ADV_X+2&&x<X1-1)advV(ctx,x,s.y+1,s.y+s.h-1,'#5a5e66',[1,3]);}
+  advH(ctx,ADV_X+1,ADV_X+ADV_PX,cy,'#3a3e46');
+  const lab=half>=100?Math.round(half/10)*10:Math.round(half/5)*5;
   if(si===0||!two){advTx(ctx,'µV '+lab,162,s.y+8,15,AC.axis,'right');advTx(ctx,'-'+lab,162,s.y+s.h-8,15,AC.axis,'right');}
   if(s.label)advTx(ctx,s.label,142,cy,15.5,AC.axis,'center');
-  const {sig,prod}=advEegSig(s.side),gap=Math.round(N*.06);
   ctx.save();ctx.beginPath();ctx.rect(ADV_X+1,s.y+1,ADV_PX-1,s.h-1);ctx.clip();ctx.strokeStyle=AC.eeg;ctx.lineWidth=1.3;ctx.lineJoin='round';ctx.beginPath();
-  let px_=-1,len=sig.length;const gain=mon.skinGain||1;
-  for(let k=Math.min(N-gap,len-1-s.lag)-1;k>=0;k--){const abs=prod-1-k;if(abs<0)continue;const x=ADV_X+(abs%N)/N*ADV_PX,v=sig[len-1-k-s.lag]*(s.lag?.9:1),y=cy-Math.max(-half*1.05,Math.min(half*1.05,v))*pxuv;
-   if(x<px_||px_<0)ctx.moveTo(x,y);else ctx.lineTo(x,y);px_=x;}
+  const len=sig.length,lag=s.lag||0,gain=(s.lag?.9:1)*ADV_EEG_GAIN,at=i=>sig[Math.max(0,Math.min(len-1-lag,i))],n0=Math.min(N,len-lag),nz=ADV.disc;
+  for(let k=0;k<n0;k++){const i=len-1-lag-(n0-1-k);let v=0;
+   if(!nz){const lp=(at(i-3)+6*at(i-2)+15*at(i-1)+20*at(i)+15*at(i+1)+6*at(i+2)+at(i+3))/64;v=advEegSoft(gain*(lp+(ADV.filters?ADV_EEG_FUZZ:.75)*(at(i)-lp)),half);}
+   const x=X1-(n0-1-k)/N*ADV_PX,y=cy-v*pxuv;if(k)ctx.lineTo(x,y);else ctx.moveTo(x,y);}
   ctx.stroke();ctx.restore();});
  if(ADV.demo)advWatermark(ctx,L);}
 // ----- the whole trend area -----
@@ -175,7 +188,7 @@ function advDrawAll(full){const c=document.getElementById('advCv');if(!c)return;
  if(full||ADV.full){ctx.fillStyle='#000';ctx.fillRect(0,0,1246,779);
   if(ADV.view==='graphs'){const r=L.rect;
    if(r.bis)advDrawBis(ctx,L,D);
-   if(L.grp){advDrawDsa(ctx,L,D,'L',r.dsaL.y,r.dsaL.h,false);advDrawAsym(ctx,L,D,r.asymP.y,r.asymP.h,true);advDrawDsa(ctx,L,D,'R',r.dsaR.y,r.dsaR.h,true);}
+   if(L.grp){advDrawDsa(ctx,L,D,'L',r.dsaL.y,r.dsaL.h,false);advDrawDsa(ctx,L,D,'R',r.dsaR.y,r.dsaR.h,true);advDrawAsym(ctx,L,D,r.asymP.y,r.asymP.h,true);}
    else if(r.dsa)advDrawDsa(ctx,L,D,ADV.hemi,r.dsa.y,r.dsa.h,false);
    if(r.asym)advDrawAsym(ctx,L,D,r.asym.y,r.asym.h,false);
    if(r.axis)advDrawAxis(ctx,L,D);
