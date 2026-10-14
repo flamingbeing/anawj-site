@@ -11,6 +11,12 @@ Lasting decisions for `bis-dsa/`. Status and next steps: `STATUS.md`.
 - Screen order like a BIS monitor (owner, 14 Oct 2026): BIS and EMG trends, then DSA above, raw EEG below; a view
   toggle (DSA + EEG, DSA, EEG) shows one large. Displayed EMG is the 30–47 Hz power + 16 dB on a 25–55 dB bar
   (`emgShow`); ketamine's gamma also lifts it, as real high-frequency power would.
+- Monitor look (owner, 14 Oct 2026): bezel, status line, BIS with SQI and EMG segment bars, SR/SEF/TP/BC row, soft keys
+  for the view. SQI = 98 − 160 × share of artefact seconds (any sample over 300 µV) in the last 30 s; artefact seconds
+  are left out of BIS, SR, EMG and TP. As on the monitor, BIS shows hollow under SQI 50 and `--` under 15. The
+  Diathermy toggle injects interference bursts to show this.
+- Monitor first (owner, 14 Oct 2026): the page opens on the monitor (a small title above it), depth slider then drug
+  right under it, smaller lanes on phones (`laneH`); the teaching intro follows.
 
 ## Address
 

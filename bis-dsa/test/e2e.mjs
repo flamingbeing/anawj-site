@@ -26,7 +26,7 @@ try {
     const h0 = await heights();
     await page.waitForTimeout(1500);
     assert.deepEqual(await heights(), h0, 'canvas heights stable');
-    assert.equal(await page.$eval('#cEeg', c => c.clientHeight), 110);
+    assert.ok(await page.$eval('#cEeg', c => c.clientHeight) >= 90);
     const lit = await page.$eval('#cDsa', c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 120) n++; return n / (d.length / 4); });
     assert.ok(lit > 0.3, `DSA drawn (${lit})`);
     assert.ok(await page.$eval('#err', e => e.hidden), 'no display error');
@@ -34,20 +34,29 @@ try {
     // screen order like a BIS monitor: trends, DSA above, EEG below; the view toggle shows one large
     const order = await page.$$eval('.screen .lane', ls => ls.map(l => l.id));
     assert.deepEqual(order, ['wTrend', 'wDsa', 'wEeg']);
+    const dsa0 = await page.$eval('#cDsa', c => c.clientHeight), eeg0 = await page.$eval('#cEeg', c => c.clientHeight);
     await page.click('#viewSeg [data-view="dsa"]');
-    await page.waitForFunction(() => document.querySelector('#cDsa').clientHeight === 300);
+    await page.waitForFunction(h => document.querySelector('#cDsa').clientHeight > h + 50, dsa0);
     assert.ok(await page.$eval('#wEeg', e => e.hidden), 'EEG hidden in DSA view');
     await page.click('#viewSeg [data-view="eeg"]');
-    await page.waitForFunction(() => document.querySelector('#cEeg').clientHeight === 280);
+    await page.waitForFunction(h => document.querySelector('#cEeg').clientHeight > h + 50, eeg0);
     assert.ok(await page.$eval('#wDsa', e => e.hidden), 'DSA hidden in EEG view');
     await page.click('#viewSeg [data-view="both"]');
-    await page.waitForFunction(() => document.querySelector('#cEeg').clientHeight === 110 && document.querySelector('#cDsa').clientHeight === 190);
+    await page.waitForFunction(([d, e]) => document.querySelector('#cEeg').clientHeight === e && document.querySelector('#cDsa').clientHeight === d, [dsa0, eeg0]);
+    // monitor first: on a phone the monitor and the drug and depth controls are near the top
+    if (viewport.width === 390) assert.ok(await page.$eval('#monitor .screen', e => e.getBoundingClientRect().top + scrollY) < 80, 'monitor at the top');
     // facial EMG raises the EMG reading
     const emg0 = await page.$eval('#vEmg', e => +e.textContent);
     await page.click('#speedSeg [data-speed="10"]');
     await page.check('#mEmg');
     await page.waitForFunction(e0 => +document.querySelector('#vEmg').textContent >= e0 + 6, emg0, { timeout: 20000 });
     await page.uncheck('#mEmg');
+    // SQI: high on a clean signal; diathermy drops it and the BIS number shows hollow or blank, like the monitor
+    assert.ok(await page.$eval('#vSqi', e => +e.textContent) >= 90, 'clean SQI');
+    await page.check('#mDia');
+    await page.waitForFunction(() => +document.querySelector('#vSqi').textContent < 60, null, { timeout: 30000 });
+    await page.waitForFunction(() => { const b = document.querySelector('#vBis'); return b.classList.contains('hollow') || b.textContent === '--'; }, null, { timeout: 30000 });
+    await page.uncheck('#mDia');
     await page.click('#speedSeg [data-speed="1"]');
     // library strips and quiz drawn
     await page.waitForFunction(() => document.querySelectorAll('#lib canvas').length === 10 && document.querySelectorAll('#opts button').length === 4);

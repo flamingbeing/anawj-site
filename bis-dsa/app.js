@@ -47,7 +47,7 @@ function profile(p,f,spEnv){
 }
 class Engine{
  constructor(){this.ph=OSC_F.map(()=>Math.random()*6.283);this.m=OSC_F.map(()=>1);this.p=target('propofol',0);
-  this.t=0;this.spPhase=0;this.bsState=0;this.bsTimer=1;this.gate=1;this.drug='propofol';this.d=0;this.mods={};}
+  this.t=0;this.spPhase=0;this.bsState=0;this.bsTimer=1;this.gate=1;this.drug='propofol';this.d=0;this.mods={};this.diT=0;this.diOn=false;}
  setTarget(drug,d,mods){this.drug=drug;this.d=d;this.mods=mods||{};}
  snap(){this.p=target(this.drug,this.d,this.mods);} // jump instantly
  sample(){ // one sample at FS
@@ -71,7 +71,10 @@ class Engine{
    const P=profile(this.p,f,spEnv); x+=Math.sqrt(2*P)*this.m[i]*Math.sin(this.ph[i]);
   }
   const emgNoise=this.p.emg>0?randn()*Math.sqrt(this.p.emg)*1.2:0;
-  return x*this.gate+emgNoise+randn()*0.6;
+  // diathermy: bursts of large broadband interference (a few seconds on, a few off)
+  let art=0;if(this.mods&&this.mods.diathermy){this.diT-=dt;if(this.diT<=0){this.diOn=!this.diOn;this.diT=this.diOn?1.5+Math.random()*2:3+Math.random()*4;}
+   if(this.diOn)art=randn()*180+250*Math.sin(2*Math.PI*41*this.t);}else this.diOn=false;
+  return x*this.gate+emgNoise+randn()*0.6+art;
  }
 }
 // FFT (radix-2, in place)
@@ -123,20 +126,29 @@ const eng=new Engine();
 const SIG=[]; const SIGMAX=8*FS;
 const COLS=[]; const COLMAX=300; // one column per second, 5 min
 const sup=[]; let bisS=null, lastSef=null, produced=0, simT=0, speed=1, paused=false;
-let drug='propofol', depth=0; const mods={elderly:false,emg:false};
+let drug='propofol', depth=0; const mods={elderly:false,emg:false,diathermy:false};
+const artH=[],bcH=[];let prevSup=false;
 function applyTarget(){eng.setTarget(drug,depth,mods);describe();}
 
 function step(nSamples){
  for(let i=0;i<nSamples;i++){SIG.push(eng.sample());if(SIG.length>SIGMAX)SIG.shift();produced++;
   if(produced%HOP===0&&SIG.length>=NWIN){
    const win=SIG.slice(-NWIN);const {P}=spectrum(win);const f=features(P,win);
-   sup.push(f.suppressed?1:0);if(sup.length>63)sup.shift();
-   const bsr=100*sup.reduce((a,b)=>a+b,0)/sup.length;
-   const raw=bisRaw(f,bsr); bisS=bisS==null?raw:bisS+(raw-bisS)*(1/15); // ~15 s smoothing
-   if(!f.suppressed)lastSef=f.sef;
+   // artefact: any sample over 300 uV in the newest second. Artefact seconds lower SQI and are left out of BIS.
+   let mx=0;for(let j=NWIN-HOP;j<NWIN;j++)mx=Math.max(mx,Math.abs(win[j]));const art=mx>300;
+   artH.push(art?1:0);if(artH.length>30)artH.shift();
+   const sqi=Math.max(0,Math.min(100,Math.round(98-160*artH.reduce((a,b)=>a+b,0)/artH.length)));
+   if(!art){sup.push(f.suppressed?1:0);if(sup.length>63)sup.shift();
+    bcH.push(prevSup&&!f.suppressed?1:0);if(bcH.length>60)bcH.shift();prevSup=f.suppressed;}
+   const bsr=sup.length?100*sup.reduce((a,b)=>a+b,0)/sup.length:0;
+   if(!art){const raw=bisRaw(f,bsr); bisS=bisS==null?raw:bisS+(raw-bisS)*(1/15);} // ~15 s smoothing
+   if(!f.suppressed&&!art)lastSef=f.sef;
    const db=new Float32Array(NB);for(let k=0;k<NB;k++)db[k]=10*Math.log10(P[k]+1e-4);
-   const emg=10*Math.log10(bandPow(P,30,47)+1e-4);
-   COLS.push({db,sef:f.suppressed?null:f.sef,bis:bisS,bsr,emg});if(COLS.length>COLMAX)COLS.shift();
+   // EMG and total power hold their last clean value through artefact seconds
+   const prev=COLS[COLS.length-1];
+   const emg=art&&prev?prev.emg:10*Math.log10(bandPow(P,30,47)+1e-4);
+   const tp=art&&prev?prev.tp:10*Math.log10(bandPow(P,0.5,47)+1e-4)+40;
+   COLS.push({db,sef:f.suppressed||art?null:f.sef,bis:bisS,bsr,emg,sqi,tp,bc:bcH.reduce((a,b)=>a+b,0)});if(COLS.length>COLMAX)COLS.shift();
    onColumn&&onColumn();
   }}
 }
@@ -150,7 +162,9 @@ function paintOff(){const d=offImg.data;const start=COLMAX-COLS.length;
   const c=LUT[(dbToX(col.db[NB-1-y])*255)|0];d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];d[i+3]=255;}}
  offCtx.putImageData(offImg,0,0);}
 let view='both';
-function drawEeg(){if(view==='dsa')return;const {ctx,w,h}=fit(cEeg,view==='eeg'?280:110);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);
+// lane heights: smaller on phones so the monitor and the controls fit one screen
+const laneH=()=>{const n=innerWidth<600;return view==='both'?{dsa:n?150:190,eeg:n?90:110}:{dsa:n?260:300,eeg:n?220:280};};
+function drawEeg(){if(view==='dsa')return;const {ctx,w,h}=fit(cEeg,laneH().eeg);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);
  ctx.strokeStyle=SCR.grid;ctx.lineWidth=1;for(let s=0;s<=8;s++){const x=Math.round(w*s/8)+.5;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
  ctx.beginPath();ctx.moveTo(0,h/2+.5);ctx.lineTo(w,h/2+.5);ctx.stroke();
  // newest 2-s epoch
@@ -168,7 +182,7 @@ function drawTrend(){const {ctx,w,h}=fit(cTrend);ctx.fillStyle=SCR.bg;ctx.fillRe
  // EMG lane: one bar per second, 25-55 dB
  ctx.fillStyle=SCR.mute;ctx.fillText('EMG',g.x-6,e.y+e.h);ctx.strokeStyle=SCR.grid;ctx.strokeRect(g.x+.5,e.y+.5,g.w-1,e.h-1);
  const bw=Math.max(1,g.w/COLMAX);COLS.forEach((c,i)=>{const v=Math.max(0,Math.min(1,(emgShow(c.emg)-25)/30));if(v<=0)return;ctx.fillStyle=v>0.55?'#ffb454':'#5fd08f';ctx.fillRect(X(i)-bw/2,e.y+e.h-v*e.h,bw,v*e.h);});}
-function drawDsa(){if(view==='eeg')return;const {ctx,w,h}=fit(cDsa,view==='dsa'?300:190);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);const g=plotGeom(w,h);
+function drawDsa(){if(view==='eeg')return;const {ctx,w,h}=fit(cDsa,laneH().dsa);ctx.fillStyle=SCR.bg;ctx.fillRect(0,0,w,h);const g=plotGeom(w,h);
  ctx.imageSmoothingEnabled=true;ctx.drawImage(off,g.x,g.y,g.w,g.h);
  // SEF line
  const start=COLMAX-COLS.length;ctx.strokeStyle=SCR.sef;ctx.lineWidth=1.4;ctx.beginPath();let pen=false;
@@ -184,9 +198,16 @@ function drawDsa(){if(view==='eeg')return;const {ctx,w,h}=fit(cDsa,view==='dsa'?
  ctx.save();ctx.translate(lx-6,g.y+g.h/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillStyle=SCR.mute;ctx.font='600 10px "JetBrains Mono", monospace';ctx.fillText('power',0,0);ctx.restore();}
 const $=id=>document.getElementById(id);
 function zoneOf(b){return b>80?'Awake/light':b>60?'Sedation':b>=40?'GA range':b>=20?'Deep':'Very deep';}
-function readouts(){const c=COLS[COLS.length-1];if(!c)return;$('vBis').textContent=Math.round(c.bis);$('vZone').textContent=zoneOf(c.bis);
+function segs(id,frac,color){const el=$(id);el.style.setProperty('--seg',color);const n=Math.round(Math.max(0,Math.min(1,frac))*10);[...el.children].forEach((x,i)=>x.classList.toggle('on',i<n));}
+function readouts(){const c=COLS[COLS.length-1];if(!c)return;
+ // like the monitor: SQI under 50 shows BIS hollow, under 15 no BIS at all
+ const b=$('vBis');b.textContent=c.sqi<15?'--':Math.round(c.bis);b.classList.toggle('hollow',c.sqi>=15&&c.sqi<50);
+ $('vZone').textContent=c.sqi<15?'Poor signal':c.sqi<50?'Low SQI: check':zoneOf(c.bis);
+ $('vSqi').textContent=c.sqi;segs('sqiSegs',c.sqi/100,c.sqi<15?'#ff6b6b':c.sqi<50?'#ffb454':'#5fd08f');
+ const e=emgShow(c.emg);$('vEmg').textContent=Math.round(e);segs('emgSegs',(e-25)/30,e>40?'#ffb454':'#5fd08f');
  $('vSr').textContent=Math.round(c.bsr);$('vSef').textContent=lastSef==null?'--':lastSef.toFixed(1);
- $('vEmg').textContent=Math.round(emgShow(c.emg));$('vEmgBar').style.width=Math.max(0,Math.min(100,(emgShow(c.emg)-25)/30*100))+'%';}
+ $('vTp').textContent=Math.round(c.tp);$('vBc').textContent=c.bc;
+ const d=new Date();$('vClock').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 
 // ===== state descriptions =====
 function describe(){const d=depth;let n,t;
@@ -208,6 +229,7 @@ function describe(){const d=depth;let n,t;
   else {n='Deep dexmedetomidine sedation';t='Slow waves dominate and spindles become sparse. BIS may fall to the 40s, but this is still a rousable, sleep-like state, not general anaesthesia.';}
  }
  if(mods.elderly&&drug!=='ketamine')t+=' Older patient: alpha and overall power are much lower, so the DSA is dimmer and BIS reads higher for the same dose.';
+ if(mods.diathermy)t+=' Diathermy: bursts of electrical interference swamp the EEG. SQI drops, those seconds are left out of BIS (the number holds, shows hollow under SQI 50 and disappears under 15), and the DSA shows bright full-height stripes.';
  if(mods.emg)t+=' Muscle activity: broad high-frequency power raises the EMG bar and pushes BIS up. It is artefact, not lighter anaesthesia.';
  $('rName').textContent=n;$('rText').textContent=t;}
 
@@ -219,6 +241,7 @@ document.querySelectorAll('#drugSeg button').forEach(b=>b.onclick=()=>{stopStory
 $('depth').oninput=e=>{stopStory();depth=e.target.value/100;applyTarget();};
 $('mElder').onchange=e=>{mods.elderly=e.target.checked;applyTarget();};
 $('mEmg').onchange=e=>{mods.emg=e.target.checked;applyTarget();};
+$('mDia').onchange=e=>{mods.diathermy=e.target.checked;applyTarget();};
 function setSpeed(s){speed=s;document.querySelectorAll('#speedSeg button[data-speed]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.speed===s));}
 document.querySelectorAll('#speedSeg button[data-speed]').forEach(b=>b.onclick=()=>setSpeed(+b.dataset.speed));
 function setView(v){view=v;document.querySelectorAll('#viewSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));$('wDsa').hidden=v==='eeg';$('wEeg').hidden=v==='dsa';dirty=true;}
@@ -239,7 +262,7 @@ const STORY=[
 let story=null;
 function stopStory(){if(!story)return;story=null;$('storyBtn').textContent='Play a case: induction to emergence';}
 $('storyBtn').onclick=()=>{if(story){stopStory();$('storyCap').textContent='';return;}
- story={t0:simT,i:-1};mods.elderly=false;mods.emg=false;$('mElder').checked=false;$('mEmg').checked=false;setSpeed(10);
+ story={t0:simT,i:-1};mods.elderly=false;mods.emg=false;mods.diathermy=false;$('mElder').checked=false;$('mEmg').checked=false;$('mDia').checked=false;setSpeed(10);
  if(paused)$('pause').click();$('storyBtn').textContent='Stop the case';};
 function runStory(){if(!story)return;const t=simT-story.t0;
  while(story.i+1<STORY.length&&t>=STORY[story.i+1].at){story.i++;const s=STORY[story.i];
