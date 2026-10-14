@@ -437,15 +437,21 @@ service cloud.firestore {
         || (signedIn() && resource.data.residentEmail == me() && resource.data.status == 'draft'
             && !resource.data.keys().hasAny(['assessment', 'submittedAt', 'declinedAt']));
 
-      // the assessor's comments meant only for the PD (optional): never readable by the resident
+      // the assessor's comments meant only for the PD (optional): never readable by the resident.
+      // Each note carries its author: after a decline and reassign, the new assessor can't read or
+      // overwrite the old assessor's note (older notes without an author: the current assessor, as before).
       match /private/{doc} {
         allow read: if isAdmin() || isPD()
-          || (signedIn() && get(/databases/$(database)/documents/evaluations/$(id)).data.assessorEmail == me());
+          || (signedIn() && resource.data.get('author', '') == me())
+          || (signedIn() && !('author' in resource.data)
+              && get(/databases/$(database)/documents/evaluations/$(id)).data.assessorEmail == me());
         allow write: if signedIn()
           && get(/databases/$(database)/documents/evaluations/$(id)).data.assessorEmail == me()
           && get(/databases/$(database)/documents/evaluations/$(id)).data.status == 'requested'
-          && request.resource.data.keys().hasOnly(['comments', 'updatedAt'])
-          && optString(request.resource.data, 'comments', 20000) && optNumber(request.resource.data, 'updatedAt');
+          && (resource == null || resource.data.get('author', me()) == me())
+          && request.resource.data.keys().hasOnly(['comments', 'updatedAt', 'author'])
+          && request.resource.data.get('author', '') == me()
+          && optString(request.resource.data, 'comments', 5000) && optNumber(request.resource.data, 'updatedAt');
       }
     }
     // Update branches (rs = the document after the write). Who-is-asking checks come first.
@@ -461,8 +467,10 @@ service cloud.firestore {
                        'itemId', 'itemText', 'tool', 'level', 'caseKey', 'catalogueVersion', 'chasedAt', 'metrics'])
         // metrics (the old assessor's open/answer times) may only be removed, when the assessor changes
         && !('metrics' in request.resource.data && request.resource.data.diff(resource.data).affectedKeys().hasAny(['metrics']))
+        // once the assessor has started, what is being assessed stays put (the scores belong to that item)
         && (resource.data.get('assessment', {}).size() == 0
-            || (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['assessorEmail', 'formId', 'itemId', 'tool'])
+            || (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['assessorEmail', 'formId', 'itemId', 'tool',
+                    'epa', 'level', 'itemText', 'formVersion', 'request', 'date', 'caseKey', 'catalogueVersion'])
                 && request.resource.data.status != 'draft'))
         && (request.resource.data.assessorEmail == resource.data.assessorEmail || isActiveFaculty(request.resource.data.assessorEmail))
         && (request.resource.data.get('request', {}) == resource.data.get('request', {}) || validCaseCard(request.resource.data.get('request', {})));
