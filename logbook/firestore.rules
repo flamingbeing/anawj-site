@@ -298,6 +298,31 @@ service cloud.firestore {
       allow read, write: if isAppOwner();
     }
 
+    // private feedback (logbook More → Send feedback): never a public GitHub issue, as a report can mention a case or
+    // a colleague. Anyone signed in may send one, as themselves, with the server's time and status 'new'; nobody but
+    // the app owner reads it. The owner marks it done (only the status changes) or deletes it. No email is stored.
+    match /feedback/{id} {
+      allow create: if signedIn() && id.size() <= 40
+        && validFeedback(request.resource.data)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'new'
+        && request.resource.data.createdAt == request.time;
+      allow read, delete: if isAppOwner();
+      allow update: if isAppOwner()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['new', 'done'];
+    }
+    function validFeedback(d) {
+      return d.keys().hasOnly(['uid', 'text', 'doing', 'screen', 'version', 'ua', 'status', 'createdAt'])
+        && d.keys().hasAll(['uid', 'text', 'screen', 'version', 'ua', 'status', 'createdAt'])
+        && d.uid is string && d.uid.size() <= 128
+        && d.text is string && d.text.size() > 0 && d.text.size() <= 2000
+        && (!('doing' in d) || (d.doing is string && d.doing.size() <= 300))
+        && d.screen is string && d.screen.size() <= 40
+        && d.version is string && d.version.size() <= 60
+        && d.ua is string && d.ua.size() <= 200;
+    }
+
     // templates offered to everyone: admins write
     match /sharedTemplates/{id} {
       allow read: if signedIn();

@@ -1568,3 +1568,16 @@ html:not(.rows-short) ul.cases .c-tags > * { max-width: 100%; }
   body:not(.compact) .datebar .chip, body:not(.compact) .datebar .mode-seg button, body:not(.compact) .datebar input[type="date"], body:not(.compact) .cat-view button { min-height: 44px; }
   body:not(.compact) .lb-monthpick input[type="month"] { min-height: 44px; }
 }
+
+/* Private feedback (ui-feedback.js): the resident's form and the owner's list */
+.fb-count { text-align: right; margin-bottom: 8px; }
+.fb-opt { font-weight: 400; }
+.fb-problem { color: var(--err); margin: 6px 0 0; }
+.fb-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.fb-item { border-top: 1px solid var(--line); padding: 10px 0; }
+.fb-item:first-child { border-top: 0; }
+.fb-meta { margin: 0 0 4px; overflow-wrap: anywhere; }
+.fb-text, .fb-doing { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-actions { flex-wrap: wrap; gap: 6px; }
+.fb-filter button { min-height: 44px; }
+.fb-gap { flex: 1; }   /* not .grow: its 160 px minimum wraps the row on a phone */
