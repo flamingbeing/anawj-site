@@ -356,3 +356,12 @@ Lasting rules. Decisions with dates are in `PLAN.md` and `STATUS.md`.
 The bottom shortcuts on the patient screen turn solid green once their section is marked complete (no tick). The PACU
 Mark complete is a full-width navy button. Day 1 / Day 2 are called POD1 / POD2 everywhere (the Word template's own
 "Day 1" labels are unchanged).
+
+### Saves that don't reach the team are shown (14 Oct 2026)
+`sync()` keeps a `failed` map (patient -> reason, saved on the phone). A patient with no hospital, a refused save
+(locked, or the phone left the team) or another save error turns the sync chip red ("N not saved", tap says why) until
+a later save reaches the team; Log out also warns about them. Before, a no-hospital patient showed "Synced" and a
+refused save only toasted. `friendly(e, ctx)` words errors by place: `'save'` and `'pacu'` (a stopped link says "This
+link has stopped working. Ask the study team for a new link."). `pacuPush` uses `updateDoc`, not a merging `setDoc`:
+a save onto a stopped link would otherwise become a create, which the rules refuse as "Not allowed" (a likely cause of
+the 13 Oct nurse failure, not proven).

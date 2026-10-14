@@ -31,7 +31,10 @@ async function start() {
 
 // Firestore rejects undefined; a JSON round trip drops it
 const plain = o => JSON.parse(JSON.stringify(o));
-const friendly = e => {
+// ctx 'save' (a patient save) and 'pacu' (the nurse link) say what to do; the default is the join / admin wording
+const friendly = (e, ctx) => {
+  if (ctx === 'pacu' && (e?.code === 'permission-denied' || e?.code === 'not-found')) return 'This link has stopped working. Ask the study team for a new link.';
+  if (ctx === 'save' && e?.code === 'permission-denied') return 'Not saved to the team: this patient may be locked, or this phone is no longer on the team. Ask a study admin.';
   if (e?.code === 'permission-denied') return 'Not allowed. Check the hospital and code.';
   if (e?.code === 'unavailable') return 'No connection. Try again with signal.';
   if (e?.code === 'auth/invalid-action-code' || e?.code === 'auth/expired-action-code') return 'That sign-in link has expired or was used already. Send a new one.';
@@ -41,7 +44,7 @@ const friendly = e => {
   if (e?.code === 'auth/weak-password') return 'Use at least 8 characters.';
   if (e?.code === 'auth/requires-recent-login') return 'For safety, sign out and sign in again, then set the password.';
   if (e?.code === 'auth/operation-not-allowed') return 'Email-link sign-in isn’t switched on in Firebase yet.';
-  return 'Something went wrong: ' + (e?.message || e);
+  return ctx ? 'Couldn’t save. Check your signal and try again.' : 'Something went wrong: ' + (e?.message || e);
 };
 export { friendly };
 
@@ -241,7 +244,11 @@ export async function pacuPush(token, f) {
   const out = {};
   for (const [k, x] of Object.entries(f)) out[k] = { ...x, auto: !!x.auto };
   if (!Object.keys(out).length) return;
-  await F.setDoc(F.doc(db, 'pacu', token), plain({ f: out }), { merge: true });
+  // updateDoc, not a merging setDoc: if the link was stopped, a merging set turns into a create, which the rules
+  // refuse as "Not allowed"; an update says not-found, which the nurse page words as "link stopped" (14 Oct 2026)
+  const upd = {};
+  for (const [k, x] of Object.entries(plain(out))) upd['f.' + k] = x;
+  await F.updateDoc(F.doc(db, 'pacu', token), upd);
 }
 // cb(data | null (no such link), { server, pending })
 export async function pacuWatch(token, cb, onError) {
