@@ -217,6 +217,18 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 .vsensor[hidden]{display:none}
 .vel{display:flex;gap:3cqw}.vel i{display:grid;place-items:center;width:7cqw;height:7cqw;border-radius:50%;border:.4cqw solid #8a8f98;font-style:normal;font-weight:700;font-size:3cqw}
 .vel i.ok{background:#1f9d4a;border-color:#3ddc6b}.vel i.chk{border-color:#ffe600;color:#ffe600}
+.screens{position:relative}
+.vmenu{position:absolute;left:6px;right:6px;top:6px;min-height:calc(100% - 12px);background:rgba(6,10,16,.97);border:1px solid #3a4558;border-radius:8px;z-index:3;padding:8px 10px;font-family:"Arimo","Liberation Sans",Arial,sans-serif;color:#fff}
+.vmenu[hidden]{display:none}
+.vmenuh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.vmenu ul{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+@media (min-width:700px){.vmenu ul{grid-template-columns:1fr 1fr}}
+.vmenu li button,.vmenuh button,.bilkeys button{font:inherit;color:#10151d;background:#c7ccd4;border:0;border-radius:6px;padding:7px 10px;cursor:pointer}
+.vmenu li button{display:flex;justify-content:space-between;width:100%;text-align:left;font-size:14px;min-height:34px}
+.vmenu li button b{font-weight:700}
+.vmenu button:focus-visible,.bilkeys button:focus-visible{outline:3px solid #178fd7;outline-offset:2px}
+.bilkeys{display:flex;gap:8px;margin-top:8px}.bilkeys button{flex:1;font-size:13px;font-weight:700}
+.bilkeys button[aria-expanded="true"]{background:#fff}
 .bilc{position:absolute;inset:0;width:100%;height:100%;display:block}
 .vwrap[hidden],#bilSum[hidden]{display:none}
 .keyrow{display:flex;flex-wrap:wrap;gap:6px}.keyrow button{flex:1 1 auto}
@@ -241,12 +253,14 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
       <div class="vbox veeg"><canvas id="c2Eeg" aria-label="EEG waveform"></canvas><span class="veegcap">EEG</span><span class="vcap l" id="v2Mm">25 mm / sec.</span><span class="vcap r" id="v2Uv">25 µV / division</span></div>
       <div class="vmsg" id="v2Msg" hidden><span id="v2MsgT"></span><button type="button" id="v2Dismiss">Dismiss</button></div>
       <button type="button" class="vkey" id="kSilent" aria-label="Silent: pause the alarm"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="bellP" d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zm-2 15a2 2 0 0 0 4 0z"/></svg><b>SILENT</b></button>
-      <button type="button" class="vkey" id="kMenu" aria-label="Menu: show or hide the monitor settings" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM3 10h18M3 15h18M9 4v16M15 4v16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><b>MENU</b></button>
+      <button type="button" class="vkey menukey" id="kMenu" aria-label="Menu: show or hide the monitor settings" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM3 10h18M3 15h18M9 4v16M15 4v16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><b>MENU</b></button>
       <button type="button" class="vkey" id="kSensor" aria-label="Sensor check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h6m8 0h6M8 8h8v8H8z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><b>SENSOR<br>CHECK</b></button>
       <canvas id="c2Dsa" class="vdsa" aria-label="Density spectral array with the BIS trend below it"></canvas>
       <div class="vsensor" id="v2Sensor" hidden><b>Sensor check</b><span class="vel"><i>1</i><i>2</i><i>3</i><i>4</i></span><span id="v2SensorT">Sensor check in progress</span></div>
     </div></div>
-    <div class="screen vwrap" id="bilatWrap" hidden><div class="vista" id="bilat" role="group" aria-label="Two-sided monitor screen: left and right EEG, DSA and trend"><canvas id="cBil" class="bilc" aria-label="Left and right EEG, density spectral arrays and trend"></canvas></div></div>
+    <div class="screen vwrap" id="bilatWrap" hidden><div class="vista" id="bilat" role="group" aria-label="Two-sided monitor screen: left and right EEG, DSA and trend"><canvas id="cBil" class="bilc" aria-label="Left and right EEG, density spectral arrays and trend"></canvas></div>
+      <div class="bilkeys"><button type="button" id="bSilent">Silent</button><button type="button" class="menukey" id="bMenu" aria-expanded="false">Menu</button><button type="button" id="bSensor">Sensor check</button></div></div>
+    <div class="vmenu" id="vMenu" role="dialog" aria-label="Monitor menu" hidden><div class="vmenuh"><b>Menu</b><button type="button" id="vMenuClose">Close</button></div><ul id="vMenuList"></ul></div>
     <div class="screen mon" id="classicWrap" hidden><div class="glass">
       <div class="statusbar"><span><b>BIS</b> · Case AH5F</span><div id="vMsg" class="msg" role="status" aria-live="polite"></div><span id="vClock">--:--</span></div>
       <div class="readouts">
