@@ -15,16 +15,21 @@ copy; a copy brings the script but not its triggers).
 2. **Project settings (⚙) → Script properties → Add**: `LOGBOOK_BOT_EMAIL` and `LOGBOOK_BOT_PASSWORD` = the Form bot's email
    and password (the same account as the Form inbox, `README.md`). Only editors of this project can see them; never paste
    them into the file or into chat.
-3. **Editor → run `logbookOutboxSetup`.** Google asks you to authorise the script (the sheet, and connecting to an external
-   service): allow. It checks the bot can sign in, puts the header **App marker** in column J of the Case tab (the marker
-   column: rows made by the app carry `app:<caseId>` there; the sheet's own script reads only A–H), and adds the 5-minute
-   trigger (`logbookOutboxRun`). Safe to run again.
-4. **On a copy only:** run `logbookOutboxTryOne` with a resident id from the Residents sheet (edit the call:
-   `logbookOutboxTryOne('202301')`): it adds one made-up case for that resident exactly as a real entry would be, runs the
-   Database, resident report and AY totals update and the sort, and doesn't touch the outbox. Check the new row at the top
-   of the Case tab (A resident text, B a real date, C `XY 34F fake test case, ignore`, D–G categories, H timestamp, J
-   `app:try…`), a row for each category in the Database tab, and the resident's own report and the AY totals. Time how long
-   it takes: it holds the sheet's lock for that long, and the sheet's own `onFormSubmit` waits only 10 seconds for it.
+3. **On the real sheet: Editor → run `logbookOutboxSetup`.** Google asks you to authorise the script (the sheet, and connecting
+   to an external service): allow. It checks the bot can sign in, puts the header **App marker** in column J of the Case tab
+   (the marker column: rows made by the app carry `app:<caseId>` there; the sheet's own script reads only A–H), and adds the
+   5-minute trigger (`logbookOutboxRun`). Safe to run again. **On a copy, don't run it** (its trigger would take real entries
+   into the copy): run `logbookOutboxCheck` instead (signs in and counts the entries, changes nothing).
+4. **Dry run, on a copy only.** A copy keeps the real residents' own report spreadsheet ids (Residents column G), and the
+   sheet's `updateResidentReport` rewrites that spreadsheet's "Case Log". So first, on the **copy's** Residents sheet, point
+   one test resident's column G at a blank throwaway spreadsheet and put that spreadsheet's id in
+   `LOGBOOK_OUTBOX_TRY_SAFE_IDS` at the top of `logbookOutboxTryOne` (the function refuses to run otherwise). Then run
+   `logbookOutboxTryOne('<that resident's 6-digit id>')`: it adds one made-up case exactly as a real entry would be, runs the
+   Database, resident report and AY totals update and the sort, and doesn't touch the outbox. Check the new row at the top of
+   the Case tab (A resident text, B a real date, C `XY 34F fake test case, ignore`, D–G categories, H timestamp, J
+   `app:try…`), a row for each category in the Database tab, the throwaway spreadsheet's Case Log, and the AY totals. Time
+   how long it takes: it holds the sheet's lock for that long, and the sheet's own `onFormSubmit` waits only 10 seconds for it.
+   Delete the copy when done.
 5. `logbookOutboxDryRun` lists what waiting entries would add, without writing anything.
 
 ## Good to know

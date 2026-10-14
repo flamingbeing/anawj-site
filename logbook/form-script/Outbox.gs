@@ -261,6 +261,12 @@ function logbookOutboxRun() {
   if (errors.length) throw new Error(errors.join('; '));
 }
 
+// Run by hand to check the bot can sign in and read the outbox (changes nothing). Use this, not logbookOutboxSetup, on a COPY.
+function logbookOutboxCheck() {
+  logbookOutboxToken_(true);
+  console.log('Bot sign-in works; ' + logbookOutboxList_().length + ' entries waiting in the outbox.');
+}
+
 // Run once by hand after setting the two Script properties: checks the bot can sign in and read the outbox, adds the
 // header "App marker" to column J if it is empty, and adds the 5-minute trigger if it isn't there. Safe to run again.
 function logbookOutboxSetup() {
@@ -287,7 +293,17 @@ function logbookOutboxDryRun() {
 
 // For a dry run on a COPY of the sheet (never the real one): adds one made-up case for the resident with this 6-digit id
 // to this sheet exactly as a real entry would be, runs the update chain, and does not touch the outbox.
+// BEFORE running it on a copy, point that resident's column G on the copy's Residents sheet at a blank throwaway
+// spreadsheet: a copy keeps the real residents' own report spreadsheet ids, and updateResidentReport would rewrite the
+// REAL resident's "Case Log" with the made-up case. (It refuses to run if column G still names a spreadsheet you
+// haven't listed in LOGBOOK_OUTBOX_TRY_SAFE_IDS.)
+var LOGBOOK_OUTBOX_TRY_SAFE_IDS = [];   // on a copy: the id(s) of the throwaway spreadsheet(s) you pointed column G at
 function logbookOutboxTryOne(rid) {
+  var res = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOGBOOK_OUTBOX_RESIDENTS_SHEET);
+  var mine = res.getLastRow() > 1 ? res.getRange(2, 1, res.getLastRow() - 1, 7).getValues().filter(function (r) { return String(r[1]) === String(rid); })[0] : null;
+  if (!mine) throw new Error('No resident ' + rid + ' on the Residents sheet.');
+  if (LOGBOOK_OUTBOX_TRY_SAFE_IDS.indexOf(String(mine[6])) < 0)
+    throw new Error('Stopped: column G for ' + rid + ' names a spreadsheet that is not in LOGBOOK_OUTBOX_TRY_SAFE_IDS. Point it at a blank throwaway spreadsheet first, or the real resident\'s Case Log would be rewritten.');
   var entry = { id: 'try' + Date.now().toString(36), email: 'fake.try@example.com', rid: String(rid), date: Utilities.formatDate(new Date(), 'Asia/Singapore', 'yyyy-MM-dd'),
     initials: 'XY', details: '34F fake test case, ignore', cats: ['16', '20', '20iii', '26', '26i'], createdAt: Date.now() };
   var lock = LockService.getDocumentLock();
