@@ -65,6 +65,14 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Decisions log
 
+- 14 Oct 2026 (M1.2): the pump's effect-site TCI runs in two phases. While loading it targets the predicted
+  effect-site peak (Shafer & Gregg style); once the prediction reaches the target it holds plasma at the target.
+  Peak-targeting alone switched between bursts and zero every 10 s. A running pump keeps its model. Syringes are
+  propofol 10 mg/mL and remifentanil 50 mcg/mL, maximum 1200 mL/h (to confirm with NUH pumps). Drug rows carry the
+  ISO 26825 class colour as a stripe, with the class written beside the name. The Drugs and Circulation tabs follow
+  the ARIA tabs pattern (arrow keys, Home, End). "Behind the monitor" is closed by default and remembered per device
+  (`otsim.behind`). The monitor does not respond to drugs until M1.4 and M2.1.
+
 - 14 Oct 2026 (M1.1): `pk.js` steps only drugs that have been given. Amounts are in mg (propofol, ketamine) or mcg
   (opioids, midazolam), so concentrations read in the papers' units. The patient's PK multipliers act on V1 and the
   metabolic clearance only (inter-compartment clearances stay). Context-sensitive half-times are tested as Hughes

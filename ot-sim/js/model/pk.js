@@ -1,7 +1,8 @@
 // Intravenous pharmacokinetics (MODEL.md section 2): mammillary models with up to three compartments and an effect
 // site, stepped by explicit Euler at the model's dt (the prototype matched RK4 at 0.01 s to 2-3 decimals). Rate
 // constants are per minute. Boluses enter the central compartment at once; infusions run in the drug's amount per
-// minute. M1.3 adds rocuronium, suxamethonium and sugammadex; M1.2 the pump's own predicted copy of these models.
+// minute, plus whatever the syringe pumps deliver (pump.js, read from the previous step). M1.3 adds rocuronium,
+// suxamethonium and sugammadex.
 //
 // State: pk.p[drug] (parameters, fixed for the run), pk.d[drug] = { a1, a2, a3 (amounts), ce, ceH? }, pk.inf[drug]
 // (amount/min). Others read cp and ce through cp(state, drug) and ce(state, drug).
@@ -109,12 +110,12 @@ export const pk = {
         if (a.rate > 0) inf[a.drug] = rateAmount(a.drug, a.rate, a.unit, w); else delete inf[a.drug];
       }
     }
-    const d = {};
+    const d = {}, pumps = prev.pump || {};
     for (const id in s.p) {
-      const cur = s.d[id];
-      if (!cur && !add[id] && !inf[id]) continue; // a drug never given costs nothing
+      const cur = s.d[id], fromPump = pumps[id] ? pumps[id].rate : 0;
+      if (!cur && !add[id] && !inf[id] && !fromPump) continue; // a drug never given costs nothing
       const k = s.p[id];
-      const nx = advance(k, cur || empty(k), inf[id] || 0, dtMin);
+      const nx = advance(k, cur || empty(k), (inf[id] || 0) + fromPump, dtMin);
       if (add[id]) nx.a1 += add[id];
       d[id] = nx;
     }
