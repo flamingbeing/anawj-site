@@ -11,6 +11,7 @@ The rule for new apps is in `AGENTS.md`.
 |---|---|---|
 | `anawj.com/` | `index.html` | Status page only. Stays on GitHub Pages. |
 | `anaes.anawj.com/bis/` | `bis-dsa/` | Static, anaesthesia teaching: BIS to DSA simulator (14 Oct 2026). Live; old `anawj.com/bis-dsa/` forwards. |
+| `anaes.anawj.com/ot/` | `ot-sim/` | Static, anaesthesia teaching: OT simulator (GA, monitor, crises). Same host as `/bis/`, so no new domain click (14 Oct 2026). |
 | `hand.anawj.com/cmcj/` | `cmcj/` | Static, hand surgery. |
 | `hand.anawj.com/babies/` | `hand-babies/` | Static, hand surgery. The old `hand/` redirect goes. |
 | `hand.anawj.com/handlog/` | `hand-log/` | Hand DOPS/Mini-CEX log; data on the phone only, no sign-in (owner, 13 Oct 2026). |
