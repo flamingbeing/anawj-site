@@ -165,6 +165,15 @@ try {
       for (const t0 = Date.now(); !(await inboxEmpty()); await p.waitForTimeout(200)) if (Date.now() - t0 > 15000) throw new Error('inbox not emptied');
       await quiet(p);
     } });
+    // deleting the Form case in the app reaches the server (it goes to the recycle bin)
+    await open('Form 3 (delete the Form case)', { check: async p => {
+      const id = await S(p, 'S.cases.find(c => c.source === "form").id');
+      await p.evaluate(async id => (await import('./js/ui-core.js')).removeCase(id), id);
+      const gone = async () => (await fetch(`${DB}/${lb}/cases/${encodeURIComponent(id)}`, { headers: H })).status === 404;
+      for (const t0 = Date.now(); !(await gone()); await p.waitForTimeout(200)) if (Date.now() - t0 > 15000) throw new Error('Form case delete never reached the server');
+      assert.equal(await S(p, 'S.cases.length'), 51);
+      await quiet(p);
+    } });
   }
   // 6. sign out: this device's copy is deleted
   await open('6 (sign out)', { check: async p => {
