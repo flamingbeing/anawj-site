@@ -21,19 +21,29 @@ Google-verified email, or a listing in `formBots`).
 
 ## 2. The Form
 
+**Keep any script you already have.** A response sheet often has its own script (Extensions → Apps Script in the
+sheet: menus, a Database tab, reports, its own `onFormSubmit`). Don't change or replace it. This script goes in the
+**Form's** own Apps Script project, which is separate; every name in it starts with `LOGBOOK_` or `logbookInbox`, so
+even in the same project as another script it would replace nothing.
+
 1. **Settings → Responses → Collect email addresses: Verified** (the inbox is addressed by the respondent's Google
-   email; responses without one are skipped).
-2. **⋮ → Apps Script**. Replace the empty `Code.gs` with the whole of [`Code.gs`](Code.gs). Save (💾).
+   email; responses without one are skipped). Then open the response sheet's **form tab** and check where the new
+   "Email address" column went: a sheet script that reads columns by position (e.g. columns A–H) needs it to the
+   right of those. If it landed among them, drag it to the far right (the Form keeps writing to it there).
+2. In the **Form** (not the sheet): **⋮ → Apps Script**. If the project is empty, replace its `Code.gs` with the whole of
+   [`Code.gs`](Code.gs). If it already has code, leave that alone: **＋ → Script**, name it `LogbookInbox`, and paste
+   into that new file instead. Save (💾).
 3. **Project settings (⚙) → Script properties → Add**: `BOT_EMAIL` = the bot's email, `BOT_PASSWORD` = its password.
    (Only the Form's editors can see these; never paste them into the file.)
-4. **Editor → choose `dryRun` → Run**. Google asks you to authorise the script (the Form, and connecting to an
-   external service): allow. The execution log shows what the latest response would send: check the date, the case
-   text and the category answers (`labels`). Nothing is sent by a dry run.
-5. **Triggers (⏰) → Add trigger**: function `onFormSubmit`, deployment Head, event source **From form**, event type
-   **On form submit**. Save. From now on every new or edited response goes to the inbox.
-6. Optional: **`backfill`** sends responses from a date onwards (edit `SINCE` at its top first). Responses already in
-   the logbook from the Admin portal's workbook import are separate cases, so start the backfill after the last
-   import to avoid doubles.
+4. **Editor → choose `logbookInboxDryRun` → Run**. Google asks you to authorise the script (the Form, and connecting
+   to an external service): allow. The execution log shows what the latest response would send: check the date, the
+   case text and the category answers (`labels`). Nothing is sent by a dry run.
+5. **Triggers (⏰) → Add trigger**: function `logbookInboxSubmit`, deployment Head, event source **From form**,
+   event type **On form submit**. Save. Any trigger you already have stays as it is; from now on every new or edited
+   response also goes to the inbox.
+6. Optional: **`logbookInboxBackfill`** sends responses from a date onwards (edit `SINCE` at its top first).
+   Responses already in the logbook from the Admin portal's workbook import are separate cases, so start the
+   backfill after the last import to avoid doubles.
 7. Add a line to the Form's description, e.g. "Your entries also appear in the APMES logbook app, which is your
    record."
 
