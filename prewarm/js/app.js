@@ -106,6 +106,9 @@ const sharing = () => cloud.enabled && (shared.member || shared.admin);
 // send changed fields; Firestore keeps them on the phone and sends them when there is signal
 // patients with changes sent but not yet confirmed by the server (no signal), kept across reloads; Log out warns
 let pending = read('pending', {});
+// patients whose last save did not reach the team and will not retry by itself: id -> why (14 Oct 2026). Shown in the chip.
+let failed = read('failed', {});
+const setFailed = (id, why) => { if (why) failed[id] = why; else if (id in failed) delete failed[id]; else return; write('failed', failed); showSync(); };
 const sessionStart = Date.now();
 // when this phone was last fully in step with the server (nothing waiting to send, team's changes received)
 let lastSync = read('lastSync', 0);
@@ -136,15 +139,18 @@ function sync(p, ids, withLock = false) {
   const ptok = pacuToken(p), pk = ptok && !p.lock?.on ? ids.filter(k => PACU_KEYS.includes(k)) : [];
   if (pk.length) cloud.pacuPush(ptok, pacuFields(p, pk)).catch(() => { /* retried by the heal below */ });
   p.site ||= val(p, 'site') || shared.member?.site || settings.site;
-  if (!p.site) return;
+  // no hospital: nothing can be sent. Say so instead of showing "Synced"
+  if (!p.site) { setFailed(p.id, 'no hospital: set it in Settings'); return; }
+  setFailed(p.id, null);
   const tok = Date.now() + Math.random();
   pending[p.id] = tok; write('pending', pending);
   showSync();
   const done = () => { if (pending[p.id] === tok) { delete pending[p.id]; write('pending', pending); synced(); } };
   cloud.push(p, ids, withLock).then(done).catch(e => {
     // refused (e.g. an admin locked the patient meanwhile): the server drops the change, so it isn't waiting either
-    if (e?.code === 'permission-denied') { done(); toast(`${sid(p)}: not saved to the team (locked by the study admin?)`); }
-    else toast(cloud.friendly(e));
+    // it stays marked as failed (chip turns red) until a later save reaches the team
+    if (e?.code === 'permission-denied') { done(); setFailed(p.id, 'refused (locked by the study admin?)'); toast(`${sid(p)}: ${cloud.friendly(e, 'save')}`); }
+    else { setFailed(p.id, 'could not be saved'); toast(cloud.friendly(e, 'save')); }
   });
 }
 // Log out (owner, 12 Oct 2026): leaves the team and deletes every patient on this phone, after a warning, and a
@@ -155,7 +161,7 @@ async function logOut(btn) {
   if (!confirm(`Log out of ${who} on this phone?\n\nThis deletes all ${n} patient${n === 1 ? '' : 's'} from this phone. What has synced stays with your team.`)) return;
   btn.disabled = true; btn.textContent = 'Checking everything has synced…';
   if (Object.keys(pending).length && await cloud.flushed(6000)) { pending = {}; write('pending', pending); synced(); }
-  const unsynced = Object.keys(pending).map(id => patients[id]).filter(p => p && !isGone(p)).map(sid);
+  const unsynced = [...new Set([...Object.keys(pending), ...Object.keys(failed)])].map(id => patients[id]).filter(p => p && !isGone(p)).map(sid);
   if (unsynced.length && !confirm(`Not synced yet: ${unsynced.join(', ')}.${lastSync ? ' ' + syncText().replace(/^Not synced:[^.]*\. ?/, '') : ''}\n\nThese changes haven’t reached your team (no signal?). Logging out now loses them. Cancel, get signal and wait a moment, or Export Excel first.\n\nLog out anyway and lose them?`)) {
     btn.disabled = false; btn.textContent = 'Log out'; return;
   }
@@ -742,6 +748,8 @@ function skippedBefore(p, id) {
 function syncChipState() {
   if (!sharing()) return ['Local', 'this phone', 'local', 'Data stays on this phone: not shared with a team'];
   const n = Object.keys(pending).map(id => patients[id]).filter(p => p && !isGone(p)).length;
+  const bad = Object.keys(failed).map(id => patients[id]).filter(p => p && !isGone(p));
+  if (bad.length) return [`${bad.length} not saved`, 'tap for why', 'bad', bad.map(p => `${sid(p)}: ${failed[p.id]}`).join('; ')];
   if (n) return [`${n} waiting`, 'to send', 'wait', `${n} patient${n === 1 ? '' : 's'} not sent to the team yet`];
   if (!navigator.onLine) return ['Offline', 'no signal', 'wait', 'No signal: changes send when it returns'];
   return ['Synced', 'with team', 'ok', syncText()];
@@ -765,7 +773,7 @@ function topBar(p, s, onLog) {
   const ckGo = () => { const n = nextDue(p, s); if (n?.target) openTarget(n.target); };
   $('#clock').onclick = e => { if (e.target.closest('.next')) ckGo(); };
   $('#clock').onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.next')) { e.preventDefault(); ckGo(); } };
-  $('#syncchip').onclick = e => refreshNow(e.currentTarget);
+  $('#syncchip').onclick = e => { const [, , st, why] = syncChipState(); if (st === 'bad') toast(`Not saved to the team: ${why}`); refreshNow(e.currentTarget); };
   const iv = setInterval(refresh, 1000);
   cleanup.push(() => clearInterval(iv));
   // patients opened here today get due alerts on every screen (kept a day)
@@ -1698,7 +1706,7 @@ route(/^\/nurse\/(\w{20,64})$/, token => {
       <p class="muted small" id="nstat" role="status">${esc(status)}</p>`);
     disableSealed();
   };
-  const push = k => { status = 'Saving…'; cloud.pacuPush(token, { [k]: rec.f[k] }).catch(e => { status = cloud.friendly(e); setStatus(); }); };
+  const push = k => { status = 'Saving…'; cloud.pacuPush(token, { [k]: rec.f[k] }).catch(e => { status = cloud.friendly(e, 'pacu'); setStatus(); }); };
   function nset(k, v, auto = false) {
     if (!setVal(rec, k, v, settings.me)) return false;
     if (auto && rec.f[k]) rec.f[k].auto = true;
@@ -1709,7 +1717,7 @@ route(/^\/nurse\/(\w{20,64})$/, token => {
     if (c != null && (get('pacu_nudesc') == null || rec.f.pacu_nudesc?.auto)) nset('pacu_nudesc', String(c), true);
   };
   (async () => {
-    try { await cloud.ensureSignedIn(); } catch (e) { status = cloud.friendly(e); draw(); return; }
+    try { await cloud.ensureSignedIn(); } catch (e) { status = cloud.friendly(e, 'pacu'); draw(); return; }
     if (!alive) return;
     const u = await cloud.pacuWatch(token, (data, m) => {
       if (!alive) return;
@@ -1720,7 +1728,7 @@ route(/^\/nurse\/(\w{20,64})$/, token => {
       }
       status = m.pending ? 'Saving…' : m.server ? 'Saved to the team ✓' : 'No signal: kept on this phone, sent when there is signal';
       if (typing() || document.querySelector('dialog[open]')) setStatus(); else draw();
-    }, e => { status = cloud.friendly(e); if (!info) draw(); else setStatus(); });
+    }, e => { status = cloud.friendly(e, 'pacu'); if (!info) draw(); else setStatus(); });
     if (alive) unsub = u; else u?.();
   })();
   draw();

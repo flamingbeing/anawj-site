@@ -429,6 +429,7 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 .syncchip:active { background: var(--bg); }
 .syncchip[data-state="ok"] { color: var(--ok); border-color: var(--ok); }
 .syncchip[data-state="wait"] { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+.syncchip[data-state="bad"] { background: var(--err); color: #fff; border-color: var(--err); }
 .syncchip[data-state="local"] { color: var(--muted); }
 .syncchip[data-busy] { opacity: .6; }
 
