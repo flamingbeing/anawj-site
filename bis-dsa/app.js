@@ -323,7 +323,7 @@ function runStory(){if(!story)return;const t=simT-story.t0;
 const cEx=$('cEx');
 const STEPS=[
  {name:'1 · Take an epoch',cap:'The monitor takes the newest 2 seconds of frontal EEG (256 samples at 128 per second). A new epoch is taken every second, so epochs overlap by half.'},
- {name:'2 · It is a sum of waves',cap:'Any EEG epoch can be rebuilt by adding together waves of different frequencies. Here it is split into slow-delta (under 4 Hz), alpha (8–13 Hz) and beta (13–30 Hz) parts. Under propofol GA the slow and alpha parts are large and beta is tiny.'},
+ {name:'2 · It is a sum of waves',cap:'Any EEG epoch can be rebuilt by adding together waves of different frequencies. Here it is split into slow-delta (under 4 Hz), alpha (8–13 Hz) and beta (13–30 Hz) parts. Awake, the small fast beta part dominates; under propofol GA the slow and alpha parts are large and beta is tiny.'},
  {name:'3 · Fourier transform',cap:'A fast Fourier transform (FFT) measures how much power the epoch has at each frequency, every 0.5 Hz from 0 to 30 Hz. Taller bar = more power (log scale, in decibels).'},
  {name:'4 · Turn it into colour',cap:'Stand the spectrum on its side so frequency runs upward, and swap bar height for colour: blue for little power, through green and yellow, to red for a lot. The whole spectrum is now one thin column.'},
  {name:'5 · Add it to the DSA',cap:'The column joins the right-hand edge of the DSA and the older columns shift left. One column a second builds the picture on the monitor. BIS is computed from features of these same spectra (and the flat-line ratio), then smoothed.'}];
