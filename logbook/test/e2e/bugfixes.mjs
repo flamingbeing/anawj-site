@@ -211,6 +211,24 @@ try { for (const width of [390, 1280]) {
   await p.locator('textarea.details').fill('');
   await p.evaluate(async () => { const { setDisplay, applyDisplay } = await import('./js/ui-settings.js'); applyDisplay(setDisplay({ firstField: null })); });
 
+  // ---- someone put on the programme list after using the app: the logbook takes their rid in that same session ----
+  // (this device remembers "not on the list" and opens from that; before, only the next start saved the rid, so that
+  // session's new cases never reached the response sheet's outbox)
+  const DEMO = 'apmes-logbook-demo-v1', WHO = 'apmes-logbook-who:demo:demo@example.com';
+  await p.evaluate(([DEMO, WHO]) => {
+    const s = JSON.parse(localStorage.getItem(DEMO));
+    s.offList = s.residents.DEMO01; delete s.residents.DEMO01; s.logbooks['demo@example.com'].doc.rid = null;
+    localStorage.setItem(DEMO, JSON.stringify(s)); localStorage.removeItem(WHO);
+  }, [DEMO, WHO]);
+  await p.reload(); await p.waitForSelector('textarea.details');
+  await poll(() => p.evaluate(WHO => JSON.parse(localStorage.getItem(WHO) || '{}').resident === null, WHO), 'this device remembers: not on the list');
+  await p.evaluate(DEMO => { const s = JSON.parse(localStorage.getItem(DEMO)); s.residents.DEMO01 = s.offList; delete s.offList; localStorage.setItem(DEMO, JSON.stringify(s)); }, DEMO);   // an admin adds them
+  await p.reload(); await p.waitForSelector('textarea.details');
+  const rids = () => p.evaluate(async DEMO => { const { S } = await import('./js/ui-core.js'); return [S.resident?.rid, S.logbook?.rid, JSON.parse(localStorage.getItem(DEMO)).logbooks['demo@example.com'].doc.rid]; }, DEMO);
+  await poll(async () => (await rids()).every(x => x === 'DEMO01'), 'the rid set here and saved, in this session');
+  const lateId = await p.evaluate(async () => (await (await import('./js/ui-core.js')).createCase({ details: 'UV 45M fake lap chole', cats: ['08'] })).id);
+  assert.ok(await outboxEntry(lateId), "this session's new case is queued for the sheet");
+
   assert.deepEqual(errors, [], 'console errors');
   await ctx.close();
   console.log(`PASS bug fixes ${width < 600 ? 'phone' : 'desktop'}`);

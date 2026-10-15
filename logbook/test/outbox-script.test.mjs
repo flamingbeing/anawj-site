@@ -194,7 +194,7 @@ function restOutbox(list) {
     calls.push({ after, n: ids.length });
     return ids.length ? ids.map(id => ({ document: { name: `${DOCS}/sheetOutbox/${id}`, fields: toFields(docs.get(id)) }, readTime: 't' })) : [{ readTime: 't' }];
   };
-  return { docs, calls, list: after => [...S.entriesOf(runQuery(S.pageQuery(after, S.batch)))] };
+  return { docs, calls, runQuery, list: after => [...S.entriesOf(runQuery(S.pageQuery(after, S.batch)))] };
 }
 // one 5-minute run against the fake outbox; props: the Script properties (cursor, pending) kept between runs
 function pagedRun(outbox, props, { appendMs = 0 } = {}) {
@@ -279,19 +279,190 @@ assert.equal(S.pageQuery('', 12).structuredQuery.startAt, undefined, 'from the s
   assert.equal(S.waitingText(w), 'Outbox: 4 waiting, 3 skipped (999999: 2, R2: 1; oldest 1.3 days).');
   // skipped for over a day: the nightly run fails (Google emails the owner) and says what to do
   const p = [...S.nightProblems({ status: 'ok' }, w, '')];
-  assert.equal(p.length, 1); assert.match(p[0], /^1 app case waited over a day .*\(resident 999999\): add the resident .*Residents tab/);
+  assert.equal(p.length, 1); assert.match(p[0], /^1 app case waited over a day .*\(resident id 999999\)\. If the id is right: add the resident .*Residents tab/);
+  // a wrong id can't be fixed in People for the entries already waiting: the alert says what to do instead
+  assert.match(p[0], /If it is wrong .*keep the id they were queued with .*run logbookOutboxDropRid for that id/);
   assert.ok(!p[0].includes('R2'), 'only the residents whose entries are over a day old');
   // skipped only since this afternoon: reported, not a failure yet
   const young = S.waiting(list.filter(e => e.id !== 's1'), ok, now);
   assert.deepEqual([young.skippedN, young.overdue, S.nightProblems({ status: 'ok' }, young, '').length], [2, 0, 0]);
   // nothing skipped; a case from a known resident waiting over a day is reported (not a failure)
   const clean = S.waiting([{ ...entry, rid: '202301', createdAt: at(26) }], ok, now);
-  assert.equal(S.waitingText(clean), 'Outbox: 1 waiting, none skipped.'); assert.equal(clean.oldOther, 1);
+  assert.equal(clean.oldOther, 1);
+  assert.equal(S.waitingText(clean), 'Outbox: 1 waiting, none skipped, 1 logged over a day ago for a resident on the Residents tab (check logbookOutboxRun in Executions).');
+  assert.equal(S.waitingText(S.waiting([...list, { ...entry, id: 'g2', rid: '202301', createdAt: at(26) }, { ...entry, id: 'g3', rid: '202301', createdAt: at(40) }], ok, now)),
+    'Outbox: 6 waiting, 3 skipped (999999: 2, R2: 1; oldest 1.3 days), 2 logged over a day ago for residents on the Residents tab (check logbookOutboxRun in Executions).');
+  assert.equal(S.waitingText(S.waiting([{ ...entry, rid: '202301', createdAt: at(2) }], ok, now)), 'Outbox: 1 waiting, none skipped.');
   assert.equal(S.waitingText({ ...S.waiting([], ok, now), capped: true }), 'Outbox: 0+ waiting, none skipped.');
   // the other failures
   assert.equal(S.nightProblems({ status: 'still differs' }, null, '').length, 1);
   assert.match(S.nightProblems({ status: 'ok' }, null, 'Outbox not checked: 403')[0], /Outbox not checked/);
   assert.equal(S.nightProblems({ status: 'fixed' }, clean, '').length, 0);
+}
+// ---------- the real entry points, against fakes of Apps Script (the sheet, the lock, Script properties, Firestore REST) ----------
+// A tab: rows[0] is row 1. getRange(row, column, rows, columns) as Apps Script's; a TextFinder as Google's (case and part
+// of a cell match unless told otherwise).
+class FakeSheet {
+  constructor(name, rows) { this.name = name; this.rows = rows; }
+  getName() { return this.name; }
+  getLastRow() { return this.rows.length; }
+  getLastColumn() { return Math.max(0, ...this.rows.map(r => r.length)); }
+  getDataRange() { return this.getRange(1, 1, this.getLastRow(), this.getLastColumn()); }
+  getRange(r, c, nr = 1, nc = 1) {
+    const rows = this.rows, cell = (i, j) => (rows[r - 1 + i] || [])[c - 1 + j] ?? '';
+    const range = {
+      getValues: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => cell(i, j))),
+      getValue: () => cell(0, 0),
+      setValue: v => range.setValues([[v]]),
+      setValues: v => v.forEach((row, i) => { const t = rows[r - 1 + i] || (rows[r - 1 + i] = []); row.forEach((x, j) => { t[c - 1 + j] = x; }); }),
+      setNumberFormat: () => range,
+      createTextFinder: text => {
+        let whole = false, exact = false;
+        const f = {
+          matchEntireCell: b => { whole = b; return f; }, matchCase: b => { exact = b; return f; },
+          findNext: () => {
+            const q = exact ? text : text.toLowerCase();
+            for (let i = 0; i < nr; i++) for (let j = 0; j < nc; j++) { const v = exact ? String(cell(i, j)) : String(cell(i, j)).toLowerCase(); if (whole ? v === q : v.includes(q)) return { row: r + i }; }
+            return null;
+          },
+        };
+        return f;
+      },
+    };
+    return range;
+  }
+}
+const CASE_HEAD = ['Resident', 'Date', 'Initials,  Case Details', 'Category', '15', '20', '26', 'Timestamp', 'Email address', 'App marker'];
+// The globals Outbox.gs uses, on the script's own sandbox; `outbox` a restOutbox. -> { ss, props, lock, trail, outbox }
+function appsScript({ outbox = restOutbox([]), residents = [['Fake Person', '202301']], caseRows = [], dbRows = [], onQuery = null } = {}) {
+  const props = new Map([['LOGBOOK_BOT_EMAIL', 'fake.bot@example.com'], ['LOGBOOK_BOT_PASSWORD', 'not-a-real-password']]);
+  const lock = { held: false, tries: [] }, trail = [];
+  const sheets = [new FakeSheet('Case', [CASE_HEAD, ...caseRows]), new FakeSheet('Residents', [['Name', 'Id'], ...residents]), new FakeSheet('Database', [['x'], ...dbRows])];
+  const ss = { getSheetByName: n => sheets.find(x => x.name === n) || null, getSheets: () => sheets };
+  const reply = (code, body) => ({ getResponseCode: () => code, getContentText: () => JSON.stringify(body) });
+  Object.assign(sandbox, {
+    console: { log: () => {}, warn: () => {} },
+    LockService: {
+      getScriptLock: () => ({ tryLock: ms => { lock.tries.push(ms); if (lock.held) return false; lock.held = true; return true; }, releaseLock: () => { lock.held = false; } }),
+      getDocumentLock: () => ({ waitLock: () => {}, releaseLock: () => {} }),
+    },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: k => (props.has(k) ? props.get(k) : null), setProperty: (k, v) => { props.set(k, String(v)); }, deleteProperty: k => { props.delete(k); } }) },
+    CacheService: { getScriptCache: () => ({ get: () => null, put: () => {} }) },
+    UrlFetchApp: { fetch: (url, o) => {
+      if (url.includes('accounts:signInWithPassword')) return reply(200, { idToken: 'fake-token' });
+      if (url.endsWith(':runQuery')) { trail.push('query'); if (onQuery) { const f = onQuery; onQuery = null; f(); } return reply(200, outbox.runQuery(JSON.parse(o.payload))); }
+      if (o.method === 'delete') { const id = decodeURIComponent(url.split('/').pop()); trail.push('delete ' + id); return reply(outbox.docs.delete(id) ? 200 : 404, {}); }
+      throw new Error('unexpected fetch ' + url);
+    } },
+    SpreadsheetApp: { getActiveSpreadsheet: () => ss, flush: () => trail.push('flush') },
+    Utilities: { sleep: () => {}, formatDate: () => '20/10/2026 03:00' },
+    // the sheet's own script
+    updateDatabase: (sheet, n) => trail.push('database ' + n), sortByTimestampDescending_: () => trail.push('sort'),
+    updateResidentReport: rid => trail.push('report ' + rid), updateAYSummaryReport: ay => trail.push('totals ' + ay),
+    rebuildDatabase: () => trail.push('rebuild Database'), rebuildAYSummaryReports: () => trail.push('rebuild AY'),
+  });
+  return { ss, props, lock, trail, outbox, caseTab: sheets[0] };
+}
+const appRows = sheet => sheet.rows.slice(1).map(r => r[9]).filter(x => /^app:/.test(String(x)));
+
+// column J is looked at again under the lock: exactly the case's marker (case and all, the whole cell)
+{
+  const w = appsScript({ caseRows: [['Fake Person (202301)', '', '', '', '', '', '', '', '', 'app:abc']] });
+  const io = S.io(w.ss);
+  assert.deepEqual([io.marked('app:abc'), io.marked('app:ABC'), io.marked('app:ab'), io.marked('app:abcd')], [true, false, false, false]);
+  assert.equal(S.io(appsScript().ss).marked('app:abc'), false, 'an empty Case tab');
+}
+// two runs that both read column J before either added a row (the overlap the script lock now prevents): the second one
+// finds the first one's rows when it looks again, under the lock, and adds nothing twice
+{
+  const w = appsScript();
+  const list = ['m1', 'm2', 'm3', 'm4'].map(id => ({ ...entry, id, rid: '202301' }));
+  const ioA = S.io(w.ss), ioB = S.io(w.ss);
+  const runWith = io => S.cycle(fakeEnv({ over: { list: () => list, io } }));
+  runWith(ioA);
+  assert.deepEqual(appRows(w.caseTab), ['app:m1', 'app:m2', 'app:m3', 'app:m4']);
+  const b2 = runWith(ioB);
+  assert.deepEqual(appRows(w.caseTab), ['app:m1', 'app:m2', 'app:m3', 'app:m4'], 'nothing added twice');
+  assert.equal(b2.added, 4, 'the second run still deletes the entries (and rebuilds the reports)');
+}
+// one run at a time: a run started while another is going (another account's trigger, or Run in the editor) does nothing;
+// the lock goes when the run ends, also when it fails; each hold of the document lock flushes the rows it wrote
+{
+  const outbox = restOutbox([...['n1', 'n2', 'n3'].map(id => ({ ...entry, id, rid: '202301' })), { ...entry, id: 'n9', rid: '999999' }]);
+  let nested = null;
+  const w = appsScript({ outbox, onQuery: () => { const q = w.trail.filter(x => x === 'query').length; sandbox.logbookOutboxRun(); nested = w.trail.filter(x => x === 'query').length - q; } });
+  sandbox.logbookOutboxRun();
+  assert.equal(nested, 0, 'the second run read nothing');
+  assert.deepEqual(w.lock.tries, [0, 0], 'never waits for the lock');
+  assert.equal(w.lock.held, false, 'let go at the end');
+  assert.deepEqual(appRows(w.caseTab), ['app:n1', 'app:n2', 'app:n3'], 'each case added once');
+  assert.deepEqual([...outbox.docs.keys()], ['n9'], 'the skipped one waits');
+  assert.ok(w.trail.indexOf('flush') > w.trail.indexOf('sort') && w.trail.indexOf('flush') < w.trail.indexOf('delete n1'), 'rows flushed before the lock goes: ' + w.trail.join());
+  // a run that fails lets go of the lock too
+  outbox.docs.set('n4', { ...entry, id: 'n4', rid: '202301' });
+  sandbox.updateDatabase = () => { throw new Error('fake Database failure'); };
+  assert.throws(() => sandbox.logbookOutboxRun(), /fake Database failure/);
+  assert.equal(w.lock.held, false, 'let go after a failure');
+  // and a run while the lock is held by someone else does nothing at all
+  w.lock.held = true; const n = w.trail.length;
+  sandbox.logbookOutboxRun();
+  assert.equal(w.trail.length, n, 'no read, no write');
+}
+// the nightly check holds the same lock; with a run still going it only reports that night
+{
+  const L1 = S.labels['01'];
+  const caseRows = Array.from({ length: 1000 }, () => ['Fake Person (202301)', '', '', L1, '', '', '', new Date('2026-10-01T00:00:00Z')]);
+  const dbRows = Array.from({ length: 1001 }, () => ['', '202301', '', '', '', '', '', '', L1]);   // one Database row too many
+  let w = appsScript({ caseRows, dbRows });
+  w.props.set('LOGBOOK_TOTALS_FIX', 'on');
+  w.lock.held = true;   // a 5-minute run that doesn't end within the wait
+  sandbox.logbookOutboxTotalsCheck();
+  assert.deepEqual(w.lock.tries, [30000]);
+  assert.ok(!w.trail.some(x => /^rebuild/.test(x)), 'no rebuild');
+  assert.match(w.props.get('LOGBOOK_TOTALS_LAST'), /differs \(an outbox run was still going, so no rebuild tonight\)/);
+  assert.match(w.props.get('LOGBOOK_TOTALS_LAST'), /Outbox: 0 waiting, none skipped\./);
+  assert.equal(w.lock.held, true, "someone else's lock is left alone");
+  // with the lock: rebuilds (here the fake ones change nothing, so it still differs and fails), and a 5-minute run
+  // started meanwhile does nothing; the lock goes at the end
+  w = appsScript({ caseRows, dbRows });
+  w.props.set('LOGBOOK_TOTALS_FIX', 'on');
+  let during = null;
+  sandbox.rebuildDatabase = () => { w.trail.push('rebuild Database'); const n = w.trail.length; sandbox.logbookOutboxRun(); during = w.trail.length - n; };
+  assert.throws(() => sandbox.logbookOutboxTotalsCheck(), /Totals still differ after the rebuild/);
+  assert.ok(w.trail.includes('rebuild Database') && w.trail.includes('rebuild AY'));
+  assert.equal(during, 0, 'a 5-minute run during the rebuilds did nothing');
+  assert.equal(w.lock.held, false);
+}
+// entries under an id the sheet will never have: listed, and deleted only when asked to; an id on the Residents tab is refused
+{
+  const list = [{ ...entry, id: 'd1', rid: 'R2' }, { ...entry, id: 'd2', rid: 'R2', date: null, dateText: 'last Tue' }, { ...entry, id: 'd3', rid: '999999' }, { ...entry, id: 'd4', rid: '202301' }];
+  const run = (rid, confirm) => { const log = [], removed = []; const r = S.dropRid({ entries: list, residentOk: x => x === '202301', remove: id => removed.push(id), log: t => log.push(t) }, rid, confirm); return { r: plain(r), log, removed }; };
+  let x = run('R2');
+  assert.deepEqual([x.r, x.removed], [{ found: 2, deleted: 0, refused: false }, []], 'a dry run unless confirmed');
+  assert.equal(x.log[0], `d1: 2026-10-14 | AB 34F elective LSCS spinal | ${S.labels['16']}, ${S.labels['28']}`, 'what each case says, to add by hand');
+  assert.match(x.log[1], /^d2: last Tue \|/);
+  assert.match(x.log[2], /^2 entries wait under R2\. Nothing deleted\. .*LOGBOOK_OUTBOX_DROP_CONFIRM to R2/);
+  x = run('R2', true);
+  assert.deepEqual([x.r, x.removed], [{ found: 2, deleted: 2, refused: false }, ['d1', 'd2']]);
+  x = run('202301', true);
+  assert.deepEqual([x.r, x.removed], [{ found: 1, deleted: 0, refused: true }, []], 'on the Residents tab: on its way to the sheet');
+  assert.match(x.log[0], /202301 is on the Residents tab/);
+  assert.throws(() => run(''), /Which resident id/);
+  // from the editor (no arguments): the id from a Script property; deletes only when the confirming property names the same id
+  const outbox = restOutbox(list);
+  const w = appsScript({ outbox });
+  assert.throws(() => sandbox.logbookOutboxDropRid(), /Which resident id/, 'no id set');
+  assert.equal(outbox.docs.size, 4);
+  w.props.set('LOGBOOK_OUTBOX_DROP_RID', 'R2');
+  sandbox.logbookOutboxDropRid();
+  assert.equal(outbox.docs.size, 4, 'listed only');
+  w.props.set('LOGBOOK_OUTBOX_DROP_CONFIRM', '999999');
+  sandbox.logbookOutboxDropRid();
+  assert.equal(outbox.docs.size, 4, 'the confirmation names another id: listed only');
+  w.props.set('LOGBOOK_OUTBOX_DROP_CONFIRM', 'R2');
+  sandbox.logbookOutboxDropRid();
+  assert.deepEqual([...outbox.docs.keys()].sort(), ['d3', 'd4']);
+  assert.ok(!w.props.has('LOGBOOK_OUTBOX_DROP_RID') && !w.props.has('LOGBOOK_OUTBOX_DROP_CONFIRM'), 'both properties removed');
 }
 console.log('PASS outbox script');
 

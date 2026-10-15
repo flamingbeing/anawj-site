@@ -25,9 +25,10 @@ export function setOutboxOn(v) { override = v; }   // tests
 
 // only cases made in the app (typed or pasted): never ones that came from the Form or the workbook import
 export const SHEET_SOURCES = ['app', 'paste'];
-// and only cases made since the outbox went live: an older app case restored from the recycle bin has no "app:<id>" row in
-// the sheet to match, so it would be added late, or twice if the resident also sent it through the Form back then
-export const SHEET_OUTBOX_SINCE = Date.parse('2026-10-14');
+// and only cases made since the outbox went live (#546 switched it on at 22:13 Singapore time, 14 Oct 2026): an older app
+// case restored from the recycle bin has no "app:<id>" row in the sheet to match, so it would be added late, or twice if
+// the resident also sent it through the Form back then
+export const SHEET_OUTBOX_SINCE = Date.parse('2026-10-14T14:15:00Z');
 
 // who: { email, rid } of the signed-in programme resident (the logbook names their rid), or null
 export function outboxEntry(c, who) {

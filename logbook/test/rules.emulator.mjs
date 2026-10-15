@@ -397,6 +397,13 @@ await t('template part admin delete', assertSucceeds(deleteDoc(doc(adm, 'config'
   await t('outbox: bot still cannot read the Form inbox', assertFails(getDocs(collection(bot, 'formInbox'))));
   await t('outbox: bot still cannot read a logbook', assertFails(getDoc(doc(bot, 'logbooks', A))));
   await t('outbox: resident deletes own', assertSucceeds(deleteDoc(doc(a, 'sheetOutbox', 'k2'))));
+  // a case deleted after the script took its entry (or one that never had one): deleting nothing is allowed, so an
+  // offline delete sent late shows no false sync error; someone else's entry and signed-out or unverified accounts stay refused
+  await t('outbox: resident deletes an entry already gone', assertSucceeds(deleteDoc(doc(a, 'sheetOutbox', 'k2'))));
+  await t('outbox: resident deletes one that never was', assertSucceeds(deleteDoc(doc(a, 'sheetOutbox', 'never1'))));
+  await t('outbox: unverified deletes one already gone', assertFails(deleteDoc(doc(unv, 'sheetOutbox', 'k2'))));
+  await t('outbox: signed out deletes one already gone', assertFails(deleteDoc(doc(anon, 'sheetOutbox', 'k2'))));
+  await t('outbox: other resident still cannot delete an entry that is there', assertFails(deleteDoc(doc(b, 'sheetOutbox', 'k5'))));
   await t('outbox: bot deletes', assertSucceeds(deleteDoc(doc(bot, 'sheetOutbox', 'k1'))));
   await t('outbox: unlisted account lists', assertFails(getDocs(collection(unv, 'sheetOutbox'))));
 }

@@ -8,9 +8,10 @@
 //
 // Each run reads one page of the outbox (12 entries, in id order) from where the last run stopped (the Script property
 // LOGBOOK_OUTBOX_CURSOR), and goes back to the start once it reaches the end. So an entry it has to skip (a resident who
-// isn't on the Residents tab yet) never holds the others back, and a run never reads more than a page. The nightly Totals
-// check (below) reads the whole outbox once and fails, so Google emails the owner, when an entry has been skipped for
-// over a day.
+// isn't on the Residents tab yet) never holds the others back, and a run reads one page (two when it goes back to the
+// start). The nightly Totals check (below) reads the whole outbox once and fails, so Google emails the owner, when an
+// entry has been skipped for over a day. Two runs never overlap (the script lock: whoever's trigger, or Run in the
+// editor, started them), and each piece looks in column J again just before adding a row.
 //
 // It signs in as the same bot account as the Form inbox script (Firebase email and password, kept in THIS project's
 // Script properties LOGBOOK_BOT_EMAIL and LOGBOOK_BOT_PASSWORD, never in this file). The rules let that bot read and
@@ -34,6 +35,9 @@ var LOGBOOK_OUTBOX_PENDING_KEY = 'LOGBOOK_OUTBOX_PENDING';   // report rebuilds 
 var LOGBOOK_OUTBOX_CURSOR_KEY = 'LOGBOOK_OUTBOX_CURSOR';     // the id of the last entry the previous run got to (none: the start)
 var LOGBOOK_OUTBOX_SKIP_ALERT_MS = 24 * 3600 * 1000;         // the nightly check fails when an entry has been skipped this long
 var LOGBOOK_OUTBOX_ALL_MAX = 3000;                           // the nightly check reads at most this many entries
+var LOGBOOK_OUTBOX_NIGHT_WAIT_MS = 30000;                    // the nightly check waits this long for a 5-minute run to end
+var LOGBOOK_OUTBOX_DROP_RID_KEY = 'LOGBOOK_OUTBOX_DROP_RID';         // logbookOutboxDropRid from the editor: the resident id
+var LOGBOOK_OUTBOX_DROP_CONFIRM_KEY = 'LOGBOOK_OUTBOX_DROP_CONFIRM'; // ... and the same id again, to delete (not just list)
 var LOGBOOK_OUTBOX_DATE_FORMAT = 'dd/mm/yyyy', LOGBOOK_OUTBOX_STAMP_FORMAT = 'dd/mm/yyyy hh:mm:ss';
 
 // The category labels exactly as the Form (and logbook/js/categories.js) write them. Tested against categories.js
@@ -136,7 +140,8 @@ function logbookOutboxSkipReason_(rid, residentOk) {
 // the new row's number, so before the sort), then sort once. The slow rebuilds (the resident's report, the AY totals) are
 // NOT done here: they are returned (rids, ays) for phase 2, each under a lock hold of its own.
 // io (the sheet and the existing script; faked in the tests):
-//   io.markers (an object: 'app:<id>' -> true, read from column J), io.residentOk(rid), io.residentText(rid),
+//   io.markers (an object: 'app:<id>' -> true, read from column J when the run opened the sheet), io.marked(mark)
+//   (optional: column J looked at again now, under the lock), io.residentOk(rid), io.residentText(rid),
 //   io.appendRow(row) -> the new row's number, io.database(rowNumber, first8Values), io.sort()
 // -> { done: [ids whose entry can be deleted], skipped: [{ id, reason }], errors: [text], rids: [..], ays: [..] }
 function logbookOutboxAdd_(entries, io) {
@@ -144,7 +149,10 @@ function logbookOutboxAdd_(entries, io) {
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i], mark = 'app:' + e.id;
     var rid = String(e.rid || '');
-    if (io.markers[mark]) {   // already in the sheet (a run that stopped before the delete): make sure its reports are rebuilt too
+    // already in the sheet (a run that stopped before the delete, or one that added it after this run read column J):
+    // make sure its reports are rebuilt too
+    if (io.markers[mark] || (io.marked && io.marked(mark))) {
+      io.markers[mark] = true;
       done.push(e.id); if (/^\d{6}$/.test(rid)) { rids[rid] = true; ays['AY' + rid.slice(0, 4)] = true; }
       continue;
     }
@@ -329,6 +337,11 @@ function logbookOutboxIo_(ss) {
   }
   return {
     markers: markers,
+    // column J now, not as the run first read it (a case and its id: exactly, case and all)
+    marked: function (mark) {
+      var n = caseSheet.getLastRow();
+      return n > 1 && !!caseSheet.getRange(2, LOGBOOK_OUTBOX_MARK_COL, n - 1, 1).createTextFinder(mark).matchEntireCell(true).matchCase(true).findNext();
+    },
     residentOk: function (rid) { return !!known[rid]; },
     residentText: function (rid) {
       if (textOf[rid]) return textOf[rid];
@@ -354,7 +367,14 @@ function logbookOutboxIo_(ss) {
 // The time trigger (every 5 minutes: logbookOutboxSetup adds it). Failures show in Apps Script → Executions, and Google
 // emails the trigger's owner a daily summary; entries that failed stay in the outbox for the next run. Skipped entries
 // only log a warning here (never a failure every 5 minutes): the nightly Totals check reports them.
+// One run at a time (the script lock covers every account's trigger and Run in the editor): two runs that both read the
+// outbox before either deleted an entry would both add its case. A run that finds another still going does nothing.
 function logbookOutboxRun() {
+  var run = LockService.getScriptLock();
+  if (!run.tryLock(0)) { console.log('Another outbox run is still going: this one did nothing.'); return; }
+  try { logbookOutboxRunLocked_(); } finally { run.releaseLock(); }
+}
+function logbookOutboxRunLocked_() {
   var props = PropertiesService.getScriptProperties();
   var env = {
     list: function (after) { return logbookOutboxPage_(after, LOGBOOK_OUTBOX_BATCH); },
@@ -363,7 +383,8 @@ function logbookOutboxRun() {
     open: function () { env.io = logbookOutboxIo_(SpreadsheetApp.getActiveSpreadsheet()); },
     remove: logbookOutboxDelete_,
     io: null,
-    locked: function (fn) { var lock = LockService.getDocumentLock(); lock.waitLock(30000); try { fn(); } finally { lock.releaseLock(); } },
+    // (flush: the rows are written before the lock goes, so whoever holds it next sees them)
+    locked: function (fn) { var lock = LockService.getDocumentLock(); lock.waitLock(30000); try { fn(); SpreadsheetApp.flush(); } finally { lock.releaseLock(); } },
     getPending: function () { try { var p = JSON.parse(props.getProperty(LOGBOOK_OUTBOX_PENDING_KEY) || '{}'); return { rids: p.rids || [], ays: p.ays || [] }; } catch (e) { return { rids: [], ays: [] }; } },
     setPending: function (p) { if (p.rids.length || p.ays.length) props.setProperty(LOGBOOK_OUTBOX_PENDING_KEY, JSON.stringify(p)); else props.deleteProperty(LOGBOOK_OUTBOX_PENDING_KEY); },
     now: function () { return Date.now(); },
@@ -387,7 +408,8 @@ function logbookOutboxCheck() {
 }
 
 // Run once by hand after setting the two Script properties: checks the bot can sign in and read the outbox, adds the
-// header "App marker" to column J if it is empty, and adds the 5-minute trigger if it isn't there. Safe to run again.
+// header "App marker" to column J if it is empty, and adds the 5-minute trigger if it isn't there. Safe to run again from
+// the same account (it can't see another account's triggers: a second one would only make runs skip, never add twice).
 function logbookOutboxSetup() {
   logbookOutboxToken_(true);
   console.log('Bot sign-in works; ' + logbookOutboxPage_('', LOGBOOK_OUTBOX_BATCH).length + ' entries on the outbox\'s first page.');
@@ -589,10 +611,10 @@ function logbookOutboxWaiting_(entries, residentOk, now) {
 function logbookOutboxDays_(ms) { return Math.round(ms / 864e5 * 10) / 10; }
 
 function logbookOutboxWaitingText_(w) {
-  var t = 'Outbox: ' + w.waiting + (w.capped ? '+' : '') + ' waiting';
-  if (!w.skippedN) return t + ', none skipped.';
-  t += ', ' + w.skippedN + ' skipped (' + w.skipped.map(function (b) { return b.rid + ': ' + b.n; }).join(', ') + '; oldest ' + logbookOutboxDays_(w.oldestSkippedMs) + ' days)';
-  if (w.oldOther) t += ', ' + w.oldOther + ' others waiting over a day';
+  var t = 'Outbox: ' + w.waiting + (w.capped ? '+' : '') + ' waiting, ';
+  t += w.skippedN ? w.skippedN + ' skipped (' + w.skipped.map(function (b) { return b.rid + ': ' + b.n; }).join(', ') + '; oldest ' + logbookOutboxDays_(w.oldestSkippedMs) + ' days)' : 'none skipped';
+  // not skipped, yet still here a day after they were logged: is the 5-minute run running?
+  if (w.oldOther) t += ', ' + w.oldOther + ' logged over a day ago for ' + (w.oldOther === 1 ? 'a resident' : 'residents') + ' on the Residents tab (check logbookOutboxRun in Executions)';
   return t + '.';
 }
 function logbookOutboxWaitingLines_(w) {
@@ -609,18 +631,25 @@ function logbookOutboxWaitingNow_() {
 
 // The nightly trigger (logbookOutboxTotalsSetup adds it). Rebuilds only when LOGBOOK_TOTALS_FIX is 'on'. Also reports
 // what waits in the outbox, and fails (so Google emails the owner) when an entry has been skipped for over a day.
+// It holds the script lock, as a 5-minute run does (the runs meanwhile do nothing, and the next one catches up). If a run is
+// still going after LOGBOOK_OUTBOX_NIGHT_WAIT_MS, tonight's check only reports.
 function logbookOutboxTotalsCheck() {
   var props = PropertiesService.getScriptProperties();
-  var w = null, wErr = '';
-  try { w = logbookOutboxWaitingNow_(); } catch (err) { wErr = 'Outbox not checked: ' + err.message; }   // first: quick, and the rebuilds can be slow
-  var s = logbookOutboxTotalsCycle_(logbookOutboxTotalsEnv_(props.getProperty(LOGBOOK_TOTALS_FIX_KEY) === 'on'));
-  var text = Utilities.formatDate(new Date(), 'Asia/Singapore', 'dd/MM/yyyy HH:mm') + ': ' + logbookOutboxTotalsSummaryText_(s) + ' ' + (w ? logbookOutboxWaitingText_(w) : wErr);
-  props.setProperty(LOGBOOK_TOTALS_LAST_KEY, text);
-  console.log(text);
-  if (s.detail) { s.detail.db.slice(0, 20).forEach(function (d) { console.log('Case vs Database: ' + d.rid + ' ' + d.label + ' case ' + d.caseCount + ' Database ' + d.dbCount); }); s.detail.ay.slice(0, 20).forEach(function (d) { console.log('Database vs ' + d.ay + ' Totals: ' + d.rid + ' ' + d.label + ' Database ' + d.dbCount + ' tab ' + d.tabCount); }); }
-  if (w) logbookOutboxWaitingLines_(w).forEach(function (t) { console.log(t); });
-  var problems = logbookOutboxNightProblems_(s, w, wErr);
-  if (problems.length) throw new Error(problems.join(' ') + ' ' + text);
+  var run = LockService.getScriptLock(), locked = run.tryLock(LOGBOOK_OUTBOX_NIGHT_WAIT_MS);
+  try {
+    var w = null, wErr = '';
+    try { w = logbookOutboxWaitingNow_(); } catch (err) { wErr = 'Outbox not checked: ' + err.message; }   // first: quick, and the rebuilds can be slow
+    var fixOn = props.getProperty(LOGBOOK_TOTALS_FIX_KEY) === 'on';
+    var s = logbookOutboxTotalsCycle_(logbookOutboxTotalsEnv_(fixOn && locked));
+    if (fixOn && !locked && s.status === 'differs') s.reason = 'an outbox run was still going, so no rebuild tonight';
+    var text = Utilities.formatDate(new Date(), 'Asia/Singapore', 'dd/MM/yyyy HH:mm') + ': ' + logbookOutboxTotalsSummaryText_(s) + ' ' + (w ? logbookOutboxWaitingText_(w) : wErr);
+    props.setProperty(LOGBOOK_TOTALS_LAST_KEY, text);
+    console.log(text);
+    if (s.detail) { s.detail.db.slice(0, 20).forEach(function (d) { console.log('Case vs Database: ' + d.rid + ' ' + d.label + ' case ' + d.caseCount + ' Database ' + d.dbCount); }); s.detail.ay.slice(0, 20).forEach(function (d) { console.log('Database vs ' + d.ay + ' Totals: ' + d.rid + ' ' + d.label + ' Database ' + d.dbCount + ' tab ' + d.tabCount); }); }
+    if (w) logbookOutboxWaitingLines_(w).forEach(function (t) { console.log(t); });
+    var problems = logbookOutboxNightProblems_(s, w, wErr);
+    if (problems.length) throw new Error(problems.join(' ') + ' ' + text);
+  } finally { if (locked) run.releaseLock(); }
 }
 
 // What makes the nightly run fail (so Google emails the owner): totals still off after a rebuild, the outbox unreadable, or
@@ -631,10 +660,54 @@ function logbookOutboxNightProblems_(s, w, wErr) {
   if (wErr) p.push(wErr + '.');
   if (w && w.overdue) {
     var rids = w.skipped.filter(function (b) { return b.oldestMs > LOGBOOK_OUTBOX_SKIP_ALERT_MS; }).map(function (b) { return b.rid; });
-    p.push(w.overdue + ' app case' + (w.overdue === 1 ? '' : 's') + ' waited over a day in the outbox without reaching the sheet (resident' + (rids.length === 1 ? ' ' : 's ') +
-      rids.join(', ') + '): add the resident (name and 6-digit id) to the Residents tab, or check the id in the app\'s People list; the next runs then add the cases.');
+    p.push(w.overdue + ' app case' + (w.overdue === 1 ? '' : 's') + ' waited over a day in the outbox without reaching the sheet (resident id' + (rids.length === 1 ? ' ' : 's ') +
+      rids.join(', ') + '). If the id is right: add the resident (name and that 6-digit id) to the Residents tab, and the next runs add the cases. ' +
+      'If it is wrong (not 6 digits, or since corrected in the app\'s People list): the waiting entries keep the id they were queued with (a fix in People ' +
+      'changes only cases logged after it), so run logbookOutboxDropRid for that id (OUTBOX-README.md) to list them and then delete them, and add those cases ' +
+      'to the sheet by hand if it needs them.');
   }
   return p;
+}
+
+// ---------- entries the sheet will never take (by hand) ----------
+// An entry keeps the resident id it was queued with. If that id is wrong (not 6 digits, or one since corrected in the app's
+// People list, which changes only the cases logged after the fix), its entries are skipped for good and the nightly check
+// fails every night. This lists them, with what each case says (to add by hand if the sheet needs it), and deletes them only
+// when asked to. It refuses an id that is on the Residents tab: those entries are on their way to the sheet.
+// From the editor (Run passes no arguments): set the Script property LOGBOOK_OUTBOX_DROP_RID to the id and run
+// logbookOutboxDropRid, which only lists. To delete them, also set LOGBOOK_OUTBOX_DROP_CONFIRM to the same id and run it
+// again; both properties are then removed. (Called with arguments: logbookOutboxDropRid('R2') lists, ('R2', true) deletes.)
+function logbookOutboxDropRid(rid, confirm) {
+  var props = PropertiesService.getScriptProperties();
+  var fromProps = rid == null || typeof rid === 'object';   // Run in the editor passes nothing (a trigger would pass an event)
+  if (fromProps) { rid = props.getProperty(LOGBOOK_OUTBOX_DROP_RID_KEY) || ''; confirm = !!rid && props.getProperty(LOGBOOK_OUTBOX_DROP_CONFIRM_KEY) === rid; }
+  var all = logbookOutboxAll_(), known = logbookOutboxResidents_(SpreadsheetApp.getActiveSpreadsheet()).known;
+  var r = logbookOutboxDropRid_({ entries: all.entries, residentOk: function (x) { return !!known[x]; }, remove: logbookOutboxDelete_, log: function (t) { console.log(t); } }, rid, confirm === true);
+  if (all.capped) console.log('The outbox holds more than ' + LOGBOOK_OUTBOX_ALL_MAX + ' entries and only those were looked at: run it again for the rest.');
+  else if (fromProps && r.deleted) { props.deleteProperty(LOGBOOK_OUTBOX_DROP_RID_KEY); props.deleteProperty(LOGBOOK_OUTBOX_DROP_CONFIRM_KEY); }
+}
+
+// env: { entries (every entry), residentOk(rid), remove(id), log(text) } -> { found, deleted, refused }
+function logbookOutboxDropRid_(env, rid, confirm) {
+  rid = String(rid || '');
+  if (!rid) throw new Error('Which resident id? Set the Script property ' + LOGBOOK_OUTBOX_DROP_RID_KEY + ' to it (OUTBOX-README.md).');
+  var mine = env.entries.filter(function (e) { return String(e.rid || '') === rid; });
+  if (!logbookOutboxSkipReason_(rid, env.residentOk)) {
+    env.log(rid + ' is on the Residents tab, so ' + (mine.length === 1 ? 'its waiting entry is' : 'its ' + mine.length + ' waiting entries are') + ' on the way to the sheet: nothing deleted.');
+    return { found: mine.length, deleted: 0, refused: true };
+  }
+  mine.forEach(function (e) {
+    var row = logbookOutboxRow_(e, '');
+    env.log(e.id + ': ' + [e.date || e.dateText || '(no date)', row[2], row.slice(3, 7).filter(String).join(' / ')].join(' | '));
+  });
+  if (!confirm) {
+    env.log(mine.length + ' entr' + (mine.length === 1 ? 'y waits' : 'ies wait') + ' under ' + rid + '. Nothing deleted. To delete ' + (mine.length === 1 ? 'it' : 'them') +
+      ', set the Script property ' + LOGBOOK_OUTBOX_DROP_CONFIRM_KEY + ' to ' + rid + ' as well and run logbookOutboxDropRid again.');
+    return { found: mine.length, deleted: 0, refused: false };
+  }
+  mine.forEach(function (e) { env.remove(e.id); });
+  env.log('Deleted ' + mine.length + ' entr' + (mine.length === 1 ? 'y' : 'ies') + ' under ' + rid + ' (listed above). Those cases are in the app only.');
+  return { found: mine.length, deleted: mine.length, refused: false };
 }
 
 // Run by hand any time: lists the differences, changes nothing.
@@ -656,4 +729,5 @@ function logbookOutboxTotalsSetup() {
 
 if (typeof module !== 'undefined') module.exports = { labels: LOGBOOK_OUTBOX_LABELS, categories: logbookOutboxCategories_, row: logbookOutboxRow_, add: logbookOutboxAdd_, cycle: logbookOutboxCycle_, chunk: LOGBOOK_OUTBOX_CHUNK, entryOf: logbookOutboxEntryOf_, date: logbookOutboxDate_,
   caseCounts: logbookOutboxCaseCounts_, dbCounts: logbookOutboxDbCounts_, totalsDiff: logbookOutboxTotalsDiff_, totalsCycle: logbookOutboxTotalsCycle_, noUi: logbookOutboxNoUi_,
-  batch: LOGBOOK_OUTBOX_BATCH, pageQuery: logbookOutboxPageQuery_, entriesOf: logbookOutboxEntriesOf_, waiting: logbookOutboxWaiting_, waitingText: logbookOutboxWaitingText_, nightProblems: logbookOutboxNightProblems_ };
+  batch: LOGBOOK_OUTBOX_BATCH, pageQuery: logbookOutboxPageQuery_, entriesOf: logbookOutboxEntriesOf_, waiting: logbookOutboxWaiting_, waitingText: logbookOutboxWaitingText_, nightProblems: logbookOutboxNightProblems_,
+  io: logbookOutboxIo_, dropRid: logbookOutboxDropRid_ };

@@ -675,7 +675,8 @@ export async function queueSheetRows(email, entries) {
   const { db, F } = await sdk();
   await Promise.allSettled(entries.map(e => queued(F.setDoc(F.doc(db, 'sheetOutbox', String(e.id)), plain(e)))));
 }
-// A case deleted before the script has picked it up. Best effort: an entry already gone has nothing to delete.
+// A case deleted before the script has picked it up. Best effort: an entry already gone has nothing to delete (the rules
+// allow that, so a delete sent late, offline, raises no sync error).
 export async function dropSheetRows(email, ids) {
   if (!ids.length) return;
   if (demo) return D.dropSheetRows(ids);

@@ -591,10 +591,15 @@ portfolio content.
   sheet turns each into a Case-tab row with `app:<caseId>` in column J and deletes the entry. New cases only (edits
   and deletions don't reach the sheet; a case deleted before pick-up is taken out of the outbox, and put back when it is
   restored with its id: Undo, the bin, a delete that failed or lost to an edit; only cases made since `SHEET_OUTBOX_SINCE`,
-  14 Oct 2026). The Admin workbook import skips rows with `app:` in column J (its count check still adds them: the AY
+  the go-live instant, 22:15 Singapore time on 14 Oct 2026; deleting an entry already gone is allowed, so a late offline
+  delete shows no false sync error). The Admin workbook import skips rows with `app:` in column J (its count check still adds them: the AY
   Totals count them). Outbox.gs reads one page of 12 per run from a cursor (`LOGBOOK_OUTBOX_CURSOR`), so entries it must
   skip (resident not on the Residents tab) never block the rest (Oct 2026: they used to, as every run read the same first
-  page); the nightly Totals check reports skipped entries and fails after a day. The sheet side is `form-script/Outbox.gs` (setup: `form-script/OUTBOX-README.md`). Lessons (14 Oct): the sheet's own script rebuilds a resident's report and the AY totals in 10–40 s under the document lock while its `onFormSubmit` waits only 10 s (now 60 s), so Outbox.gs holds the lock in small pieces and keeps owed rebuilds in a Script property; a copy of the sheet keeps the REAL residents' report spreadsheet ids (Residents column G), so any test on a copy must repoint them first (`logbookOutboxTryOne` refuses otherwise); Apps Script loads files in list order (keep the original order, put new files last); a script that adds rows doesn't fire `onFormSubmit`, so it runs the same chain itself. Tests: `test/sheet-outbox.test.mjs`, the sheetOutbox rules in
+  page); the nightly Totals check reports skipped entries and fails after a day. One run at a time (the script lock), and
+  each piece looks in column J again under the lock, so overlapping runs never add a case twice. An entry keeps the rid it
+  was queued with, so a wrong id fixed in People leaves the old entries stuck: `logbookOutboxDropRid` lists, then deletes
+  them. New cases go only once the logbook names the resident's rid (`toSheet`); `app.js keepRid` sets it the moment the
+  resident is known, also mid-session (someone put on the list after this device last asked). The sheet side is `form-script/Outbox.gs` (setup: `form-script/OUTBOX-README.md`). Lessons (14 Oct): the sheet's own script rebuilds a resident's report and the AY totals in 10–40 s under the document lock while its `onFormSubmit` waits only 10 s (now 60 s), so Outbox.gs holds the lock in small pieces and keeps owed rebuilds in a Script property; a copy of the sheet keeps the REAL residents' report spreadsheet ids (Residents column G), so any test on a copy must repoint them first (`logbookOutboxTryOne` refuses otherwise); Apps Script loads files in list order (keep the original order, put new files last); a script that adds rows doesn't fire `onFormSubmit`, so it runs the same chain itself. Tests: `test/sheet-outbox.test.mjs`, the sheetOutbox rules in
   `test/rules.emulator.mjs`, and `TEST=conflicts` (scenario `sheetOutbox`).
 - **Privacy policy:** `privacy/index.html` (anawj.com/privacy/) shows who sees what. Keep it in step when roles change.
 - **Private feedback (14 Oct 2026):** More → Send feedback (`ui-feedback.js`, pure parts in `feedback.js`) saves

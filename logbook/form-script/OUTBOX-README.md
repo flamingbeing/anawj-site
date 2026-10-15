@@ -18,7 +18,8 @@ copy; a copy brings the script but not its triggers).
 3. **On the real sheet: Editor → run `logbookOutboxSetup`.** Google asks you to authorise the script (the sheet, and connecting
    to an external service): allow. It checks the bot can sign in, puts the header **App marker** in column J of the Case tab
    (the marker column: rows made by the app carry `app:<caseId>` there; the sheet's own script reads only A–H), and adds the
-   5-minute trigger (`logbookOutboxRun`). Safe to run again. **On a copy, don't run it** (its trigger would take real entries
+   5-minute trigger (`logbookOutboxRun`). Safe to run again from the same Google account (only one person sets it up: it
+   can't see another account's triggers). **On a copy, don't run it** (its trigger would take real entries
    into the copy): run `logbookOutboxCheck` instead (signs in and counts the entries, changes nothing).
 4. **Dry run, on a copy only.** A copy keeps the real residents' own report spreadsheet ids (Residents column G), and the
    sheet's `updateResidentReport` rewrites that spreadsheet's "Case Log". So first, on the **copy's** Residents sheet, point
@@ -40,11 +41,17 @@ When `Outbox.gs` changes in the repo, the owner pastes it again (the sheet runs 
 **Extensions → Apps Script → the `LogbookOutbox` file → select all, paste the whole new [`Outbox.gs`](Outbox.gs) → Save.**
 Nothing else: the triggers and Script properties stay. If Google asks to authorise again, allow.
 
-- **Oct 2026 (paging and skipped entries):** paste the new file. Before this, every run read only the outbox's first 12
-  entries, so once 12 entries were waiting for residents who aren't on the Residents tab, other residents' cases stopped
-  reaching the sheet. Now each run carries on from where the last stopped (Script property `LOGBOOK_OUTBOX_CURSOR`, made
-  by the script; leave it), and the nightly Totals check reports skipped entries and fails when one has waited over a day.
-  Optional check after pasting: run `logbookOutboxCheck` (changes nothing): it lists what waits and why.
+- **15 Oct 2026 (two changes, one paste):** paste the whole current file once; it holds both.
+  - Paging and skipped entries: before, every run read only the outbox's first 12 entries, so once 12 entries were
+    waiting for residents who aren't on the Residents tab, other residents' cases stopped reaching the sheet. Now each run
+    carries on from where the last stopped (Script property `LOGBOOK_OUTBOX_CURSOR`, made by the script; leave it), and
+    the nightly Totals check reports skipped entries and fails when one has waited over a day.
+  - One run at a time: two runs at once (a second account's trigger, or Run pressed during a trigger run) could add a
+    case twice. Now a run that finds another still going does nothing, and each piece looks in column J again just before
+    adding a row. The nightly check takes the same lock (5-minute runs skip while it holds it; the next one catches up).
+  - `logbookOutboxDropRid` (new, by hand): deletes entries stuck under a resident id the sheet will never have (see
+    "Entries under a wrong id" below).
+  - Optional check after pasting: run `logbookOutboxCheck` (changes nothing): it lists what waits and why.
 
 ## Good to know
 
@@ -62,20 +69,23 @@ Nothing else: the triggers and Script properties stay. If Google asks to authori
   the 5-minute trigger but expect an occasional missed Form response during a run, or restrict the trigger to quiet hours.
 - Rebuilds still owed are written to the Script property `LOGBOOK_OUTBOX_PENDING` before an entry is deleted, so a run that
   stops half way loses nothing; the next run does them first. A run stops starting new work after 4.5 minutes.
-- A case is never added twice: column J's `app:<caseId>` is checked first (a run that stopped before deleting the entry
-  just deletes it next time). Deleting a Case row by hand doesn't update the Database or reports (same as for Form rows):
-  use the menu's Rebuild commands.
+- A case is never added twice: column J's `app:<caseId>` is checked first, and again just before each row is added, under
+  the lock (a run that stopped before deleting the entry just deletes it next time). Runs never overlap: the script lock
+  covers every account's trigger and Run in the editor, so a run that finds another going does nothing. Deleting a Case
+  row by hand doesn't update the Database or reports (same as for Form rows): use the menu's Rebuild commands.
 - A resident whose id isn't on the Residents sheet is skipped: their entries wait in the outbox and their cases don't reach the
-  sheet until a PC adds the resident (name and 6-digit id) to the Residents tab; the next runs then add them. Each run reads
-  one page of 12 entries in id order, from where the last run stopped (Script property `LOGBOOK_OUTBOX_CURSOR`), and goes back
-  to the start at the end, so skipped entries never hold other residents' cases back and a run never reads more than a page
-  (a read per entry: about 3,500 reads a day at most). The 5-minute run only logs a skip (it never fails for one); the nightly
+  sheet until a PC adds the resident (name and 6-digit id) to the Residents tab; the next runs then add them. If the id
+  itself is wrong, see "Entries under a wrong id" below. Each run reads one page of 12 entries in id order, from where the
+  last run stopped (Script property `LOGBOOK_OUTBOX_CURSOR`), and goes back to the start at the end, so skipped entries
+  never hold other residents' cases back and a run reads one page (two when it goes back to the start; a read per entry:
+  about 3,700 reads a day at most). The 5-minute run only logs a skip (it never fails for one); the nightly
   Totals check reports them once a day (count, ids, oldest age) and **fails when one has waited over a day**, so Google's
   failure email reaches the trigger's owner. `logbookOutboxCheck` (by hand, changes nothing) lists them too.
 - The logbook's Admin workbook import skips rows with `app:` in column J (they're already in the logbook).
 - **Off switch:** delete the trigger (Triggers ⏰), or set `SHEET_OUTBOX_ON = false` in the app.
 - Failures show in Apps Script → Executions, and Google emails the trigger's owner a daily summary. The trigger runs as the
-  person who created it; if they lose edit access to the sheet it stops: recreate it from another editor.
+  person who created it; if they lose edit access to the sheet it stops: recreate it from another editor (that editor runs
+  `logbookOutboxSetup`; then delete the old trigger in Triggers ⏰ if it is still listed).
 - If the Form gets a new question, check that its answers don't land in column J (a Form adds columns to the right).
 - Change the bot's password (Authentication → Users → ⋮ → Reset password) in **both** projects' Script properties when an
   editor leaves.
@@ -104,5 +114,24 @@ Database -> each AY Totals tab, and can run the same two rebuilds the sheet's ow
   does) and adds a line to `LOGBOOK_TOTALS_LAST`, e.g. `Outbox: 4 waiting, 3 skipped (202701: 2, R2: 1; oldest 1.3 days).`
   It **fails** (so Google emails the trigger's owner) when an entry has been skipped for over a day (its resident isn't on the
   Residents tab, or the id isn't 6 digits), when the outbox can't be read, or, as before, when the Totals still differ after a
-  rebuild. Fix for skipped entries: add the resident (name and 6-digit id) to the Residents tab, or check their id in the
-  app's People list.
+  rebuild. The line also counts entries for residents who *are* on the Residents tab but were logged over a day ago (not a
+  failure: a case logged offline can arrive late, but many of these mean the 5-minute run has stopped: check
+  `logbookOutboxRun` in Executions).
+  The check holds the script lock, as the 5-minute run does; if a run is still going after 30 seconds, that night it only
+  reports (no rebuild) and says so.
+- **Fix for skipped entries.** If the id is right, add the resident (name and that 6-digit id) to the Residents tab: the
+  next runs add the cases. If the id is wrong, see below.
+
+## Entries under a wrong id
+
+Each outbox entry keeps the resident id it was queued with. So when a resident's id is wrong (not 6 digits, like `R2`, or
+a 6-digit id that was wrong and has since been corrected in the app's People list), correcting it in People only changes
+the cases logged **after** the fix: the entries already waiting keep the old id, are skipped for good, and the nightly
+check fails every night. Clear them by hand (Extensions → Apps Script, the `LogbookOutbox` file):
+
+1. **Project settings (⚙) → Script properties → Add** `LOGBOOK_OUTBOX_DROP_RID` = the old id (as the nightly email names it).
+2. Editor → run **`logbookOutboxDropRid`**. It deletes nothing: the log lists each waiting entry under that id (date,
+   initials and details, categories), so the cases can be added to the sheet by hand (or sent through the Form) if the
+   sheet needs them. It refuses an id that is on the Residents tab (those entries are on their way to the sheet).
+3. To delete them: add the Script property `LOGBOOK_OUTBOX_DROP_CONFIRM` = the same id, and run `logbookOutboxDropRid`
+   again. It deletes them and removes both properties. The cases stay in the app.

@@ -344,7 +344,10 @@ service cloud.firestore {
         && request.resource.data.email == me()
         && request.resource.data.rid == get(/databases/$(database)/documents/logbooks/$(me())).data.rid;
       allow read: if isFormBot();
-      allow delete: if isFormBot() || (signedIn() && resource.data.email == me());
+      // a resident takes back their own entry when the case is deleted; one that is already gone (the sheet script took it,
+      // or the case never had one) is nothing to delete, so that is allowed too (refused, it showed a false "could not be
+      // synced" when the delete was sent late, offline)
+      allow delete: if isFormBot() || (signedIn() && (resource == null || resource.data.email == me()));
     }
 
     // private feedback (logbook More → Send feedback): never a public GitHub issue, as a report can mention a case or
