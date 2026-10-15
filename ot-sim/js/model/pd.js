@@ -61,11 +61,16 @@ const GAMMA_H = 4.5, GAMMA_S = 5.22;
 
 // stimuli: intensity relative to laryngoscopy (Kazama 1997 ratios) [V ratios, D use]; brief ones last BRIEF seconds
 export const STIMULI = { tetanus: 0.95, laryngoscopy: 1.0, incision: 1.02, intubation: 1.78, surgery: 0.8 };
-const BRIEF = 30;            // s a brief stimulus counts as present [D]
+const BRIEF = 60;            // s a brief stimulus drives the autonomic response (it peaks at 30-60 s) [D]
 const AUTO_RISE = 20;        // s time constant of the autonomic response rising (30-60 s to peak) [D]
 const AUTO_FALL = 90;        // s time constant of its fading after a brief stimulus (3-5 min) [D]
-const BAR = 1.6;             // the autonomic surface needs about 1.6 x the hypnotic levels (MAC-BAR 1.5-2 MAC) [V ratio, D]
-const BAR_OPIOID = 0.5;      // ng/mL: opioid relatively more potent on it (fentanyl 3 ng/mL: MAC-BAR -83% vs MAC -61%) [V, D]
+// autonomic drive [D, calibrated in M2.1]: a graded response, auto = 1/(1 + U_a^2), U_a the stimulus surface with the
+// hypnotic terms needing 1.6 x (MAC-BAR about 1.6 MAC; 1.5-2 MAC [V]) and the opioid C50 1.0 ng/mL instead of 1.36, so
+// opioids weigh relatively more on it (fentanyl 3 ng/mL lowers MAC-BAR about 71% here vs MAC 64%; measured 83% vs
+// 61%). At every P_TOL 0.9 pair it gives about 0.4, which cardio.js turns into SBP +19-32 and HR +6-10 at
+// laryngoscopy (van den Berg 2021) [V target]
+const BAR = 1.6;
+const BAR_OPIOID = 1.0;
 
 // U for "no response to voice" (hypnosis)
 export function uHypnosis({ ceP, ceS = 0, ceR = 0, age, mac40 = SEVO_MAC40 }) {
@@ -116,8 +121,9 @@ export const pd = {
       ctx.log({ kind: 'stimulus', stimulus: a.kind, pNoResponse: Math.round(pNoResp * 100) / 100 });
     }
     if (stim && !stim.ongoing && t - stim.t0 > BRIEF) stim = null;
-    // autonomic drive towards 1 - P(no autonomic response) while a stimulus is present
-    const target = stim ? 1 - pNo(uStimulus(L, stim.I, true), GAMMA_S) : 0;
+    // autonomic drive towards the graded response while a stimulus is present
+    const ua = stim ? uStimulus(L, stim.I, true) : 0;
+    const target = stim ? 1 / (1 + ua * ua) : 0;
     const tau = target > s.auto ? AUTO_RISE : AUTO_FALL;
     const auto = s.auto + (target - s.auto) * (ctx.dt / tau);
     // BIS-like: arousal adds up to about 8 with a full autonomic response (van den Berg: +3 to +11) [D]

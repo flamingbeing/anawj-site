@@ -105,10 +105,11 @@ function stepOnce(prev, systems, strict) {
   return next;
 }
 
-// a new simulation: patient from the profile and seed, every subsystem initialised, then the warm start
-export function createSim({ seed = 1, profile = {}, systems = SYSTEMS, strict = false, warmup = WARMUP } = {}) {
+// a new simulation: patient from the profile and seed, every subsystem initialised, then the warm start. dt is fixed
+// at 0.1 s; tests pass a smaller one to check the step size changes nothing that matters
+export function createSim({ seed = 1, profile = {}, systems = SYSTEMS, strict = false, warmup = WARMUP, dt = DT } = {}) {
   const state = {
-    v: 1, seed: seed >>> 0, profile: JSON.parse(JSON.stringify(profile)), dt: DT, step: 0, t: 0,
+    v: 1, seed: seed >>> 0, profile: JSON.parse(JSON.stringify(profile)), dt, step: 0, t: 0,
     rng: {}, queue: [], ev: { seq: 0, ring: [] }, log: [], trend: [],
   };
   const pstream = streamState(state.seed, 'patient');
@@ -117,12 +118,12 @@ export function createSim({ seed = 1, profile = {}, systems = SYSTEMS, strict = 
   const ctx = makeCtx(state, state, systems, []);
   for (const sys of systems) if (sys.init) state[sys.name] = sys.init(state, ctx);
   const sim = new Sim(state, { systems, strict });
-  const n = Math.round(warmup / DT);
+  const n = Math.round(warmup / dt);
   if (n > 0) {
     sim.step(n);
     // the warm start is not part of the run: the clock, log and trend start at zero. Its last events are kept with
     // negative times (sequence numbers carry on), so the monitor has a full sweep of history at t = 0.
-    const off = n * DT, ev = sim.state.ev;
+    const off = n * dt, ev = sim.state.ev;
     const ring = ev.ring.map(e => ({ ...e, t: Math.round((e.t - off) * 1e9) / 1e9 }));
     sim.state = { ...sim.state, step: 0, t: 0, log: [], trend: [], ev: { seq: ev.seq, ring }, queue: [] };
     for (const sys of systems) if (sys.rebase) sim.state[sys.name] = sys.rebase(sim.state[sys.name], off);

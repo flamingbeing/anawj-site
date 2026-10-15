@@ -197,7 +197,9 @@ use the plain wash-in [V for the protocol].
   - **Movement:** the patient moves at stimulus onset if P(no response) < q, unless paralysed.
   - **Autonomic drive** `pd.auto` (0–1): a second surface needing about 1.6× the hypnotic Ce50 with the opioid
     relatively more potent (MAC-BAR is about 1.5–2 MAC; fentanyl 3 ng/mL cuts sevoflurane MAC-BAR by 83% but MAC by
-    61%) [V ratios, D form]. `cardio.js` turns it into sympathetic drive, calibrated in M2.1 so laryngoscopy at P_TOL
+    61%) [V ratios, D form]. Built in M2.1 as a graded response, auto = 1/(1 + U_a²) with the hypnotic terms × 1.6 and
+    the opioid C50 1.0 ng/mL (fentanyl 3 ng/mL: MAC-BAR −71% here), about 0.4 at every P_TOL 0.9 pair; a probability
+    (1 − P(no response)) was about 0.01 there and could not give the measured rise. Brief stimuli drive it for 60 s. `cardio.js` turns it into sympathetic drive, calibrated in M2.1 so laryngoscopy at P_TOL
     0.9 gives SBP +19 to +32 mmHg and HR +6 to +10 (van den Berg 2021) [V]; rise over 30–60 s, fade over 3–5 min for
     brief stimuli, held during surgery [D].
   - Light-anaesthesia signs in Examine: sweating and tears (two of Evans' PRST signs), pupils dilating with a noxious
@@ -240,6 +242,14 @@ Hybrid design (`research/cardio.md` section 1, prototyped in `research/prototype
   systemic (about 1590 with the pulmonary bed), systemic mean filling pressure 10.4, venous compartment 9.4 mmHg, Rvr =
   (Psv − CVP)/CO, systemic resistance 0.896 mmHg·s/mL; displayed SVR (MAP − CVP)/CO = 15.9 Wood units (1270
   dyn·s·cm⁻⁵; 1000–1200 dyn is 12.5–15 Wood units). Prototype: HR 72.0, SV 75.0, CO 5.40, 120/75, CVP 4.0, LAP 8.0.
+- **As built in M2.1:** `cardio.js` reads the beats `rhythm.js` placed in the previous step (0.1 s later) and does not
+  split the step at the beat: flows change at step boundaries, and volume is still conserved (flux transfer; drift under
+  1e-6 mL an hour, tested). The filling-time loss is (1 − exp(−(RR − 0.3 s)/0.08 s)), normalised to 1 at rest [D]. The
+  opioid adds vagal drive v + 1.0·E_R·(1 − v) with E_R = CeR_eq/(CeR_eq + 2) (HR 56–59 at remifentanil 4–8 with
+  propofol at P_TOL 0.9) and lowers SVR up to 7.5%; the stimulus adds 1.4 × `pd.auto` of sympathetic drive after the
+  reflex's blunting (laryngoscopy at P_TOL 0.9: SBP +19 to +31, HR +5 to +16, wider than van den Berg's +6 to +10 at
+  low opioid); propofol's haemodynamic C50 is 1.0/(1 + 0.02·(age − 40)) mcg/mL so the elderly fall further (75 y:
+  −18.8 vs −17.9 mmHg at 2 min) [D]. The critical closing pressure waits for VF (M2.7).
 - **Critical closing pressure** [D, not yet prototyped]: Q_sys = (Psa − max(Psv, Pcrit))/R with Pcrit about 20 mmHg
   engaging only at low flow, plus a small leak so pressures still equalise over minutes. A closing pressure changes
   where arterial pressure settles, not how fast: after VF starts it falls with τ ≈ R·C (about 1.4 s) towards Pcrit,

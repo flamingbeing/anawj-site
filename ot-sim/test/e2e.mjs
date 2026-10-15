@@ -117,11 +117,14 @@ try {
 
     // Drugs: a propofol bolus raises the plasma level at once and the effect site over the next minute and a half
     await page.click('#tab-drugs');
+    const map0 = await page.evaluate(() => otsim.state.cv.map);
     await page.click('[data-bolus="propofol"][data-dose="140"]');
     const cp0 = await page.evaluate(() => otsim.state.pk.d.propofol.a1 / otsim.state.pk.p.propofol.V1);
     assert.ok(cp0 > 20, `${name}: propofol Cp after 140 mg: ${cp0}`);
     await page.evaluate(() => otsim.step(900));
     assert.ok(await page.evaluate(() => otsim.state.pk.d.propofol.ce) > 4, `${name}: effect site rises`);
+    await page.evaluate(() => otsim.step(300));
+    assert.ok(await page.evaluate(m => otsim.state.cv.map < m - 5, map0), `${name}: blood pressure falls after propofol`);
     assert.match(await page.textContent('#given'), /Propofol 140 mg/);
     // the Patient tab: asleep after propofol; a stimulus shows in the events
     await page.click('#tab-pt');
@@ -166,6 +169,7 @@ try {
     assert.ok(rows.some(r => /^Remifentanil3\.0/.test(r)) && rows.some(r => /^Propofol––/.test(r)), `${name}: behind rows ${rows}`);
     assert.ok(rows.some(r => /^Twitch \(T1\)/.test(r)), `${name}: neuromuscular rows in Behind the monitor`);
     assert.ok(rows.some(r => /^To voice \(asleep\)/.test(r)), `${name}: depth rows in Behind the monitor`);
+    assert.ok(rows.some(r => /^Cardiac output/.test(r)), `${name}: circulation rows in Behind the monitor`);
     assert.equal(await page.evaluate(() => localStorage.getItem('otsim.behind')), '1');
 
     // no horizontal scroll; axe on the paused theatre
