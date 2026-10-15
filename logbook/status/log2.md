@@ -27,8 +27,8 @@ Agreed queue (one PR each, in order, once he says go):
    default: Patient ages, ASA mix, Elective vs emergency and GA vs regional (marked "estimated", with "from N of M
    cases"), Logging habits (how soon after the case, streak). Faculty / PCs: Year comparison (each year's median per
    target, residents well behind it highlighted), shown by default in their Analytics.
-6. **More page:** group 1 (hidden tabs, Account, Recent changes, Export / Import, Settings last); group 2 "Help and
-   admin" (Send feedback, Feedback, Admin portal) with its own heading; privacy and credits as plain matching fine print
+6. **More page:** group 1 (hidden tabs, Recover, Export / Import, Settings last); group 2 "Account and help" (Account,
+   Send feedback, Feedback, Admin portal; owner: Account moves here) with its own heading; privacy and credits as plain matching fine print
    (no cards) at the very bottom, after Install and Sign out, before the app version. Privacy text (owner agreed):
    "Privacy · Only you can read your cases (and the app owner, for the old Google Form import). Log initials only,
    never names or NRIC. Programme residents share counts per tag, never details. Sign out on shared devices."
