@@ -20,6 +20,13 @@ Agreed queue (one PR each, in order, once he says go):
 5. **Analytics Edit mode:** Edit at the top; cards fold to rows; drag handle (plus Move up / down) to reorder; eye to
    hide, a "Hidden cards" list to bring back; Reset layout; Done. Saved for the account. Cards a profile can't use
    aren't listed.
+5b. **More Analytics cards** (owner: build them all, show only the most important by default; the rest start hidden in
+   the Edit mode's "Hidden cards"). Shown by default: Finish line (per tag, the date your pace reaches its target vs
+   its due year), This posting / this month (cases, top tags, new tags, targets met), Reflection material (☆ cases by
+   the heading they'd fit, for headings still short), Milestones (firsts, round numbers, targets met, dated). Hidden by
+   default: Patient ages, ASA mix, Elective vs emergency and GA vs regional (marked "estimated", with "from N of M
+   cases"), Logging habits (how soon after the case, streak). Faculty / PCs: Year comparison (each year's median per
+   target, residents well behind it highlighted), shown by default in their Analytics.
 6. **More page:** group 1 (hidden tabs, Account, Recent changes, Export / Import, Settings last); group 2 "Help and
    admin" (Send feedback, Feedback, Admin portal) with its own heading; privacy and credits as plain matching fine print
    (no cards) at the very bottom, after Install and Sign out, before the app version. Privacy text (owner agreed):
