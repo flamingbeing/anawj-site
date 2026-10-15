@@ -11,7 +11,7 @@ const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: pr
 const errors = [];
 const txt = (p, sel) => p.$eval(sel, e => e.textContent.trim());
 try {
-  for (const [viewport, deviceScaleFactor] of [[{ width: 1100, height: 900 }, 1], [{ width: 390, height: 844 }, 2]]) {
+  for (const [viewport, deviceScaleFactor] of [[{ width: 1100, height: 900 }, 1], [{ width: 390, height: 844 }, 2]].filter(([v]) => !process.env.BIS_VIEW || (process.env.BIS_VIEW === 'phone') === (v.width === 390))) { // BIS_VIEW=phone or desktop runs one size (the Checks run each as its own job)
     const phone = viewport.width === 390;
     const page = await b.newPage({ viewport, deviceScaleFactor });
     page.on('pageerror', e => errors.push(e.message));
@@ -31,7 +31,7 @@ try {
     // the older, dimmed sweep does not shimmer at 15 mm/s: right of the cursor the trace stays the same from frame to frame
     { const d = await page.evaluate(async () => { const sp = SED.set.eegSpeed; SED.set.eegSpeed = 15; const cv = SED.cvE, N = 1474, raf = () => new Promise(r => requestAnimationFrame(r));
         const grab = () => { sedDrawEeg(); return { pos: SED.eg.n % N, d: cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data }; };
-        let a, b; for (let tries = 0; tries < 5; tries++) { await raf(); a = grab(); await raf(); await raf(); b = grab(); if (b.pos > a.pos && b.pos < N - 200) break; }
+        await raf(); let a = grab(), b = a; for (let tries = 0; tries < 120; tries++) { await raf(); b = grab(); if (b.pos > a.pos && b.pos < N - 200) break; if (b.pos < a.pos || b.pos >= N - 200) a = b; } // wait until the sweep has moved on (a slow machine can draw frames with no new samples)
         SED.set.eegSpeed = sp; const k = cv.width / 800, x0 = Math.round((50 + b.pos * 737 / N + 70) * k), x1 = Math.round(780 * k);
         if (b.pos === a.pos || x1 - x0 < 20) return -1; let n = 0, t = 0; for (let y = 0; y < cv.height; y++) for (let x = x0; x < x1; x++) { const j = (y * cv.width + x) * 4; t++; if (Math.abs(a.d[j] - b.d[j]) > 30) n++; } return n / t; });
       assert.ok(d >= 0 && d < 0.002, `dim EEG sweep is steady between frames (${(d * 100).toFixed(2)}% changed)`); }

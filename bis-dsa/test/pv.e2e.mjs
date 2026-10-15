@@ -8,7 +8,7 @@ const BASE = `http://localhost:${process.env.PORT || 8080}/bis-dsa/`;
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
 const errors = [];
 try {
-  for (const [viewport, deviceScaleFactor] of [[{ width: 1100, height: 900 }, 1], [{ width: 390, height: 844 }, 2]]) {
+  for (const [viewport, deviceScaleFactor] of [[{ width: 1100, height: 900 }, 1], [{ width: 390, height: 844 }, 2]].filter(([v]) => !process.env.BIS_VIEW || (process.env.BIS_VIEW === 'phone') === (v.width === 390))) { // BIS_VIEW=phone or desktop runs one size (the Checks run each as its own job)
     const phone = viewport.width === 390;
     const page = await b.newPage({ viewport, deviceScaleFactor });
     page.on('pageerror', e => errors.push(e.message));
