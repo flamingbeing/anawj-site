@@ -7,7 +7,8 @@ Last updated: 2026-10-13 by Claude Code, design session (branch `claude/inspirin
 
 ## Now
 
-- No session is working on `nuhsdesign/`. The design session is idle, nothing half-done.
+- Design session (branch `claude/inspiring-dijkstra-pctmrf`): the app kit (`app.css`, `app.js`, `app.html`), then moving
+  each NUHS-style app onto it, one PR per app (not the logbook). Progress: see Next.
 
 ## Waiting on the owner
 
@@ -18,7 +19,13 @@ Last updated: 2026-10-13 by Claude Code, design session (branch `claude/inspirin
 
 ## Next (agreed queue)
 
-- Nothing queued.
+Owner, 15 Oct 2026: a web-app design indistinguishable from a native app (from the logbook, the most polished), then
+every app using the NUHS style moves onto it, except the logbook. One PR per app, each with screenshots and preview links:
+
+1. App kit (`app.css`, `app.js`, `app.html`, README "App kit").
+2. Hand log, People, Evals, NUH roster, Prewarm (+ `prewarm/update.html`, `prewarm-update/`). Prewarm is vital (live
+   study data): full `tools/test-prewarm.sh`, preview links, coordinate with the prewarm webapp session, and never merge
+   while a case is being collected.
 
 ## Recently done
 
@@ -32,6 +39,8 @@ Last updated: 2026-10-13 by Claude Code, design session (branch `claude/inspirin
 
 ## Decisions log
 
+- 2026-10-15: Apps use the app kit: the phone's own font (brand from colour and the band), inset grouped lists, bottom
+  sheets, switches, translucent bars, light only until each app is checked in dark. The logbook keeps its own styles.
 - 2026-10-13: The design folder is `nuhsdesign/` (owner), so every subdomain can serve it. Changes to the design,
   `prewarm/` or `prewarm-update/` wait while a prewarming study case is being collected (they change what the
   phones load).

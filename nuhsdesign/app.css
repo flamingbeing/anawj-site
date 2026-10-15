@@ -1,0 +1,490 @@
+/*
+  NUHS-style app kit: makes an installed web app (PWA) look and feel like a native phone app.
+  Load it after tokens.css:  <link rel="stylesheet" href="../nuhsdesign/tokens.css">
+                             <link rel="stylesheet" href="../nuhsdesign/app.css">
+  then put class="a-app" on <body>. Optional behaviour (keyboard, sheets, screen transitions): app.js.
+  Guide and examples: README.md ("App kit") and app.html (open /nuhsdesign/app.html on a phone).
+
+  Built from the logbook (the most polished app) plus what makes native apps feel native: a translucent bar and tab
+  bar, large titles, inset grouped lists, bottom sheets, switches, press feedback instead of hover, safe areas and
+  no web-page habits (text selection on buttons, tap flash, double-tap zoom, pull-to-refresh).
+  Classes start with .a-; colours come from tokens.css (--n-*). Light by default; add data-theme="auto" on <html> to
+  follow the phone's dark mode (or "dark" to force it) once the app's own styles have been checked in dark.
+*/
+
+:root {
+  /* type: the phone's own font (SF Pro on iPhone, Roboto on Android) reads as native; brand comes from colour */
+  --a-font: system-ui, -apple-system, "Segoe UI", Roboto, "Open Sans", sans-serif;
+  --a-text: 17px;            /* iOS body size; inputs stay >= 16px so iPhones don't zoom on focus */
+  --a-text-sm: 15px;
+  --a-text-xs: 13px;
+  --a-title: 34px;           /* large title */
+
+  /* surfaces */
+  --a-bg: #f2f2f7;           /* grouped background (the grey behind lists) */
+  --a-surface: #ffffff;      /* cards, list rows, sheets */
+  --a-surface-2: #e9e9ef;    /* pressed row, segmented track, fields on white */
+  --a-bar: rgba(249, 249, 251, .82);   /* translucent app bar and tab bar */
+  --a-sep: rgba(60, 60, 67, .22);      /* hairline separators */
+  --a-ink: #111418;
+  --a-ink-2: #5d636b;        /* secondary text, 5.9:1 on white */
+  --a-ink-3: #767c84;        /* placeholders and captions, 4.6:1 on white */
+  --a-tint: var(--n-navy);   /* the app's accent: buttons, selected tab, links, switches */
+  --a-tint-ink: #ffffff;
+  --a-tint-soft: #e2ebf6;    /* tinted (secondary) buttons, selected chips */
+  --a-danger: #c4122f;
+  --a-ok: #1a7f37;
+  --a-warn: #8a5a00;
+  --a-warn-bg: #fff4d1;
+  --a-danger-bg: #fdecee;
+  --a-ok-bg: #e3f4e8;
+  --a-focus: var(--n-focus);
+  --a-backdrop: rgba(0, 0, 0, .38);
+
+  /* shape and size */
+  --a-r: 12px;               /* list groups, cards, buttons */
+  --a-r-lg: 16px;            /* sheets */
+  --a-row: 48px;             /* min row height (44px touch target + breathing room) */
+  --a-gutter: 16px;
+  --a-bar-h: 52px;
+  --a-tab-h: 56px;
+  --a-band: 3px;             /* the four-quarter NUHS band along the very top */
+  --a-safe-t: env(safe-area-inset-top, 0px);
+  --a-safe-b: env(safe-area-inset-bottom, 0px);
+  --a-safe-l: env(safe-area-inset-left, 0px);
+  --a-safe-r: env(safe-area-inset-right, 0px);
+  --a-ease: cubic-bezier(.2, .8, .2, 1);   /* native-like ease out */
+  --a-shadow: 0 8px 28px rgba(0, 0, 0, .14);
+  color-scheme: light;
+}
+
+/* dark mode: the phone's setting (data-theme="auto") or forced (data-theme="dark") */
+:root[data-theme="dark"] { color-scheme: dark; }
+@media (prefers-color-scheme: dark) { :root[data-theme="auto"] { color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --a-bg: #000000; --a-surface: #1c1c1e; --a-surface-2: #2c2c2e; --a-bar: rgba(22, 22, 24, .8);
+  --a-sep: rgba(84, 84, 88, .6); --a-ink: #f2f2f7; --a-ink-2: #aeaeb2; --a-ink-3: #8e8e93;
+  --a-tint: #5aa9ec; --a-tint-ink: #001b3d; --a-tint-soft: #12304f; --a-danger: #ff6b6b; --a-ok: #4cc26b;
+  --a-warn: #f2c14e; --a-warn-bg: #3a2f10; --a-danger-bg: #3b1418; --a-ok-bg: #12301b; --a-focus: #5aa9ec;
+  --a-backdrop: rgba(0, 0, 0, .6); --a-shadow: 0 8px 28px rgba(0, 0, 0, .5);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --a-bg: #000000; --a-surface: #1c1c1e; --a-surface-2: #2c2c2e; --a-bar: rgba(22, 22, 24, .8);
+    --a-sep: rgba(84, 84, 88, .6); --a-ink: #f2f2f7; --a-ink-2: #aeaeb2; --a-ink-3: #8e8e93;
+    --a-tint: #5aa9ec; --a-tint-ink: #001b3d; --a-tint-soft: #12304f; --a-danger: #ff6b6b; --a-ok: #4cc26b;
+    --a-warn: #f2c14e; --a-warn-bg: #3a2f10; --a-danger-bg: #3b1418; --a-ok-bg: #12301b; --a-focus: #5aa9ec;
+    --a-backdrop: rgba(0, 0, 0, .6); --a-shadow: 0 8px 28px rgba(0, 0, 0, .5);
+  }
+}
+
+/* ---------- the page behaves like an app, not a web page ---------- */
+
+.a-app {
+  margin: 0; min-height: 100vh; min-height: 100dvh;
+  background: var(--a-bg); color: var(--a-ink);
+  font: 400 var(--a-text)/1.35 var(--a-font); letter-spacing: -.01em;
+  -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;     /* no grey flash on tap */
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;                  /* no pull-to-refresh: a stray swipe would reload the app */
+  padding-left: var(--a-safe-l); padding-right: var(--a-safe-r);
+}
+html:has(> .a-app) { overscroll-behavior-y: none; background: var(--a-bg); }
+:where(.a-app) *, :where(.a-app) *::before, :where(.a-app) *::after { box-sizing: border-box; }
+/* resets use :where() so they never outrank the kit's own classes */
+:where(.a-app) :where(button, input, select, textarea) { font: inherit; color: inherit; letter-spacing: inherit; }
+/* controls: no double-tap zoom delay, no text selection or iOS callout on long press */
+:where(.a-app) :where(button, a, [role="button"], [role="tab"], label), .a-tabbar, .a-bar, .a-seg {
+  touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+:where(.a-app) img { -webkit-user-drag: none; }
+.a-app [hidden] { display: none !important; }
+:where(.a-app) :focus { outline: none; }
+:where(.a-app) :focus-visible { outline: 3px solid var(--a-focus); outline-offset: 2px; }
+:where(.a-app) a { color: var(--a-tint); text-decoration: none; }
+@media (hover: hover) { :where(.a-app) a:where(:not([class])):hover { text-decoration: underline; } }
+:where(.a-app) :where(h1, h2, h3) { margin: 0; color: var(--a-ink); letter-spacing: -.02em; }
+
+/* screen content: below the bar, above the tab bar, readable width on tablets and laptops */
+.a-main {
+  max-width: 720px; margin: 0 auto;
+  padding: 0 var(--a-gutter) calc(24px + var(--a-safe-b));
+}
+.a-app:has(.a-tabbar) .a-main { padding-bottom: calc(24px + var(--a-tab-h) + var(--a-safe-b)); }
+
+/* ---------- app bar ---------- */
+/* <header class="a-bar"><div class="a-band"><i></i><i></i><i></i><i></i></div>
+     <div class="a-bar-row"><button class="a-bar-btn">‹ Back</button><h1 class="a-bar-title">Title</h1>
+     <button class="a-bar-btn">Edit</button></div></header>
+   The small title fades in once the large title (.a-title) has scrolled away (app.js; static without it). */
+
+.a-bar {
+  position: sticky; top: 0; z-index: 40;
+  padding-top: var(--a-safe-t);
+  background: var(--a-bar);
+  -webkit-backdrop-filter: saturate(1.8) blur(20px); backdrop-filter: saturate(1.8) blur(20px);
+  border-bottom: .5px solid transparent;
+  transition: border-color .2s;
+}
+.a-bar.is-scrolled, .a-bar.a-bar--solid { border-bottom-color: var(--a-sep); }
+.a-band { display: grid; grid-template-columns: repeat(4, 1fr); height: var(--a-band); }
+.a-band > :nth-child(1) { background: var(--n-orange); }
+.a-band > :nth-child(2) { background: var(--n-red); }
+.a-band > :nth-child(3) { background: var(--n-stripe-blue); }
+.a-band > :nth-child(4) { background: var(--n-navy); }
+/* the band sits above the safe area on notched phones too: the bar's top padding is below it */
+.a-bar > .a-band:first-child { margin-top: calc(-1 * var(--a-safe-t)); margin-bottom: var(--a-safe-t); }
+.a-bar-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px;
+  min-height: var(--a-bar-h); padding: 0 8px; max-width: 980px; margin: 0 auto;
+}
+.a-bar-row > :first-child { justify-self: start; }
+.a-bar-row > :last-child { justify-self: end; }
+.a-bar-title {
+  grid-column: 2; font-size: var(--a-text); font-weight: 600; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw;
+  opacity: 1; transition: opacity .2s;
+}
+.a-bar[data-large] .a-bar-title { opacity: 0; }            /* large title showing: keep the small one hidden */
+.a-bar[data-large].is-scrolled .a-bar-title { opacity: 1; }
+.a-bar-btn {
+  display: inline-flex; align-items: center; gap: 2px; min-height: 44px; min-width: 44px; padding: 0 8px;
+  border: 0; background: none; color: var(--a-tint); font-size: var(--a-text); cursor: pointer; border-radius: 10px;
+}
+.a-bar-btn:active { opacity: .45; }
+.a-bar-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.a-bar-btn--strong { font-weight: 600; }
+
+/* large title at the top of a screen's content */
+.a-title { font-size: var(--a-title); font-weight: 700; line-height: 1.12; padding: 4px 4px 10px; letter-spacing: -.025em; }
+.a-subtitle { margin: -6px 4px 14px; color: var(--a-ink-2); font-size: var(--a-text-sm); }
+
+/* ---------- tab bar (bottom on phones, top under the bar on wide screens) ---------- */
+/* <nav class="a-tabbar" role="tablist"><button role="tab" aria-selected="true"><svg>…</svg><span>Home</span></button>…</nav> */
+
+.a-tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  display: flex; padding: 0 var(--a-safe-r) var(--a-safe-b) var(--a-safe-l);
+  background: var(--a-bar);
+  -webkit-backdrop-filter: saturate(1.8) blur(20px); backdrop-filter: saturate(1.8) blur(20px);
+  border-top: .5px solid var(--a-sep);
+}
+.a-tabbar > * {
+  flex: 1 1 0; min-width: 0; height: var(--a-tab-h); position: relative;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 0; background: none; padding: 6px 2px 4px; cursor: pointer;
+  color: var(--a-ink-3); font-size: 11px; font-weight: 500; letter-spacing: 0;
+}
+.a-tabbar > * > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.a-tabbar svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.a-tabbar [aria-selected="true"], .a-tabbar [aria-current="page"] { color: var(--a-tint); }
+.a-tabbar [aria-selected="true"] svg, .a-tabbar [aria-current="page"] svg { stroke-width: 2.2; }
+.a-tabbar > :active svg { transform: scale(.88); }
+.a-tabbar svg { transition: transform .15s var(--a-ease); }
+.a-tabbar .a-badge { position: absolute; top: 4px; left: calc(50% + 6px); }
+@media (min-width: 900px) {
+  /* tablets and laptops: tabs sit under the bar, as in iPad apps */
+  .a-tabbar {
+    position: sticky; top: calc(var(--a-safe-t) + var(--a-band) + var(--a-bar-h)); bottom: auto; justify-content: center;
+    gap: 4px; padding: 6px; border-top: 0; border-bottom: .5px solid var(--a-sep);
+  }
+  .a-tabbar > * { flex: 0 0 auto; flex-direction: row; height: 36px; padding: 0 14px; gap: 6px; border-radius: 10px; font-size: var(--a-text-sm); }
+  .a-tabbar svg { width: 20px; height: 20px; }
+  .a-tabbar [aria-selected="true"], .a-tabbar [aria-current="page"] { background: var(--a-tint-soft); }
+  .a-app:has(.a-tabbar) .a-main { padding-bottom: calc(24px + var(--a-safe-b)); }
+  .a-tabbar .a-badge { position: static; }
+}
+
+/* ---------- inset grouped lists (the iOS Settings look) ---------- */
+/* <p class="a-section">Header</p>
+   <ul class="a-list"><li><a class="a-row" href="…"><span class="a-row-icon">…</span>
+     <span class="a-row-text">Title<small>Detail</small></span><span class="a-row-value">Value</span>
+     <span class="a-chev"></span></a></li></ul>
+   <p class="a-footnote">Footer note</p> */
+
+.a-section {
+  margin: 22px 16px 7px; color: var(--a-ink-2); font-size: var(--a-text-xs); font-weight: 400;
+  text-transform: uppercase; letter-spacing: .02em;
+}
+.a-section:first-child { margin-top: 8px; }
+.a-section-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 22px 16px 7px; }
+.a-section-row .a-section { margin: 0; }
+.a-section-row a, .a-section-row button { font-size: var(--a-text-sm); text-transform: none; }
+.a-list {
+  list-style: none; margin: 0; padding: 0; overflow: hidden;
+  background: var(--a-surface); border-radius: var(--a-r);
+}
+.a-list > li { position: relative; }
+/* hairline between rows, inset from the left like native lists */
+.a-list > li + li::before {
+  content: ""; position: absolute; top: 0; right: 0; left: var(--a-sep-inset, 16px);
+  border-top: .5px solid var(--a-sep); pointer-events: none;
+}
+.a-list:has(.a-row-icon) { --a-sep-inset: 60px; }
+.a-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: var(--a-row);
+  padding: 10px 16px; border: 0; background: none; text-align: left; color: var(--a-ink);
+  font-size: var(--a-text); text-decoration: none !important;
+}
+a.a-row, button.a-row, label.a-row { cursor: pointer; }
+a.a-row:active, button.a-row:active, label.a-row:active { background: var(--a-surface-2); transition: none; }
+.a-row { transition: background .25s; }
+.a-row-icon {
+  flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px;
+  background: var(--a-tint); color: #fff;
+}
+.a-row-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.a-row-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.a-row-text small { color: var(--a-ink-2); font-size: var(--a-text-sm); line-height: 1.3; }
+.a-row-value { flex: none; max-width: 45%; color: var(--a-ink-2); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.a-chev { flex: none; width: 8px; height: 8px; margin-left: 2px; border: solid var(--a-ink-3); border-width: 2px 2px 0 0; transform: rotate(45deg); opacity: .7; }
+.a-row--danger { color: var(--a-danger); }
+.a-row--center { justify-content: center; color: var(--a-tint); }
+.a-footnote { margin: 7px 16px 0; color: var(--a-ink-2); font-size: var(--a-text-xs); line-height: 1.4; }
+
+/* card: a single grouped block with padding, for content that isn't a list */
+.a-card { background: var(--a-surface); border-radius: var(--a-r); padding: 16px; }
+.a-card + .a-card { margin-top: 12px; }
+.a-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.a-card p { margin: 6px 0; color: var(--a-ink-2); }
+
+/* ---------- buttons ---------- */
+/* .a-btn (filled), .a-btn--tinted (soft), .a-btn--plain (text), .a-btn--danger, .a-btn--block (full width), .a-btn--sm */
+
+.a-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 50px; padding: 0 20px; border: 0; border-radius: var(--a-r); cursor: pointer;
+  background: var(--a-tint); color: var(--a-tint-ink); font-size: var(--a-text); font-weight: 600;
+  text-decoration: none !important; white-space: nowrap;
+  transition: transform .12s var(--a-ease), opacity .12s;
+}
+.a-btn:active { transform: scale(.97); opacity: .85; }
+.a-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.a-btn--tinted { background: var(--a-tint-soft); color: var(--a-tint); }
+:root[data-theme="dark"] .a-btn--tinted { color: #cfe4ff; }
+.a-btn--plain { background: none; color: var(--a-tint); min-height: 44px; padding: 0 8px; font-weight: 500; }
+.a-btn--plain:active { transform: none; opacity: .45; }
+.a-btn--danger { background: var(--a-danger-bg); color: var(--a-danger); }
+.a-btn--block { display: flex; width: 100%; }
+.a-btn--sm { min-height: 36px; padding: 0 14px; font-size: var(--a-text-sm); border-radius: 18px; }
+.a-btn:disabled, .a-btn[aria-disabled="true"] { opacity: .4; transform: none; cursor: default; }
+.a-actions { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+.a-actions--row { flex-direction: row; }
+.a-actions--row > * { flex: 1 1 0; }
+
+/* floating action button: the one main action on a screen, bottom right above the tab bar */
+.a-fab {
+  position: fixed; z-index: 35; right: calc(16px + var(--a-safe-r));
+  bottom: calc(16px + var(--a-safe-b)); width: 56px; height: 56px; border-radius: 28px; border: 0;
+  display: grid; place-items: center; background: var(--a-tint); color: var(--a-tint-ink); box-shadow: var(--a-shadow);
+  transition: transform .12s var(--a-ease);
+}
+.a-app:has(.a-tabbar) .a-fab { bottom: calc(16px + var(--a-tab-h) + var(--a-safe-b)); }
+.a-fab:active { transform: scale(.92); }
+.a-fab svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+
+/* ---------- controls ---------- */
+
+/* segmented control: <div class="a-seg" role="tablist"><button role="tab" aria-selected="true">Day</button>…</div> */
+.a-seg { display: flex; padding: 2px; gap: 2px; border-radius: 9px; background: var(--a-surface-2); }
+.a-seg > * {
+  flex: 1 1 0; min-height: 32px; padding: 0 10px; border: 0; border-radius: 7px; background: none; cursor: pointer;
+  font-size: var(--a-text-sm); font-weight: 500; color: var(--a-ink); white-space: nowrap;
+}
+.a-seg [aria-selected="true"], .a-seg [aria-pressed="true"], .a-seg :checked + span {
+  background: var(--a-surface); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .12), 0 0 0 .5px rgba(0, 0, 0, .04);
+}
+:root[data-theme="dark"] .a-seg [aria-selected="true"], :root[data-theme="dark"] .a-seg [aria-pressed="true"] { background: #636366; }
+
+/* switch: <input type="checkbox" class="a-switch" role="switch"> */
+.a-switch {
+  -webkit-appearance: none; appearance: none; flex: none; position: relative; margin: 0; cursor: pointer;
+  width: 51px; height: 31px; border-radius: 16px; background: var(--a-surface-2);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .06); transition: background .2s;
+}
+.a-switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, .2); transition: transform .25s var(--a-ease);
+}
+.a-switch:checked { background: var(--a-ok); }
+.a-switch:checked::after { transform: translateX(20px); }
+.a-switch:disabled { opacity: .45; }
+
+/* checkmark rows (pick one or several from a list): <label class="a-row"><span class="a-row-text">…</span>
+   <input type="radio" class="a-check" name="x"></label> */
+.a-check { -webkit-appearance: none; appearance: none; flex: none; margin: 0; width: 22px; height: 22px; cursor: pointer; position: relative; }
+.a-check:checked::after {
+  content: ""; position: absolute; left: 7px; top: 2px; width: 7px; height: 13px;
+  border: solid var(--a-tint); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg);
+}
+
+/* fields: inside a list row (label left, input right) or on their own */
+.a-field {
+  width: 100%; min-height: 44px; padding: 10px 12px; border: 0; border-radius: 10px;
+  background: var(--a-surface); color: var(--a-ink); font-size: max(16px, var(--a-text)); /* >= 16px: no iOS zoom */
+  -webkit-appearance: none; appearance: none;
+}
+.a-card .a-field { background: var(--a-surface-2); }
+.a-field::placeholder { color: var(--a-ink-3); }
+.a-field:focus-visible { outline: 2px solid var(--a-tint); outline-offset: 0; }
+textarea.a-field { min-height: 96px; resize: vertical; line-height: 1.4; }
+select.a-field { padding-right: 32px; background-image: linear-gradient(45deg, transparent 50%, var(--a-ink-3) 50%), linear-gradient(-45deg, transparent 50%, var(--a-ink-3) 50%); background-position: right 16px top 50%, right 11px top 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+.a-row .a-field { background: none; padding: 0; min-height: 0; text-align: right; border-radius: 0; flex: 1 1 50%; }
+.a-row .a-field:focus-visible { outline: none; }
+.a-row:has(.a-field:focus-visible) { box-shadow: inset 3px 0 0 var(--a-tint); }
+.a-search { position: relative; }
+.a-search .a-field { padding-left: 36px; }
+.a-search::before {
+  content: ""; position: absolute; left: 13px; top: 50%; width: 12px; height: 12px; margin-top: -8px;
+  border: 2px solid var(--a-ink-3); border-radius: 50%; pointer-events: none;
+}
+.a-search::after {
+  content: ""; position: absolute; left: 24px; top: 50%; width: 6px; height: 2px; margin-top: 4px;
+  background: var(--a-ink-3); transform: rotate(45deg); pointer-events: none;
+}
+
+/* chips: filters and quick picks. <button class="a-chip" aria-pressed="true">Cardiac</button> */
+.a-chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 8px; scrollbar-width: none; scroll-snap-type: x proximity; }
+.a-chips::-webkit-scrollbar { display: none; }
+.a-chip {
+  flex: none; scroll-snap-align: start; min-height: 34px; padding: 0 14px; border: 0; border-radius: 17px; cursor: pointer;
+  background: var(--a-surface); color: var(--a-ink); font-size: var(--a-text-sm); font-weight: 500;
+  box-shadow: inset 0 0 0 .5px var(--a-sep);
+}
+.a-chip[aria-pressed="true"], .a-chip[aria-selected="true"] { background: var(--a-tint); color: var(--a-tint-ink); box-shadow: none; }
+.a-chip:active { opacity: .7; }
+
+/* badges and status pills */
+.a-badge {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--n-red); color: #fff; font-size: 12px; font-weight: 600; line-height: 1;
+}
+.a-pill { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: var(--a-text-xs); font-weight: 600; background: var(--a-surface-2); color: var(--a-ink-2); }
+.a-pill--ok { background: var(--a-ok-bg); color: var(--a-ok); }
+.a-pill--warn { background: var(--a-warn-bg); color: var(--a-warn); }
+.a-pill--danger { background: var(--a-danger-bg); color: var(--a-danger); }
+.a-pill--tint { background: var(--a-tint-soft); color: var(--a-tint); }
+
+/* avatar with initials */
+.a-avatar { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--a-tint-soft); color: var(--a-tint); font-weight: 600; font-size: 15px; }
+
+/* banner: a message across the top of a screen's content (demo mode, offline, update ready) */
+.a-banner { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--a-r); background: var(--a-tint-soft); color: var(--a-ink); font-size: var(--a-text-sm); margin: 8px 0 12px; }
+.a-banner > :first-child { flex: 1 1 auto; }
+.a-banner--warn { background: var(--a-warn-bg); }
+.a-banner--danger { background: var(--a-danger-bg); }
+
+/* empty state */
+.a-empty { text-align: center; padding: 48px 24px; color: var(--a-ink-2); }
+.a-empty svg { width: 56px; height: 56px; fill: none; stroke: var(--a-ink-3); stroke-width: 1.5; margin-bottom: 12px; }
+.a-empty h2 { font-size: 22px; font-weight: 700; color: var(--a-ink); margin-bottom: 6px; }
+.a-empty .a-btn { margin-top: 18px; }
+
+/* ---------- bottom sheets and alerts ---------- */
+/* <dialog class="a-sheet"><div class="a-sheet-head"><button class="a-bar-btn" value="cancel">Cancel</button>
+     <h2>Title</h2><button class="a-bar-btn a-bar-btn--strong">Done</button></div> …content… </dialog>
+   app.js: aSheet.open(el) / close, drag the grabber down (or tap outside) to close, Escape closes. */
+
+.a-sheet {
+  box-sizing: border-box; margin: auto 0 0; width: 100%; max-width: 100%; max-height: calc(100dvh - var(--a-safe-t) - 12px);
+  padding: 0 0 calc(16px + var(--a-safe-b)); border: 0; border-radius: var(--a-r-lg) var(--a-r-lg) 0 0;
+  background: var(--a-bg); color: var(--a-ink); overflow: auto; overscroll-behavior: contain;
+  box-shadow: var(--a-shadow);
+}
+.a-sheet[open] { animation: a-sheet-in .38s var(--a-ease); }
+.a-sheet.is-closing { animation: a-sheet-out .24s ease-in forwards; }
+.a-sheet::backdrop { background: var(--a-backdrop); animation: a-fade-in .3s; }
+.a-sheet.is-closing::backdrop { animation: a-fade-out .24s forwards; }
+.a-sheet::before {    /* grabber */
+  content: ""; display: block; width: 36px; height: 5px; margin: 6px auto 0; border-radius: 3px; background: var(--a-sep);
+}
+/* keyboard open (app.js sets --a-kb): the sheet sits above it and shrinks to fit */
+.a-sheet { margin-bottom: var(--a-kb, 0px); max-height: calc(100dvh - var(--a-kb, 0px) - var(--a-safe-t) - 12px); }
+.a-sheet-head {
+  position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center; padding: 2px 8px; background: var(--a-bg);
+}
+.a-sheet-head > :first-child { justify-self: start; }
+.a-sheet-head > :last-child { justify-self: end; }
+.a-sheet-head h2 { grid-column: 2; font-size: var(--a-text); font-weight: 600; text-align: center; }
+.a-sheet-body { padding: 8px var(--a-gutter) 0; }
+.a-sheet--full { height: calc(100dvh - var(--a-safe-t) - 12px); }
+@media (min-width: 700px) {
+  /* tablets and laptops: a centred card */
+  .a-sheet { margin: auto; width: min(560px, calc(100vw - 48px)); max-height: min(760px, calc(100dvh - 48px)); border-radius: var(--a-r-lg); padding-bottom: 16px; }
+  .a-sheet::before { display: none; }
+  .a-sheet[open] { animation: a-pop-in .28s var(--a-ease); }
+  .a-sheet--full { height: auto; }
+}
+
+/* alert: a short question with two or three answers, centred like a native alert */
+.a-alert {
+  box-sizing: border-box; width: min(290px, calc(100vw - 48px)); padding: 0; border: 0; border-radius: 14px;
+  background: var(--a-surface); color: var(--a-ink); text-align: center; overflow: hidden;
+}
+.a-alert[open] { animation: a-pop-in .22s var(--a-ease); }
+.a-alert::backdrop { background: var(--a-backdrop); }
+.a-alert h2 { font-size: var(--a-text); font-weight: 600; margin: 20px 16px 4px; }
+.a-alert p { margin: 0 16px 18px; font-size: var(--a-text-xs); color: var(--a-ink-2); line-height: 1.4; }
+.a-alert-actions { display: flex; border-top: .5px solid var(--a-sep); }
+.a-alert-actions > * { flex: 1 1 0; min-height: 46px; border: 0; background: none; color: var(--a-tint); font-size: var(--a-text); cursor: pointer; }
+.a-alert-actions > * + * { border-left: .5px solid var(--a-sep); }
+.a-alert-actions > :active { background: var(--a-surface-2); }
+.a-alert-actions .is-default { font-weight: 600; }
+.a-alert-actions .is-danger { color: var(--a-danger); }
+
+/* toast: a short confirmation above the tab bar. app.js: aToast('Saved', { action: 'Undo', onAction }) */
+.a-toast {
+  position: fixed; z-index: 60; left: 50%; bottom: calc(16px + var(--a-safe-b));
+  display: flex; align-items: center; gap: 12px; max-width: min(440px, calc(100vw - 32px));
+  padding: 12px 16px; border-radius: 14px; background: rgba(30, 32, 36, .94); color: #fff;
+  font-size: var(--a-text-sm); box-shadow: var(--a-shadow);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  transform: translate(-50%, 24px); opacity: 0; pointer-events: none;
+  transition: transform .3s var(--a-ease), opacity .2s;
+}
+.a-app:has(.a-tabbar) .a-toast { bottom: calc(12px + var(--a-tab-h) + var(--a-safe-b)); }
+.a-toast.is-shown { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+.a-toast button { border: 0; background: none; color: #8cc4ff; font-weight: 600; padding: 4px; min-height: 32px; cursor: pointer; }
+
+/* ---------- motion ---------- */
+
+@keyframes a-sheet-in { from { transform: translateY(100%); } }
+@keyframes a-sheet-out { to { transform: translateY(100%); } }
+@keyframes a-pop-in { from { transform: scale(1.08); opacity: 0; } }
+@keyframes a-fade-in { from { opacity: 0; } }
+@keyframes a-fade-out { to { opacity: 0; } }
+
+/* screen changes (app.js aGo(), or pages linked to each other): the new screen slides in from the right,
+   going back slides the other way, as in a native navigation stack */
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .32s; animation-timing-function: var(--a-ease); }
+:root.a-nav-push::view-transition-old(root) { animation-name: a-out-left; }
+:root.a-nav-push::view-transition-new(root) { animation-name: a-in-right; }
+:root.a-nav-pop::view-transition-old(root) { animation-name: a-out-right; }
+:root.a-nav-pop::view-transition-new(root) { animation-name: a-in-left; }
+@keyframes a-in-right { from { transform: translateX(100%); } }
+@keyframes a-out-left { to { transform: translateX(-30%); opacity: .6; } }
+@keyframes a-in-left { from { transform: translateX(-30%); opacity: .6; } }
+@keyframes a-out-right { to { transform: translateX(100%); } }
+/* the bar and tab bar stay put while screens slide */
+.a-bar { view-transition-name: a-bar; }
+.a-tabbar { view-transition-name: a-tabbar; }
+
+@media (prefers-reduced-motion: reduce) {
+  .a-app *, .a-app *::before, .a-app *::after, .a-app ::backdrop { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+
+/* installed (standalone) only: what a browser tab needs but an app doesn't */
+@media (display-mode: standalone) { .a-browser-only { display: none !important; } }
+@media not (display-mode: standalone) { .a-app-only { display: none !important; } }
+
+/* helpers */
+.a-muted { color: var(--a-ink-2); }
+.a-small { font-size: var(--a-text-sm); }
+.a-stack > * + * { margin-top: 12px; }
+.a-hstack { display: flex; align-items: center; gap: 8px; }
+.a-grow { flex: 1 1 auto; min-width: 0; }
+.a-sr { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
