@@ -86,7 +86,7 @@ try { for (const width of [390, 1280]) {
   assert.doesNotMatch(await p.locator('#toast').innerText(), /now \d+\/\d+/);
   // Analytics (in More): cases per tag (your own tags too), no year
   await goHash('progress');
-  await p.locator('.an-sec summary', { hasText: 'Tags' }).click();
+  await p.locator('.an-sec summary', { has: p.locator('.an-t', { hasText: /^Tags$/ }) }).click();
   await p.locator('.an-list li', { hasText: 'Lower Segment Caesarean Section' }).first().waitFor();
   assert.equal(await p.locator('.legend.tally').count(), 0);
   assert.equal(await p.getByText('Compare with your intake').count(), 0);
@@ -179,7 +179,8 @@ try { for (const width of [390, 1280]) {
   await goHash('log'); await goHash('showhide');
   await p.locator('.profile-now', { hasText: 'Now: Custom (based on Basic)' }).waitFor();
   assert.equal(await group('extras').getByRole('switch', { name: 'The Logbook grid view' }).isChecked(), true);
-  assert.equal(await group('extras').getByRole('switch', { name: /^Analytics trends/ }).isChecked(), false);
+  assert.equal(await group('extras').getByRole('switch', { name: /^Analytics trends/ }).isChecked(), true, 'full Analytics in every profile');
+  assert.equal(await group('extras').getByRole('switch', { name: 'Figures and references in reflections' }).isChecked(), false);
   assert.equal(await group('case').getByRole('switch', { name: /^Quick picks/ }).isChecked(), true);
   assert.equal(await group('case').getByRole('switch', { name: 'Suggested tags as you type' }).isChecked(), true, 'an older quick turns both halves on');
   assert.equal(await group('case').getByRole('switch', { name: 'Plan for later' }).isChecked(), false);

@@ -78,9 +78,8 @@ try { for (const width of [390, 1280]) {
   assert.equal(await p.locator('main .seg button').filter({ hasText: /^Grid$/ }).count(), 0);
   await p.evaluate(() => { location.hash = '#progress'; });
   await p.locator('.an-sec').first().waitFor();
-  assert.equal(await p.locator('.an-sec summary').filter({ hasText: /Trends|Gone quiet|Reflection to-dos/ }).count(), 0);
-  assert.equal(await p.locator('a.an-link').count(), 0);
-  assert.ok(!/at your pace/.test(await p.locator('main').innerText()));
+  // full Analytics in every profile, Basic too (owner, 15 Oct 2026)
+  await p.locator('.an-sec summary').filter({ hasText: 'Trends' }).waitFor();
   await p.evaluate(async () => { const { reflectOnCase } = await import('./js/ui-reflect.js'); await reflectOnCase({ id: 'fake-basic', date: '2026-10-10', initials: 'ZZ', details: 'Fake basic case', cats: ['13'] }); });
   await p.waitForSelector('.refl-editor');
   assert.equal(await p.locator('.refl-editor summary').filter({ hasText: /Figures|References/ }).count(), 0);

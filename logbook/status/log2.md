@@ -36,12 +36,12 @@ Agreed queue (one PR each, in order, once he says go):
    dark and high-contrast themes (a11y.mjs).
 3. **Built (Reset PR).** **Reset all settings** at the bottom of Settings: This device / My account too (tag list kept unless ticked); never
    cases, reflections, notes or drafts; asks, offers a settings-file backup, Undo.
-4. **Full Analytics for every profile:** the `analytics` switch on by default everywhere. Exceptions kept (owner):
+4. **Built (Analytics PR).** **Full Analytics for every profile:** the `analytics` switch on by default everywhere. Exceptions kept (owner):
    Personal stays without the APMES parts; Basic: logbook only stays without the Reflections card.
-5. **Analytics Edit mode:** Edit at the top; cards fold to rows; drag handle (plus Move up / down) to reorder; eye to
+5. **Built (Analytics Edit PR; 5b new cards next).** **Analytics Edit mode:** Edit at the top; cards fold to rows; drag handle (plus Move up / down) to reorder; eye to
    hide, a "Hidden cards" list to bring back; Reset layout; Done. Saved for the account. Cards a profile can't use
    aren't listed.
-5b. **More Analytics cards** (owner: build them all, show only the most important by default; the rest start hidden in
+5b. **Built (Analytics cards PR; Faculty Year comparison still to do).** **More Analytics cards** (owner: build them all, show only the most important by default; the rest start hidden in
    the Edit mode's "Hidden cards"). Shown by default: Finish line (per tag, the date your pace reaches its target vs
    its due year), This posting / this month (cases, top tags, new tags, targets met), Reflection material (☆ cases by
    the heading they'd fit, for headings still short), Milestones (firsts, round numbers, targets met, dated). Hidden by
