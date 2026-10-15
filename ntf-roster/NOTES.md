@@ -131,9 +131,7 @@ new rule of an existing type, made in the app). The comment block at the top of 
 1. **Name it.** Pick a short camelCase type key (e.g. `minGap`) and the plain-English label the builder shows.
 2. **Add one entry to `RULE_TYPES` in `js/rules.js`**, next to a similar type to copy from (`maxRun` is a short
    person-scoped example; `cover` a day-scoped one; `spread` a global one):
-   - `label`, `icon` (an emoji; the app doesn't show it, see Design), `help`, `example`: the words on the "Add rule"
-     picker. Add the type's line icon to `ICON_PATHS` in `js/ui-rules.js` (24 px line style; without one it gets the
-     generic rule icon).
+   - `label`, `icon` (an emoji), `help`, `example`: the words on the "Add rule" picker.
    - `params`: the form, as a list of ParamSpecs (`{ key, label, kind, options?, min?, max?, optional?, help? }`
      with kind `codes`, `code`, `number`, `select`, `who` or `bool`; the `P.codes`, `P.num` and `P.sel` helpers make
      the common ones). The rule builder (`js/ui-rules.js`) draws its form from this list, so no UI code
@@ -169,10 +167,7 @@ post call. Deterministic for a seed: the search length is a budget of tries (500
 100,000, from a cool start, T0 1), and it ends early once it has converged (no must-fix problems left and nothing
 better in the last 60% of the budget); the time option (3, 6 or 15 s) is only an upper bound for a slow phone. Tuned on
 four practice departments (Oct 2026): the same quality as the first version's 1,500 tries per slot from T0 25, in a
-third of the tries. A tight department (the hard rules can only just be met) may still have must-fix problems when
-that budget runs out: then the search carries on, hot again (T0 25, like the first version), up to 1,500 tries per
-slot (at most 300,000) or the time option. On 60 runs of cut-down practice departments that brings the must-fix total
-back to the first version's (162; 176 with the short budget alone), still about 2.5x faster. On the practice department, November's 82 must-fix problems go to 0 in about 0.6 s on a laptop.
+third of the tries. On the practice department, November's 82 must-fix problems go to 0 in about 0.6 s on a laptop.
 The dialog shows the first draft's counts at once. The preview shows shifts added and removed, must-fix and soft counts
 before and after, and anything unfilled; Apply is one undo step.
 
@@ -186,47 +181,26 @@ The owner found the first version slow on a phone. What keeps it quick, and what
   `<style>`, the toolbar selects and the paint bar are rewritten only when they change (rewriting a `<style>`
   restyles every element on the page). The cell editor is built once and updated in place.
 - **Full redraws are progressive** (another month, back from another tab, a filter, Auto-fill or an import changing
-  most rows): the rows in the grid's window go in first, then the rest over the next frames (the first of them a frame
-  later, so the frame that shows the month is painted first); rows above the window wait in a spacer (`tr.r-spacer`)
-  sized from the last drawing (or `rowHeights()`), and the scroll position is corrected when they arrive. The
-  remembered cell (`app.selectedCell`) is drawn in that first window: `renderGrid({ focus: staffId })` starts the
-  window at that person's row and scrolls there, so going back to a month or to the Roster tab with a cell low in the
-  list doesn't draw every row at once. Code that needs a row that may not be drawn yet calls `flushRows()` (keyboard
-  moves and paint do; `selBtn()` does as a last resort). The scroller keeps its position through a redraw: it is set
-  only when it has to move (setting it lays the grid out). The first screen after the app starts is drawn whole.
+  most rows): the rows in the grid's window go in first, then the rest over the next frames; rows above the window
+  wait in a spacer (`tr.r-spacer`) sized from the last drawing, and the scroll position is corrected when they arrive.
+  Code that needs a row that may not be drawn yet calls `flushRows()` (`selBtn()`, keyboard moves and paint already
+  do). The first screen after the app starts is drawn whole.
 - **The rule check** (`evaluate`, about 5 ms a month on a laptop) rules out most person-days with one bit test per
   code list (`compileCodes`) and lists each person's request days once (`requests` rules), which also made Auto-fill's
   search about twice as fast with identical results.
 - **Start-up**: the first screen's modules are fetched side by side; weekdays and the duty map are memoised in
-  `model.js`. The fonts are self-hosted with `font-display: swap` (Design), so nothing waits on Google Fonts.
-- **Sheets over the grid open non-modal** (`sheet()` in `app.js`: `is-nonmodal`, its own `.sheet-scrim` and Tab loop;
-  same look and behaviour). A modal `<dialog>` makes everything behind it inert, and the browser then restyles every
-  element on the page: with the grid's ~5,000 elements that was about 0.25 s to open the cell editor and again to
-  close it on a slowed phone. Other screens keep the kit's modal sheet.
-- **No colour fade on the cell editor's code tiles**: a 150 ms background fade repainted the open sheet for several
-  frames after each tap (about 100 ms of paint on a slowed phone); on and off now switch at once (the press scale stays).
-- **No `:has()` on an ancestor of the grid.** `body:has(.roster…)` made every row or cell the grid added restyle all
-  the page's spans (Chrome re-checks a `:has()` anchor on each change inside it). The roster sets `body.roster-grid`
-  instead. `:has()` on small parts (toolbar selects, segmented controls) is fine.
+  `model.js`. The Google Fonts stylesheet in `index.html` is render-blocking (it held the first paint by ~0.4 s on a
+  slow connection in testing): self-hosted fonts with `font-display: swap`, or a non-blocking link, remove that.
 - **Guard**: `node ntf-roster/test/perf.e2e.mjs` (Playwright, phone size, CPU 4x slower) times tap a cell → editor,
-  tap a code → grid, and switch month, against budgets of about 2x the Oct 2026 numbers. In the Checks workflow,
-  where it fails only if a second run is over budget too (timings vary with the machine).
-- Measured in Chromium at 390 px with the CPU 4x slower (medians of interleaved runs, first version → speed work and
-  NTF design merged): switch month 0.76 s → 0.39 s until the new month shows (about 1 s until every row is in, as
-  before); tab to Roster 0.71 s → 0.46 s; tap a cell → editor 0.22 s → 0.17 s; tap a code → grid 0.40 s → 0.31 s;
-  paint 3 cells 1.08 s → 0.78 s; rule builder live check 0.17 s → 0.07 s; Auto-fill to the preview 3.2 s → 0.95 s
-  (laptop 3.0 s → 0.77 s). On a laptop: switch month 132 → 89 ms, tab to Roster 136 → 82 ms, tap a code 60 → 35 ms.
-  The kit's richer screens cost a little: tabs other than Roster open 40 to 80 ms later on the slowed phone (0.08 to
-  0.17 s before; 0.12 to 0.23 s now).
-- After the second review (same harness, phone, medians, merged speed and design → these fixes): switch month 469 →
-  384 ms until it shows; back to a month whose remembered cell is far down 606–874 → 226–291 ms (8 rows first, not
-  all 74); tap a code 224 → 196 ms; paint one cell 257 → 207 ms; Apply Auto-fill 459 → 374 ms; first Roster screen
-  1.09 → 0.98 s. Taps still spend most of their time in the browser's own painting of the ~5,000-element grid (the
-  app's code is about 60 ms of a 200 ms tap).
+  tap a code → grid, and switch month, against budgets of about 2x the Oct 2026 numbers. Not in the Checks workflow.
+- Measured in Chromium at 390 px with the CPU 4x slower (medians, before → after): switch month 0.75 s → 0.32 s
+  until the new month shows (about 0.8 s until every row is in, as before); tab to Roster 0.83 s → 0.35 s; tap a code
+  → grid 0.35 s → 0.26 s; rule builder live check 0.16 s → 0.07 s; Auto-fill to the preview 3.4 s → 1.1 s (laptop
+  2.8 s → 0.7 s). On a laptop: switch month 150 → 70 ms, tab to Roster 150 → 67 ms, tap a code 66 → 43 ms.
 
 ## Screens
 
-Roster (the grid: cell editor as a popover with a mouse and a bottom sheet on touch screens, paint mode for leave blocks,
+Roster (the grid: cell editor as a popover on laptops and a bottom sheet on phones, paint mode for leave blocks,
 keyboard entry, person view, coverage rows, fairness counts), Day (phone default: who is on what, away, requests,
 notes, problems), People (staff, groups, tags, duty codes), Rules (list, schema-driven builder with a live check,
 templates, rules log, rules JSON), Check (problems by rule, fairness, coverage), More (Excel import with a review,
@@ -235,60 +209,6 @@ Excel/PDF/CSV/ICS export, backup and restore, settings and public holidays, team
 Hash routes (the month comes from `m`, else from `d`; changing month writes `m` into the link):
 `#roster?m=2026-11&p=<staffId>`, `#day?d=2026-11-03`, `#people?s=staff|groups|tags|codes`,
 `#rules?edit=<ruleId>|new`, `#check?rule=<ruleId>&v=fairness|coverage`, `#more`.
-
-## Design (owner, 15 Oct 2026)
-
-The owner asked for "the new NTF design language for webapps": the app follows anantf-site `DESIGN-APP.md` (the NTF
-Anaesthesia app language, the phone version of its `DESIGN.md`). The NUHS look (`nuhsdesign/tokens.css`, Open Sans,
-navy, the four-colour band) is **not** used in this app; the rest of anawj.com keeps it.
-
-- **The kit is vendored**: `css/app.css` is a copy of anantf-site `assets/app/app.css` (15 Oct 2026; only its font URLs
-  changed). Keep it in step: when the kit changes there, copy it again and change nothing else in it. This app's own
-  CSS is `style.css` (shell, roster grid, cell editor, person month, day, Auto-fill, More) and `css/rules.css` (Rules,
-  People, Check), on the kit's `--app-*` tokens only. Markup uses the kit's classes (`app-row`, `app-btn`, `app-chip`,
-  `app-segmented`, `app-switch`, `app-sheet`, `app-badge`, `app-empty`…); add CSS only for content the kit has no part for.
-- **Fonts** in `fonts/` (Inter, Fraunces, JetBrains Mono; SIL OFL 1.1, `fonts/LICENSE.md`). The subdomain can only
-  reach `ntf-roster/`, so nothing loads from anantf.com or Google Fonts; `sw.js` caches them with the shell. The kit's
-  Fraunces italic isn't copied (nothing uses it).
-- **Shell**: the kit's top bar (the practice badge on the left opens Reset / Leave; undo and redo on the right), a
-  large title per screen that collapses into the bar, with the month and the screen's one primary action beside it
-  (`#screenhead`: Auto-fill on Roster, Day and Check), the tab bar (five tabs: at the bottom, a left rail from 1024 px;
-  People sits under More at every size, the kit's five-tab limit), sheets as `<dialog>` (grabber, head, body, foot;
-  Back, Esc, a tap outside or a drag down closes them; over the roster grid they open non-modal, see Speed), the kit's
-  toasts with Undo (a warning is the same ink toast with a warning sign), skeleton rows while a screen loads.
-- **Screen head on phones** (second design review): one row, the large title, the month (tap it for today; phones
-  have no Today button) and Auto-fill as an icon. On the roster grid the month moves into the always-solid top bar
-  (`.bar-month`, `renderHeader()` in `app.js`), the large title is for screen readers only and Auto-fill leads the chip
-  row (`.r-af`), so the grid starts about 100 px higher (the page never scrolls there, so a large title could never
-  collapse). Under 360 px the practice badge gives the month its room on that screen.
-- **Pushed screens have a back button in the bar** (`#back`): one person's month ("‹ Roster", the person's name as the
-  large title, no Auto-fill; the person arrows carry the neighbours' names) and People ("‹ More"). Views set this with
-  `app.setHead({ title, back, noAutofill })` (null for the tab's own head); on phones the back button takes the
-  practice badge's place.
-- **Sheets**: one way to close a read-only sheet (the X: Key, Keyboard shortcuts, Rules log); the cell editor saves as
-  you go, so its head has "Done" (`sheet({ closeLabel })`) and no footer. The cell editor is a sheet on phones and any
-  touch screen (`pointer: coarse`), the floating panel only with a mouse. Rule rows have no buttons: tap the row to
-  open the rule; Delete (red) and Copy are in the rule's footer, the switch has a 44 px tap area. A new rule opens with
-  a neutral hint; errors show after the first change or on Add rule, under the field (`.app-field-error`,
-  `aria-invalid` on inputs, `aria-describedby` on code lists).
-- **Targets**: grid rows are 44 px on touch screens (`max-width: 720px` or `pointer: coarse`; days stay 38 px wide);
-  paint codes, picked-person pills and the laptop code tiles are drawn 36 px inside 44 px targets; names in the code
-  tiles and the rule builder's chips wrap (never cut off). The selected day on Day is blush with a wine edge (the kit's
-  selected), not a wine fill; the grid's keyboard-position box shows only with a mouse.
-- **Light only**; wine `#633d3c` is the one interface accent; no blue, teal or purple interface colours (nor in the
-  default duty colours); public holidays on the kit's warm tone (`--app-warn-bg`); no emoji
-  (rule types and templates show line icons from `ICON_PATHS` in `ui-rules.js`). One primary button per screen;
-  inputs at least 16 px (no iOS zoom); nothing under 12 px; targets at least 44 px.
-- **Dense data stays dense**: the roster grid and Check's tables use 12 px Inter with tabular figures (counts in
-  JetBrains Mono), hairline rules, weekends on inset, public holidays on the banner tone with a wine dot, today in
-  blush under a wine header; small square-ish chips are fine there (content, like a spreadsheet). A 31-day month fits
-  1300 px beside the rail (day columns 32 px; long codes like "Clinic" are set tight to fit).
-- **Duty colours are data**, like clinical codes. The default palette (`DEFAULT_DUTIES` in `model.js`) is warm and
-  earthy, told apart by hue and lightness, with every ink at least 4.5:1 on its fill: Call the strongest (brick red),
-  PM burnt orange, SMO chestnut, OTC umber, PHD dark olive, W charcoal brown, Creg soft brick, APS green, Clinic olive,
-  Inj ochre; leave rose, requests outlined in wine, other codes on the kit's fill grey. A code with no valid colour
-  falls back to the kit's fill and ink. Saved rosters keep their own colours; only new installs and the practice
-  department use the defaults (the second review swapped SMO plum, OTC slate blue, PHD teal, W violet and Creg rose).
 
 ## Excel (`js/io.js`)
 
@@ -331,14 +251,6 @@ only when Excel is used.
   with a weight; a new type is one `RULE_TYPES` entry plus a test.
 - 2026-10-15: local first with JSON backup; Firebase team sync built but off until the owner creates the project.
 - 2026-10-15: built by five parallel builders against `SPEC.md`, then integrated and tested in one pass.
-- 2026-10-15: the NTF app design language (anantf-site `DESIGN-APP.md`, kit vendored in `css/app.css`) instead of
-  the NUHS look, at the owner's request; the NUHS band is not used in this app (Design, above).
-- 2026-10-15: speed work after the owner found it "a bit too slow" (Speed, above): the grid patches cells and draws
-  big redraws progressively, Auto-fill searches shorter and stops once converged (same quality, different rosters
-  than before for a seed), sheets over the grid open non-modal, and `perf.e2e.mjs` guards it in the Checks workflow.
-- 2026-10-15: second review of speed and design: Auto-fill searches on (hot, up to the first version's budget) while
-  must-fix problems remain; People under More at every size (five tabs, as the kit says); on phones the roster's month
-  sits in the top bar; pushed screens get a back button in the bar; duty colours without blue, teal or purple.
 
 Phone details (review, 15 Oct 2026): paint mode paints by tap on touch screens (a swipe scrolls) and has a "Done
 painting" button; Back closes an open sheet, and the rule builder asks before discarding changes; removing a person or

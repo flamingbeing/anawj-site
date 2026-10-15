@@ -272,7 +272,7 @@ const demoBlob = await roundTrip(demo, '2026-10', 'practice department');
       const v = io.cellText(row.getCell(c).value);
       if (v === 'C') {
         found = true;
-        eq(row.getCell(c).fill.fgColor.argb, 'FF9C2B1E', 'call cell coloured with the call colour (the default palette)');
+        eq(row.getCell(c).fill.fgColor.argb, 'FFC62828', 'call cell coloured with the call colour');
         ok(/\bx$/.test(io.cellText(row.getCell(c + 1).value)), 'post-call day shows x');
       }
     }
@@ -349,7 +349,7 @@ const demoBlob = await roundTrip(demo, '2026-10', 'practice department');
   bad.settings.holidays = [];
   const back = io.restoreJSON(io.backupJSON(bad));
   const zz = back.duties.find(d => d.code === 'ZZ');
-  eq([zz.kind, zz.color], ['other', '#e6e1d6'], 'duty kind and colour from the fixed set (the kit fill)');
+  eq([zz.kind, zz.color], ['other', '#e0e0e0'], 'duty kind and colour from the fixed set');
   ok(back.groups.every(g => g && g.id) && back.staff.every(p => p && p.id) && back.tags.every(t => t && t.id), 'no null or id-less entries');
   eq(back.settings.holidays, {}, 'holidays made an object');
   assert.throws(() => io.restoreJSON(JSON.stringify({ kind: 'ntf-roster-backup', v: 1, state: { staff: [], cells: [] } })), /damaged/); checks++;

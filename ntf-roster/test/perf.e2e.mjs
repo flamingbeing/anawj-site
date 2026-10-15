@@ -2,13 +2,11 @@
 // DevTools' "mid-tier mobile"), timing the three things a rosterer does most: tap a cell until its editor shows, tap
 // a code until the grid shows it, and switch month until the new month is on screen. Each time runs from the input
 // event to the frame that shows the result. Prints the numbers and fails when a median is over its budget.
-// The budgets are about 2x what a laptop measured in Oct 2026 (tap 240 ms, code 290 ms, month 400 ms at 4x; on a
-// busier machine, with the NTF app design, 180 / 300 / 500 ms), so a slower CI machine passes but a real slowdown (the
-// whole grid drawn at once again, say: 800+ ms, or a modal sheet over the grid: tap 450+ ms) does not.
+// The budgets are about 2x what a laptop measured in Oct 2026 (tap 240 ms, code 290 ms, month 400 ms at 4x), so a
+// slower CI machine passes but a real slowdown (the whole grid drawn at once again, say: 800+ ms) does not.
 // Run (from the repo root, with a static server on the repo root at port 8080, e.g. python3 -m http.server 8080):
 //   node ntf-roster/test/perf.e2e.mjs            PORT=8091 for another port; REPS=n (default 5)
-// In the Checks workflow, run a second time before it fails (timings vary with the machine); run it after changing the
-// grid, the editor, sheets, the store or the styles.
+// Not in the Checks workflow (timings vary with the machine); run it after changing the grid, the editor or the store.
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 
@@ -47,6 +45,7 @@ const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: pr
 const errors = [];
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
 await ctx.route('https://www.gstatic.com/**', r => r.abort());        // no Firebase
+await ctx.route('https://fonts.googleapis.com/**', r => r.abort());   // no web font round trip in the timings
 await ctx.addInitScript(HELPER);
 const page = await ctx.newPage();
 page.on('pageerror', e => errors.push(e.message));
@@ -93,11 +92,11 @@ assert.ok(cells.length >= REPS, 'found empty cells to edit');
 const T = { tap: [], toggle: [], month: [], monthAll: [] };
 for (let i = 0; i < REPS; i++) {
   const cell = cells[i];
-  T.tap.push(await timedTap(await spot(cell), `document.querySelector('dialog.app-sheet[open] .tchip[data-code="MC"]')`));
+  T.tap.push(await timedTap(await spot(cell), `document.querySelector('.sheet .tchip[data-code="MC"]')`));
   await page.waitForTimeout(400);   // the sheet has slid in
-  T.toggle.push(await timedTap(await spot('dialog.app-sheet[open] .tchip[data-code="MC"]'), `document.querySelector('${cell} .chip')?.textContent === 'MC'`));
+  T.toggle.push(await timedTap(await spot('.sheet .tchip[data-code="MC"]'), `document.querySelector('${cell} .chip')?.textContent === 'MC'`));
   await page.waitForTimeout(300);
-  await page.click('dialog.app-sheet[open] .sheet-done');   // Done (in the sheet's head)
+  await page.click('.sheet-foot .btn-primary');   // Done
   await page.waitForTimeout(400);
 }
 // month switches from the top of the grid, there and back

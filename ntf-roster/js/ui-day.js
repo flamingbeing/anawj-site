@@ -1,6 +1,6 @@
 // NTF Roster: one day at a glance (#day?d=YYYY-MM-DD), the default screen on phones. Who is on each duty (with the
-// cover rules' counts), who is away, requests, notes and the day's problems with a Show button to jump to the grid,
-// each as one of the kit's grouped lists. Swipe left/right (or the arrows, or the date strip) to change day.
+// cover rules' counts), who is away, requests, notes and the day's problems with a Show button to jump to the grid.
+// Swipe left/right (or the arrows, or the date strip) to change day.
 import * as M from './model.js';
 import { coverOn, makeHasCodes, chipVars } from './ui-roster.js';
 
@@ -16,8 +16,8 @@ export function mount(el, app) {
   const root = h('div', { class: 'dayv' });
   el.append(root);
 
-  const prevBtn = h('button', { type: 'button', class: 'app-bar-btn day-arrow', 'aria-label': 'Previous day', html: icon('left') });
-  const nextBtn = h('button', { type: 'button', class: 'app-bar-btn day-arrow', 'aria-label': 'Next day', html: icon('right') });
+  const prevBtn = h('button', { type: 'button', class: 'icon-btn day-arrow', 'aria-label': 'Previous day', html: icon('left') });
+  const nextBtn = h('button', { type: 'button', class: 'icon-btn day-arrow', 'aria-label': 'Next day', html: icon('right') });
   const title = h('div', { class: 'day-title' });
   const head = h('div', { class: 'day-head' }, prevBtn, title, nextBtn);
   const strip = h('div', { class: 'day-strip', role: 'group', 'aria-label': 'Days of the month' });
@@ -76,9 +76,9 @@ export function mount(el, app) {
     title.append(
       h('h2', { class: 'day-h' }, longDate(day)),
       h('p', { class: 'day-sub' },
-        day === today ? h('span', { class: 'app-badge' }, 'Today') : null,
-        hol ? h('span', { class: 'app-badge app-badge--ink' }, hol) : null,
-        M.isWeekend(day) && !hol ? h('span', { class: 'app-badge app-badge--ink' }, 'Weekend') : null,
+        hol ? h('span', { class: 'pill pill-hol' }, hol) : null,
+        M.isWeekend(day) && !hol ? h('span', { class: 'pill pill-we' }, 'Weekend') : null,
+        day === today ? h('span', { class: 'pill pill-today' }, 'Today') : null,
         h('span', { class: 'muted' }, `${staff.length} in post`)));
 
     // strip
@@ -112,81 +112,97 @@ export function mount(el, app) {
 
     content.innerHTML = '';
     if (!staff.length) {
-      content.append(h('div', { class: 'app-card app-empty' }, h('span', { class: 'app-empty-icon', html: icon('person') }),
-        h('p', { class: 'app-empty-title' }, 'Nobody in post'), h('p', { class: 'app-empty-text' }, 'Nobody on the staff list is in post on this day.')));
+      content.append(h('div', { class: 'card empty-card' }, h('p', null, 'Nobody is in post on this day.')));
       return;
     }
-
-    // one grouped list: a section header (with the count), then rows
-    const group = (cls, label, head, rows) => h('section', { class: `app-section day-card ${cls}`, 'aria-label': label },
-      h('h3', { class: 'app-section-header dc-h' }, head), h('ul', { class: 'app-list' }, rows.map(r => h('li', null, r))));
-    const row = (lead, title, sub, trail) => h('div', { class: 'app-row' }, lead,
-      h('span', { class: 'app-row-body' }, h('span', { class: 'app-row-title' }, title), sub ? h('span', { class: 'app-row-sub' }, sub) : null), trail);
-    const lead = (chip) => h('span', { class: 'day-row-lead' }, chip);
 
     // problems
     if (dayViol.length) {
       const hard = dayViol.filter(v => v.hard), soft = dayViol.filter(v => !v.hard);
-      content.append(group('day-probs', 'Problems',
-        ['Problems', h('span', { class: 'dc-count' }, hard.length ? `${hard.length} must-fix` : '', hard.length && soft.length ? ' · ' : '', soft.length ? `${soft.length} to improve` : '')],
-        [...hard, ...soft].map(v => {
-          const sid = v.staffId || (v.staffIds || [])[0] || null;
-          return row(h('span', { class: `app-row-icon ${v.hard ? 'app-row-icon--bad' : 'app-row-icon--warn'}`, html: icon('alert') }), v.msg, v.hard ? null : 'To improve',
-            h('button', {
-              type: 'button', class: 'app-btn app-btn--plain app-btn--compact', 'aria-label': `Show on the roster: ${v.msg}`,
-              onclick: () => { app.selectCell(day, sid); if (!sid) app.selectedCell = { date: day, staffId: null }; app.go('roster', { m: app.month }); },
-            }, 'Show'));
-        })));
+      const card = h('section', { class: 'card day-card day-probs', 'aria-label': 'Problems' },
+        h('h3', { class: 'dc-h' }, h('span', { class: 'dc-ic vh', html: icon('alert') }), `Problems`,
+          h('span', { class: 'dc-count' }, hard.length ? `${hard.length} must-fix` : '', hard.length && soft.length ? ' · ' : '', soft.length ? `${soft.length} to improve` : '')));
+      const ul = h('ul', { class: 'plist' });
+      for (const v of [...hard, ...soft]) {
+        const sid = v.staffId || (v.staffIds || [])[0] || null;
+        ul.append(h('li', { class: v.hard ? 'vh' : 'vs' },
+          h('span', { class: 'vi', html: icon('alert') }),
+          h('span', { class: 'pl-msg' }, v.msg),
+          h('button', {
+            type: 'button', class: 'btn btn-ghost btn-xs', 'aria-label': `Show on the roster: ${v.msg}`,
+            onclick: () => { app.selectCell(day, sid); if (!sid) app.selectedCell = { date: day, staffId: null }; app.go('roster', { m: app.month }); },
+          }, 'Show')));
+      }
+      card.append(ul);
+      content.append(card);
     }
 
     // duties: shifts first (auto ones always, others when someone is on them)
     const shiftDuties = (state.duties || []).filter(d => d.kind === 'shift' && (d.auto || byCode.has(d.code)));
+    const dutyGrid = h('div', { class: 'day-duties' });
     for (const du of shiftDuties) {
       const on = byCode.get(du.code) || [];
       const cv = cover.filter(c => (c.rule.params?.codes || []).includes(du.code));
       if (!on.length && !cv.length) continue;   // auto duty not needed today (e.g. PHD on a normal day)
-      const badges = cv.length ? h('span', { class: 'cov-badges' }, cv.map(c => {
-        const need = c.min != null ? c.min : c.max;
-        const txt = `${c.label} ${c.n}${need != null ? '/' + need : ''}`;
-        const say = c.status === 'short' ? `short by ${c.min - c.n}` : c.status === 'over' ? `${c.n - c.max} too many` : 'covered';
-        return h('span', { class: `app-badge app-badge--${c.status === 'ok' ? 'ok' : c.status === 'short' ? 'bad' : 'warn'}`, title: c.rule.name || '' },
-          h('span', { html: icon(c.status === 'ok' ? 'ok' : 'alert') }), txt, h('span', { class: 'sr-only' }, ', ' + say));
-      })) : null;
-      const rows = on.length ? on.map(({ p, auto, cell }) => row(null, nm(p), gmap.get(p.group)?.name || '',
-        auto || (cell.r || []).length ? h('span', { class: 'day-row-chips' },
-          auto ? h('span', { class: 'app-badge app-badge--ink', title: 'Placed by auto-fill' }, 'Auto') : null,
-          (cell.r || []).map(c => h('span', { class: 'chip rq', style: styleVars(dmap.get(c)) }, c))) : null))
-        : [h('div', { class: 'app-row' }, h('span', { class: 'app-row-body' }, h('span', { class: 'app-row-title muted' }, 'Nobody yet')))];
-      content.append(group('duty-card', du.name,
-        [h('span', { class: 'chip', style: styleVars(du) }, du.code), h('span', { class: 'dc-name' }, du.name), h('span', { class: 'dc-count' }, String(on.length)), badges], rows));
+      const card = h('section', { class: 'card day-card duty-card', style: { '--c': du.color || '#999' }, 'aria-label': du.name },
+        h('h3', { class: 'dc-h' }, h('span', { class: 'chip', style: styleVars(du) }, du.code), h('span', { class: 'dc-name' }, du.name), h('span', { class: 'dc-count' }, String(on.length))));
+      if (cv.length) {
+        card.append(h('div', { class: 'cov-pills' }, cv.map(c => {
+          const need = c.min != null ? c.min : c.max;
+          const txt = `${c.label} ${c.n}${need != null ? '/' + need : ''}`;
+          const say = c.status === 'short' ? `short by ${c.min - c.n}` : c.status === 'over' ? `${c.n - c.max} too many` : 'covered';
+          return h('span', { class: `cov-pill ${c.status}`, title: c.rule.name || '' }, h('span', { class: 'cp-ic', html: icon(c.status === 'ok' ? 'ok' : 'alert') }), txt, h('span', { class: 'sr-only' }, ', ' + say));
+        })));
+      }
+      if (on.length) {
+        card.append(h('ul', { class: 'who' }, on.map(({ p, auto, cell }) => h('li', null,
+          h('span', { class: 'who-n' }, nm(p)),
+          h('span', { class: 'who-g' }, gmap.get(p.group)?.name || ''),
+          auto ? h('span', { class: 'who-auto', title: 'Placed by auto-fill' }, 'auto') : null,
+          (cell.r || []).length ? h('span', { class: 'who-req' }, cell.r.join(' ')) : null))));
+      } else card.append(h('p', { class: 'muted dc-empty' }, 'Nobody yet'));
+      dutyGrid.append(card);
     }
+    if (dutyGrid.children.length) content.append(dutyGrid);
 
     // away: leave, other and post call
     const awayCodes = (state.duties || []).filter(d => (d.kind === 'leave' || d.kind === 'other') && byCode.has(d.code));
     const unknown = [...byCode.keys()].filter(c => !dmap.has(c));
     if (awayCodes.length || post.length || unknown.length) {
       const total = new Set([...awayCodes.flatMap(d => byCode.get(d.code).map(x => x.p.id)), ...post.map(p => p.id)]).size;
-      const rows = awayCodes.map(du => row(lead(h('span', { class: 'chip', style: styleVars(du) }, du.code)), du.name, byCode.get(du.code).map(x => nm(x.p)).join(', ')));
-      for (const c of unknown) rows.push(row(lead(h('span', { class: 'chip unk' }, c)), 'Not a code here', byCode.get(c).map(x => nm(x.p)).join(', ')));
-      if (post.length) rows.push(row(lead(h('span', { class: 'chip dx' }, 'x')), 'Post call', post.map(nm).join(', ')));
-      content.append(group('day-away', 'Away', ['Away', h('span', { class: 'dc-count' }, String(total))], rows));
+      const card = h('section', { class: 'card day-card', 'aria-label': 'Away' }, h('h3', { class: 'dc-h' }, h('span', { class: 'dc-ic', html: icon('person') }), 'Away', h('span', { class: 'dc-count' }, String(total))));
+      const dl = h('dl', { class: 'away' });
+      for (const du of awayCodes) {
+        dl.append(h('dt', null, h('span', { class: 'chip', style: styleVars(du) }, du.code), h('span', { class: 'away-name' }, du.name)),
+          h('dd', null, byCode.get(du.code).map(x => nm(x.p)).join(', ')));
+      }
+      for (const c of unknown) dl.append(h('dt', null, h('span', { class: 'chip unk' }, c)), h('dd', null, byCode.get(c).map(x => nm(x.p)).join(', ')));
+      if (post.length) dl.append(h('dt', null, h('span', { class: 'chip dx' }, 'x'), h('span', { class: 'away-name' }, 'Post call')), h('dd', null, post.map(nm).join(', ')));
+      card.append(dl);
+      content.append(card);
     }
 
     // requests
     if (reqs.size) {
-      const n = [...reqs.values()].reduce((a, b) => a + b.length, 0);
-      content.append(group('day-reqs', 'Requests', ['Requests', h('span', { class: 'dc-count' }, String(n))],
-        [...reqs].map(([c, ps]) => { const du = dmap.get(c); return row(lead(h('span', { class: 'chip rq', style: styleVars(du) }, c)), du?.name || c, ps.map(nm).join(', ')); })));
+      const card = h('section', { class: 'card day-card', 'aria-label': 'Requests' }, h('h3', { class: 'dc-h' }, h('span', { class: 'dc-ic', html: icon('list') }), 'Requests', h('span', { class: 'dc-count' }, String([...reqs.values()].reduce((a, b) => a + b.length, 0)))));
+      const dl = h('dl', { class: 'away' });
+      for (const [c, ps] of reqs) {
+        const du = dmap.get(c);
+        dl.append(h('dt', null, h('span', { class: 'chip rq', style: styleVars(du) }, c), h('span', { class: 'away-name' }, du?.name || c)), h('dd', null, ps.map(nm).join(', ')));
+      }
+      card.append(dl);
+      content.append(card);
     }
 
     // notes
     if (notes.length) {
-      content.append(group('day-notes', 'Notes', ['Notes', h('span', { class: 'dc-count' }, String(notes.length))],
-        notes.map(n => row(null, nm(n.p), n.note))));
+      content.append(h('section', { class: 'card day-card', 'aria-label': 'Notes' },
+        h('h3', { class: 'dc-h' }, h('span', { class: 'dc-ic', html: icon('note') }), 'Notes', h('span', { class: 'dc-count' }, String(notes.length))),
+        h('ul', { class: 'notes' }, notes.map(n => h('li', null, h('strong', null, nm(n.p) + ': '), n.note)))));
     }
 
     content.append(h('p', { class: 'day-foot' },
-      h('button', { type: 'button', class: 'app-btn app-btn--secondary', onclick: () => { app.selectedCell = { date: day, staffId: null }; app.go('roster', { m: app.month }); }, html: `${icon('grid')}<span>See this day on the roster</span>` })));
+      h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { app.selectedCell = { date: day, staffId: null }; app.go('roster', { m: app.month }); }, html: `${icon('grid')}<span>See this day on the roster</span>` })));
   }
 
   render();
