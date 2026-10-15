@@ -131,6 +131,8 @@ try {
     await page.click('#skinSeg [data-skin="sedline"]');
     await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedWrap', false], { timeout: 5000 }); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#vistaWrap', true], { timeout: 5000 });
     await page.waitForFunction(() => /PSi \d+/.test(document.querySelector('#bilSum').textContent), null, { timeout: 5000 });
+    // the monitor switch at the top of the page changes the monitor, and stays in step with the Display panel
+    for (const k of ['advance', 'sedline', 'vista']) { await page.click(`#monSwitch [data-skin="${k}"]`); assert.equal(await page.$eval(`#skinSeg [data-skin="${k}"]`, e => e.getAttribute('aria-pressed')), 'true'); assert.equal(await page.$eval(`#monSwitch [data-skin="${k}"]`, e => e.getAttribute('aria-pressed')), 'true'); }
     // the teaching layout is still there for the rest of the checks
     await page.click('#skinSeg [data-skin="classic"]');
     await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#classicWrap', false], { timeout: 5000 });
@@ -209,7 +211,7 @@ try {
     await page.click('#viewSeg [data-view="both"]');
     await page.waitForFunction(([d, e]) => document.querySelector('#cEeg').clientHeight === e && document.querySelector('#cDsa').clientHeight === d, [dsa0, eeg0]);
     // monitor first: on a phone the monitor and the drug and depth controls are near the top
-    if (viewport.width === 390) assert.ok(await page.$eval('#classicWrap', e => e.getBoundingClientRect().top + scrollY) < 80, 'monitor at the top');
+    if (viewport.width === 390) assert.ok(await page.$eval('#classicWrap', e => e.getBoundingClientRect().top + scrollY) < 180, 'monitor near the top (under the monitor switch)');
     // facial EMG raises the EMG reading (no relaxant on board)
     await page.click('#nmbSeg [data-nmb="off"]');
     const emg0 = await page.$eval('#vEmg', e => +e.textContent);

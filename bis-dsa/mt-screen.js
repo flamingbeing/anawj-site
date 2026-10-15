@@ -266,7 +266,7 @@ const MT_DW=323,MT_DH=118,MT_OFF=document.createElement('canvas');MT_OFF.width=M
 const mtSm=x=>x*x*(3-2*x);
 const mtTilt=hz=>MT_TILT[0]-MT_TILT[1]*mtSm(Math.max(0,Math.min(1,(hz-MT_TILT[2])/MT_TILT[3])));
 const MT_TILT=[12,14,10,8],MT_LO=-8,MT_SPAN=30;
-function mtPaintDsa(m){const W=MT_DW,H=MT_DH,per=m.win/W,sh=((mon.dbLo-DB_LO)+(mon.dbHi-DB_HI))/2,sc=(mon.dbHi-mon.dbLo)/(DB_HI-DB_LO),LO=MT_LO+sh,SPAN=MT_SPAN*sc;
+function mtPaintDsa(m){const W=MT_DW,H=MT_DH,per=m.win/W,sh=0,sc=1,LO=MT_LO+sh,SPAN=MT_SPAN*sc;
  if(!MT_IMG)MT_IMG=MT_OFF.getContext('2d').createImageData(W,H);const d=MT_IMG.data;
  if(!MT_ROWS){MT_ROWS=[];for(let y=0;y<H;y++){const hz=30*(1-(y+.5)/H),kf=Math.max(0,Math.min(58.999,hz*2)),k0=Math.floor(kf);MT_ROWS.push([k0,kf-k0,mtTilt(hz)]);}}
  const v=new Float32Array(60),w=new Float32Array(60);
