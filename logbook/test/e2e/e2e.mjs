@@ -985,6 +985,9 @@ async function run(label, ctxOpts) {
     // the summary is written 4 s after a change; the demo lets the test write it now
     await p.evaluate(() => window.__logbookTest.flushSummary());
     await tab('totals'); await p.waitForSelector('table.totals');
+    // Compact off (full names across the top) for the steps that read them; the 'totals' step checks Compact
+    const compactBtn = p.locator('main button', { hasText: /^Compact$/ });
+    if (await compactBtn.getAttribute('aria-pressed') === 'true') { await compactBtn.click(); await p.waitForSelector('table.totals th.rot'); }
     await p.locator('main button', { hasText: 'Refresh' }).click(); await p.waitForSelector('table.totals');
     const groupsT = await p.locator('main select[aria-label="Residency year"] option').allInnerTexts();
     assert(groupsT.includes('R3 / SMO'), 'no R3 / SMO group: ' + groupsT);
@@ -1454,6 +1457,18 @@ async function run(label, ctxOpts) {
     await p.waitForSelector('table.totals');
     const cols = await p.locator('table.totals thead th').count();
     assert(cols >= 4, 'cols ' + cols);
+    // Compact (on by default; 15 Oct 2026): initials across the top, a tap names the person, a key under the table,
+    // short category names; Show targets at the bottom
+    const cBtn = p.locator('main button', { hasText: /^Compact$/ });
+    if (await cBtn.getAttribute('aria-pressed') !== 'true') await cBtn.click();
+    await p.locator('table.totals.compact .ini-btn').first().click();
+    await until(async () => / = .+ · /.test(await p.evaluate(() => document.querySelector('.tname')?.textContent || '')), 'tapping initials did not name the person');
+    assert(/ = /.test(await p.evaluate(() => document.querySelector('.tkey')?.textContent || '')), 'no key under the table');
+    assert(await p.locator('table.totals small.tgt', { hasText: / by / }).count() > 0, 'targets hidden by default');
+    await p.getByLabel('Show targets').uncheck(); await nap(200);
+    assert(await p.locator('table.totals small.tgt', { hasText: / by / }).count() === 0, 'Show targets off left the target lines');
+    await p.getByLabel('Show targets').check(); await nap(200);
+    await cBtn.click(); await p.waitForSelector('table.totals th.rot');   // full names again for the checks below
     const t26 = await p.locator('table.totals td.cat', { hasText: 'Peripheral nerve' }).first().innerText();
     assert(/by R\d/.test(t26), 'targets missing under the name: ' + t26);
     const behind = await p.locator('table.totals td.late, table.totals td.due').count();

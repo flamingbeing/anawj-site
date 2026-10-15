@@ -100,7 +100,7 @@ Agreed queue (one PR each, in order, once he says go):
    browser's own corner handle, so add a grab bar under the box (a 44 px touch target, pointer events, works with a
    mouse too; double-tap resets). "Grow as I type" switch, ON by default (owner, 15 Oct): the box grows from the set height as text is added, up to
    about two thirds of the screen, then scrolls; a dragged height is the starting size.
-9h. **Totals: Compact** (owner; ON by default, per device): a Compact switch at the top of the Totals card (by the year
+9h. **Built (Totals compact PR).** **Totals: Compact** (owner; ON by default, per device): a Compact switch at the top of the Totals card (by the year
    picker and the buttons). Names become initials ("AJ"; a clash adds the next surname letter, "AJi" / "AJa"), set
    across on one line, no year (the page is one year); tapping an initials heading shows the full name in a small bar
    (a tap, never tap and hold), and a key under the table ("AJ = …"). Categories use their short names (the pill names)

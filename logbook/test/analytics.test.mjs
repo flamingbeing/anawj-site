@@ -128,4 +128,13 @@ const cases = list => list.map(([date, ...cats], i) => ({ id: 'c' + i, date, cat
   assert.equal(A.loggingHabits(cases, '2026-10-10').now, 0);
 }
 
+// Totals compact: initials, a clash adds letters of the surname
+{
+  const { shortNames } = await import('../js/analytics.js');
+  assert.deepEqual(shortNames(['Ann Jones', 'Ben Lee', 'Amy Jacobs', 'Cara']), ['AJo', 'BL', 'AJa', 'C']);
+  assert.deepEqual(shortNames(['Fake Resident A', 'Fake Resident B']), ['FRA', 'FRB']);
+  assert.deepEqual(shortNames(['Al Jo', 'Al Jo']).length, 2);
+  assert.deepEqual(shortNames(['']), ['?']);
+}
+
 console.log('analytics tests passed');

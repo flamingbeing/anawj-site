@@ -256,16 +256,18 @@ function fitBox(ta) {
 }
 // the grab bar under the box: drag (finger or mouse) to set the height; double-tap resets; ↑ ↓ on a keyboard
 function boxGrab(ta) {
-  const set = px => { const v = Math.max(60, Math.min(Math.round(innerHeight * 0.85), Math.round(px))); ta.style.height = v + 'px'; return v; };
+  const set = px => { const v = Math.max(60, Math.min(Math.round(innerHeight * 0.85), Math.round(px))); ta.style.height = v + 'px'; grab.setAttribute('aria-valuenow', v); return v; };
   const save = v => { setDisplay({ boxHeight: v }); fitBox(ta); };
   let lastTap = 0;
-  return h('div', { class: 'box-grab', role: 'separator', tabindex: '0', 'aria-orientation': 'horizontal', 'aria-label': 'Case box height: drag to change, double-tap to reset',
+  // a focusable separator is a slider to screen readers: it needs a value (the height in pixels)
+  const grab = h('div', { class: 'box-grab', role: 'separator', tabindex: '0', 'aria-orientation': 'horizontal', 'aria-label': 'Case box height: drag to change, double-tap to reset',
+    'aria-valuemin': '60', 'aria-valuemax': String(Math.round(innerHeight * 0.85)), 'aria-valuenow': String(boxHeight() || 96),
     onpointerdown: e => {
       const now = Date.now();
       if (now - lastTap < 350) { lastTap = 0; setDisplay({ boxHeight: null }); fitBox(ta); return; }
       lastTap = now;
       e.preventDefault();
-      const grab = e.currentTarget, y0 = e.clientY, h0 = ta.offsetHeight;
+      const y0 = e.clientY, h0 = ta.offsetHeight;
       grab.setPointerCapture?.(e.pointerId); grab.classList.add('dragging');
       let v = h0;
       const move = ev => { v = set(h0 + ev.clientY - y0); };
@@ -273,6 +275,7 @@ function boxGrab(ta) {
       grab.addEventListener('pointermove', move); grab.addEventListener('pointerup', up); grab.addEventListener('pointercancel', up);
     },
     onkeydown: e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); save(set(ta.offsetHeight + (e.key === 'ArrowDown' ? 24 : -24))); } } });
+  return grab;
 }
 // Paste: the clipboard into a box (filled when empty, else on a new line). Browsers that can't read
 // the clipboard (or a refused permission) get a hint to long-press and paste instead.
