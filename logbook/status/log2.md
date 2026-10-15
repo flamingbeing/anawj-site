@@ -1,12 +1,9 @@
 # Now: Claude Code, Logbook 2 (log2)
 
-**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): **the 15 Oct batch is done** (owner said go, 15 Oct;
-away ~6 h). Merged 15 Oct: #651 Themes, #652 four bugs (live sync line, PWA sign-in by redirect, Paeds by age + paste
-ticks, age cap), #654 ACGME-style, #655 initials line + lighter highlights, #656 detection settings, #659 Reset all
-settings, #660 Analytics (every profile, Edit mode, new cards), #661 More page groups + tab bars + More Edit + Profile
-page + one Recover page, #662 case box grab bar + Grow as I type, #663 Totals Compact + Show targets (and the grab
-bar's screen-reader value), #664 reflections on the Logbook calendar + this note. Nothing half-done.
-Not started: 9 / 9b / 9c / 9d bulk select and edit, 9e global search, 10–14, Markdown.
+**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): the 15 Oct batch is merged (#651–#664). Owner said
+go on the next queue (15 Oct): **now building 9 / 9d, Select and Bulk edit on the Logbook** (one PR); then 9b Notes,
+9c Reflections (the same bar and popup), then 9e global search.
+Not started: 9b / 9c bulk select in Notes and Reflections, 9e global search, 10–14, Markdown.
 Waiting on the owner: a real-phone check of sign-in (installed app and Firefox for Android).
 
 Agreed queue (one PR each, in order, once he says go):
@@ -72,7 +69,7 @@ Agreed queue (one PR each, in order, once he says go):
    saying all devices or this device: Needs attention (only when any: unsynced / clashing changes, Retry, Keep mine /
    theirs), Recently deleted (the bin, all devices, 30 days), Unfinished drafts (this device), Earlier versions (this
    device, last 100; folded by default).
-9. **Bulk select and edit:** press and hold (desktop: a Select button) in List and in Calendar's day list; bar: N
+9. **Built (Select and Bulk edit PR; with 9d's popup for the Logbook).** **Bulk select and edit:** press and hold (desktop: a Select button) in List and in Calendar's day list; bar: N
    selected, Select all (whole search, across pages), Select none, Bulk edit…, Done. Bulk edit: a row per field (date,
    initials, case summary replace / append / find-replace, APMES and own tags add / remove / replace, ☆ Interesting),
    each starts "unchanged"; a warning saying what gets overwritten; Undo in the toast and in Recent changes (skips

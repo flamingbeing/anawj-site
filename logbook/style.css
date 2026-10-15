@@ -1664,3 +1664,30 @@ table.totals.compact td.cat .cat-in { overflow-x: visible; overflow-wrap: anywhe
 ul.cases li.refl-under { padding: 2px 0 8px 28px; border-top: 0; }
 ul.cases li.refl-under button { min-height: 32px; text-align: left; }
 .lb-reflsw { font-size: calc(13px * var(--fs, 1)); }
+/* Logbook → Select: a checkbox on each row, the chosen ones tinted, the bar held at the bottom (above the tab bar) */
+.lb-wrap.selecting ul.cases li:not(.monthhead):not(.refl-under) { padding-left: 42px; }
+.lb-wrap.selecting ul.cases li:not(.monthhead)::after, .lb-wrap.selecting ul.cases .acts { display: none; }
+.lb-wrap.selecting ul.cases .note-flag { pointer-events: none; }
+.lb-wrap ul.cases li .sel-box { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; min-height: 0; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.lb-wrap ul.cases li.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.sel-bar { position: sticky; bottom: calc((var(--tabbar-h) + var(--safe-b)) / var(--ui-zoom, 1)); z-index: 10; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--edge, var(--line)); border-radius: var(--radius, calc(14px * var(--round, 1))); box-shadow: 0 -6px 12px -10px rgba(0,0,0,.35); }
+.sel-bar[hidden] { display: none; }
+.sel-bar .sel-n { font-weight: 700; margin-right: 4px; }
+/* Bulk edit…: a row per field (name, then the choice and what it needs); the warning; samples before → after */
+.bulk-h { margin: 14px 0 4px; font-size: calc(15px * var(--fs, 1)); }
+.bulk-row { display: grid; grid-template-columns: 8.5em 1fr; gap: 6px 10px; align-items: start; padding: 6px 0; border-bottom: 1px solid var(--edge, var(--line)); }
+.bulk-l { font-weight: 600; padding-top: 8px; }
+.bulk-c select, .bulk-c input { width: 100%; }
+.bulk-extra { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.bulk-extra:empty { display: none; }
+.bulk-extra > * { flex: 1 1 12em; }
+.bulk-extra > span { flex: 0 0 auto; }
+.bulk-acts { flex-wrap: wrap; gap: 6px; }
+.bulk-lines { margin: 4px 0 8px; padding-left: 20px; }
+.bulk-warn { padding: 8px 10px; border-radius: 8px; background: var(--warn-bg); color: var(--ink); }
+.bulk-samples { list-style: none; margin: 4px 0 8px; padding: 0; font-size: calc(13px * var(--fs, 1)); }
+.bulk-samples li { padding: 6px 0; border-bottom: 1px solid var(--edge, var(--line)); }
+.bulk-btns { margin-top: 14px; }
+@media (max-width: 560px) { .bulk-row { grid-template-columns: 1fr; } .bulk-l { padding-top: 0; } }
+/* a press and hold selects: no text selection or iOS callout under the finger (Copy is in the row menu) */
+@media (pointer: coarse) { .lb-wrap ul.cases li:not(.monthhead) { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }

@@ -32,6 +32,20 @@ const SCREENS = [
     await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   }, false],
   ['Logbook list', async p => { await hash('logbook')(p); await p.locator('main .seg button', { hasText: /^List$/ }).first().click(); }, false],
+  ['Logbook selecting', async p => {
+    await hash('logbook')(p); await p.locator('main .seg button', { hasText: /^List$/ }).first().click();
+    await p.locator('button.lb-selbtn').click();
+    await p.locator('ul.cases li:not(.monthhead)').nth(1).click();
+    await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  }, true],
+  ['Bulk edit', async p => {
+    await hash('logbook')(p); await p.locator('main .seg button', { hasText: /^List$/ }).first().click();
+    await p.locator('button.lb-selbtn').click();
+    await p.locator('ul.cases li:not(.monthhead)').nth(1).click();
+    await p.locator('.sel-bar').getByRole('button', { name: 'Bulk edit…' }).click();
+    await p.locator('dialog[open]').getByLabel('Case summary').selectOption('find');
+    await p.locator('dialog[open]').getByLabel('Tags', { exact: true }).selectOption('replace');
+  }, true],
   ['Reflections', hash('reflect'), true],
   ['Analytics', hash('progress'), true],
   ['Totals', hash('totals'), false],
