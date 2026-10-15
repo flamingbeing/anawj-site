@@ -4,6 +4,7 @@
 
 import { S, h, toast, modal, hooks, profile, facultyRole, shows } from './ui-core.js';
 import { DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
+import { lookCss } from './themes.js';
 import { checkCss } from './custom-css.js';
 import { applyFonts } from './fonts.js';
 import { offBar } from './profiles.js';
@@ -80,7 +81,8 @@ export function cachedCompact() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['noteToolbar', 'compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy', 'hideTabsTyping'];
+export const DISPLAY_KEYS = ['noteToolbar', 'compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy', 'hideTabsTyping',
+  'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -109,7 +111,19 @@ export function adoptDisplay(accountSettings, { fresh = false } = {}) {
   return display();   // (an old account text size becomes the zoom here too)
 }
 export function resetDisplay() { adoptedNow = false; try { localStorage.removeItem(DISPLAY_KEY); } catch { /* storage blocked */ } }
-export function applyDisplay(d = display()) { applyCompact(!!d.compact); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); applyLook(d); }
+export function applyDisplay(d = display()) { applyCompact(!!d.compact); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); applyLook(d); applyThemeLook(d); }
+// Themes (themes.js): the background tint, the top band, the heading font, spacing and tab style as one style sheet
+// after the colour's (so it wins), cached on the device for the first paint (index.html) like the colour's
+const LOOK_CSS_KEY = 'apmes-logbook-look-css';
+export function applyThemeLook(d = display()) {
+  const p = lightPalette(cleanAccent(d.accent) || DEFAULT_ACCENT);
+  const css = lookCss(d, [p.s1, p.s2, p.s3, p.s4]);
+  let el = document.getElementById('look-css');
+  if (!el) { el = document.createElement('style'); el.id = 'look-css'; }
+  if (el.textContent !== css) el.textContent = css;
+  if (el.nextElementSibling || el.parentNode !== document.head) document.head.append(el);   // last, after the colour's
+  try { css ? localStorage.setItem(LOOK_CSS_KEY, css) : localStorage.removeItem(LOOK_CSS_KEY); } catch { /* storage blocked */ }
+}
 // page width (lineWidth), line spacing, contrast, motion, icons-only tabs: classes on <html> and --lh (style.css, end); also set at
 // first paint from the same localStorage entry (index.html)
 export const LINE_WIDTHS = [['narrow', 'Narrow (easier to read on a big screen)'], ['normal', 'Normal (default)'], ['wide', 'Wide'], ['full', 'Full (no limit)']];

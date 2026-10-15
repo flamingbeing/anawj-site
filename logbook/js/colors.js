@@ -11,6 +11,13 @@ export const PRESETS = [
   ['#6d4fc2', 'Purple'], ['#c2417a', 'Pink'], ['#c2410c', 'Orange'], ['#27272a', 'Graphite'],
 ];
 
+// Settings → Themes → Colour: suggested colours (owner, 15 Oct 2026): the NUH ones as they are, muted ones, and
+// pastels (the palette below darkens a pastel for text and buttons, so it shows as a soft tint), then Custom
+export const SWATCHES = [
+  ['NUH', [['#002f6c', 'NUHS navy (default)'], ['#e57200', 'NUH orange'], ['#e4002b', 'NUH red'], ['#178fd7', 'NUH blue']]],
+  ['Muted', [['#4f7f7a', 'Muted teal'], ['#7d9a78', 'Sage'], ['#8a7a9e', 'Dusty purple'], ['#5b6b7c', 'Slate']]],
+  ['Pastel', [['#f4c2d0', 'Blush pink'], ['#cdbfe8', 'Lavender'], ['#bfe5d3', 'Mint'], ['#f8cfb4', 'Peach'], ['#bcd7ef', 'Powder blue'], ['#f6e7a6', 'Butter yellow']]],
+];
 const HEX = /^#[0-9a-f]{6}$/i;
 export const cleanAccent = c => (HEX.test(String(c || '')) ? String(c).toLowerCase() : null);
 const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));

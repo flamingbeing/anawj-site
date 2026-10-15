@@ -10,6 +10,8 @@ import { feedbackRecord, sendProblem, taskText, byNewestFeedback, screenOf, TEXT
 
 
 let sentNote = false;   // after a send, the page says so until it is left
+let draft = '';   // text to start the box with (Themes → Suggest a theme), used once
+export const setFeedbackDraft = t => { draft = String(t || ''); sentNote = false; };
 const rerender = () => hooks.render();
 
 export function renderFeedbackSend() {
@@ -20,7 +22,8 @@ export function renderFeedbackSend() {
       h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: () => { sentNote = false; rerender(); } }, 'Send more feedback'))));
   }
   const text = h('textarea', { id: 'fb-text', rows: '6', maxlength: String(TEXT_MAX), 'aria-describedby': 'fb-count' });
-  const count = h('span', { id: 'fb-count', class: 'hint' }, `0 / ${TEXT_MAX}`);
+  if (draft) { text.value = draft; draft = ''; }
+  const count = h('span', { id: 'fb-count', class: 'hint' }, `${text.value.length} / ${TEXT_MAX}`);
   const doing = h('input', { id: 'fb-doing', type: 'text', maxlength: String(DOING_MAX), autocomplete: 'off' });
   const tick = h('input', { id: 'fb-tick', type: 'checkbox' });
   const note = h('p', { class: 'hint fb-problem', role: 'alert', hidden: true });

@@ -84,6 +84,7 @@ const ICONS = {
   admin: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4M12 15v2',   // a lock: admins only
   recovery: 'M3 11a9 9 0 1 1 3 8M3 4v7h7M12 7v5l3 2',
   data: 'M12 3v12M7 10l5 5 5-5M5 21h14',
+  themes: 'M12 3a9 9 0 1 0 0 18c1.1 0 1.5-.8 1.5-1.5 0-1-.8-1.4-.8-2.3 0-.9.7-1.4 1.6-1.4H17a4 4 0 0 0 4-4c0-4.4-4-7.8-9-7.8zM7.5 12h.01M9.5 8h.01M14.5 8h.01',   // a palette
   display: 'M3 5h18v12H3zM8 21h8M12 17v4',
   access: 'M12 5.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5 8l7 1.5L19 8M12 9.5V14M12 14l-3 7M12 14l3 7',   // a figure, arms out
   logging: 'M12 5v14M5 12h14',
@@ -134,7 +135,8 @@ const TABS = [
   { id: 'data', bar: true, short: 'Export', label: 'Export / Import', render: page(['logbook', 'notesExport', 'cloudSave', 'backup'], () => renderDataPage()), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
-  { id: 'display', label: 'Display', render: page(['settings'], m => m.settings.renderDisplay()), hidden: true, under: 'settings', unlisted: true, desc: 'Light or dark, colour, compact, borders; fonts and more under Advanced' },
+  { id: 'themes', label: 'Themes', render: page(['settings'], m => m.settings.renderThemes()), hidden: true, under: 'settings', unlisted: true, desc: 'Ready-made looks, colour, light or dark, the top band' },
+  { id: 'display', label: 'Display', render: page(['settings'], m => m.settings.renderDisplay()), hidden: true, under: 'settings', unlisted: true, desc: 'Compact mode, the screen it opens on; more under Advanced' },
   { id: 'access', label: 'Accessibility', render: page(['settings'], m => m.settings.renderAccessibility()), hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion, swipe gestures' },
   { id: 'displayadv', label: 'Advanced display', render: page(['settings'], m => m.settings.renderDisplayAdvanced()), hidden: true, under: 'display', unlisted: true, desc: 'The header and tab bar, Logbook rows, fonts, custom CSS' },
   { id: 'loggingadv', label: 'Advanced logging', render: page(['settings'], m => m.settings.renderLoggingAdvanced()), hidden: true, under: 'logging', unlisted: true, desc: 'Case tab parts, labelled parts and a case template, the keyboard, search, the week, undo, tips' },
@@ -219,7 +221,7 @@ function installCard() {
 // Search in Settings (owner): the options of every settings page and its Advanced page, read from the pages
 // themselves (each is drawn once, off screen, the first time someone types), so the index never goes stale.
 // A result opens its page and scrolls to the option, which flashes.
-const SEARCH_PAGES = ['showhide', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'tags', 'reflset', 'notesset', 'sharefmt', 'sendto', 'sync', 'account'];
+const SEARCH_PAGES = ['showhide', 'themes', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'tags', 'reflset', 'notesset', 'sharefmt', 'sendto', 'sync', 'account'];
 const SEARCH_MODS = ['settings', 'send', 'sync', 'account'];   // the modules those pages are drawn from
 let settingsIndex = null, findAfterRender = '';
 const optionText = n => {
@@ -303,7 +305,7 @@ function settingsSearch() {
 // Logging, Reflections, Notes and sharing, Data, Advanced. Search finds any option on any page.
 const SETTINGS_GROUPS = [
   ['Profile', ['showhide']],
-  ['Look', ['display', 'access']],
+  ['Look', ['themes', 'display', 'access']],
   ['Logging', ['logging', 'tags']],
   ['Reflections', ['reflset']],
   ['Notes and sharing', ['notesset', 'sharefmt', 'sendto', 'sync']],
@@ -815,7 +817,7 @@ document.addEventListener('touchend', async e => {
 // its counts in place; other screens re-render when nothing is being edited (pendingRender: declared above render()).
 // Settings pages that show no case data: drawing them again would only throw away what is half filled in there (a
 // sync place being added, a search being typed)
-const CASE_FREE = new Set(['settings', 'showhide', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'sendto', 'sync']);
+const CASE_FREE = new Set(['settings', 'showhide', 'themes', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'sendto', 'sync']);
 hooks.casesChanged = () => {
   paintWho();
   if (S.tab === 'log') return logCasesChanged();
@@ -1196,7 +1198,7 @@ addEventListener('keydown', e => {
   e.preventDefault();   // instead of the browser's own zoom, so the setting and the screen agree
   const v = stepZoom(dir);
   toast(`Zoom ${Math.round(v * 100)}%`, { ms: 1200 });
-  if (S.tab === 'display') render();
+  if (S.tab === 'display' || S.tab === 'themes') render();
 });
 if (cachedCompact()) document.body.classList.add('compact');   // first paint; corrected once the logbook loads
 paintWho();
