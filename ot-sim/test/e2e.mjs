@@ -113,7 +113,20 @@ try {
     assert.match(await page.textContent('#n-nibp-age'), /min ago|just now/);
     assert.ok(!/cycle/.test(await page.textContent('#n-nibp-age')), 'manual mode shows no cycle');
 
+    // fluids: a bolus runs and is counted; bleeding lowers the blood volume
+    await page.click('[data-fluid="crystalloid"][data-ml="250"]');
+    await page.evaluate(() => otsim.step(20));
+    assert.match(await page.textContent('#fluid-state'), /Running: crystalloid \d+ mL to go/);
+    await page.evaluate(() => otsim.step(3000));
+    assert.match(await page.textContent('#fluid-state'), /Given: crystalloid 250 mL/);
     await axe(page, `${name} theatre, Circulation tab`);
+    await page.click('#tab-pt');
+    const bv1 = await page.evaluate(() => otsim.state.cv.bloodVol);
+    await page.selectOption('#bleed', '100');
+    await page.evaluate(() => otsim.step(600));
+    assert.ok(await page.evaluate(v => otsim.state.cv.bloodVol < v - 50, bv1), `${name}: bleeding lowers blood volume`);
+    await page.selectOption('#bleed', '0');
+    await page.click('#tab-circ');
 
     // Drugs: a propofol bolus raises the plasma level at once and the effect site over the next minute and a half
     await page.click('#tab-drugs');

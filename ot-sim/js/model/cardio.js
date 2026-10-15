@@ -13,7 +13,8 @@
 // s, v and the effectors.
 
 import { exp, log } from './fmath.js';
-import { macAt, ceREq } from './pd.js';
+import { ceREq } from './pd.js';
+import { initFluids, fluidActions, stepFluids, hbOf } from './fluids.js';
 
 // defaults (MODEL.md section 5 and the prototype) [S/D]
 export const CV = {
@@ -109,6 +110,7 @@ export const cardio = {
       sHist: new Array(Math.round(HIST_S / state.dt) + 1).fill(0.5),
       eff: { hpV: 0.5, hpS: 0.5, svr: 0.5, vu: 0.5, ees: 0.5 },
       hr: CV.hr, map: CV.map, sbp: 0, dbp: 0, cvp: CV.cvp, lap: CV.lap, co: CV.co, svr: 0, edvL: lvEdv, s: 0.5, dc: 0,
+      fl: initFluids(p), bloodVol: BV, hb: p.hb0,
     };
   },
   step(prev, ctx) {
@@ -137,7 +139,10 @@ export const cardio = {
     // flows over this step (mL), capped at what is available
     const qL = Math.min((svL / rr) * dt, Math.max(0, c.Vp - 1)), qR = Math.min((svR / rr) * dt, Math.max(0, c.Vv - 1));
     const qS = Math.min(Math.max(0, (Psa - Psv) / Rsys) * dt, Math.max(0, c.Va - 1));
-    const Va = c.Va + qL - qS, Vv = c.Vv + qS - qR, Vp = c.Vp + qR - qL;
+    // fluids in and blood out through the veins (fluids.js)
+    const F = stepFluids(fluidActions(c.fl, ctx.actions), c.Va + c.Vv + c.Vp, c.Vv, Psa, dt);
+    const Va = c.Va + qL - qS, Vv = c.Vv + qS - qR + F.dV, Vp = c.Vp + qR - qL;
+    const bloodVol = Va + Vv + Vp;
 
     // baroreflex: filtered MAP, sigmoid, delays and lags
     const mapF = lag(c.mapF, Psa, dt, BARO.tauMap);
@@ -164,13 +169,13 @@ export const cardio = {
     const hp = Math.max(0.3, fx.T0 + fx.aV * eff.hpV - fx.aS * eff.hpS);
     const pp = (CV.ppFactor * svL) / CV.Ca, co = (svL / rr) * 0.06;
     return {
-      ...c, Va, Vv, Vp, svL, svR, rr, hp, mapF, sHist, eff, edvL, s, dc,
+      ...c, Va, Vv, Vp, svL, svR, rr, hp, mapF, sHist, eff, edvL, s, dc, fl: F.fl, bloodVol, hb: hbOf(F.fl, bloodVol),
       hr: 60 / rr, map: Psa, sbp: Psa + (2 / 3) * pp, dbp: Psa - pp / 3, cvp: R.P, lap: L.P, pa: Pp, co,
       svr: co > 0 ? ((Psa - R.P) / co) : 0, // Wood units (mmHg·min/L)
     };
   },
   rebase(c) { return c; },
-  trend(c) { return { hr: c.hr, sbp: c.sbp, dbp: c.dbp, map: c.map, co: c.co, cvp: c.cvp }; },
+  trend(c) { return { hr: c.hr, sbp: c.sbp, dbp: c.dbp, map: c.map, co: c.co, cvp: c.cvp, hb: c.hb, bloodVol: c.bloodVol }; },
 };
 
 // total blood volume in the circulation, mL (tests)

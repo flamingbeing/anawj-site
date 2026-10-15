@@ -67,6 +67,13 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Decisions log
 
+- 15 Oct 2026 (M2.2): `fluids.js` is called by `cardio.js` (state `cv.fl`), so volume stays in one slice; everything
+  enters or leaves through the veins. Crystalloid excess `cx` leaves to the interstitium and urine at Hahn's
+  MAP-dependent rates (k21 taken as 0); colloid leaves with t½ 2.5 h; red cells add 280 mL and 56 g of Hb; bleeding
+  removes whole blood (Hb, crystalloid and colloid in proportion). Bags run at 50 mL/min, a red-cell unit over about
+  10 min [D]. Haemorrhage reproduces the prototype awake; the GA haemorrhage test sets `vol.mac` 1.6 by hand until
+  M2.5 (sevoflurane's own drives get tuned there). Stub until scenarios (M4): surgical bleeding on the Patient tab.
+
 - 15 Oct 2026 (M2.1): `cardio.js` as in MODEL.md section 5 (as-built notes there): the prototype's structure and
   numbers reproduce (steady state exact, propofol 2 mg/kg SBP −17.9 at 2 min, steady Ce 1 −10.5%). `pd.auto` became a
   graded response, because a probability could not give the laryngoscopy rise; brief stimuli now last 60 s. Beat

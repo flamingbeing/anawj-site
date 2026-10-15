@@ -45,6 +45,7 @@ function panels(force = false) {
   if (!force && now - panelsAt < 500) return;
   panelsAt = now;
   drugs.update(sim.state);
+  if (!$('panel-circ').hidden) { const t = fluidText(sim.state); if ($('fluid-state').textContent !== t) $('fluid-state').textContent = t; }
   if (!$('panel-pt').hidden) { const h = eventsHtml(sim.state); if ($('events').innerHTML !== h) $('events').innerHTML = h; }
   if ($('behind-box').open) { const h = behindHtml(sim.state); if ($('behind').innerHTML !== h) $('behind').innerHTML = h; }
 }
@@ -78,6 +79,14 @@ $('surgery').addEventListener('click', () => {
   sim.act({ type: 'stimulus', kind: 'surgery', level: on ? 0.8 : 0 });
   acted();
 });
+for (const b of document.querySelectorAll('[data-fluid]')) b.addEventListener('click', () => { sim.act({ type: 'fluid', product: b.dataset.fluid, ml: +b.dataset.ml }); acted(); });
+$('bleed').addEventListener('change', () => { sim.act({ type: 'bleed', mlPerMin: +$('bleed').value }); acted(); });
+const PRODUCT_NAME = { crystalloid: 'crystalloid', colloid: 'colloid', rbc: 'red cells' };
+function fluidText(state) {
+  const fl = state.cv.fl, run = fl.running.map(r => `${PRODUCT_NAME[r.product]} ${Math.round(r.left)} mL to go`);
+  const given = Object.entries(fl.given).filter(([, v]) => v > 0.5).map(([k, v]) => `${PRODUCT_NAME[k]} ${Math.round(v)} mL`);
+  return [run.length ? `Running: ${run.join(', ')}.` : '', given.length ? `Given: ${given.join(', ')}.` : ''].filter(Boolean).join(' ');
+}
 const EVENT_TEXT = {
   asleep: () => 'No longer responds to voice', awake: () => 'Responds to voice again',
   movement: e => `Moved at ${e.stimulus === 'surgery' ? 'the start of surgery' : e.stimulus}`,

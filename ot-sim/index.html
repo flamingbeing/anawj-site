@@ -159,7 +159,14 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
           <button type="button" id="nibp-go">Start NIBP</button>
           <label>Cycle <select id="nibp-cycle"></select></label>
         </div>
-        <p class="hint">Fluids, blood and the circulation's controls come in the next updates.</p>
+        <h3 class="sub">Fluids and blood</h3>
+        <div class="act">
+          <button type="button" data-fluid="crystalloid" data-ml="250">Crystalloid 250 mL</button>
+          <button type="button" data-fluid="crystalloid" data-ml="500">Crystalloid 500 mL</button>
+          <button type="button" data-fluid="colloid" data-ml="250">Colloid 250 mL</button>
+          <button type="button" data-fluid="rbc" data-ml="280">Red cells, 1 unit</button>
+        </div>
+        <p class="state" id="fluid-state"></p>
       </div>
       <div class="panel" role="tabpanel" id="panel-pt" aria-labelledby="tab-pt" hidden>
         <div class="act"><button type="button" id="talk">Talk to the patient</button></div>
@@ -172,6 +179,7 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
           <button type="button" data-stim="incision">Skin incision</button>
           <button type="button" id="surgery" aria-pressed="false">Surgery running</button>
         </div>
+        <div class="act"><label>Surgical bleeding <select id="bleed"><option value="0">None</option><option value="20">20 mL/min</option><option value="50">50 mL/min</option><option value="100">100 mL/min</option><option value="300">300 mL/min</option></select></label></div>
         <h3 class="sub">Events</h3>
         <ol class="given" id="events"><li class="none">Nothing yet</li></ol>
       </div>
