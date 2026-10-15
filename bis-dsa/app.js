@@ -791,6 +791,7 @@ var onColumn=()=>{dirty=true;};
 function frame(now){requestAnimationFrame(frame);try{frameBody(now);}catch(e){const el=$('err');if(el&&el.hidden){el.hidden=false;el.textContent='Display error: '+e.message;}}}
 function frameBody(now){const dt=Math.min(0.1,(now-last)/1000);last=now;
  if(!paused){const target=simT+dt*speed;const need=Math.floor(target*FS)-Math.floor(simT*FS);simT=target;nmStep(dt*speed);step(need);stepR(need);runStory();}
+ if(typeof tlTick==='function')tlTick();
  if(mon.skin==='advance')advTick(dirty);
  if(mon.skin==='sedline')sedTick(dirty);
  if(mon.skin==='philips')pvTick(dirty);

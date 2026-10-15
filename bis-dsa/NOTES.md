@@ -615,7 +615,7 @@ BIS", the BIS INOPs and the factory defaults), and the owner's photo; reference 
   has none.
 - Layout from the photo, 1440 x 900 design pixels (16:10): info line, alarm/INOP field top left, ECG II, Pleth and EEG waves
   on the left, HR, Pulse, ST-II, SpO2 and BIS with SQI/EMG/SR on the right, NBP with its list of readings, SmartKeys.
-- BIS colour is yellow, Philips' factory colour and what the owner's monitor shows (the photo's glare made it look white; owner,
+- BIS colour is a pale, desaturated yellow (#e4da98; owner, 15 Oct 2026), Philips' factory colour and what the owner's monitor shows (the photo's glare made it look white; owner,
   15 Oct 2026). White is a choice in Main Setup, "BIS colour".
 - Setup BIS (tap BIS or the EEG): factory defaults High Limit 70, Low Limit 20, Alarms On, Scale 100µV; Smoothing Rate is the
   page's smoothing (10/15/30 s). Show Sensor opens "BIS 4 Electrode Sensor" with Start Sensor Chk and Last Check.
@@ -625,3 +625,17 @@ BIS", the BIS INOPs and the factory defaults), and the owner's photo; reference 
   5 minutes from depth. The EEG is the left engine's signal scaled like SedLine's (`PV_EEG_GAIN`).
 - Font: no source names Philips' typeface; its numerals are tall and narrow with a footless 1. Selawik Semibold (already bundled
   for BIS Advance) squeezed to 80 % width matches well.
+
+## Case timeline (owner, 15 Oct 2026)
+
+`timeline.js` (test `test/timeline.e2e.mjs`): a bar of the case under the monitor switch and buttons −15, −5, −1, +1, +5, +15 min;
+a tap on the bar jumps there. It works the same on every monitor.
+
+- Forward runs the simulation on at full speed (app.js's own `step()`, in 1 s steps, 60 s per slice so the page stays alive;
+  about 6 s for 15 min on a laptop). It is a new run, not a replay.
+- Back: every 30 s of simulated time a save point keeps both engines and their per-channel state, the relaxant model, the case
+  story and the drug controls. A jump back restores the last save point at least 20 s before the chosen time (so the EEG buffer
+  refills), cuts the trend history there and runs on to the exact second. The drug controls go back to what they were then.
+- What came after is dropped (shown hatched on the bar, "… ahead was rewound"); marks made in it (Medtronic gaps, BIS Advance
+  snapshots and events, SedLine gaps) go with it. The start of the case (the page's first live second) is the earliest point.
+- Drug-control changes show as yellow ticks on the bar. Medtronic keeps DSA + AMPL under the DSA (owner, 15 Oct 2026).

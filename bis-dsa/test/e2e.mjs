@@ -291,5 +291,6 @@ try {
   await import('./adv.e2e.mjs'); // the BIS Advance screen
   await import('./sed.e2e.mjs'); // the Masimo SedLine screen
   await import('./pv.e2e.mjs'); // the Philips IntelliVue screen
+  await import('./timeline.e2e.mjs'); // the case timeline (jump back and forward)
   console.log('bis-dsa e2e: ok');
 } finally { await b.close(); }
