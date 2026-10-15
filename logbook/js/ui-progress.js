@@ -396,6 +396,9 @@ export function countSwitch() {
     [['all', 'All tags'], ['min', 'Towards minimums']].map(([v, t]) => h('button', { type: 'button', class: 'small', 'aria-pressed': String(countMode() === v), onclick: set(v) }, t)));
 }
 
+// a Category cell: at most a third of the width; long names wrap, and a word too wide for it scrolls sideways inside
+// the cell (owner, 15 Oct 2026). No tooltips (tap and hold clashed with selecting text).
+const catCell = (...kids) => h('td', { class: 'cat' }, h('div', { class: 'cat-in' }, ...kids));
 export function totalsTable(people) {
   const prog = people.map(p => Object.fromEntries(progress(p.counts || {}, p.rYear || 1).map(x => [x.code, x])));
   const codes = CATEGORIES.filter(c => !c.retired || people.some(p => (p.counts || {})[c.code])).map(c => c.code);
@@ -413,7 +416,7 @@ export function totalsTable(people) {
     const tgt = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${appYear(y)}`).join(' | ');
     const tgtR = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${y}`).join(' | ');   // the download keeps R4/R5
     data.rows.push({ label: catName(code) + (tgtR ? ` [${tgtR}]` : ''), values: vals, statuses: sts });
-    add(tbody, h('tr', {}, h('td', { class: 'cat', title: BY_CODE[code].full }, catName(code), tgt ? h('small', { class: 'tgt' }, tgt) : null),
+    add(tbody, h('tr', {}, catCell(catName(code), tgt ? h('small', { class: 'tgt' }, tgt) : null),
       vals.map((v, i) => h('td', { class: `n ${sts[i]}` }, v == null ? '–' : String(v)))));   // no tooltips: tap and hold clashed with selecting text (owner)
   }
   const totals = people.map(p => p.total || 0);
@@ -422,10 +425,10 @@ export function totalsTable(people) {
   const tagLabel = min ? `Total towards the minimums (of ${MINIMUM_TOTAL})` : 'Total tags (all cases, every year)';
   data.rows.push({ label: tagLabel, values: tags }, { label: 'Total cases', values: totals }, { label: 'Reflections (towards the 96 needed)', values: refl });
   add(tbody, 
-    h('tr', { class: 'total' }, h('td', { class: 'cat', title: min ? 'Each tag counted up to its last target' : 'Every tag on every case, added up (a case with 3 tags adds 3)' },
+    h('tr', { class: 'total' }, catCell(
       min ? 'Towards minimums' : 'Total tags', h('small', { class: 'tgt' }, min ? `of the ${MINIMUM_TOTAL} needed` : 'every tag on every case')), tags.map(v => h('td', { class: 'n' }, String(v)))),
-    h('tr', { class: 'total' }, h('td', { class: 'cat' }, 'Total cases'), totals.map(v => h('td', { class: 'n' }, String(v)))),
-    h('tr', {}, h('td', { class: 'cat', title: 'Counted towards each heading’s minimum only' }, 'Reflections', h('small', { class: 'tgt' }, 'towards the 96 needed')), refl.map(v => h('td', { class: 'n' }, String(v)))));
+    h('tr', { class: 'total' }, catCell('Total cases'), totals.map(v => h('td', { class: 'n' }, String(v)))),
+    h('tr', {}, catCell('Reflections', h('small', { class: 'tgt' }, 'towards the 96 needed')), refl.map(v => h('td', { class: 'n' }, String(v)))));
   const thead = h('thead', {}, h('tr', {}, h('th', {}, 'Category'),
     people.map(p => h('th', { class: `rot ${p.rid === meId ? 'me' : ''}` }, `${p.name} · ${p.smo ? 'SMO' : p.rYear ? yearName(p.rYear) : '?'}`))));
   data.title = `${tview.year ? (tview.year === 3 && people.some(p => p.smo) ? 'R3 / SMO' : 'R' + tview.year) : 'Year unknown'} totals${min ? ' (towards the minimums)' : ''} — ${todayISO()}`;

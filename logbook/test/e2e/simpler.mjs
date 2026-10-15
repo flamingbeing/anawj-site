@@ -150,6 +150,8 @@ try { for (const width of [390, 1280]) {
   assert.equal(await p.locator('table.totals thead th').first().innerText(), 'Category');
   assert.equal(await p.locator('table.totals thead th.rot').first().evaluate(e => getComputedStyle(e).position), 'sticky');
   assert.equal(await p.locator('table.totals td.n[title]').count(), 0);
+  assert.equal(await p.locator('table.totals td.cat .cat-in').first().evaluate(e => getComputedStyle(e).overflowX), 'auto', 'a long category scrolls sideways');
+  assert.equal(await p.locator('table.totals td[title]').count(), 0, 'no tooltips');
   assert.ok(await p.evaluate(() => { const t = document.querySelector('table.totals'), sw = [...document.querySelectorAll('main .seg button')].find(b => /All tags/.test(b.textContent)); return !!sw && !!(t.compareDocumentPosition(sw) & Node.DOCUMENT_POSITION_FOLLOWING); }), 'All tags / Towards minimums below the table');
   const zipDl = p.waitForEvent('download'); await p.getByRole('button', { name: 'Download all years (zip)' }).click();
   assert.match((await zipDl).suggestedFilename(), /^totals-all-years-\d{4}-\d{2}-\d{2}\.zip$/);
