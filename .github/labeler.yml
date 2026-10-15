@@ -12,6 +12,9 @@ nuh-roster:
 ntf-roster:
   - changed-files:
       - any-glob-to-any-file: 'ntf-roster/**'
+nuh-junior-monthly:
+  - changed-files:
+      - any-glob-to-any-file: 'nuh-junior-monthly/**'
 prewarm:
   - changed-files:
       - any-glob-to-any-file: 'prewarm/**'

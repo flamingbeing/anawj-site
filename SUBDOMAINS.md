@@ -17,6 +17,7 @@ The rule for new apps is in `AGENTS.md`.
 | `hand.anawj.com/handlog/` | `hand-log/` | Hand DOPS/Mini-CEX log; data on the phone only, no sign-in (owner, 13 Oct 2026). |
 | `prewarmstudy.anawj.com/` | `prewarm/` | **Real study data.** The name is a reminder that it holds sensitive data and stays isolated. |
 | `nuhroster.anawj.com/` | `nuh-roster/` | Own Firebase project `nuh-roster`. |
+| `nuhjuniormonthly.anawj.com/` | `nuh-junior-monthly/` | NUH junior monthly roster helper (15 Oct 2026). Data in the browser. Needs the owner's custom-domain click. |
 | `ntfroster.anawj.com/` | `ntf-roster/` | NTF anaesthesia monthly duty roster (15 Oct 2026). Data in the browser until its own Firebase project `ntf-roster` exists. Needs the owner's custom-domain click. |
 | `apmes.anawj.com/logbook/` | `logbook/` | With evals: one Firebase project (`apmes-logbook`), one sign-in. |
 | `apmes.anawj.com/evals/` | `evals/` | |
