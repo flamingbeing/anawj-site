@@ -603,3 +603,25 @@ checked against a photo of a Root. Look chosen: the 2017/2018 builds (ADULT pill
 - Medtronic BIS opens with about 35 minutes of earlier trend (an awake patient, made by adv-seed.js, kept in `MT.pre`, never in
   HIST), so its DSA is full like the owner's photos; time labels then fall on whole clock steps. Clear Trend empties it.
 - BIS Advance DSA keeps 25 % (was 45 %) of the column before, for the finer minute-to-minute grain of the real screen.
+
+## Philips IntelliVue (`philips`), 15 Oct 2026
+
+The owner asked for the BIS view on a Philips IntelliVue patient monitor (photo of an MX800 in theatre). Files: `pv-screen.js`,
+`pv.css`, test `test/pv.e2e.mjs` (run by `e2e.mjs`). Sources: Philips' Instructions for Use, MX400-800 Release N ("Monitoring
+BIS", the BIS INOPs and the factory defaults), and the owner's photo; reference copies stay out of the repo.
+
+- What IntelliVue shows for BIS: the EEG wave (label `EEG`, a `100µV` calibration bar, 25 mm/s) and the numerics BIS, SQI, EMG,
+  SR (SEF and TP off by default). **There is no BIS DSA on IntelliVue** (only the separate EEG module has a CSA), so this screen
+  has none.
+- Layout from the photo, 1440 x 900 design pixels (16:10): info line, alarm/INOP field top left, ECG II, Pleth and EEG waves
+  on the left, HR, Pulse, ST-II, SpO2 and BIS with SQI/EMG/SR on the right, NBP with its list of readings, SmartKeys.
+- BIS colour is yellow, Philips' factory colour and what the owner's monitor shows (the photo's glare made it look white; owner,
+  15 Oct 2026). White is a choice in Main Setup, "BIS colour".
+- Setup BIS (tap BIS or the EEG): factory defaults High Limit 70, Low Limit 20, Alarms On, Scale 100µV; Smoothing Rate is the
+  page's smoothing (10/15/30 s). Show Sensor opens "BIS 4 Electrode Sensor" with Start Sensor Chk and Last Check.
+- Alarms and INOPs use Release N wording: `** BIS High` / `** BIS Low` (yellow, the numeric flashes), `BIS SQI < 15%` and
+  `BIS IsoelectricEEG` (light blue). Silence acknowledges (a tick before the text). No sounds yet.
+- Stand-ins (not simulated physiology): HR drifts and follows depth a little, Pulse is HR - 1, SpO2 100, ST-II 0.3, NBP every
+  5 minutes from depth. The EEG is the left engine's signal scaled like SedLine's (`PV_EEG_GAIN`).
+- Font: no source names Philips' typeface; its numerals are tall and narrow with a footless 1. Selawik Semibold (already bundled
+  for BIS Advance) squeezed to 80 % width matches well.

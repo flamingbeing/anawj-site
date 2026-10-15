@@ -600,14 +600,14 @@ function scaleUI(){$('kScale').textContent=`EEG ±${mon.scale} µV`;}
 function trendUI(){$('kTrend').textContent=`Trend ${mon.trend} min`;$('kBottom').textContent='Bottom: '+(mon.bottom==='emg'?'BIS + EMG':mon.bottom==='sr'?'BIS + SR':'BIS trend');
  txt('dsaRange',(mon.dbLo===DB_LO&&mon.dbHi===DB_HI?'':`${mon.dbLo}…${mon.dbHi} dB · `)+`last ${mon.trend} min`);}
 let menuOpen=false; // the on-screen Menu (VISTA and two-sided screens)
-function applySkin(s,reset,init){mon.skin=s;mtApply();$('vistaWrap').hidden=s!=='vista';$('sedWrap').hidden=s!=='sedline';if(s==='sedline')sedApply();$('advWrap').hidden=s!=='advance';if(s==='advance')advApply();$('classicWrap').hidden=s!=='classic';$('teachStrip').hidden=s==='classic';$('bilSum').hidden=s!=='sedline'&&s!=='advance';
+function applySkin(s,reset,init){mon.skin=s;mtApply();$('vistaWrap').hidden=s!=='vista';$('sedWrap').hidden=s!=='sedline';if(s==='sedline')sedApply();$('advWrap').hidden=s!=='advance';if(s==='advance')advApply();$('pvWrap').hidden=s!=='philips';if(s==='philips')pvApply();$('classicWrap').hidden=s!=='classic';$('teachStrip').hidden=s==='classic';$('bilSum').hidden=s!=='sedline'&&s!=='advance'&&s!=='philips';
  document.querySelectorAll('#skinSeg button,#monSwitch button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.skin===s));
  $('keySeg').hidden=s!=='classic';if(s==='classic')closeMenu(true);
  if(reset){mon.scale=s==='classic'?100:50;mon.sweep=s==='classic'?'auto':8;}
  scaleUI();dispUI(false);trendUI();if(!init){dirty=true;try{localStorage.setItem('bisdsa.skin',s);}catch(e){}if(reset)saveDisp();}}
 document.querySelectorAll('#skinSeg button,#monSwitch button').forEach(b=>b.onclick=()=>applySkin(b.dataset.skin,true));
 // the Menu: tap an item to step through its values; settings are the same ones the soft keys and Display panel change
-const RANGES=[[-3,31],[0,25],[5,20],[-9,40]],SKINS=[['vista','Medtronic BIS'],['advance','BIS Advance'],['sedline','SedLine']];
+const RANGES=[[-3,31],[0,25],[5,20],[-9,40]],SKINS=[['vista','Medtronic BIS'],['advance','BIS Advance'],['sedline','SedLine'],['philips','IntelliVue']];
 const MENU=[
  ['Smoothing rate',()=>mon.smooth+' s',()=>$('kSmooth').click()],
  ['EEG scale',()=>`±${mon.scale} µV`,()=>$('kScale').click()],
@@ -637,7 +637,7 @@ $('tReset2').onclick=()=>{tim.sup=tim.low=R.tim.sup=R.tim.low=0;dirty=true;};
 function setTeach(on){mon.teach=on;$('mTeach').checked=on;$('vZone').hidden=!on;$('tgtCap').hidden=!on;dirty=true;try{localStorage.setItem('bisdsa.teach',on?'1':'0');}catch(e){}}
 $('mTeach').onchange=e=>setTeach(e.target.checked);
 try{if(localStorage.getItem('bisdsa.teach')==='0')setTeach(false);}catch(e){}
-let skin0='vista';try{{const q=localStorage.getItem('bisdsa.skin');if(['classic','advance','sedline'].includes(q))skin0=q;}}catch(e){}
+let skin0='vista';try{{const q=localStorage.getItem('bisdsa.skin');if(['classic','advance','sedline','philips'].includes(q))skin0=q;}}catch(e){}
 applySkin(skin0,true,true);
 try{const d=JSON.parse(localStorage.getItem('bisdsa.disp')||'null');if(d&&['auto',4,8,16].includes(d.sweep)){mon.sweep=d.sweep;dispUI(false);}}catch(e){}
 $('pause').onclick=()=>{paused=!paused;$('pause').setAttribute('aria-pressed',paused);$('pause').textContent=paused?'Resume':'Pause';};
@@ -793,6 +793,7 @@ function frameBody(now){const dt=Math.min(0.1,(now-last)/1000);last=now;
  if(!paused){const target=simT+dt*speed;const need=Math.floor(target*FS)-Math.floor(simT*FS);simT=target;nmStep(dt*speed);step(need);stepR(need);runStory();}
  if(mon.skin==='advance')advTick(dirty);
  if(mon.skin==='sedline')sedTick(dirty);
+ if(mon.skin==='philips')pvTick(dirty);
  if(dirty){paintOff();drawTrend();drawDsa();if(mon.skin==='vista'){paintV();drawVDsa();}readouts();stimUI();dirty=false;}
  drawEeg();if(mon.skin==='vista')drawVEeg();
  if(exPlaying){exT+=dt;if(exT>=T[6]){exT=0;snapshotEx();}}

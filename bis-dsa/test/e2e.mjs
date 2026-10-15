@@ -290,5 +290,6 @@ try {
   assert.deepEqual(errors, [], 'page errors');
   await import('./adv.e2e.mjs'); // the BIS Advance screen
   await import('./sed.e2e.mjs'); // the Masimo SedLine screen
+  await import('./pv.e2e.mjs'); // the Philips IntelliVue screen
   console.log('bis-dsa e2e: ok');
 } finally { await b.close(); }
