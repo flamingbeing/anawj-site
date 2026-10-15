@@ -308,15 +308,19 @@ export function splitAge(details) {
   const s = String(details || '');
   const compound = s.match(/^\s*(\d{1,3}m\d{1,2}w[MF]?)(?![A-Za-z])[\s,;:\-]*/i);
   const m = compound || s.match(AGE_SEX);
-  return m ? { age: m[1].replace(/\s+/g, ''), rest: s.slice(m[0].length).trim() } : { age: '', rest: s.trim() };
+  // no one is over 120 years: "150M …" is a number, not an age (15 Oct 2026)
+  if (!m || (!compound && overAge(m[1]))) return { age: '', rest: s.trim() };
+  return { age: m[1].replace(/\s+/g, ''), rest: s.slice(m[0].length).trim() };
 }
+export const MAX_AGE = 120;
+const overAge = age => { const x = String(age || '').replace(/\s+/g, '').match(/^(\d+)(yo|y\/o|yrs?|years?|y)?[mf]?$/i); return !!x && Number(x[1]) > MAX_AGE; };
 
 // Human-readable preview only; the original shorthand stays in the case text.
 export function humanAge(age) {
   const compound = String(age || '').match(/^(\d{1,3})m(\d{1,2})w([mf])?$/i);
   if (compound) return Number(compound[1]) + ' month' + (Number(compound[1]) === 1 ? '' : 's') + ' ' + Number(compound[2]) + ' week' + (Number(compound[2]) === 1 ? '' : 's') + (compound[3] ? ' · ' + (compound[3].toLowerCase() === 'm' ? 'male' : 'female') : '');
   const m = String(age || '').match(/^(\d{1,3})(mo|m\/o|\/12|\/52|d\/o|yo|y\/o|yrs?|years?|y)?([mf])?$/i);
-  if (!m) return String(age || '');
+  if (!m || overAge(age)) return String(age || '');
   const n = Number(m[1]), unit = (m[2] || '').toLowerCase();
   const name = ['mo', 'm/o', '/12'].includes(unit) ? 'month' : unit === '/52' ? 'week' : unit === 'd/o' ? 'day' : 'year';
   return n + ' ' + name + (n === 1 ? '' : 's') + (m[3] ? ' · ' + (m[3].toLowerCase() === 'm' ? 'male' : 'female') : '');
