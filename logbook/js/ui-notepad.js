@@ -97,7 +97,7 @@ async function healClosed(job, me) {
   const group = writes.entries().filter(x => x.kind === 'note' && x.record.id === job.record.id && (x.state === 'pending' || x.state === 'conflict'));
   const local = group[0] ? group[0].record : job.record, first = group.at(-1) || job;
   const base = 'base' in first ? first.base : null;
-  await writes.archive(job.key);
+  await writes.archive((group[0] || job).key);   // (the newest: archive sets aside that one and older)
   await writes.save('note', me, mergeDayNote(local, base, job.remote), job.remote || null);
 }
 // the notes as the server has them (not a possibly stale offline copy), for anything that must not miss one (Sync,
@@ -197,9 +197,10 @@ async function mergeOver(n, s, me, job) {
   // merged against the base the first unsynced save was written from (all of them are set aside together): s.base has
   // moved on to the saved copy once a save was accepted (before the server answered), and against that the text typed
   // since would look like nothing new
-  const first = writes.entries().filter(x => x.kind === 'note' && x.record.id === n.id && (x.state === 'pending' || x.state === 'conflict')).at(-1) || job;
+  const group = writes.entries().filter(x => x.kind === 'note' && x.record.id === n.id && (x.state === 'pending' || x.state === 'conflict'));
+  const first = group.at(-1) || job;
   const base = 'base' in first ? first.base : s.base;
-  await writes.archive(job.key);
+  await writes.archive((group[0] || job).key);
   const merged = mergeDayNote(n, base, job.remote);
   for (const k of Object.keys(n)) if (!(k in merged)) delete n[k];
   Object.assign(n, merged);

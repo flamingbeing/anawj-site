@@ -164,10 +164,12 @@ async function restoreBackup(file) {
           const added = p.cases.length ? await addMissingCases(p.cases) : [];
           if (S.resident) for (const img of p.images) await cloud.saveImage(mine(), img);   // photos: programme residents only (rules)
           const addedRefl = p.refl.length ? await cloud.addMissing(mine(), 'reflection', p.refl) : [];
-          for (const n of p.notes) await writes.save('note', mine(), n, null);   // (base null: never over an existing note)
+          // a note with a change made elsewhere still to choose is kept in Recent changes; the rest of the restore goes on
+          let held = 0;
+          for (const n of p.notes) await writes.save('note', mine(), n, null).catch(err => { if (writes.status('note', n.id) !== 'conflict') throw err; held++; });   // (base null: never over an existing note)
           if (p.newTpl.length) await patchLogbook({ templates: [...((S.logbook && S.logbook.templates) || []), ...p.newTpl] });
           if (p.extra.length) await patchLogbook({ ...(p.profile ? { profile: p.profile } : {}), ...(p.name ? { name: p.name } : {}), ...(Object.keys(p.newSettings).length ? { settings: p.newSettings } : {}) });
-          toast(`Restored ${added.length} cases, ${addedRefl.length} reflections${p.notes.length ? `, ${p.notes.length} notes` : ''}`);
+          toast(`Restored ${added.length} cases, ${addedRefl.length} reflections${p.notes.length - held ? `, ${p.notes.length - held} notes` : ''}${held ? ` (${held} changed elsewhere: see Recent changes)` : ''}`);
         } catch (err) { toast('Restore stopped: ' + err.message); }
       } }, 'Restore')),
   ]);

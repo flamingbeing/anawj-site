@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-14 by Claude Code (plan session: build plan written; no simulator yet).
+Last updated: 2026-10-15 by Claude Code (build session: M2.2-M2.6, one combined PR).
 
 ## Now
 
@@ -10,7 +10,6 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Waiting on the owner
 
-- **Go-ahead to start building** (the owner asked for a plan first, 14 Oct 2026). Read `DESIGN.md` "In short".
 - Answers to the 11 questions at the end of `DESIGN.md` (monitor brand, TCI model, airway and resuscitation
   algorithms, crisis guideline defaults, NUH drugs and products including dantrolene, sevoflurane MAC, fentanyl ke0,
   scenario order, scores, processed EEG). The build can start on the defaults given there.
@@ -20,11 +19,31 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next
 
-1. On the owner's go: M0.1 (model loop, seeded RNG, `fmath.js`, patient covariates, determinism tests), then the PR
+1. M2.2 (fluids and bleeding), M2.3 (vasoactive drugs), M2.4 (gas exchange and breathing), then the rest of the PR
    order in `DESIGN.md`, one PR at a time, each merged before the next.
 
 ## Recently done
 
+- M2.1 (15 Oct 2026): circulation (`cardio.js`, `rhythm.js`): three compartments, beat-latched stroke volumes, the
+  baroreflex, empty-ventricle decompensation, propofol, opioid and stimulus drives. Heart rate, blood pressure and the
+  waveforms now follow the model; "Behind the monitor" shows output, SVR, CVP and the reflex.
+- M1.4 (15 Oct 2026, #577): hypnosis (asleep by one rule for everyone, the patient's own sensitivity), the stimulus response
+  (movement unless paralysed), the BIS-like index and the autonomic drive; a Patient tab (talk, stimuli, events).
+- M1.3 (15 Oct 2026, #576): neuromuscular block: rocuronium, suxamethonium, sugammadex, neostigmine; TOF on the monitor
+  every 15 s, PTC on request; the block by muscle in "Behind the monitor". Tuned to the trials' acceleromyography;
+  known misses in MODEL.md.
+- M1.2 (15 Oct 2026, #575): syringe pumps with their own predicted model (Schnider, Marsh, Minto), plasma and effect-site
+  TCI; the Drugs tab (boluses for the patient's weight, custom doses, infusions, TCI), the Circulation tab (NIBP) and
+  "Behind the monitor" (the pump's prediction beside the true level).
+- M1.1 (14 Oct 2026, #573): `pk.js` and `drugs.js`: propofol (Schnider, haemodynamic effect site), remifentanil (Minto),
+  fentanyl, alfentanil, midazolam, ketamine, Marsh for the pump; boluses and infusions as actions; between-patient
+  PK variation. Model only (the Drugs tab comes with M1.2).
+- M0.2 (14 Oct 2026, #572): first monitor at `#theatre`: library screen, sweeping ECG, pleth and capnogram lanes (real pace
+  at 5x and 20x), HR, SpO2, EtCO2, RR, NIBP (cycle, start/stop) and temperature, speed keys and pause, fonts, the
+  old-address forward, `?seed` and `?test`.
+- M0.1 (14 Oct 2026, #570): `js/model/` loop (`sim.js`, fixed 0.1 s Jacobi step, snapshot, replay, event ring, trends,
+  300 s warm start), `rng.js` (sfc32, named streams), `fmath.js` (exact exp, log, pow, sin, cos), `patient.js`
+  (covariates and variation), a placeholder `vitals.js`; tests for maths, determinism, purity and the patient.
 - Build plan (14 Oct 2026): `DESIGN.md`, `MODEL.md`, `SCENARIOS.md`, `research/`; brief corrected (Marsh example);
   revised after two reviews, prototypes of the riskiest models and a source check (`research/prototypes.md`).
 - Environment prepared: folder, address, labels, CI hooks, test runner, smoke test, build brief (14 Oct 2026).

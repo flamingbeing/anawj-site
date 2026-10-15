@@ -1,29 +1,59 @@
 import { recoveryStore, recordSignature } from './recovery-store.js';
 const copy = value => JSON.parse(JSON.stringify(value));
 const keyOf = job => job.kind + ':' + job.record.id;
+const same = (a, b) => recordSignature(a) === recordSignature(b);
 const terminal = new Set(['synced', 'archived']);
+const KEEP = 100;   // finished saves kept in the device history (Recent changes)
 // the network dropped mid-save (Firestore: 'unavailable', 'deadline-exceeded'): the job stays pending and tries again
 const transient = error => error?.code === 'unavailable' || error?.code === 'deadline-exceeded';
-export function createWriteQueue({ store, backend, getOwner = () => null, normalize = (_kind, value) => value, online = () => true, delay = ms => new Promise(r => setTimeout(r, ms)) }) {
+const failure = job => new Error(/Recent changes/.test(job.error) ? job.error : job.error + ' — a copy is kept in Recent changes');
+export function createWriteQueue({ store, backend, getOwner = () => null, normalize = (_kind, value) => value, online = () => true, delay = ms => new Promise(r => setTimeout(r, ms)), notice = () => {} }) {
   let owner = null, generation = 0, jobs = [], loading = null, storageError = '';
   const running = new Map(), listeners = new Set(), waits = new Map();
   const notify = () => { for (const fn of listeners) fn(); };
   const current = (email, gen) => owner === email && generation === gen && getOwner() === email;
   const ordered = () => [...jobs].sort((a, b) => a.at - b.at || a.key.localeCompare(b.key));
+  // a record's saves not yet done with, oldest first: only the first is ever sent
+  const chainOf = id => ordered().filter(x => keyOf(x) === id && !terminal.has(x.state));
   async function persist(job) { await store.put(copy(job)); }
+  // Another window on this device (a second tab, or the home-screen app beside the browser) shares the store and may
+  // have sent or set aside a job since this one read it: what it stored wins, or this window sends its stale copy
+  // later (a case deleted there comes back, one restored there is deleted again). Two windows sending one job at the
+  // same moment is harmless (checkWrite: same content); no Web Lock, which a frozen background window would hold.
+  // -> true when the job moved on
+  async function refresh(job) {
+    let stored;
+    try { stored = await store.get(job.key); } catch { return false; }   // unreadable: carry on as before
+    // Not there: another window finished it and later pruned it (KEEP newer finished ones are then there), or the
+    // browser cleared the site's storage (this window's copy may be the only one, so it goes)
+    if (!stored) {
+      let newer = 0;
+      try { newer = (await store.list(job.owner)).filter(x => terminal.has(x.state) && x.at >= job.at).length; } catch { return false; }
+      if (newer < KEEP) return false;
+      job.state = 'archived'; jobs = jobs.filter(x => x !== job); return true;
+    }
+    if (stored.state === job.state || stored.state === 'pending') return false;
+    Object.assign(job, { state: stored.state, error: stored.error || '', result: stored.result, remote: stored.remote, accepted: stored.accepted, kept: stored.kept });
+    return true;
+  }
   async function drain(id) {
     if (running.has(id)) return running.get(id);
     const email = owner, gen = generation;
     const task = (async () => {
       while (true) {
-        const job = ordered().find(x => keyOf(x) === id && !terminal.has(x.state));
+        const job = chainOf(id)[0];
         if (!job || !current(email, gen) || !online() || job.state !== 'pending') break;
+        const moved = await refresh(job);
+        if (!current(email, gen)) return;
+        if (moved) { notify(); continue; }
         try {
           const result = await backend(email, job.kind, copy(job.record), copy(job.base));
           if (!current(email, gen)) return;
           job.result = copy(result); job.state = 'synced'; job.error = '';
         } catch (error) {
           if (!current(email, gen)) return;
+          // set aside while it was being sent (a save made on the other copy took its place): it stays so, the next goes
+          if (job.state === 'archived') continue;
           if (transient(error)) { job.error = 'Waiting for the connection'; retryLater(id, email, gen); notify(); break; }
           job.state = error.code === 'write-conflict' ? 'conflict' : 'failed';
           job.error = error.message || 'Could not save';
@@ -34,13 +64,14 @@ export function createWriteQueue({ store, backend, getOwner = () => null, normal
         if (job.state !== 'synced') break;
         waits.delete(id);
       }
-      // Keep a short device history; failed/conflicting/pending records never expire here.
-      const old = ordered().filter(x => terminal.has(x.state)).slice(0, -100);
+      // Keep a short device history; failed/conflicting/pending records never expire here, nor this device's own
+      // versions set aside by a save made on the other copy (kept)
+      const old = ordered().filter(x => terminal.has(x.state) && !x.kept).slice(0, -KEEP);
       for (const job of old) { await store.remove(job.key); jobs = jobs.filter(x => x !== job); }
     })().finally(() => {
       if (running.get(id) !== task) return;
       running.delete(id);
-      if (current(email, gen) && online() && !waits.get(id)?.timer && ordered().find(x => keyOf(x) === id && !terminal.has(x.state))?.state === 'pending') void drain(id).catch(error => { storageError = error.message; notify(); });
+      if (current(email, gen) && online() && !waits.get(id)?.timer && chainOf(id)[0]?.state === 'pending') void drain(id).catch(error => { storageError = error.message; notify(); });
     });
     running.set(id, task); return task;
   }
@@ -67,53 +98,104 @@ export function createWriteQueue({ store, backend, getOwner = () => null, normal
   async function save(kind, email, record, base = null) {
     record = copy(normalize(kind, copy(record))); base = copy(base);
     if (getOwner() !== email) throw new Error('Account changed; the editor has not been saved');
-    await activate(email); const gen = generation;
-    const previous = [...ordered()].reverse().find(x => x.kind === kind && x.record.id === record.id && !terminal.has(x.state));
+    await activate(email); const gen = generation, id = kind + ':' + record.id;
+    let moved = false;
+    for (const x of chainOf(id)) moved = await refresh(x) || moved;
+    if (!current(email, gen)) throw new Error('Account changed; the editor has not been saved');
+    if (moved) notify();
+    const chain = chainOf(id), previous = chain.at(-1), conflict = chain.find(x => x.state === 'conflict');
+    // After a conflict nothing more is sent until the resident chooses in Recent changes: a later save waited behind it
+    // for good, said 'Saved locally', and either conflict button set it aside (14 Oct 2026). Made on the other copy
+    // (the version shown), it takes the stopped chain's place; unchanged, it changes nothing (opening a record is no
+    // choice). Made on this device's own version, it is kept as one more conflict and fails, so the editor keeps it.
+    const over = !!conflict && same(base, conflict.remote), held = !!conflict && !over;
+    if (over && base && same(record, normalize(kind, copy(base)))) return copy(record);   // (both as the editor saves them)
+    // a failed save, or a held copy (never sent), is replaced by the next one
+    const stale = !over && previous && (previous.state === 'failed' || held && previous.state === 'conflict' && previous !== chain[0]) ? previous : null;
     let job;
-    if (previous && previous.state === 'failed' && recordSignature(previous.record) === recordSignature(record)) {
-      job = previous; job.state = 'pending'; job.error = '';
+    if (stale && same(stale.record, record)) {
+      job = stale; if (!held) { job.state = 'pending'; job.error = ''; }
     } else {
       job = { key: email + ':' + Date.now().toString(36) + ':' + Math.random().toString(36).slice(2), owner: email,
-        kind, record: copy(record), base: copy(previous?.state === 'failed' ? previous.base : base), state: 'pending', accepted: false, at: Math.max(Date.now(), ...jobs.map(x => x.at + 1)) };
+        kind, record: copy(record), base: copy(stale?.state === 'failed' ? stale.base : base), state: held ? 'conflict' : 'pending', accepted: false, at: Math.max(Date.now(), ...jobs.map(x => x.at + 1)) };
+      if (held) { job.remote = copy(conflict.remote ?? null); job.error = conflict.error; }
     }
     try { await persist(job); storageError = ''; }
     catch { storageError = 'Local storage is unavailable. Your input has not been cleared.'; notify(); throw new Error(storageError); }
     if (!current(email, gen)) throw new Error('Account changed; the editor has not been saved');
-    if (previous && previous !== job && previous.state === 'failed') { previous.state = 'archived'; await persist(previous); }
+    // set aside once the new save is stored: the one it replaces, or (made on the other copy) the whole stopped chain,
+    // kept in the history for good, and the resident told (it was silent)
+    for (const x of over ? chain : stale && stale !== job ? [stale] : []) { x.state = 'archived'; if (over) x.kept = true; await persist(x); }
     if (!jobs.includes(job)) jobs.push(job);
     notify();
+    if (over && !same(previous.record, record)) notice('Your version from this device is kept in Recent changes');
+    if (held) throw failure(job);
     await Promise.race([drain(keyOf(job)), delay(180)]);
     if (!current(email, gen)) throw new Error('Account changed; the editor has not been saved');
-    if (job.state === 'failed' || job.state === 'conflict') throw new Error(/Recent changes/.test(job.error) ? job.error : job.error + ' — a copy is kept in Recent changes');
+    if (job.state === 'failed' || job.state === 'conflict') throw failure(job);
     job.accepted = true; await persist(job); notify();
     return copy(job.result || job.record);
+  }
+  // 'Restore …' in Recent changes. After a conflict it is saved over the other copy (the first conflict's, which save()
+  // checks); behind a failed save, from what the server holds, that save's base (made from the list's copy it waited
+  // behind the failed one for good, saying 'Version restored'). Either way the stopped chain is set aside only once the
+  // new save is stored (after a conflict save() does it, unless this is the other copy unchanged). A failed save on its
+  // own, save() replaces itself.
+  async function restore(kind, email, record, base = null) {
+    if (getOwner() !== email) throw new Error('Account changed; the editor has not been saved');
+    await activate(email); const id = kind + ':' + record.id;
+    for (const x of chainOf(id)) if (await refresh(x)) notify();
+    const chain = chainOf(id), conflict = chain.find(x => x.state === 'conflict');
+    const stuck = !conflict && chain.length > 1 && chain[0].state === 'failed';
+    const saved = await save(kind, email, record, conflict ? conflict.remote ?? null : stuck ? chain[0].base ?? null : base);
+    if (conflict || stuck) await archive(chain.at(-1).key);
+    return saved;
   }
   function overlay(kind, email, list) {
     if (email !== owner) return list;
     const result = new Map(list.map(r => [r.id, r]));
     for (const id of new Set(jobs.filter(x => x.kind === kind).map(x => x.record.id))) {
-      const group = ordered().filter(x => x.kind === kind && x.record.id === id && !terminal.has(x.state));
-      const conflict = group.find(x => x.state === 'conflict');
-      if (conflict) { if (conflict.remote) result.set(id, conflict.remote); else result.delete(id); }
-      else { const latest = group.filter(x => x.accepted).at(-1); if (latest) { if (latest.record._deleted) result.delete(id); else result.set(id, latest.record); } }
+      const group = chainOf(kind + ':' + id), conflicts = group.filter(x => x.state === 'conflict');
+      if (conflicts.length) {
+        // The list is the server's copy (the sync engine), so an edit or delete made elsewhere since the conflict shows;
+        // it showed the copy found at the conflict, and counted it (parked seed 285932884). That copy shows only while
+        // the list still has this device's own unsynced version, or the very one it started from (a stale cached list;
+        // the same content saved again elsewhere, as by a restore, has a newer stamp), or its delete took it off.
+        const cur = result.get(id), sig = recordSignature(cur || null);
+        const started = x => recordSignature(x.base) === sig && (x.base?.updatedAt ?? null) === (cur.updatedAt ?? null);
+        if (cur ? group.some(x => recordSignature(x.record) === sig || started(x)) : group.some(x => x.record._deleted)) {
+          const { remote } = conflicts[0]; if (remote) result.set(id, remote); else result.delete(id);
+        } else if (cur) for (const x of conflicts) if (recordSignature(x.remote) !== sig) x.remote = copy(cur);   // Recent changes' other copy
+      } else { const latest = group.filter(x => x.accepted).at(-1); if (latest) { if (latest.record._deleted) result.delete(id); else result.set(id, latest.record); } }
     }
     return [...result.values()];
   }
   async function retry(key) {
-    const job = jobs.find(x => x.key === key); if (!job || getOwner() !== owner || job.state === 'conflict') return;
+    let job = jobs.find(x => x.key === key); const email = owner, gen = generation;
+    if (!job || getOwner() !== owner || job.state === 'conflict') return;
+    if (await refresh(job)) notify();
+    if (!current(email, gen) || (job.state !== 'failed' && job.state !== 'pending')) return;
+    const head = chainOf(keyOf(job))[0];
+    if (head?.state === 'conflict') throw new Error('An earlier save of this record met a change made elsewhere: choose a version there first');
+    // waiting behind a failed save (Retry did nothing): that one is sent again first
+    if (head && head !== job && head.state === 'failed') { if (await refresh(head)) notify(); if (!current(email, gen)) return; if (head.state === 'failed') job = head; }
     job.state = 'pending'; job.error = ''; await persist(job); notify(); await drain(keyOf(job));
   }
+  // sets aside that save and older ones, never a newer save (it is sent next, or meets the conflict again); from a
+  // conflict also the held copies behind it (never sent, the same conflict), or the record needs a second tap
   async function archive(key) {
     const job = jobs.find(x => x.key === key); if (!job || getOwner() !== owner) return;
-    for (const item of jobs.filter(x => keyOf(x) === keyOf(job) && !terminal.has(x.state))) { item.state = 'archived'; await persist(item); }
+    const chain = chainOf(keyOf(job)), upto = chain.indexOf(job);
+    for (const item of chain.filter((x, i) => i <= upto || upto >= 0 && job.state === 'conflict' && x.state === 'conflict')) { item.state = 'archived'; await persist(item); }
     notify();
+    void drain(keyOf(job)).catch(error => { storageError = error.message; notify(); });
   }
   async function forget() {
     const old = owner; owner = null; ++generation; loading = null; jobs = []; running.clear(); waits.clear(); storageError = ''; notify();
     if (old) await store.forget(old);
   }
-  return { activate, save, overlay, retry, archive, forget, kick,
-    configure(config) { if (config.backend) backend = config.backend; if (config.getOwner) getOwner = config.getOwner; if (config.normalize) normalize = config.normalize; },
+  return { activate, save, restore, overlay, retry, archive, forget, kick,
+    configure(config) { if (config.backend) backend = config.backend; if (config.getOwner) getOwner = config.getOwner; if (config.normalize) normalize = config.normalize; if (config.notice) notice = config.notice; },
     onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     entries: () => copy(ordered().reverse()),
     pending: () => jobs.filter(x => !terminal.has(x.state)).length,

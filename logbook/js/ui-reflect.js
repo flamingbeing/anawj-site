@@ -866,7 +866,7 @@ function editor() {
   if (!editorSessions.has(r)) editorSessions.set(r, { base: JSON.parse(JSON.stringify(S.reflections.find(x => x.id === r.id) || null)), saving: null });
   const session = editorSessions.get(r);
   const status = h('span', { class: 'muted', 'aria-live': 'polite', style: 'font-size:calc(13px * var(--fs, 1))' }, r.id ? 'Saved' : 'Not saved yet');
-  const persist = async () => {
+  const persist = async quiet => {
     if (rv.editing !== r || S.user?.email !== owner) return false;
     while (session.saving) { await session.saving; if (rv.editing !== r || S.user?.email !== owner) return false; }
     if (r.source !== 'word') setJr(r);
@@ -878,19 +878,22 @@ function editor() {
     session.saving = (async () => {
       try {
         const saved = await writes.save('reflection', owner, payload, session.base);
-        session.base = saved;
-        if (rv.editing === r && S.user?.email === owner) status.textContent = writes.status('reflection', r.id) === 'synced' ? 'Synced' : 'Saved locally · pending sync';
+        session.base = saved; session.failed = '';
+        const st = writes.status('reflection', r.id);
+        if (rv.editing === r && S.user?.email === owner) status.textContent = st === 'synced' ? 'Synced' : st === 'conflict' ? 'Changed elsewhere · open Recent changes' : 'Saved locally · pending sync';
         if (rv.editing !== r || S.user?.email !== owner) return false;
         if (JSON.stringify(r) !== JSON.stringify(payload)) { status.textContent = 'Newer edits kept · save again'; return false; }
         return true;
       } catch (err) {
-        if (rv.editing === r && S.user?.email === owner) { status.textContent = 'Save failed · retry or open Recent changes'; toast('Could not save: ' + err.message); }
+        // an autosave says it once (after a conflict each one fails until a version is chosen in Recent changes)
+        if (rv.editing === r && S.user?.email === owner) { status.textContent = 'Save failed · retry or open Recent changes'; if (quiet !== true || session.failed !== err.message) toast('Could not save: ' + err.message); }
+        session.failed = err.message;
         return false;
       }
     })();
     try { return await session.saving; } finally { session.saving = null; }
   };
-  const autosave = debounce(persist, 1200);
+  const autosave = debounce(() => persist(true), 1200);
   const words = h('span', { 'aria-live': 'polite' });
   const paintWords = () => {
     const n = wordCount(r), ok = n >= MIN_WORDS;

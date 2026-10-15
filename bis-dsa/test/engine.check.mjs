@@ -60,6 +60,10 @@ chk('Propofol 0.17', 'BIS', p17.bis, 80, 95); chk('Propofol 0.17', 'beta 13-25 d
 const p57 = run('propofol', 0.57, {}, 120, null, 4);
 chk('Propofol 0.57', 'BIS', p57.bis, 40, 55); chk('Propofol 0.57', 'SEF95', p57.sef, 12, 17);
 chk('Propofol 0.57', 'RMS uV', p57.rms, 25, 40); chk('Propofol 0.57', 'RMS GA/awake', p57.rms / awake.rms, 3, 99);
+// the Medtronic screen's amplitude (AMPL, max |EEG| per second in dB re 1 uV) and ST (cumulative suppression seconds) columns
+{ const lastCol = awake.S.COLS[awake.S.COLS.length - 1], gaCol = p57.S.COLS[p57.S.COLS.length - 1];
+  chk('Medtronic AMPL', 'awake amplitude dB (about 25-40 uV peak)', lastCol.amp, 22, 36); chk('Medtronic AMPL', 'GA amplitude minus awake (slow waves are bigger)', gaCol.amp - lastCol.amp, 0.01, 20);
+  chk('Medtronic ST', 'ST seconds, awake', lastCol.st, 0, 0); }
 const p76 = run('propofol', 0.76);
 chk('Propofol 0.76', 'BIS', p76.bis, 30, 42); chk('Propofol 0.76', 'SR', p76.sr, 0, 4.99);
 const p90 = run('propofol', 0.9);
@@ -193,6 +197,32 @@ chk('Stimulus at 0.57, delta arousal', 'BIS change (falls)', sd.bis - q57.bis, -
 { const S = load(); S.mods.nmbMode = 'auto'; S.nmDose(0.6); for (let t = 0; t < 60; t++) S.nmStep(1); const r0 = S.nmRead(); S.nmSug(2); for (let t = 0; t < 30; t++) S.nmStep(1); const r2 = S.nmRead();
   chk('Sugammadex 2 mg/kg on profound block', 'T1 % rises but not fully', r2.t1 - r0.t1, -1, 20); chk('Sugammadex 2 mg/kg on profound block', 'TOF count', r2.tofc, 0, 1);
   S.nmSug(16); for (let t = 0; t < 30; t++) S.nmStep(1); chk('Sugammadex 18 mg/kg total', 'TOFr', S.nmRead().tofr ?? 1, 0.9, 1); }
+
+
+// the SedLine screen's pure parts (sed-draw.js, sed-screen.js, app.js): the PSi stand-in, the spectrogram colour scale, signed ASYM, the 2 h history
+{ const src = fs.readFileSync(new URL('../sed-draw.js', import.meta.url), 'utf8'), cut = src.indexOf('function sT('), head = src.slice(src.indexOf('const SC='), cut);
+  const psiLine = SRC.split('\n').find(l => l.startsWith('const psiOf=')), histMax = +/const HISTMAX=(\d+)/.exec(SRC)[1];
+  const F = new Function(`${psiLine};${head};const sedAsym=${/const sedAsym=([^\n]+);\n/.exec(src)[1]};return {psiOf,SED_LUT,sedAsym};`)();
+  chk('SedLine PSi stand-in', 'BIS 40 maps to PSi 25 (lower limit)', F.psiOf(40), 25, 25); chk('SedLine PSi stand-in', 'BIS 60 maps to PSi 50 (upper limit)', F.psiOf(60), 50, 50);
+  chk('SedLine PSi stand-in', 'clamped at 0 (BIS 5)', F.psiOf(5), 0, 0); chk('SedLine PSi stand-in', 'clamped at 100 (BIS 120)', F.psiOf(120), 100, 100); chk('SedLine PSi stand-in', 'no BIS: no PSi', F.psiOf(null) === null ? 1 : 0, 1, 1);
+  chk('SedLine DSA colours', 'quantised to 51 steps', F.SED_LUT.length, 51, 51);
+  chk('SedLine DSA colours', 'strongest step is red (#ed1c24)', F.SED_LUT[50].join() === '237,28,36' ? 1 : 0, 1, 1);
+  chk('SedLine DSA colours', 'weakest step is deep indigo (#3349a5)', F.SED_LUT[0].join() === '51,73,165' ? 1 : 0, 1, 1);
+  chk('SedLine ASYM', 'left stronger: positive', F.sedAsym(70, 60), 1, 100); chk('SedLine ASYM', 'right stronger: negative', F.sedAsym(60, 70), -100, -1); chk('SedLine ASYM', 'equal: zero', Math.abs(F.sedAsym(65, 65)), 0, 0.001);
+  chk('SedLine ASYM', 'range within +-100', Math.abs(F.sedAsym(90, 20)), 0, 100);
+  chk('SedLine history', 'columns kept (the monitor shows up to 2 h)', histMax, 7200, 999999); }
+
+// the SedLine EEG generator (sed-draw.js): band-limited resonators, unit variance each; the mix must be 1/f-like (mostly 1-12 Hz, 20-25% above 14 Hz)
+{ const src = fs.readFileSync(new URL('../sed-draw.js', import.meta.url), 'utf8'), a = src.indexOf('const SED_FS'), b = src.indexOf('function sedEegInit');
+  const F = new Function(`const clampv=(v,a,b)=>Math.max(a,Math.min(b,v));${src.slice(a, b)};return {sedRes,SED_RES,sedRng,SED_FS};`)();
+  const rnd = F.sedRng(5), gs = () => { let u = 0; while (u < 1e-9) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(6.2831853 * rnd()); };
+  const N = 8192, y = new Float64Array(N), st = { slow: [0, 0], mid: [0, 0], beta: [0, 0] }, one = { slow: [], mid: [], beta: [] }, sg = { slow: 6.5, mid: 12, beta: Math.sqrt(.2 * (42 + 144)) };
+  for (let n = 0; n < N + 500; n++) { let v = 0; for (const k of ['slow', 'mid', 'beta']) { const r = F.SED_RES[k], o = r.a1 * st[k][0] + r.a2 * st[k][1] + gs() * r.g; st[k][1] = st[k][0]; st[k][0] = o; if (n >= 500) { v += o * sg[k]; one[k].push(o); } } if (n >= 500) y[n - 500] = v; }
+  const vr = a => { const m = a.reduce((p, q) => p + q, 0) / a.length; return a.reduce((p, q) => p + (q - m) ** 2, 0) / a.length; };
+  chk('SedLine EEG', 'resonator output has unit variance (slow)', vr(one.slow), .6, 1.5); chk('SedLine EEG', 'resonator output has unit variance (beta)', vr(one.beta), .8, 1.25);
+  let lo = 0, mid = 0, hi = 0; for (let k = 1; k < 2800; k++) { const f = k * F.SED_FS / N; let re = 0, im = 0; for (let n = 0; n < N; n++) { re += y[n] * Math.cos(2 * Math.PI * k * n / N); im -= y[n] * Math.sin(2 * Math.PI * k * n / N); } const pw = re * re + im * im; if (f < 4) lo += pw; else if (f < 14) mid += pw; else hi += pw; }
+  const tot = lo + mid + hi; chk('SedLine EEG', 'share of power above 14 Hz', hi / tot, .12, .3); chk('SedLine EEG', 'share of power at 4-14 Hz (the dominant band)', mid / tot, .45, .85);
+  const sd = Math.sqrt(vr(Array.from(y))); chk('SedLine EEG', 'typical peak-to-peak at 5 uV/mm (px, 4 sd)', 4 * sd * 6.43 / 5, 60, 130); }
 
 const wid = rows[0].map((_, i) => Math.max(...rows.map(r => r[i].length)));
 for (const r of rows) console.log(r.map((c, i) => c.padEnd(wid[i])).join('  '));

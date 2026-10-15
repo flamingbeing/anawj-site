@@ -1,30 +1,29 @@
 # Now: Claude Code, Logbook 2 (log2)
 
-**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): the app → response-sheet sync is **live**
-(#527, #532, #546 merged; plan `logbook/PLAN-app-to-sheet.md`). The owner installed `form-script/Outbox.gs` on the real sheet,
-ran `logbookOutboxSetup` (column J header, 5-minute trigger `logbookOutboxRun`) and raised the Form handler's lock wait to 60 s.
+**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): **paused (15 Oct, 00:50 UTC, owner's usage limit)** in the middle
+of the reliability hour (owner: "spend the next 1hr maximizing reliability and sync data integrity… cast a wide net", with Firetop).
 
-**To do next (needs a programme resident to test with; the owner has none yet, a reminder is scheduled for the morning of
-15 Oct, trigger `trig_01AHgj1ztZYjHeJv2H5onoWj`):** the end-to-end check under "Waiting on the owner" in `logbook/STATUS.md`
-(new Case-tab row with `app:` in J, Database rows, the sheet's Apps Script Executions page, a Form response during a sync).
-If it fails, ask the owner for the Executions error text; entries exist only for a programme member (`logbook.rid` set and a
-`residents` entry with that email); check `cloud.queueSheetRows`, the `sheetOutbox` rules and the bot's Script properties
-(`LOGBOOK_BOT_EMAIL` / `LOGBOOK_BOT_PASSWORD` in the sheet's project).
-Also scheduled: 14 Nov 2026 reminder (`trig_01XdhSrpiJ31pLuSdwXAKb3V`) to turn off "anyone with the link" on the response sheet.
+**Resume from `logbook/status/wip/README.md`.** It holds the restore steps for the bundle, the merge order and the state of each of the
+5 fix branches (`tmp-writes`, `tmp-bulktag`, `tmp-backup`, `tmp-form`, `tmp-outbox`), the queued follow-ups, and Firetop's soak results.
+`findings/*.json` holds about 25 verified audit findings.
 
-The go-live bug hunt is parked at the owner's request: remaining items and Firetop's findings are in
-`logbook/PLAN-go-live-bugfix.md` ("Parked findings"). Firetop (`session_01F92cPiysiT5WAFPXMga7f4`) has no pending job from log2.
-Note: messages from here that ask Firetop to change a LIVE system (e.g. edit the real sheet's script) are blocked by the
-permission classifier; the owner does those steps themselves or adds a permission rule.
+Done in the hour: #569 (an admin re-import never overwrites a case already in the logbook), #571 and #574 (multidevice harness:
+real offline under a slow network, partial multi-delete, newest queue job, edits that conflict after reconnecting).
+Firetop: drift check IN SYNC (16,020 cases); a read-only integrity scan (no duplicates, nothing both live and in the bin, no unknown
+categories, no inbox or outbox backlog; 38 imported cases have no date and 11 have a future or pre-2015 date, the residents' own entries;
+8 counts summaries are stale, and each heals when that resident opens the app). Firetop can't read the sheet's Apps Script Executions
+(its OAuth scopes are too narrow): the owner reads them.
 
-**Drift tooling (14 Oct):** `/drift-check` (asks Firetop to run `bash Projects/jobs/drift-check/drift-check.sh`, read-only, counts
-and names in chat only), weekly on Firetop Mondays 08:30 SGT with a phone message, private dashboard "Logbook Sync Check"
-(Claude artifact `TFa1Dvn9b4uA4oAedz5111`; refresh from the run's rids-only counts via `ArtifactData`, datasets `run` and
-`residents` are uploaded JSON files). Sheet script has the nightly Totals check (owner installs it). Next if asked: app edits and
-deletes to the sheet (the `app:` marker finds the row), then sheet edits to the app. A message to Firetop that asks for a LIVE
-change is blocked by the permission classifier: give the owner paste-ready wording.
+Next on resume, in order:
+1. `tmp-writes`: fix the blocking `restore()` regression (see the README), review or drop the WIP commit, full `tools/test-logbook.sh`,
+   multidevice seeds, PR, merge.
+2. Then `tmp-bulktag` and `tmp-backup` (merge main in, test, PR; possibly one PR with `tmp-writes`).
+3. `tmp-form` (rules change) and `tmp-outbox` (rules change; review the second pass first).
+4. Queued follow-ups (atomic delete, sameResponse, re-import rules).
+5. Ask Firetop to rerun the failing seeds on merged main.
 
-**15 Oct:** app → sheet sync verified with a real resident (drift check IN SYNC 01:34 SGT); the reminder trigger was deleted. resident 202411
-revert done (CSV for her pending in Firetop). Nothing half-done on log2's side. Next, only if the owner asks: plan and build app
-edits/deletes → sheet (the `app:` marker finds the row; Database and Totals rebuild via the nightly check), refresh the dashboard
-after the Monday 19 Oct drift run, `/drift-check` any time.
+Earlier work (all merged): the app → sheet sync (#527, #532, #546), the drift-check skill (#549, #550), the nightly Totals check (#551),
+the save-state commits (#553, #564), and the private dashboard "Logbook Sync Check" (claude.ai/artifact/TFa1Dvn9b4uA4oAedz5111).
+The 14 Nov reminder `trig_01XdhSrpiJ31pLuSdwXAKb3V` (turn off "anyone with the link" on the response sheet) is still scheduled.
+A stray remote branch `fix/import-no-overwrite` (same commit as #569) couldn't be deleted from here (the proxy refused): harmless.
+Messages to Firetop that ask for LIVE changes are blocked by the permission classifier: give the owner paste-ready wording.
