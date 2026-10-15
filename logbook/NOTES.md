@@ -823,7 +823,8 @@ portfolio content.
 - Programme tag groups are adopted only from the server logbook, never a cached copy (it overwrote groups
   changed on another device). Delete account re-authenticates before deleting anything.
 - Totals: your own column is live (summaryOf), not the copy loaded when Analytics opened.
-- **App version (owner, 14 Oct 2026, as in the prewarming app):** the bottom of Settings shows "App version
+- **App version (owner, 14 Oct 2026, as in the prewarming app):** the bottom of More (owner, 15 Oct 2026; it was
+  Settings) shows "App version
   2026-10-14 (3f9a2c1d)" (the service worker's cache name, stamped at deploy by
   `tools/stamp-versions.mjs`; the date is the day that version went live) and "Get the latest version": it unregisters this app's service worker and deletes the
   `logbook-` caches, then reloads (`js/app-version.js`). Never data, drafts, settings or other apps' caches; refused

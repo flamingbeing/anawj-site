@@ -181,7 +181,8 @@ function renderMore() {
     privacyCard(),
     creditsCard(),
     installCard(),
-    signOutCard());
+    signOutCard(),
+    versionLine());
 }
 
 // "Install the app" (More): Android and desktop Chrome/Edge offer their own install prompt, which we
@@ -324,11 +325,10 @@ function renderSettingsMenu() {
     h('section', { class: 'card more-list settings-menu' }, h('h2', {}, 'Settings'),
       settingsGroups().map(([name, ids]) => [h('h3', {}, name), h('ul', {}, ids.map(item))])),
     settingsFileCard(),
-    connectClaudeCard(),
-    versionLine());
+    connectClaudeCard());
 }
 
-// at the very bottom: which app version this device runs, and a way to fetch the latest when it seems stuck on an old
+// at the very bottom of More (owner, 15 Oct 2026; was Settings): which app version this device runs, and a way to fetch the latest when it seems stuck on an old
 // one (the "Update available" banner is the usual way)
 function versionLine() {
   const ver = h('span', {}, 'App version …');
