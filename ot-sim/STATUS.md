@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-15 by Claude Code (build session: M2.7, M2.8, M3.1, M3.2 slices 1-3 merged; M3.2 slice 4 Examine/Help — M3.2 complete).
+Last updated: 2026-10-15 by Claude Code (build session: M2.7-M3.2 merged, M3.2 complete; M3.3 slice 1 alarm engine + bar).
 
 ## Now
 
@@ -19,13 +19,17 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next
 
-1. **M3.2 is complete** (library → pre-op → theatre with the operation timeline, Examine and Help). Next milestone:
-   M3.3 alarms (monitor limits per parameter, three IEC priorities, 2-min silence, technical alarms, a Log tab). Then
-   M4.x: `conditions.js`/`events.js` scenario engine + crisis scenarios (the "diverse use cases" goal).
+1. M3.3 slice 2: trainee-set alarm limits (an Alarms settings area/menu) and technical alarms (probe off,
+   disconnection, no CO₂ detected). Then slice 3: the Log tab. Then M4.x: `conditions.js`/`events.js` scenario engine +
+   crisis scenarios (the "diverse use cases" goal).
 
 ## Recently done
 
-- M3.2 slice 4 (15 Oct 2026, #614→next): the Examine and Help tabs (`ui/examine.js`, `ui/help.js`). Examine is a
+- M3.3 slice 1 (15 Oct 2026, #622→next): the alarm engine (`monitor.js`) — per-parameter limits (defaults in
+  MODEL.md §14), three IEC priorities, onset debounce, 2-min silence, logged in simulated time (onset identical at any
+  speed); the alarm bar at the top of the monitor (top alarm, colour/flash, aria-live, +N more, Silence). Physiological
+  alarms only; technical alarms and trainee-set limits are slice 2. `test/alarms.test.mjs` + e2e.
+- M3.2 slice 4 (15 Oct 2026, #622): the Examine and Help tabs (`ui/examine.js`, `ui/help.js`). Examine is a
   read-only clinical read of the model (chest/breath sounds/skin/pupils/movement) that matches the monitor; Help has
   the four team actions as logged events (call for help, tell the surgeon, airway trolley, major haemorrhage). Finishes
   M3.2. `test/examine.test.mjs` + e2e.

@@ -595,3 +595,25 @@ desflurane washout faster than measured, N2O at 30 min slightly low, rocuronium 
 reversal faster than published, phenylephrine wearing off more slowly than "about
 5 min", the closed-loop pressor-test baroreflex slope about half the awake human value. Each scenario's debrief lists
 what it simplifies.
+
+## 14. Alarms (`monitor.js`, PR M3.3)
+
+The monitor evaluates each displayed numeric against a limit each step, in simulated time, so onset timing is identical
+at every speed and is logged (`{kind:'alarm', param, dir, priority, state}`) for the debrief. A parameter alarms low or
+high, never both at once; a breach must persist for an onset debounce before it latches (high 3 s, medium 5 s, low 10 s
+[D]), and a 2-minute silence pauses the audio without clearing the alarm. Three priorities follow IEC 60601-1-8 (red
+flashing high, amber flashing medium, cyan steady low).
+
+Default limits and priorities (all **[D]**, our design choice; the owner reviews them, and M3.3 slice 2 lets the
+trainee change them per device):
+
+| Parameter | Low → priority | High → priority |
+|---|---|---|
+| SpO₂ | < 90% → high | — |
+| Heart rate | < 45 → medium | > 130 → medium |
+| EtCO₂ | < 25 mmHg → medium | > 60 → medium |
+| Respiratory rate | < 6 → medium | > 30 → low |
+| Systolic BP (last NIBP) | < 85 → medium | > 180 → medium |
+| Temperature (core) | < 35 °C → medium | > 38.5 → low |
+
+Still to come in M3.3: trainee-set limits, technical alarms (probe off, disconnection, no CO₂ detected) and the Log tab.

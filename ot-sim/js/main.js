@@ -3,7 +3,7 @@
 
 import { createSim } from './model/sim.js';
 import { applyPreset, PRESETS } from './model/presets.js';
-import { NIBP_CYCLES } from './model/monitor.js';
+import { NIBP_CYCLES, PRIORITY_RANK } from './model/monitor.js';
 import { Loop, SPEEDS } from './ui/loop.js';
 import { Lane } from './ui/lanes.js';
 import { ecg, pleth, co2, modelSource, FastSource } from './ui/synth.js';
@@ -72,11 +72,30 @@ function resusText(state) {
   return parts.join(' · ');
 }
 
+// the alarm bar (M3.3): the highest-priority active alarm, its IEC colour/flash (via the class), aria-live assertive
+// for a high-priority alarm, and the silence countdown. Shown whenever any alarm is active, on any tab.
+function updateAlarmBar() {
+  const m = sim.state.mon, bar = $('alarmbar');
+  if (!m.alarms.length) { if (!bar.hidden) { bar.hidden = true; bar.className = 'alarmbar'; } return; }
+  const top = m.alarms.reduce((a, b) => (PRIORITY_RANK[b.priority] > PRIORITY_RANK[a.priority] ? b : a));
+  const silenced = sim.state.t < m.silencedUntil, extra = m.alarms.length - 1;
+  const cls = `alarmbar ${top.priority}${silenced ? ' silenced' : ''}`;
+  if (bar.className !== cls) bar.className = cls;
+  const live = top.priority === 'high' && !silenced ? 'assertive' : 'polite';
+  if (bar.getAttribute('aria-live') !== live) bar.setAttribute('aria-live', live);
+  const msg = `${top.msg}${extra ? ` · +${extra} more` : ''}`;
+  if ($('alarm-msg').textContent !== msg) $('alarm-msg').textContent = msg;
+  const sbt = silenced ? `Silenced ${Math.ceil((m.silencedUntil - sim.state.t) / 60)} min` : 'Silence 2 min';
+  if ($('alarm-silence').textContent !== sbt) $('alarm-silence').textContent = sbt;
+  bar.hidden = false;
+}
+
 let panelsAt = -1e9;
 function panels(force = false) {
   const now = performance.now();
   if (!force && now - panelsAt < 500) return;
   panelsAt = now;
+  updateAlarmBar();
   drugs.update(sim.state);
   if (!$('panel-circ').hidden) circDrugs.update(sim.state);
   if (!$('panel-breath').hidden) {
@@ -278,6 +297,7 @@ function setPaused(p) {
 }
 for (const b of document.querySelectorAll('[data-speed]')) b.addEventListener('click', () => setSpeed(+b.dataset.speed));
 $('pause').addEventListener('click', () => setPaused(!loop.paused));
+$('alarm-silence').addEventListener('click', () => { sim.act({ type: 'alarmSilence' }); acted(); });
 
 // NIBP
 const cyc = $('nibp-cycle');

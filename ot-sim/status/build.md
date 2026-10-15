@@ -45,5 +45,15 @@
   in the events feed (eventsHtml extended) and are there for the M5 debrief; no physiological effect in M3.2 (the
   scenarios give them meaning in M4). Two new tabs; `test/examine.test.mjs`; e2e covers both tabs + axe. Footer and a
   stale comment updated. `tools/test-ot-sim.sh`, check, proofread green.
-- **M3.2 is complete.** Next: M3.3 alarms (monitor limits, three priorities, silence, technical alarms, a Log tab),
-  then M4.x (`conditions.js`/`events.js` scenario engine + the crisis scenarios — the "diverse use cases" goal).
+- **M3.2 is complete.**
+- M3.3 (alarms) is being delivered in slices. Slice 1 built on this branch (from main after #622 merged): the alarm
+  engine in `monitor.js` — per-parameter limits (`ALARM_LIMITS`, defaults tagged [D] in MODEL.md §14), three IEC
+  60601-1-8 priorities, an onset debounce (high 3 s / medium 5 s / low 10 s), and a 2-minute silence, all evaluated in
+  simulated time and logged (`{kind:'alarm',…}`) so onset timing is identical at every speed. The **alarm bar** at the
+  top of the monitor shows the highest-priority alarm with its colour/flash, aria-live assertive for high, a "+N more"
+  count, and the Silence button/countdown. `test/alarms.test.mjs` (limits well-formed, SpO2 high alarm on apnoea,
+  onset-time identical bulk vs one-by-one, silence); e2e drives hypoxia and checks the bar + silence + axe.
+  `tools/test-ot-sim.sh`, check, proofread green.
+- M3.3 still to come (slice 2+): trainee-set limits and technical alarms (probe off, disconnection, no CO₂ detected);
+  then the Log tab (slice 3). Then M4.x (`conditions.js`/`events.js` scenario engine + the crisis scenarios — the
+  "diverse use cases" goal).
