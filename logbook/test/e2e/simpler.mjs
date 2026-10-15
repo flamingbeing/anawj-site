@@ -149,7 +149,9 @@ try { for (const width of [390, 1280]) {
   assert.equal(await p.locator('table.totals thead th').first().innerText(), 'Category');
   assert.equal(await p.locator('table.totals thead th').nth(1).evaluate(e => getComputedStyle(e).position), 'sticky');
   assert.equal(await p.locator('table.totals td.n[title]').count(), 0);
-  assert.equal(await p.locator('table.totals td.cat .cat-in').first().evaluate(e => getComputedStyle(e).overflowX), 'auto', 'a long category scrolls sideways');
+  // a long category: wraps in Compact (on by default: no sideways scroll nobody can reach by keyboard, #663), scrolls
+  // sideways without it
+  assert.deepEqual(await p.locator('table.totals td.cat .cat-in').first().evaluate(e => [getComputedStyle(e).overflowX, getComputedStyle(e).overflowWrap]), ['visible', 'anywhere'], 'Compact: a long category wraps');
   assert.equal(await p.locator('table.totals td[title]').count(), 0, 'no tooltips');
   assert.ok(await p.evaluate(() => { const t = document.querySelector('table.totals'), sw = [...document.querySelectorAll('main .seg button')].find(b => /All tags/.test(b.textContent)); return !!sw && !!(t.compareDocumentPosition(sw) & Node.DOCUMENT_POSITION_FOLLOWING); }), 'All tags / Towards minimums below the table');
   const zipDl = p.waitForEvent('download'); await p.getByRole('button', { name: 'Download all years (zip)' }).click();
