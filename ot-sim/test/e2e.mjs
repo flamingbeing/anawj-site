@@ -158,6 +158,13 @@ try {
     assert.ok(await page.evaluate(() => parseFloat(document.getElementById('n-ppeak').textContent)) > 8, `${name}: airway pressure shown`);
     await page.evaluate(() => otsim.step(3000));
     assert.ok(await page.evaluate(() => otsim.state.gas.sao2) > 98, `${name}: oxygenated on 100% (got ${await page.evaluate(() => otsim.state.gas.sao2)})`);
+    // the vaporiser: sevoflurane washes in, raising the agent numeric and MAC
+    await page.selectOption('#vap-agent', 'sevoflurane');
+    await page.fill('#vap-dial', '6'); await page.click('#vap-apply');
+    await page.fill('#fgf-o2', '4'); await page.click('#fgf-apply');
+    await page.evaluate(() => otsim.step(12000));
+    assert.ok(await page.evaluate(() => otsim.state.vol.mac) > 0.8, `${name}: sevoflurane raises MAC`);
+    assert.match(await page.textContent('#n-agent'), /^\d/);
     await axe(page, `${name} theatre, Breathing tab`);
     await page.click('#tab-drugs');
     // the Patient tab: asleep under TCI; a stimulus shows in the events

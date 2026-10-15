@@ -6,7 +6,7 @@ import { initFluids, stepFluids, fluidActions, hbOf } from '../js/model/fluids.j
 
 const near = (a, b, tol, what) => assert.ok(Math.abs(a - b) <= tol, `${what}: ${a} not within ${tol} of ${b}`);
 const fixed = { q: 0.5, pkV1: 1, pkCL: 1, baroGain: 1, ihr: 95.3 };
-const mk = () => createSim({ seed: 1, profile: { fixed } });
+const mk = (o = {}) => createSim({ seed: 1, profile: { fixed, ...(o.profile || {}) } });
 const avg = (s, secs = 10) => { const a = { hr: 0, map: 0 }, n = secs * 10; for (let i = 0; i < n; i++) { s.step(1); a.hr += s.state.cv.hr / n; a.map += s.state.cv.map / n; } return a; };
 
 // Hahn's check, kinetics alone at a held MAP of 70: 1 L over 30 min leaves about 80% in the circulation (MODEL.md: 83%)
@@ -64,8 +64,7 @@ const avg = (s, secs = 10) => { const a = { hr: 0, map: 0 }, n = secs * 10; for 
 
 // under GA (MAC fraction 1.6 set by hand until volatile.js, M2.5): hypotension from 10-15% loss with a small HR rise
 {
-  const s = mk();
-  s.state = { ...s.state, vol: { mac: 1.6 } };
+  const s = mk({ profile: { macStub: 1.6 } });
   s.step(3000);
   const b = avg(s, 30), bv0 = s.state.cv.bloodVol;
   s.act({ type: 'bleed', mlPerMin: bv0 / 100 });

@@ -51,8 +51,9 @@ export function drives(prev) {
   // propofol, haemodynamic effect site; C50 falls with age so the elderly fall further (Kazama 1999) [D]
   const eP = ceH / (ceH + 1.0 / (1 + 0.02 * Math.max(0, prev.patient.age - 40)));
   const eR = ceR / (ceR + 2.0);                       // opioid, saturating [D]
-  const mac = prev.vol && prev.vol.mac ? prev.vol.mac : 0;
+  const mac = (prev.vol && prev.vol.mac ? prev.vol.mac : 0) + (prev.patient.macStub || 0); // macStub: a test hook
   const m = Math.min(1, mac / 1.6);
+  const vmac = Math.min(2, mac); // volatile vasodilation and depression, capped [D]
   // vasoactive drugs (vaso.js) at their effect sites
   const ce = {};
   for (const id in RECEPTORS) if (d[id]) ce[id] = d[id].ce;
@@ -60,10 +61,10 @@ export function drives(prev) {
   return {
     eP, eR, mac, A, V,
     symScale: 1 - 0.3 * eP,                           // sympathetic tone (MSNA falls at induction, Ebert 1992)
-    svr: (1 - 0.15 * eP) * (1 - 0.075 * eR) * (1 - 0.3 * Math.min(1, mac / 1.5)) * V.svr,
+    svr: (1 - 0.15 * eP) * (1 - 0.075 * eR) * (1 - 0.2 * vmac) * V.svr,
     vu: 100 * eP + V.vu,
-    ees: (1 - 0.1 * eP) * V.ees,
-    setShift: -15 * eP,
+    ees: (1 - 0.1 * eP) * (1 - 0.1 * vmac) * V.ees,
+    setShift: -15 * eP - 14 * vmac,  // volatiles reset the baroreflex lower too [D]
     gHR: (1 - 0.75 * m) * (1 - 0.3 * eP),             // reflex gain on the heart-period limbs
     gVasc: (1 - 0.5 * m) * (1 - 0.3 * eP),            // milder, on the vascular limbs
     vagal: TUNE.vagal * eR,                         // opioid vagal tone, upstream of the reflex

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createSim } from '../js/model/sim.js';
 
 const fixed = { q: 0.5, pkV1: 1, pkCL: 1, baroGain: 1, ihr: 95.3 };
-const ga = () => { const s = createSim({ seed: 1, profile: { fixed } }); s.state = { ...s.state, vol: { mac: 1.6 } }; s.step(3000); return s; };
+const ga = () => { const s = createSim({ seed: 1, profile: { fixed, macStub: 1.6 } }); s.step(3000); return s; };
 const awake = () => createSim({ seed: 1, profile: { fixed } });
 const avg = (s, secs = 10) => { const a = { hr: 0, map: 0, co: 0, dbp: 0 }, n = secs * 10; for (let i = 0; i < n; i++) { s.step(1); for (const k in a) a[k] += s.state.cv[k] / n; } return a; };
 const bol = (drug, dose, unit = 'mcg') => ({ type: 'bolus', drug, dose, unit, route: 'iv' });

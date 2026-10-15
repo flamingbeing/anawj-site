@@ -46,7 +46,12 @@ function panels(force = false) {
   panelsAt = now;
   drugs.update(sim.state);
   if (!$('panel-circ').hidden) circDrugs.update(sim.state);
-  if (!$('panel-breath').hidden) { const r = sim.state.resp; const t = r.mode === 'spont' ? (r.apnoea ? 'Apnoeic (no spontaneous breaths).' : `Spontaneous: Vt ${Math.round(r.vt)} mL, rate ${r.rr.toFixed(0)}, MV ${r.mv.toFixed(1)} L/min.`) : `${r.mode === 'vc' ? 'Volume' : 'Pressure'} control: Vt ${Math.round(r.vt)} mL, Ppeak ${Math.round(r.ppeak)}, Pplat ${Math.round(r.pplat)}, MV ${r.mv.toFixed(1)} L/min${r.autoPeep > 0.05 ? `, auto-PEEP ${r.autoPeep.toFixed(1)}` : ''}.`; if ($('vent-state').textContent !== t) $('vent-state').textContent = t; }
+  if (!$('panel-breath').hidden) {
+    const vol = sim.state.vol, fg = vol.fgf, parts = [];
+    for (const id in vol.dial) if (vol.dial[id] > 0) parts.push(`${id} ${vol.dial[id]}% (Et ${(vol.t[id].fa * 100).toFixed(1)}%)`);
+    const at = `Fresh gas O₂ ${fg.o2} / air ${fg.air} / N₂O ${fg.n2o} L/min.${parts.length ? ' ' + parts.join(', ') + '.' : ''} MAC ${vol.mac.toFixed(1)}.`;
+    if ($('agent-state').textContent !== at) $('agent-state').textContent = at;
+    const r = sim.state.resp; const t = r.mode === 'spont' ? (r.apnoea ? 'Apnoeic (no spontaneous breaths).' : `Spontaneous: Vt ${Math.round(r.vt)} mL, rate ${r.rr.toFixed(0)}, MV ${r.mv.toFixed(1)} L/min.`) : `${r.mode === 'vc' ? 'Volume' : 'Pressure'} control: Vt ${Math.round(r.vt)} mL, Ppeak ${Math.round(r.ppeak)}, Pplat ${Math.round(r.pplat)}, MV ${r.mv.toFixed(1)} L/min${r.autoPeep > 0.05 ? `, auto-PEEP ${r.autoPeep.toFixed(1)}` : ''}.`; if ($('vent-state').textContent !== t) $('vent-state').textContent = t; }
   if (!$('panel-circ').hidden) { const t = fluidText(sim.state); if ($('fluid-state').textContent !== t) $('fluid-state').textContent = t; }
   if (!$('panel-pt').hidden) { const h = eventsHtml(sim.state); if ($('events').innerHTML !== h) $('events').innerHTML = h; }
   if ($('behind-box').open) { const h = behindHtml(sim.state); if ($('behind').innerHTML !== h) $('behind').innerHTML = h; }
@@ -84,6 +89,8 @@ $('vmode').addEventListener('change', () => {
   const m = $('vmode').value;
   $('vc-set').hidden = m !== 'vc'; $('pc-set').hidden = m !== 'pc';
 });
+$('fgf-apply').addEventListener('click', () => { sim.act({ type: 'fgf', o2: +$('fgf-o2').value, air: +$('fgf-air').value, n2o: +$('fgf-n2o').value }); acted(); });
+$('vap-apply').addEventListener('click', () => { sim.act({ type: 'vaporiser', agent: $('vap-agent').value, dial: +$('vap-dial').value }); acted(); });
 $('v-apply').addEventListener('click', () => {
   const m = $('vmode').value;
   const a = { type: 'vent', mode: m, peep: +$('v-peep').value, ie: 1 / (+$('v-ie').value || 2), fio2: Math.min(1, Math.max(0.21, +$('fio2').value || 0.21)) };

@@ -69,6 +69,15 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Decisions log
 
+- 15 Oct 2026 (M2.5): `volatile.js` (the circle circuit, three Gas Man tissue groups, agent effect sites, age-adjusted
+  MAC, the N2O concentration effect) owns `vol.fi/ce/pv/mac`. `pd.js` now reads the whole volatile MAC fraction as one
+  sevoflurane-equivalent, so every agent counts and the sevoflurane-written formulas hold (sevoflurane alone is
+  unchanged). The volatile circulation effect was strengthened (1 MAC about -21% MAP, 1.5 MAC about -28%, heart rate
+  about unchanged). Wash-in and washout match Yasuda. `patient.macStub` is a test-only hook for a steady volatile depth
+  without running the vaporiser to steady state (the fluids and vaso GA tests use it, in place of the old `vol` stub
+  that a live volatile system would overwrite). UI: a vaporiser and fresh-gas control on the Breathing tab, agent
+  Fi/Et/MAC on the monitor. Known miss, as in the prototype: low-flow Et/dial reads a little low; desflurane washout.
+
 - 15 Oct 2026 (M2.4): `gas.js` (one lung store that collapses when obstructed, two blood O2 pools so SaO2 falls at a
   realistic rate, a CO2 body store) and `resp.js` (Bouillon drive with the slope flattened, the ventilator closed-form,
   pleural pressure to the circulation). Apnoea: healthy preox about 8.6 min, air about 1 min, obese 130 kg about 3.5

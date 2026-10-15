@@ -22,7 +22,7 @@ function ageText(n, t) {
 
 export class Numerics {
   constructor() {
-    this.el = { hr: $('n-hr'), spo2: $('n-spo2'), etco2: $('n-etco2'), rr: $('n-rr'), nibp: $('n-nibp'), map: $('n-map'), age: $('n-nibp-age'), temp: $('n-temp'), clock: $('clock'), go: $('nibp-go'), tof: $('n-tof'), tofr: $('n-tofr'), ptc: $('n-ptc'), ppeak: $('n-ppeak'), peep: $('n-peep'), mv: $('n-mv') };
+    this.el = { hr: $('n-hr'), spo2: $('n-spo2'), etco2: $('n-etco2'), rr: $('n-rr'), nibp: $('n-nibp'), map: $('n-map'), age: $('n-nibp-age'), temp: $('n-temp'), clock: $('clock'), go: $('nibp-go'), tof: $('n-tof'), tofr: $('n-tofr'), ptc: $('n-ptc'), ppeak: $('n-ppeak'), peep: $('n-peep'), mv: $('n-mv'), agent: $('n-agent'), agentName: $('n-agent-name') };
     this.lastWrite = -1e9;
   }
   set(el, text) { if (el.textContent !== text) el.textContent = text; }
@@ -51,5 +51,15 @@ export class Numerics {
     this.set(e.ppeak, rp && rp.ppeak > 0 ? r(rp.ppeak) : '--');
     this.set(e.peep, rp ? r(rp.peep) : '--');
     this.set(e.mv, rp ? rp.mv.toFixed(1) : '--');
+    const vol = state.vol;
+    if (vol) {
+      // show the agent with the highest MAC share
+      let top = null, topMac = 0;
+      for (const id in vol.fi) { const m = vol.ce[id]; if (vol.fi[id] > 0.001 || m > 0.0005) { if (m >= topMac) { topMac = m; top = id; } } }
+      if (top && top !== 'nitrous' && (vol.fi[top] > 0.001 || vol.ce[top] > 0.0005)) {
+        this.set(e.agent, `${(vol.fi[top] * 100).toFixed(1)}/${(state.vol.t ? state.vol.t[top].fa * 100 : 0).toFixed(1)}/${vol.mac.toFixed(1)}`);
+        this.set(e.agentName, top[0].toUpperCase() + top.slice(1, 4) + (vol.fgf && vol.fi.nitrous > 0.01 ? ' +N₂O' : ''));
+      } else { this.set(e.agent, vol.fi.nitrous > 0.01 ? `N₂O ${(vol.fi.nitrous * 100).toFixed(0)}%` : '--'); this.set(e.agentName, ''); }
+    }
   }
 }

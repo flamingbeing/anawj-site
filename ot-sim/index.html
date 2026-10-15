@@ -63,6 +63,7 @@ h1{font-size:1.6rem;line-height:1.2;margin:.75rem 0 .25rem}
 .num .sub{font-size:15px;font-variant-numeric:tabular-nums;margin-top:2px}
 .tof{color:var(--tof)}.ecg{color:var(--ecg)}.spo2{color:var(--spo2)}.co2{color:var(--co2)}.nibp{color:var(--nibp)}.temp{color:var(--temp)}
 .row{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 10px;padding-top:6px}
+.row .nv{font-size:22px}
 .box{display:flex;flex-direction:column;justify-content:center;padding:4px 6px;line-height:1.1}
 .box .nl{font:13px/1.1 var(--f-narrow)}
 .box .nv{font-weight:700;font-size:30px;font-variant-numeric:tabular-nums}
@@ -143,6 +144,7 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
       </div>
       <div class="row">
         <div class="box nibp"><span class="nl">NIBP mmHg</span><span class="nv"><span id="n-nibp">--/--</span> <small id="n-map"></small></span><span class="age" id="n-nibp-age"></span></div>
+        <div class="box co2"><span class="nl">Agent Fi/Et/MAC</span><span class="nv" id="n-agent">--</span><span class="age" id="n-agent-name"></span></div>
         <div class="box"><span class="nl">Paw cmH₂O</span><span class="nv"><span id="n-ppeak">--</span></span><span class="age">PEEP <span id="n-peep">--</span> · MV <span id="n-mv">--</span></span></div>
         <div class="box tof"><span class="nl">TOF</span><span class="nv"><span id="n-tof">4/4</span> <small id="n-tofr"></small></span><span class="age" id="n-ptc"></span></div>
         <div class="box temp"><span class="nl">Temp</span><span class="nv"><span id="n-temp">--</span><small>°C</small></span></div>
@@ -191,6 +193,19 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
           <button type="button" id="v-apply">Set ventilator</button>
         </div>
         <p class="state" id="vent-state"></p>
+        <h3 class="sub">Fresh gas and vaporiser</h3>
+        <div class="act">
+          <label>O<sub>2</sub> <input type="number" inputmode="decimal" min="0" max="15" step="0.5" id="fgf-o2" value="2"></label>
+          <label>Air <input type="number" inputmode="decimal" min="0" max="15" step="0.5" id="fgf-air" value="0"></label>
+          <label>N<sub>2</sub>O <input type="number" inputmode="decimal" min="0" max="15" step="0.5" id="fgf-n2o" value="0"></label>
+          <span class="nl">L/min</span><button type="button" id="fgf-apply">Set flows</button>
+        </div>
+        <div class="act">
+          <label>Agent <select id="vap-agent"><option value="sevoflurane">Sevoflurane</option><option value="desflurane">Desflurane</option><option value="isoflurane">Isoflurane</option></select></label>
+          <label>Dial <input type="number" inputmode="decimal" min="0" max="18" step="0.5" id="vap-dial" value="0"> %</label>
+          <button type="button" id="vap-apply">Set vaporiser</button>
+        </div>
+        <p class="state" id="agent-state"></p>
         <p class="hint">Airway control (mask, LMA, tube) and spontaneous-breathing support come with the airway update.</p>
       </div>
       <div class="panel" role="tabpanel" id="panel-pt" aria-labelledby="tab-pt" hidden>
