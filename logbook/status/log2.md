@@ -138,9 +138,6 @@ Agreed queue (one PR each, in order, once he says go):
    High contrast); "Inspired" (owner's name for it) as one searchable dropdown (type to filter; each row a small colour preview and
    the name; picking one previews it at once, Undo in the toast); a "Suggest a theme" button under it opens Send
    feedback with "Theme suggestion: " filled in (the private feedback queue, owner reads it in Feedback).
-   Fun palettes for Inspired (owner asked for Blackpink, G-Dragon, McDonald's, Ferrari; proposed with descriptive
-   names, no brand, band or person names or logos, since the app carries the NUHS / APMES name: "Pink & Black",
-   "Daisy" (yellow on black, G-Dragon-ish), "Ketchup & Mustard", "Racing Red"). Owner to confirm the names.
    A theme sets the Advanced display settings too (owner, 15 Oct): fonts, line spacing and width, corners, borders,
    shadows, compact, icons on buttons, icons-only tab bar, page titles in the header, plain calendar, shorter rows;
    every one stays editable afterwards (the card then says "Custom (based on …)"), and a theme never touches layout
