@@ -119,7 +119,13 @@ async function rollBack(owner, kind, entries) {
     if (job) await writes.archive(job.key).catch(() => {});
     // the record changed elsewhere first: that version stays, so the delete is undone; say so, or the case seems to
     // come back by itself
-    if (job && job.state === 'conflict') { toast(`A ${kind} you deleted was changed on another device, so it was kept`); continue; }
+    if (job && job.state === 'conflict') {
+      // archive() keeps newer saves (writes.js), but a restore from the bin queued behind this delete is the binned,
+      // older copy: it goes too, or it would meet the newer version as one more conflict
+      const latest = writes.jobKey(kind, e.data.id);
+      if (latest && latest !== job.key && writes.stateOf(latest) !== 'synced') await writes.archive(latest).catch(() => {});
+      toast(`A ${kind} you deleted was changed on another device, so it was kept`); continue;
+    }
     try {
       if (kind === 'case') await restoreCase({ ...e.data }, e.data);
       else if (kind === 'note') await writes.save('note', owner, { ...e.data }, e.data);
