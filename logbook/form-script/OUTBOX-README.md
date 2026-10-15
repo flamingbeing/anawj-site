@@ -40,6 +40,10 @@ copy; a copy brings the script but not its triggers).
 When `Outbox.gs` changes in the repo, the owner pastes it again (the sheet runs its own copy, not the repo's):
 **Extensions → Apps Script → the `LogbookOutbox` file → select all, paste the whole new [`Outbox.gs`](Outbox.gs) → Save.**
 Nothing else: the triggers and Script properties stay. If Google asks to authorise again, allow.
+Before pasting the 15 Oct version, search the sheet's own Apps Script files for `getScriptLock`: the outbox run now holds
+the script lock for its whole run (and the nightly rebuild), so any other code there that takes it would wait or fail
+meanwhile. Entries keep the rid they were queued with: if a wrong id waiting in the outbox is another resident's real
+id, those cases would be added under that resident (rare; check `logbookOutboxCheck` after fixing ids).
 
 - **15 Oct 2026 (two changes, one paste):** paste the whole current file once; it holds both.
   - Paging and skipped entries: before, every run read only the outbox's first 12 entries, so once 12 entries were
