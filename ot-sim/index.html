@@ -41,6 +41,18 @@ h1{font-size:1.6rem;line-height:1.2;margin:.75rem 0 .25rem}
 .card h2{font-size:1.15rem;margin:0 0 4px}.card p{margin:0;color:var(--mut)}
 .card .meta{font-size:.875rem;color:var(--mut);margin-top:6px}
 
+/* pre-op */
+.back-link{display:inline-flex;align-items:center;min-height:44px;margin-top:4px}
+.dl{display:grid;gap:8px 14px;margin:8px 0 0}
+.dl>div{display:grid;grid-template-columns:7.5rem 1fr;gap:2px 10px}
+.dl dt{color:var(--mut);margin:0}
+.dl dd{margin:0}
+.checklist{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:8px}
+.checklist label{display:flex;gap:10px;align-items:flex-start;min-height:44px;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.checklist input{width:22px;height:22px;margin:1px 0 0;flex:none;accent-color:#9fd3ff}
+.btn-primary{display:inline-flex;align-items:center;justify-content:center;background:var(--keyon);color:#0a0f18;border:1px solid var(--keyon);border-radius:10px;min-height:48px;padding:0 20px;font-weight:700;text-decoration:none;margin-top:20px}
+.btn-primary:hover{filter:brightness(.95)}
+
 /* theatre */
 .topbar{display:flex;align-items:center;gap:8px;padding:8px 12px;flex-wrap:wrap;background:var(--panel);border-bottom:1px solid var(--line)}
 .topbar .back{min-height:44px;font-size:15px;display:inline-flex;align-items:center;padding:0 4px}
@@ -111,8 +123,23 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
     <p class="lead">A teaching simulator of a general anaesthetic: the vitals monitor, the drugs and the crises, on a synthetic patient. In development.</p>
     <ul class="cards">
       <li><a class="card" href="#theatre"><h2>Free run</h2><p>A healthy synthetic adult, awake, on the monitor. You do everything.</p><p class="meta">Drugs, airway, breathing, circulation, rhythm and resuscitation controls.</p></a></li>
-      <li><a class="card" href="?case=electiveGA#theatre"><h2>Elective GA</h2><p>Start a guided general anaesthetic already induced, intubated and ventilated — maintain, then wake the patient.</p><p class="meta">A pre-op screen and the surgical-stimulus timeline are being added.</p></a></li>
+      <li><a class="card" href="?case=electiveGA#preop"><h2>Elective GA</h2><p>A guided general anaesthetic: read the patient at pre-op and run the sign-in, then start already induced, intubated and ventilated — maintain, then wake the patient.</p><p class="meta">The surgical-stimulus timeline is being added.</p></a></li>
     </ul>
+    <p class="foot">Teaching only. The patient is synthetic and the numbers are a model, not clinical advice.</p>
+  </main>
+</section>
+
+<section id="preop" class="screen" hidden>
+  <main class="wrap">
+    <a class="back-link" href="#library">← Library</a>
+    <h1 id="preop-title">Pre-op</h1>
+    <p class="lead">Read the patient over, then run the theatre checklist before you start. Nothing is enforced here — it is a briefing.</p>
+    <h2 class="sub">Synthetic patient</h2>
+    <dl class="dl" id="preop-sum"></dl>
+    <dl class="dl" id="preop-clin"></dl>
+    <h2 class="sub">Sign in (before induction)</h2>
+    <ul class="checklist" id="preop-list"></ul>
+    <a class="btn-primary" id="preop-begin" href="#theatre">Begin the anaesthetic →</a>
     <p class="foot">Teaching only. The patient is synthetic and the numbers are a model, not clinical advice.</p>
   </main>
 </section>
