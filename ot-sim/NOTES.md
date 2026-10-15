@@ -69,6 +69,20 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Decisions log
 
+- 15 Oct 2026 (M2.8): resuscitation (`resus.js`, a new subsystem between rhythm and cardio). It owns the arrest
+  "devices": chest compressions (`cprFrac`, an output fraction by quality with a coronary build-up), the defibrillator
+  (shock success by time-in-VF and perfusion, exported as `shockSuccess`), and transcutaneous pacing (capture at the
+  patient's drawn `paceThresh`). Cardio reads `resus.cprFrac` as the output of a non-perfusing rhythm; rhythm reads
+  `resus.convert` (a successful shock → sinus) and `resus.pace.capturing` (→ paced). Two gas couplings were added,
+  both gated below the normal cardiac-output range so every earlier gas/anaesthetised/apnoea calibration is untouched
+  (they all run at normal CO): CO2 clearance follows pulmonary blood flow (saturating knee at the resting CO 5.0 —
+  steady-state EtCO2 is VCO2/VA and flow-independent, so only arrest/CPR lowers it, giving the clinical EtCO2 feedback),
+  and the arterial/venous O2 pools stagnate at very low flow so SpO2 falls in an untreated arrest and recovers with
+  compressions — this closes the M2.7 known miss. `patient.paceThresh` is drawn last in makePatient so every
+  already-fixed test patient and the earlier draws are unchanged. UI: a Resuscitation block on the Patient tab (CPR +
+  quality, defibrillate + joules + amiodarone, pacer + mA) with a live status line; the pacing threshold is hidden so
+  the learner discovers it. Amiodarone the drug is M4.0; `{type:'amiodarone'}` sets the shock-success hook for now.
+
 - 15 Oct 2026 (M2.7): rhythms and the ECG. `rhythm.js` grew from sinus-only into an atrial clock, an AV node and a
   ventricular clock with a rhythm catalogue (`CATALOG`): sinus (brady, tachy), junctional, the AV blocks (first-degree,
   Wenckebach, Mobitz II, complete), AF, flutter, SVT, bigeminy, VT, torsades, VF, PEA, asystole, paced and the three

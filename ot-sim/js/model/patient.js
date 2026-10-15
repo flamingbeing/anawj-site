@@ -70,7 +70,10 @@ export function makePatient(profile = {}, draw) {
     pkCL: exp(0.25 * draw.normal()),
     baroGain: clamp(1 + 0.25 * draw.normal(), 0.5, 1.5),
     ihr: intrinsicHr(age) * clamp(1 + 0.075 * draw.normal(), 0.85, 1.15),
+    // transcutaneous pacing capture threshold, mA (MODEL.md section 13; about 50-90 mA [U]). Drawn last so the
+    // earlier draws, and every patient already fixed in a test, are unchanged.
+    paceThresh: clamp(70 + 15 * draw.normal(), 45, 95),
   };
-  for (const k of ['q', 'pkV1', 'pkCL', 'baroGain', 'ihr']) if (fixed[k] != null) out[k] = fixed[k];
+  for (const k of ['q', 'pkV1', 'pkCL', 'baroGain', 'ihr', 'paceThresh']) if (fixed[k] != null) out[k] = fixed[k];
   return out;
 }

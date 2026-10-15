@@ -23,6 +23,10 @@ export const GAS = {
   co2Cap: 0.84,           // mL/kg/mmHg body CO2 store (59 mL/mmHg at 70 kg) [D, prototype]
   co2Gap: 6,              // mmHg venous-alveolar CO2 difference at rest, which sets the exchange conductance [D]
   vdAlv: 0.06,            // alveolar dead-space fraction: EtCO2 = PACO2 x (1 - vdAlv) [D]
+  flowKnee: 5.0,          // L/min: CO2 clearance follows pulmonary blood flow, saturating at about the resting output
+                          // (steady-state EtCO2 is set by VCO2/VA and is flow-independent, so normal and anaesthetised
+                          // patients are unaffected; only the low output of arrest and CPR lowers EtCO2) [D]
+  stagQ: 2.0, stagRate: 0.6, // L/min knee and per-min rate for arterial-venous O2 stagnation at arrest (SpO2 falls) [D]
 };
 
 // Severinghaus 1979 [V]: saturation (0-1) from PO2 (mmHg)
@@ -77,9 +81,11 @@ export const gas = {
     const cc = content(PAO2, hb), ca = g.Qa / GAS.vaO2, cv = g.Qv / GAS.vvO2;
     const ccLung = (1 - shunt) * cc + shunt * cv;                       // content leaving the lung (shunt admixture)
     const o2Up = Math.max(0, q * (1 - shunt) * (cc - cv));              // mL/min from the lung into the blood
-    // CO2: body store <-> alveolus, conductance set so the resting gap is co2Gap
+    // CO2: body store <-> alveolus, conductance set so the resting gap is co2Gap; CO2 reaches the lung only as fast as
+    // the pulmonary blood flow carries it, so low output (arrest, CPR) lowers EtCO2 — the clinical CPR feedback
+    const fFlow = Math.min(1, q / GAS.flowKnee);
     const gCo2 = (GAS.vo2PerKg * GAS.rq * p.weightKg) / GAS.co2Gap;
-    const co2Out = gCo2 * (g.pvco2 - PACO2);                             // mL/min into the lung
+    const co2Out = fFlow * gCo2 * (g.pvco2 - PACO2);                     // mL/min into the lung
     const pvco2 = g.pvco2 + ((vco2 - co2Out) / (GAS.co2Cap * p.weightKg)) * dt;
     // the lung store: alveolar ventilation out at alveolar fractions, in at inspired fractions plus the net uptake
     const va = r.open ? r.va : 0;
@@ -97,8 +103,17 @@ export const gas = {
     vl = Math.max(vl, 1);
     // arterial pool: blood arrives from the lung at ccLung, leaves to the tissues at the arterial content; venous and
     // tissue pool: receives what the tissues did not consume and returns it to the lung
-    const Qa = Math.max(0, g.Qa + (q * ccLung - q * ca) * dt);
-    const Qv = Math.max(0, g.Qv + (q * ca - vo2 - q * cv) * dt);
+    let Qa = Math.max(0, g.Qa + (q * ccLung - q * ca) * dt);
+    let Qv = Math.max(0, g.Qv + (q * ca - vo2 - q * cv) * dt);
+    // stagnation at very low cardiac output (arrest): with almost no flow the arterial and venous pools equilibrate as
+    // the tissues keep extracting oxygen, so SaO2 falls over minutes; compressions or a restored rhythm bring flow
+    // back and it recovers. Zero above a low output, so the apnoea and steady-state behaviour is unchanged. [D]
+    const stag = GAS.stagRate * Math.max(0, 1 - q / GAS.stagQ);
+    if (stag > 0) {
+      const ceq = (Qa + Qv) / (GAS.vaO2 + GAS.vvO2), mix = Math.min(1, stag * dt);
+      Qa += (ceq * GAS.vaO2 - Qa) * mix;
+      Qv += (ceq * GAS.vvO2 - Qv) * mix;
+    }
     const pao2 = po2Of(ca, hb), paco2 = fa.co2 * PDRY;
     return {
       ...g, vl, fa, vo2, vco2, shunt, Qa, Qv, pvco2, fi,
