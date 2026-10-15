@@ -134,6 +134,8 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Decisions log
 
+- 2026-10-15 (log2): Owner: when GitHub's Checks are slow, sessions may run the same checks locally and merge on that (#589 merged
+  on the full local logbook suite, rules suite and conflict scenarios; the rules deploy was still confirmed afterwards).
 - 2026-10-15 (log2): Reliability hour with Firetop. Live data checked clean (drift IN SYNC; integrity scan: no duplicates, no
   live-and-binned cases, no unknown categories). Code audit found real data-loss paths in the save queue, the bin, backup restore, the
   Form inbox, the sheet outbox and the workbook re-import; fixes paused mid-way at the owner's usage limit, saved as a git bundle in
