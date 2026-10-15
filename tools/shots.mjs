@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 
 // the page to show for changes in each folder (apps open in their demo: fake data only)
 export const PAGES = {
-  'logbook/': '/logbook/?demo', 'evals/': '/evals/?demo', 'nuh-roster/': '/nuh-roster/?demo', 'prewarm/': '/prewarm/?demo',
+  'logbook/': '/logbook/?demo', 'evals/': '/evals/?demo', 'nuh-roster/': '/nuh-roster/?demo', 'ntf-roster/': '/ntf-roster/?demo', 'prewarm/': '/prewarm/?demo',
   'hand-babies/': '/hand-babies/', 'bis-dsa/': '/bis-dsa/', 'ot-sim/': '/ot-sim/', 'hand-log/': '/hand-log/', 'cmcj/': '/cmcj/', 'privacy/': '/privacy/',
   'edit/': '/edit/?page=/privacy/', 'nuhsdesign/': '/logbook/?demo', 'index.html': '/',
 };
