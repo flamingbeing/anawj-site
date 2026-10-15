@@ -5,8 +5,8 @@ globalThis.location = { search: '?demo' };
 const device = new Map();
 globalThis.localStorage = { getItem: k => device.get(k) || null, setItem: (k,v) => { device.set(k,String(v)); Object.defineProperty(localStorage,k,{value:String(v),configurable:true,enumerable:true}); }, removeItem: k => { device.delete(k); delete localStorage[k]; } };
 const cloud = await import('../js/cloud.js');
-const { resetDemo, DEMO_USER } = await import('../js/demo-backend.js');
-const { S, setCases, resetCaches } = await import('../js/ui-core.js');
+const { resetDemo, DEMO_USER, sheetOutbox } = await import('../js/demo-backend.js');
+const { S, setCases, resetCaches, createCase, writes } = await import('../js/ui-core.js');
 const B = await import('../js/bin.js');
 
 const DAY = 864e5, now = Date.parse('2026-03-01T00:00:00Z');
@@ -77,6 +77,42 @@ assert.equal(await B.purgeExpired(), 0, 'runs once per user');
 await B.deleteForever(es[1].id);
 assert.equal((await cloud.listBin(email)).length, 0);
 await assert.rejects(B.restoreFromBin('nope'));
+
+// the response sheet's outbox (sheet-outbox.js; the demo keeps it in memory): a new case's entry leaves with the delete and
+// comes back when the case is restored with its id (Undo, the bin, a delete that failed); never under a new id, and never
+// for a case from before the outbox went live
+{
+  S.resident = { rid: '209901', name: 'Fake Resident', email };
+  S.logbook = { ...(S.logbook || {}), rid: '209901' };
+  const queued = id => sheetOutbox().some(e => e.id === id);
+  const until = async (fn, what) => { for (let i = 0; i < 100; i++) { if (fn()) return; await new Promise(r => setTimeout(r, 20)); } assert.fail(what); };
+  const c = await createCase({ details: 'XY 30F fake LSCS spinal', cats: ['16', '28'], date: '2026-10-20' });
+  assert.ok(queued(c.id), 'queued when logged');
+  const be = await B.moveToBin('case', S.cases.find(x => x.id === c.id));
+  assert.ok(!queued(c.id), 'taken out with the delete');
+  const back = await B.restoreFromBin(be.id);   // what the toast's Undo and the bin's Restore do
+  assert.equal(back.id, c.id); assert.ok(queued(c.id), 'back in the outbox after Undo');
+  assert.equal(sheetOutbox().filter(e => e.id === c.id).length, 1);
+  // restored under a new id (a live case has the old one): not queued, or the sheet would get the case twice
+  const be2 = await B.moveToBin('case', S.cases.find(x => x.id === c.id));
+  await cloud.saveCase(email, { ...c }); setCases(await cloud.listCases(email));
+  const back2 = await B.restoreFromBin(be2.id);
+  assert.notEqual(back2.id, c.id); assert.ok(!queued(back2.id), 'never under a new id'); assert.ok(!queued(c.id));
+  // an app case from before the outbox went live: restored, not queued
+  const old = { id: 'old1', date: '2026-03-01', initials: 'OP', details: 'fake old case', cats: ['13'], createdAt: Date.parse('2026-03-01T02:00:00Z'), updatedAt: Date.parse('2026-03-01T02:00:00Z'), source: 'app' };
+  await cloud.saveCase(email, old); setCases(await cloud.listCases(email));
+  const be3 = await B.moveToBin('case', S.cases.find(x => x.id === 'old1'));
+  assert.equal((await B.restoreFromBin(be3.id)).id, 'old1'); assert.ok(!queued('old1'), 'an old case is not sent late');
+  // a delete accepted, then failing (a connection that only looks online): the case is saved again, and queued again
+  const c2 = await createCase({ details: 'ZW 41M fake lap chole', cats: ['08', '13'], date: '2026-10-21' });
+  writes.configure({ backend: async (em, kind, rec, bs) => { if (!rec._deleted) return cloud.commitRecord(em, kind, rec, bs); await new Promise(r => setTimeout(r, 400)); throw new Error('Fake: the client is offline'); } });
+  try {
+    await B.moveToBin('case', S.cases.find(x => x.id === c2.id));
+    assert.ok(!queued(c2.id), 'taken out once the delete was accepted');
+    await until(() => queued(c2.id) && S.cases.some(x => x.id === c2.id), 'the failed delete put the case and its outbox entry back');
+  } finally { writes.configure({ backend: cloud.commitRecord }); }
+  S.resident = null;
+}
 
 resetCaches();
 console.log('bin tests passed');

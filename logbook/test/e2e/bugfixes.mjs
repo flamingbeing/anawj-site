@@ -45,6 +45,37 @@ try { for (const width of [390, 1280]) {
   const jobs = await p.evaluate(async id => (await import('./js/ui-core.js')).writes.entries().filter(x => x.record.id === id).map(x => [x.state, !!x.record._deleted]), ids[1]);
   assert.deepEqual(jobs[0], ['synced', false]); assert.ok(jobs.some(([s, del]) => s === 'archived' && del), JSON.stringify(jobs));
 
+  // ---- the response sheet's outbox: a new case deleted and brought back is queued again ----
+  // (a programme resident's new cases; the demo keeps the outbox in memory)
+  const outboxEntry = id => p.evaluate(async id => (await import('./js/demo-backend.js')).sheetOutbox().find(e => e.id === id) || null, id);
+  const newId = await p.evaluate(async () => {
+    const { S, createCase } = await import('./js/ui-core.js');
+    S.resident = { rid: '209901', name: 'Fake Resident', email: S.user.email }; S.logbook = { ...S.logbook, rid: '209901' };
+    return (await createCase({ details: 'QR 33F fake LSCS spinal', cats: ['16', '28'] })).id;
+  });
+  assert.ok(await outboxEntry(newId), 'queued when logged');
+  // deleted as the edit dialog's Delete does, then Undo on the toast
+  await p.evaluate(async id => { const { S } = await import('./js/ui-core.js'), { moveToBin } = await import('./js/bin.js'); await moveToBin('case', S.cases.find(c => c.id === id), { toast: true }); }, newId);
+  assert.equal(await outboxEntry(newId), null, 'taken out with the delete');
+  await p.locator('#toast button', { hasText: 'Undo' }).click();
+  await poll(async () => await hasCase(newId) && !!(await outboxEntry(newId)), 'Undo put the case and its outbox entry back');
+  // a delete that loses to an edit made on another device: that version is kept, and goes back into the outbox
+  const keptId = await p.evaluate(async () => {
+    const { S, createCase, writes, cloud } = await import('./js/ui-core.js'), { moveToBin } = await import('./js/bin.js');
+    const c = await createCase({ details: 'ST 50M fake hernia repair', cats: ['13'] });
+    writes.configure({ backend: async (email, kind, rec, bs) => {
+      if (!rec._deleted) return cloud.commitRecord(email, kind, rec, bs);
+      await new Promise(r => setTimeout(r, 600));
+      const remote = await cloud.saveCase(email, { ...c, details: 'fake hernia repair, edited on another device', updatedAt: Date.now() });
+      throw Object.assign(new Error('This record changed elsewhere. Both versions are kept in Recent changes'), { code: 'write-conflict', remote });
+    } });
+    await moveToBin('case', S.cases.find(x => x.id === c.id));
+    return c.id;
+  });
+  assert.equal(await outboxEntry(keptId), null, 'taken out once the delete was accepted');
+  await poll(async () => /edited on another device/.test((await outboxEntry(keptId))?.details || ''), 'the kept version went back into the outbox');
+  await p.evaluate(async () => { const { writes, cloud, S } = await import('./js/ui-core.js'); writes.configure({ backend: cloud.commitRecord }); S.resident = null; });
+
   // ---- Settings search: the Settings page's own cards, the bin, and Account ----
   await goHash('settings');
   const search = async (q, text, page) => {

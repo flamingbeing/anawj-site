@@ -133,12 +133,14 @@ function findCol(header, ...names) {
 const APP_MARK_COL = 9;   // column J
 
 // rows: the "Case" tab as row arrays, header row included (it is found within the first 10 rows).
-// Returns { cases, skipped:[{row, reason}], warnings:[{row, message}] }. row numbers are 1-based sheet rows.
+// Returns { cases, skipped:[{row, reason}], warnings:[{row, message}], appRows:[{rid, cats, row}] }. row numbers are 1-based
+// sheet rows. appRows: the rows the sheet script added for cases logged in the app (skipped: already in the logbook), kept
+// apart only so the count check can add them (the sheet's AY Totals count them too); never imported, never keyed.
 export function parseCaseSheet(rows) {
-  const warnings = [], skipped = [], cases = [];
+  const warnings = [], skipped = [], cases = [], appRows = [];
   rows = Array.isArray(rows) ? rows : [];
   const h = rows.findIndex((r, i) => i < 10 && Array.isArray(r) && r.some(c => norm(cellText(c)) === 'resident'));
-  if (h < 0) return { cases, skipped, warnings: [{ row: 0, message: 'No "Resident" header found in the Case sheet.' }] };
+  if (h < 0) return { cases, skipped, warnings: [{ row: 0, message: 'No "Resident" header found in the Case sheet.' }], appRows };
   const header = rows[h].map(cellText);
   const col = {
     resident: findCol(header, 'resident'),
@@ -153,10 +155,23 @@ export function parseCaseSheet(rows) {
   for (const k of ['resident', 'date', 'details', 'category']) {
     if (col[k] < 0) warnings.push({ row: h + 1, message: `Column "${k}" not found.` });
   }
-  if (col.resident < 0) return { cases, skipped, warnings };
+  if (col.resident < 0) return { cases, skipped, warnings, appRows };
   // Old sheets kept the sub-category questions in D..G right after Category; fall back to that layout.
   const catCols = [col.category, col.neuro, col.paeds, col.blocks].filter(i => i >= 0);
   const get = (r, i) => (i >= 0 ? r[i] : null);
+  // a row's category codes, each once; warn(message) for what doesn't fit
+  const catsOf = (r, warn) => {
+    const cats = [];
+    for (const ci of catCols) {
+      for (const label of splitLabels(r[ci])) {
+        const code = codeOf(label);
+        if (!code) { warn(`Unknown category "${label}"`); continue; }
+        if (cats.includes(code)) warn(`Category ${code} listed twice (counted once)`);
+        else cats.push(code);
+      }
+    }
+    return cats;
+  };
 
   for (let i = h + 1; i < rows.length; i++) {
     const r = rows[i] || [], rowNo = i + 1;
@@ -167,7 +182,11 @@ export function parseCaseSheet(rows) {
     }
     if (norm(residentLabel) === 'wrong entry') { skipped.push({ row: rowNo, reason: 'WRONG ENTRY' }); continue; }
     // rows the sheet script added for cases logged in the app (column J: 'app:<caseId>'; sheet-outbox.js): already in the logbook
-    if (/^app:/i.test(cellText(r[APP_MARK_COL]).trim())) { skipped.push({ row: rowNo, reason: 'Made in the app' }); continue; }
+    if (/^app:/i.test(cellText(r[APP_MARK_COL]).trim())) {
+      skipped.push({ row: rowNo, reason: 'Made in the app' });
+      appRows.push({ rid: ridOf(residentLabel), cats: catsOf(r, () => {}), row: rowNo });
+      continue;
+    }
     const rid = ridOf(residentLabel);
     if (!rid) warnings.push({ row: rowNo, message: `No resident id in "${residentLabel}"` });
 
@@ -175,15 +194,7 @@ export function parseCaseSheet(rows) {
     const date = parseDate(rawDate);
     const dateText = date ? '' : cellText(get(r, col.date)).trim();
     const details = cellText(get(r, col.details)).trim();
-    const cats = [];
-    for (const ci of catCols) {
-      for (const label of splitLabels(r[ci])) {
-        const code = codeOf(label);
-        if (!code) { warnings.push({ row: rowNo, message: `Unknown category "${label}"` }); continue; }
-        if (cats.includes(code)) warnings.push({ row: rowNo, message: `Category ${code} listed twice (counted once)` });
-        else cats.push(code);
-      }
-    }
+    const cats = catsOf(r, message => warnings.push({ row: rowNo, message }));
     if (!cats.length) warnings.push({ row: rowNo, message: 'No categories' });
     cases.push({ rid, residentLabel, date, dateText, details, cats, timestamp: timestampMs(get(r, col.timestamp)), row: rowNo });
   }
@@ -201,7 +212,7 @@ export function parseCaseSheet(rows) {
     seen.set(base, n + 1);
     c.importKey = base + '#' + n;
   }
-  return { cases, skipped, warnings };
+  return { cases, skipped, warnings, appRows };
 }
 
 // ---------- AY totals tab ----------
@@ -236,7 +247,8 @@ export function parseTotalsSheet(rows) {
 
 // ---------- checks ----------
 
-// Compare imported cases with an old totals table. Only rids and codes present in the totals are checked.
+// Compare imported cases with an old totals table. Only rids and codes present in the totals are checked. The sheet's
+// Totals also count the rows made in the app (parseCaseSheet's appRows): pass them in with the cases.
 export function countCheck(cases, totalsByRid) {
   const got = {};
   for (const c of cases || []) {

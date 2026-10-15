@@ -34,6 +34,7 @@ function demoDoc(email, name) {
 // ---- storage ----
 
 let memory = null;            // fallback when localStorage is missing or throws
+const outbox = new Map();     // the response sheet's outbox (sheetOutbox), in memory only: see queueSheetRows
 function storage() {
   try { if (typeof localStorage !== 'undefined') { localStorage.getItem(KEY); return localStorage; } } catch { /* blocked */ }
   return null;
@@ -69,6 +70,7 @@ function mode() {
 // because IMAGES_KEY is declared further down and this can run while the module is loading.
 export function resetDemo({ seeded = true } = {}) {
   memory = null;
+  outbox.clear();
   const ls = storage();
   if (ls) { try { ls.removeItem(KEY); ls.removeItem(KEY + '-images'); ls.removeItem(KEY + '-submissions'); } catch { /* ignore */ } }
   const s = blank();
@@ -538,3 +540,9 @@ export async function deleteBinEntry(email, id) {
   notifyBin(email);
 }
 // ---- end recycle bin ----
+
+// The response sheet's outbox (sheet-outbox.js; `outbox`, near the top): in memory only, as no sheet script reads it here,
+// so it just shows the tests what the app queues and takes back. As the rules do, an entry already there is not replaced.
+export function queueSheetRows(entries) { for (const e of entries) if (!outbox.has(String(e.id))) outbox.set(String(e.id), plain(e)); }
+export function dropSheetRows(ids) { for (const id of ids) outbox.delete(String(id)); }
+export const sheetOutbox = () => [...outbox.values()].map(plain);

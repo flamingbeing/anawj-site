@@ -351,7 +351,7 @@ function importCard() {
           h('td', {}, g.rid || '—'),
           h('td', {}, r ? r.name : g.label),
           h('td', {}, r && r.email ? r.email : h('span', { class: 'flag err' }, 'no email — add to residents first')),
-          h('td', { class: 'num' }, String(g.cases.length)),
+          h('td', { class: 'num' }, String(g.cases.length), g.app && g.app.length ? h('span', { class: 'muted', title: 'Rows made in the app: already in the logbook, not imported, but counted in the check' }, ` + ${g.app.length} in the app`) : null),
           h('td', {}, g.check.checked ? (g.check.ok ? h('span', { class: 'flag', style: 'background:var(--ok-bg);color:var(--ok)' }, '✓ matches') :
             h('span', { class: 'flag err', title: g.check.diffs.map(d => `${d.code}: expected ${d.expected}, got ${d.got}`).join('\n') }, `${g.check.diffs.length} differ`)) : h('span', { class: 'muted' }, 'no totals')));
       })))),
@@ -381,10 +381,15 @@ async function readWorkbook(file) {
       if (!groups.has(k)) groups.set(k, { rid: c.rid, label: c.residentLabel, cases: [] });
       groups.get(k).cases.push(c);
     }
+    // rows the sheet script added for cases logged in the app: not imported (already in the logbook), but the Totals tabs
+    // count them, so the check does too
+    const appByRid = new Map();
+    for (const a of parsed.appRows || []) if (a.rid) appByRid.set(a.rid, [...(appByRid.get(a.rid) || []), a]);
     const list = [...groups.values()].sort((a, b) => String(a.rid).localeCompare(String(b.rid)));
     for (const g of list) {
       const t = g.rid && totals[g.rid] ? { [g.rid]: totals[g.rid] } : null;
-      g.check = t ? { checked: true, ...countCheck(g.cases, t) } : { checked: false, ok: false, diffs: [] };
+      g.app = (g.rid && appByRid.get(g.rid)) || [];
+      g.check = t ? { checked: true, ...countCheck([...g.cases, ...g.app], t) } : { checked: false, ok: false, diffs: [] };
     }
     A.imp = { groups: list, total: parsed.cases.length, skipped: parsed.skipped.length, warnings: parsed.warnings.length, warningList: parsed.warnings };
   } catch (err) { toast('Could not read the workbook: ' + err.message); }

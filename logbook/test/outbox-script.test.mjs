@@ -112,9 +112,10 @@ function fakeEnv({ entries = [], pending = { rids: [], ays: [] }, over = {}, ioO
   let clock = 0, held = 0, maxHeld = 0, holds = 0;
   const io = fakeIo({ ...ioOver, appendRow: row => { log.push('append'); return 2; }, database: () => log.push('database'), sort: () => log.push('sort'),
     residentReport: rid => { log.push(`report ${rid}`); clock += 20000; }, aySummary: ay => { log.push(`totals ${ay}`); clock += 30000; } });
-  const store = { pending: JSON.parse(JSON.stringify(pending)) };
+  const store = { pending: JSON.parse(JSON.stringify(pending)), cursor: '' };
   const env = { trail: log, log: () => {}, store, io,
     list: () => entries, remove: id => log.push(`delete ${id}`),
+    getCursor: () => store.cursor, setCursor: id => { store.cursor = id; },
     locked: fn => { held++; holds++; maxHeld = Math.max(maxHeld, held); log.push('lock'); try { fn(); } finally { held--; log.push('unlock'); } },
     getPending: () => JSON.parse(JSON.stringify(store.pending)), setPending: p => { store.pending = JSON.parse(JSON.stringify(p)); log.push('pending ' + p.rids.length + '/' + p.ays.length); },
     now: () => clock, pause: ms => { clock += ms; }, ...over };
@@ -167,6 +168,130 @@ function fakeEnv({ entries = [], pending = { rids: [], ays: [] }, over = {}, ioO
     initials: { stringValue: 'AB' }, details: { stringValue: '34F' }, cats: { arrayValue: { values: [{ stringValue: '16' }, { stringValue: '28' }] } }, createdAt: { integerValue: '1760412015000' } } };
   assert.deepEqual(plain(S.entryOf(doc)), { id: 'k9', email: 'fake.person@example.com', rid: '202301', date: '2026-10-14', initials: 'AB', details: '34F', cats: ['16', '28'], createdAt: 1760412015000 });
   assert.deepEqual([...S.entryOf({ name: 'x/y/z', fields: { cats: { arrayValue: {} }, date: { nullValue: null } } }).cats], []);
+}
+
+// ---------- paging: entries that are skipped never hold the others back ----------
+// A fake of Firestore's runQuery that reads the request body Outbox.gs sends, as the REST API does: documents in id
+// (__name__) order, at most `limit`, starting after the startAt id; the answer as runQuery gives it.
+const DOCS = 'projects/apmes-logbook/databases/(default)/documents';
+const toFields = e => Object.fromEntries(Object.entries(e).map(([k, v]) => [k, v == null ? { nullValue: null } : Array.isArray(v) ? { arrayValue: { values: v.map(x => ({ stringValue: x })) } }
+  : typeof v === 'number' ? { integerValue: String(v) } : { stringValue: String(v) }]));
+function restOutbox(list) {
+  const docs = new Map(list.map(e => [e.id, e])), calls = [];
+  const runQuery = body => {
+    const q = body.structuredQuery;
+    assert.deepEqual(plain(q.from), [{ collectionId: 'sheetOutbox' }]);
+    assert.deepEqual(plain(q.orderBy), [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }]);
+    assert.ok(Number.isInteger(q.limit) && q.limit > 0 && q.limit <= 300, 'a page size the API takes');
+    let after = '';
+    if (q.startAt) {
+      assert.equal(q.startAt.before, false, 'starts just after the given id');
+      const ref = q.startAt.values[0].referenceValue;
+      assert.ok(ref.startsWith(DOCS + '/sheetOutbox/'), ref);
+      after = ref.slice((DOCS + '/sheetOutbox/').length);
+    }
+    const ids = [...docs.keys()].sort().filter(id => !after || id > after).slice(0, q.limit);
+    calls.push({ after, n: ids.length });
+    return ids.length ? ids.map(id => ({ document: { name: `${DOCS}/sheetOutbox/${id}`, fields: toFields(docs.get(id)) }, readTime: 't' })) : [{ readTime: 't' }];
+  };
+  return { docs, calls, list: after => [...S.entriesOf(runQuery(S.pageQuery(after, S.batch)))] };
+}
+// one 5-minute run against the fake outbox; props: the Script properties (cursor, pending) kept between runs
+function pagedRun(outbox, props, { appendMs = 0 } = {}) {
+  let clock = 0;
+  const env = fakeEnv({ over: {
+    list: outbox.list, remove: id => outbox.docs.delete(id),
+    getCursor: () => props.cursor || '', setCursor: id => { props.cursor = id; },
+    getPending: () => props.pending || { rids: [], ays: [] }, setPending: p => { props.pending = JSON.parse(JSON.stringify(p)); },
+    now: () => clock, pause: ms => { clock += ms; },
+  } });
+  const append = env.io.appendRow;
+  env.io.appendRow = row => { clock += appendMs; return append(row); };
+  const before = outbox.calls.length;
+  const s = S.cycle(env);
+  const calls = outbox.calls.slice(before);
+  assert.ok(calls.length <= 2 && calls.every(c => c.n <= S.batch), 'a run reads one page (two when it goes back to the start): ' + JSON.stringify(calls));
+  return s;
+}
+{
+  assert.equal(S.batch, 12);
+  // 14 entries for a resident who isn't on the Residents tab and one whose id isn't 6 digits, all sorting first (as the
+  // REST API lists by id); then cases from residents who are on it
+  const skip = Array.from({ length: 14 }, (_, n) => ({ ...entry, id: 'a' + String(n).padStart(2, '0'), rid: '999999' })).concat([{ ...entry, id: 'a14', rid: 'R2' }]);
+  const good = ['b0', 'b1', 'b2', 'b3', 'b4'].map(id => ({ ...entry, id, rid: '202301' })).concat(['z0', 'z1', 'z2'].map(id => ({ ...entry, id, rid: '202402' })));
+  const outbox = restOutbox([...good, ...skip]);
+  const props = {};
+  // (the old way, the first page every time, never got past the skipped ones)
+  assert.deepEqual(outbox.list('').map(e => e.id), skip.slice(0, 12).map(e => e.id));
+  let s = pagedRun(outbox, props);
+  assert.equal(s.added, 0); assert.equal(s.skipped.length, 12); assert.equal(props.cursor, 'a11', 'the next run starts after the page it saw');
+  s = pagedRun(outbox, props);
+  assert.equal(s.added, good.length, 'the cases after the skipped ones are delivered');
+  assert.equal(props.cursor, '', 'the end of the outbox: back to the start');
+  assert.deepEqual([...outbox.docs.keys()].sort(), skip.map(e => e.id), 'only the skipped entries wait');
+  // a new case whose id sorts among the skipped ones, and one after them: through within one round of the outbox
+  outbox.docs.set('a05x', { ...entry, id: 'a05x', rid: '202301' });
+  outbox.docs.set('c1', { ...entry, id: 'c1', rid: '202301' });
+  for (let run = 0; run < 3 && outbox.docs.size > skip.length; run++) pagedRun(outbox, props);
+  assert.equal(outbox.docs.size, skip.length, 'both new cases delivered');
+  assert.ok(!outbox.docs.has('a05x') && !outbox.docs.has('c1'));
+  // a run past the last entry finds nothing after its cursor: it goes back to the start in the same run
+  props.cursor = 'zz';
+  outbox.docs.set('b9', { ...entry, id: 'b9', rid: '202301' });
+  const n0 = outbox.calls.length;
+  pagedRun(outbox, props); pagedRun(outbox, props);
+  assert.ok(!outbox.docs.has('b9'), 'delivered after going back to the start');
+  assert.deepEqual(outbox.calls.slice(n0, n0 + 2).map(c => c.after), ['zz', ''], 'nothing after the cursor: the first page, in the same run');
+  // nothing waiting at all: one read, the sheet isn't opened, and the cursor goes back to the start
+  const empty = restOutbox([]), p2 = { cursor: 'k1' };
+  let opened = 0;
+  const env = fakeEnv({ over: { list: empty.list, getCursor: () => p2.cursor, setCursor: id => { p2.cursor = id; }, open: () => { opened++; } } });
+  const quiet = S.cycle(env);
+  assert.deepEqual([quiet.idle, opened, p2.cursor], [true, 0, '']);
+}
+// out of time half way through a page: the next run carries on after the last entry this one looked at
+{
+  const ids = ['g0', 'g1', 'g2', 'g3', 'g4', 'g5'];
+  const outbox = restOutbox(ids.map(id => ({ ...entry, id, rid: '202301' })));
+  const props = {};
+  const s = pagedRun(outbox, props, { appendMs: 100000 });   // 100 s per row: the 4.5-minute budget ends after the first piece
+  assert.equal(s.added, S.chunk); assert.equal(props.cursor, ids[S.chunk - 1]);
+  pagedRun(outbox, props);
+  assert.equal(outbox.docs.size, 0, 'the rest delivered by the next run'); assert.equal(props.cursor, '');
+}
+// the runQuery answer with no match is just a read time
+assert.deepEqual([...S.entriesOf([{ readTime: 't' }])], []);
+assert.equal(S.pageQuery('', 12).structuredQuery.startAt, undefined, 'from the start: no startAt');
+
+// ---------- the nightly report of skipped entries ----------
+{
+  const H = 3600e3, now = Date.parse('2026-10-20T03:00:00Z');
+  const ok = rid => rid === '202301';
+  const at = hours => now - hours * H;
+  const list = [
+    { ...entry, id: 's1', rid: '999999', createdAt: at(30) }, { ...entry, id: 's2', rid: '999999', createdAt: at(2) },
+    { ...entry, id: 's3', rid: 'R2', createdAt: at(5) }, { ...entry, id: 'g1', rid: '202301', createdAt: at(1) },
+  ];
+  const w = S.waiting(list, ok, now);
+  assert.deepEqual([w.waiting, w.skippedN, w.overdue, w.oldOther, Math.round(w.oldestSkippedMs / H)], [4, 3, 1, 0, 30]);
+  assert.deepEqual(plain(w.skipped).map(b => [b.rid, b.n, Math.round(b.oldestMs / H)]), [['999999', 2, 30], ['R2', 1, 5]]);
+  assert.match(w.skipped[0].reason, /no resident 999999 on the Residents sheet/); assert.match(w.skipped[1].reason, /not 6 digits/);
+  assert.equal(S.waitingText(w), 'Outbox: 4 waiting, 3 skipped (999999: 2, R2: 1; oldest 1.3 days).');
+  // skipped for over a day: the nightly run fails (Google emails the owner) and says what to do
+  const p = [...S.nightProblems({ status: 'ok' }, w, '')];
+  assert.equal(p.length, 1); assert.match(p[0], /^1 app case waited over a day .*\(resident 999999\): add the resident .*Residents tab/);
+  assert.ok(!p[0].includes('R2'), 'only the residents whose entries are over a day old');
+  // skipped only since this afternoon: reported, not a failure yet
+  const young = S.waiting(list.filter(e => e.id !== 's1'), ok, now);
+  assert.deepEqual([young.skippedN, young.overdue, S.nightProblems({ status: 'ok' }, young, '').length], [2, 0, 0]);
+  // nothing skipped; a case from a known resident waiting over a day is reported (not a failure)
+  const clean = S.waiting([{ ...entry, rid: '202301', createdAt: at(26) }], ok, now);
+  assert.equal(S.waitingText(clean), 'Outbox: 1 waiting, none skipped.'); assert.equal(clean.oldOther, 1);
+  assert.equal(S.waitingText({ ...S.waiting([], ok, now), capped: true }), 'Outbox: 0+ waiting, none skipped.');
+  // the other failures
+  assert.equal(S.nightProblems({ status: 'still differs' }, null, '').length, 1);
+  assert.match(S.nightProblems({ status: 'ok' }, null, 'Outbox not checked: 403')[0], /Outbox not checked/);
+  assert.equal(S.nightProblems({ status: 'fixed' }, clean, '').length, 0);
 }
 console.log('PASS outbox script');
 

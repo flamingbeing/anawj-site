@@ -34,6 +34,18 @@ copy; a copy brings the script but not its triggers).
    Delete the copy when done.
 5. `logbookOutboxDryRun` lists what waiting entries would add, without writing anything.
 
+## Updating the script after a change
+
+When `Outbox.gs` changes in the repo, the owner pastes it again (the sheet runs its own copy, not the repo's):
+**Extensions → Apps Script → the `LogbookOutbox` file → select all, paste the whole new [`Outbox.gs`](Outbox.gs) → Save.**
+Nothing else: the triggers and Script properties stay. If Google asks to authorise again, allow.
+
+- **Oct 2026 (paging and skipped entries):** paste the new file. Before this, every run read only the outbox's first 12
+  entries, so once 12 entries were waiting for residents who aren't on the Residents tab, other residents' cases stopped
+  reaching the sheet. Now each run carries on from where the last stopped (Script property `LOGBOOK_OUTBOX_CURSOR`, made
+  by the script; leave it), and the nightly Totals check reports skipped entries and fails when one has waited over a day.
+  Optional check after pasting: run `logbookOutboxCheck` (changes nothing): it lists what waits and why.
+
 ## Good to know
 
 - A script that adds rows itself doesn't fire the sheet's `onFormSubmit`, so this runs the same chain: `updateDatabase`
@@ -53,7 +65,13 @@ copy; a copy brings the script but not its triggers).
 - A case is never added twice: column J's `app:<caseId>` is checked first (a run that stopped before deleting the entry
   just deletes it next time). Deleting a Case row by hand doesn't update the Database or reports (same as for Form rows):
   use the menu's Rebuild commands.
-- A resident whose id isn't on the Residents sheet is skipped (their entries wait in the outbox; the log says so).
+- A resident whose id isn't on the Residents sheet is skipped: their entries wait in the outbox and their cases don't reach the
+  sheet until a PC adds the resident (name and 6-digit id) to the Residents tab; the next runs then add them. Each run reads
+  one page of 12 entries in id order, from where the last run stopped (Script property `LOGBOOK_OUTBOX_CURSOR`), and goes back
+  to the start at the end, so skipped entries never hold other residents' cases back and a run never reads more than a page
+  (a read per entry: about 3,500 reads a day at most). The 5-minute run only logs a skip (it never fails for one); the nightly
+  Totals check reports them once a day (count, ids, oldest age) and **fails when one has waited over a day**, so Google's
+  failure email reaches the trigger's owner. `logbookOutboxCheck` (by hand, changes nothing) lists them too.
 - The logbook's Admin workbook import skips rows with `app:` in column J (they're already in the logbook).
 - **Off switch:** delete the trigger (Triggers ⏰), or set `SHEET_OUTBOX_ON = false` in the app.
 - Failures show in Apps Script → Executions, and Google emails the trigger's owner a daily summary. The trigger runs as the
@@ -62,7 +80,8 @@ copy; a copy brings the script but not its triggers).
 - Change the bot's password (Authentication → Users → ⋮ → Reset password) in **both** projects' Script properties when an
   editor leaves.
 - Tests: `node logbook/test/outbox-script.test.mjs` (the row mapping against `js/categories.js`, the sheet's expectations and
-  the logbook's import, and the order of the update chain, with fakes).
+  the logbook's import, the order of the update chain, and paging past skipped entries against a fake of Firestore's
+  runQuery, with fakes).
 
 ## The nightly Totals check (optional, same file)
 
@@ -81,3 +100,9 @@ Database -> each AY Totals tab, and can run the same two rebuilds the sheet's ow
   `Categories.gs`) is ignored, not a difference. The last result is kept in the Script property `LOGBOOK_TOTALS_LAST`.
 - Measure first: run `logbookOutboxTotalsReport`, then run the menu's Rebuild commands by hand once and note how long each
   takes (the 6-minute limit applies to the nightly run, which runs both).
+- **What waits in the outbox.** The nightly run also reads the whole outbox once (signing in as the bot, as the 5-minute run
+  does) and adds a line to `LOGBOOK_TOTALS_LAST`, e.g. `Outbox: 4 waiting, 3 skipped (202701: 2, R2: 1; oldest 1.3 days).`
+  It **fails** (so Google emails the trigger's owner) when an entry has been skipped for over a day (its resident isn't on the
+  Residents tab, or the id isn't 6 digits), when the outbox can't be read, or, as before, when the Totals still differ after a
+  rebuild. Fix for skipped entries: add the resident (name and 6-digit id) to the Residents tab, or check their id in the
+  app's People list.

@@ -9,7 +9,7 @@
 // purgeExpired()                 drop entries older than 30 days; app.js runs it once after sign-in
 // renderBin() / openBin()        the bin view (element) / the same in a dialog
 
-import { S, h, toast, modal, confirmBox, cloud, writes, fill, removeCase, restoreCase, miniChips, resetters } from './ui-core.js';
+import { S, h, toast, modal, confirmBox, cloud, writes, fill, removeCase, restoreCase, toSheet, miniChips, resetters } from './ui-core.js';
 import { cleanNote, noteTitle, MAX_NOTES, isDayNote, cappedNotes, mergeDayNote } from './notepad.js';
 import { cleanCase } from './clean.js';
 import { cleanReflection } from './reflections.js';
@@ -97,7 +97,8 @@ export async function moveToBin(kind, item, extra = {}) {
 // the bin entries of originals whose delete failed come out again; a failed delete in the write queue is set aside
 // (archived), so a later Retry can't delete the record with no copy in the bin. The bin feed may already have hidden
 // the record (here and on other devices: its tombstone is that version), so it is saved again, stamped after that
-// version; not after a conflict (the record changed elsewhere: that newer copy already shows everywhere).
+// version; not after a conflict (the record changed elsewhere: that newer copy already shows everywhere). A case goes
+// back into the response sheet's outbox either way (the delete took its entry out: sheet-outbox.js).
 async function rollBack(owner, kind, entries) {
   if (S.user?.email !== owner) return;   // (signed out or switched: the old account's bin can't be reached)
   for (const e of entries) {
@@ -107,9 +108,13 @@ async function rollBack(owner, kind, entries) {
     if (job) await writes.archive(job.key).catch(() => {});
     // the record changed elsewhere first: that version stays, so the delete is undone; say so, or the case seems to
     // come back by itself
-    if (job && job.state === 'conflict') { toast(`A ${kind} you deleted was changed on another device, so it was kept`); continue; }
+    if (job && job.state === 'conflict') {
+      // the version kept: the server's copy the conflict reported (or this device's, once it shows again)
+      if (kind === 'case') { const kept = job.remote || S.cases.find(c => c.id === e.data.id); if (kept) toSheet([kept]); }
+      toast(`A ${kind} you deleted was changed on another device, so it was kept`); continue;
+    }
     try {
-      if (kind === 'case') await restoreCase({ ...e.data }, e.data);
+      if (kind === 'case') { await restoreCase({ ...e.data }, e.data); toSheet([e.data]); }
       else if (kind === 'note') await writes.save('note', owner, { ...e.data }, e.data);
       else await cloud.saveReflection(owner, { ...e.data });
     } catch (err) { console.warn('Could not save the record again after a failed delete', e.data.id, err); }
@@ -146,8 +151,11 @@ export async function restoreFromBin(id) {
   let out;
   if (e.kind === 'case') {
     out = { ...e.data };
-    if (S.cases.some(c => c.id === out.id)) out.id = uid();
+    const sameId = !S.cases.some(c => c.id === out.id);
+    if (!sameId) out.id = uid();
     await restoreCase(out);    // updates S.cases, the counts and the summary
+    // back into the response sheet's outbox (the delete took its entry out); never under a new id (a second sheet row)
+    if (sameId) toSheet([out]);
   } else if (e.kind === 'note') {
     // the notes may not be loaded yet (they load on first use): load them, so the limit and the id check hold
     const have = (await (await import('./ui-notepad.js')).ensureNotes().catch(() => null)) || S.notes || [];

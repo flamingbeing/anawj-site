@@ -670,13 +670,15 @@ export async function commitFormPickup(email, items) {
 // New app cases for the response sheet (sheet-outbox.js). Each entry is its own small write; offline they wait in
 // Firestore's queue with the rest. An entry already there (a retried save) is refused by the rules: fine.
 export async function queueSheetRows(email, entries) {
-  if (demo || !entries.length) return;
+  if (!entries.length) return;
+  if (demo) return D.queueSheetRows(entries);
   const { db, F } = await sdk();
   await Promise.allSettled(entries.map(e => queued(F.setDoc(F.doc(db, 'sheetOutbox', String(e.id)), plain(e)))));
 }
 // A case deleted before the script has picked it up. Best effort: an entry already gone has nothing to delete.
 export async function dropSheetRows(email, ids) {
-  if (demo || !ids.length) return;
+  if (!ids.length) return;
+  if (demo) return D.dropSheetRows(ids);
   const { db, F } = await sdk();
   await Promise.allSettled(ids.map(id => queued(F.deleteDoc(F.doc(db, 'sheetOutbox', String(id))))));
 }

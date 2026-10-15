@@ -449,8 +449,10 @@ export async function createCase({ id, createdAt, date, details, initials, cats,
 }
 
 // New app cases also go to the response sheet's outbox (sheet-outbox.js): programme residents only, never waited for
-// and never a reason for a save to fail.
-function toSheet(cases) {
+// and never a reason for a save to fail. Also used when a deleted case comes back with its id (bin.js): its entry went
+// with the delete. The rules refuse an entry that is still there (harmless), and the sheet script skips a case its
+// "app:<id>" marker shows is in the sheet already.
+export function toSheet(cases) {
   const who = outboxOn() && S.resident && S.logbook?.rid === S.resident.rid ? { email: mine(), rid: S.resident.rid } : null;
   const entries = who ? outboxEntries(cases, who) : [];
   if (entries.length) cloud.queueSheetRows(who.email, entries).catch(err => console.warn('Sheet outbox not queued', err));
