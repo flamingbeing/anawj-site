@@ -354,10 +354,10 @@ body[data-tab="people"] .ctx-row { display: none; }   /* the month and Auto-fill
 .chip.sm { font-size: 10.5px; letter-spacing: -.05em; padding: 0 1px; }
 .chip.rq { background: transparent; color: var(--c, #0b5394); box-shadow: inset 0 0 0 1px var(--c, #0b5394); font-weight: 600; }
 .chip.au { background-image: linear-gradient(to top, rgba(255, 255, 255, .5) 0 2px, transparent 2px); }
-.chip.dx { background: transparent; color: #5f6773; font-weight: 600; min-width: 0; }
+.chip.dx { background: transparent; color: #262b33; font-weight: 600; min-width: 0; }
 td.c.pt { background-color: var(--pt); }
 td.c.pt.we, td.c.pt.hol { background-color: var(--pt); background-image: linear-gradient(rgba(0, 47, 108, .05), rgba(0, 47, 108, .05)); }
-.chip.pc-only { background: transparent; color: #374151; font-weight: 400; box-shadow: none; }
+.chip.pc-only { background: transparent; color: #1f2937; font-weight: 400; box-shadow: none; }
 .chip.unk { background: #fff; color: #333; box-shadow: inset 0 0 0 1px #999; border-style: dashed; }
 .chip.ghost { background: #eef1f6; color: var(--ink); }
 .no-req .chip.rq { display: none; }
