@@ -38,7 +38,7 @@ Agreed queue (one PR each, in order, once he says go):
    cases, reflections, notes or drafts; asks, offers a settings-file backup, Undo.
 4. **Built (Analytics PR).** **Full Analytics for every profile:** the `analytics` switch on by default everywhere. Exceptions kept (owner):
    Personal stays without the APMES parts; Basic: logbook only stays without the Reflections card.
-5. **Analytics Edit mode:** Edit at the top; cards fold to rows; drag handle (plus Move up / down) to reorder; eye to
+5. **Built (Analytics Edit PR; 5b new cards next).** **Analytics Edit mode:** Edit at the top; cards fold to rows; drag handle (plus Move up / down) to reorder; eye to
    hide, a "Hidden cards" list to bring back; Reset layout; Done. Saved for the account. Cards a profile can't use
    aren't listed.
 5b. **More Analytics cards** (owner: build them all, show only the most important by default; the rest start hidden in

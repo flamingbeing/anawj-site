@@ -594,6 +594,10 @@ portfolio content.
   (`settings-file.js` `resetAccountPatch`: your year, profile, saved searches, send and sync places and the app's
   bookkeeping stay; tags and shorthand only when ticked). Saves a settings file first by default; Undo in the toast.
 
+- **Analytics Edit mode** (owner, 15 Oct 2026): Edit above the cards; drag by ⠿ or the arrows, Hide / Show, Reset
+  layout, Done. Saved for the account as `settings.anLayout { order, hidden }` (`analytics.js` arrangeCards: cards a
+  profile lacks are left out; new cards land in their default place). A new card needs an id in `CARD_NAMES`.
+
 ## Data, roles and photos (`firestore.rules`)
 
 - **App owner:** `owners/{email}`, set by hand in the Firebase console. May read logbooks and cases and import

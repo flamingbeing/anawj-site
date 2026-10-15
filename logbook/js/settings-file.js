@@ -10,6 +10,7 @@ import { cleanExportOpts } from './export-opts.js';
 import { cleanDestinations } from './destinations.js';
 import { SWITCH_KEYS } from './profiles.js';
 import { cleanSync } from './sync-md.js';
+import { cleanLayout } from './analytics.js';
 import { cleanLabels, cleanCaseTemplate } from './parts.js';
 
 export const SETTINGS_KIND = 'apmes-logbook-settings';
@@ -29,6 +30,7 @@ const OBJECTS = {
   partLabels: v => (v == null ? null : cleanLabels(v)),
   caseTpl: v => (v == null ? null : cleanCaseTemplate(v)),
   catOrder: strs,
+  anLayout: v => cleanLayout(v),   // Analytics Edit mode: the cards' order and the hidden ones
   caseHide: v => strs(v).slice(0, 20),
   basicOn: v => strs(v).slice(0, 30),
   // the profile switches (profiles.js): known keys, true or false

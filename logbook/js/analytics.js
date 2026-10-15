@@ -73,3 +73,32 @@ export function reflectionTodos(cases, reflections, now = Date.now(), days = 30)
     .sort((a, b) => (a.updatedAt || a.createdAt || 0) - (b.updatedAt || b.createdAt || 0));
   return { interesting, stale };
 }
+
+// Analytics Edit mode (owner, 15 Oct 2026): the account's layout of the cards, settings.anLayout { order, hidden }.
+// ids: the cards this profile can show, in their default order -> { shown, hidden } (cards the layout doesn't know yet
+// go in their default place; ones it names that aren't available are ignored)
+export function cleanLayout(v) {
+  const ids = x => (Array.isArray(x) ? [...new Set(x.filter(s => typeof s === 'string' && /^[a-z]{1,20}$/.test(s)))].slice(0, 40) : []);
+  return v && typeof v === 'object' && !Array.isArray(v) ? { order: ids(v.order), hidden: ids(v.hidden) } : { order: [], hidden: [] };
+}
+export function arrangeCards(ids, layout) {
+  const { order, hidden } = cleanLayout(layout);
+  const known = order.filter(id => ids.includes(id));
+  // a card not in the saved order goes after the card it follows by default
+  const all = [...known];
+  ids.forEach((id, i) => { if (all.includes(id)) return; const prev = ids.slice(0, i).reverse().find(x => all.includes(x)); all.splice(prev ? all.indexOf(prev) + 1 : 0, 0, id); });
+  return { shown: all.filter(id => !hidden.includes(id)), hidden: all.filter(id => hidden.includes(id)) };
+}
+// one card moved by n places among the shown ones -> the new layout
+export function moveCard(ids, layout, id, n) {
+  const { shown, hidden } = arrangeCards(ids, layout);
+  const i = shown.indexOf(id), j = Math.max(0, Math.min(shown.length - 1, i + n));
+  if (i < 0 || i === j) return cleanLayout(layout);
+  shown.splice(j, 0, ...shown.splice(i, 1));
+  return { order: [...shown, ...hidden], hidden };
+}
+export function hideCard(ids, layout, id, hide) {
+  const { shown, hidden } = arrangeCards(ids, layout);
+  const h2 = hide ? [...new Set([...hidden, id])] : hidden.filter(x => x !== id);
+  return { order: [...shown, ...hidden], hidden: h2 };
+}

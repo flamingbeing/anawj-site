@@ -7,7 +7,7 @@ import { display, setDisplay } from './display.js';
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress, HEADING_BY_ID } from './reflections.js';
 import { logbookGlance, reflectionGlance, cohortGlance } from './glance.js';
-import { paceForecast, paceText, goneQuiet, reflectionTodos } from './analytics.js';
+import { paceForecast, paceText, goneQuiet, reflectionTodos, arrangeCards, moveCard, hideCard } from './analytics.js';
 import { reflectOnCase, openReflection } from './ui-reflect.js';
 import { S, h, ic, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName, summaryOf, basicHides } from './ui-core.js';
 
@@ -78,7 +78,7 @@ export function renderProgress() {
     h('label', { class: 'check', style: 'margin:0 0 4px' }, h('input', { type: 'checkbox', checked: !!pview.hideDone, onchange: e => { pview.hideDone = e.target.checked; hooks.render(); } }), 'Hide done'),
     progList(shown, fc));
   // everyone's counts are on their own tab, Totals (owner, 15 Oct 2026), not linked from here
-  return h('div', {}, head, urgentSec, quietSec, targets, reflectionsOn() ? reflCard() : null, advanced() ? todoCard() : null, advanced() ? trendsCard() : null);
+  return layoutPage(head, { urgent: urgentSec, quiet: quietSec, targets, refl: reflectionsOn() ? reflCard() : null, todo: advanced() ? todoCard() : null, trends: advanced() ? trendsCard() : null });
 }
 const reflectionsOn = () => !basicHides('reflect') && !basicHides('reflHeadings');
 
@@ -96,8 +96,61 @@ function renderCounts() {
   const counts = section('counts', 'Tags', `${rows.length} tag${rows.length === 1 ? '' : 's'} used · ${S.cases.length} cases`,
     rows.length ? h('ul', { class: 'an-list' }, rows.map(([k, x]) => h('li', {}, casesLink(name(k), { tag: k }), h('small', { class: 'muted' }, ` · ${x} case${x === 1 ? '' : 's'}`))))
       : h('p', { class: 'empty' }, 'No cases yet.'));
-  return h('div', {}, head, counts, reflectionsOn() ? reflCard() : null, advanced() ? todoCard() : null, advanced() ? trendsCard() : null);
+  return layoutPage(head, { counts, refl: reflectionsOn() ? reflCard() : null, todo: advanced() ? todoCard() : null, trends: advanced() ? trendsCard() : null });
 }
+
+// ---------- Edit mode (owner, 15 Oct 2026): the cards in your order, some hidden; saved for the account ----------
+
+const CARD_NAMES = { urgent: 'Needs attention', quiet: 'Gone quiet', targets: 'Logbook', counts: 'Tags', refl: 'Reflections', todo: 'Reflection to-dos', trends: 'Trends' };
+// cards: id -> its card, or null when this profile (or the data) has none; the cards a profile can't use aren't listed
+function layoutPage(head, cards) {
+  const ids = Object.keys(cards).filter(k => cards[k]);
+  const layout = settings().anLayout;
+  const { shown, hidden } = arrangeCards(ids, layout);
+  if (pview.edit) return h('div', {}, head, editCard(ids, layout));
+  const edit = () => { pview.edit = true; hooks.render(); };
+  return h('div', {}, head,
+    h('div', { class: 'bar an-editbar' }, hidden.length ? h('span', { class: 'hint' }, `${hidden.length} card${hidden.length === 1 ? '' : 's'} hidden`) : null,
+      h('span', { style: 'flex:1' }), h('button', { type: 'button', class: 'small', onclick: edit }, 'Edit')),
+    ...shown.map(id => cards[id]));
+}
+function editCard(ids, layout) {
+  const { shown, hidden } = arrangeCards(ids, layout);
+  const save = l => { patchLogbook({ settings: { anLayout: l } }); hooks.render(); };
+  const list = h('ul', { class: 'an-edit-list', role: 'list' }, shown.map((id, i) => h('li', { 'data-card': id },
+    h('span', { class: 'an-grip', 'aria-hidden': 'true', title: 'Drag to move', onpointerdown: e => drag(e, id) }, '⠿'),
+    h('span', { class: 'an-edit-name' }, CARD_NAMES[id] || id),
+    h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${CARD_NAMES[id]} up`, disabled: i === 0, onclick: () => save(moveCard(ids, layout, id, -1)) }, '↑'),
+    h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${CARD_NAMES[id]} down`, disabled: i === shown.length - 1, onclick: () => save(moveCard(ids, layout, id, 1)) }, '↓'),
+    h('button', { type: 'button', class: 'small', 'aria-label': `Hide ${CARD_NAMES[id]}`, onclick: () => save(hideCard(ids, layout, id, true)) }, 'Hide'))));
+  // drag by the grip (a finger or a mouse): the row follows, and drops where the pointer is
+  function drag(e, id) {
+    e.preventDefault();
+    const li = e.target.closest('li'), rows = [...list.children], y0 = e.clientY;
+    li.classList.add('dragging'); e.target.setPointerCapture?.(e.pointerId);
+    const move = ev => { li.style.transform = `translateY(${ev.clientY - y0}px)`; };
+    const up = ev => {
+      e.target.removeEventListener('pointermove', move); e.target.removeEventListener('pointerup', up); e.target.removeEventListener('pointercancel', up);
+      li.classList.remove('dragging'); li.style.transform = '';
+      const to = rows.filter(r => r !== li).filter(r => { const b = r.getBoundingClientRect(); return ev.clientY > b.top + b.height / 2; }).length;
+      const from = rows.indexOf(li);
+      if (to !== from) save(moveCard(ids, layout, id, to - from));
+    };
+    e.target.addEventListener('pointermove', move); e.target.addEventListener('pointerup', up); e.target.addEventListener('pointercancel', up);
+  }
+  return h('section', { class: 'card an-edit' },
+    h('h2', {}, 'Arrange Analytics'),
+    h('p', { class: 'hint help' }, 'Drag a card by ⠿, or use the arrows. Hidden cards wait below. Saved for your account.'),
+    list,
+    hidden.length ? [h('h3', {}, 'Hidden cards'), h('ul', { class: 'an-edit-list', role: 'list' }, hidden.map(id => h('li', {},
+      h('span', { class: 'an-edit-name' }, CARD_NAMES[id] || id),
+      h('button', { type: 'button', class: 'small', 'aria-label': `Show ${CARD_NAMES[id]}`, onclick: () => save(hideCard(ids, layout, id, false)) }, 'Show'))))] : null,
+    h('div', { class: 'bar', style: 'margin:12px 0 0' },
+      h('button', { type: 'button', class: 'linkish', onclick: () => save(null) }, 'Reset layout'),
+      h('span', { style: 'flex:1' }),
+      h('button', { type: 'button', class: 'primary', onclick: () => { pview.edit = false; hooks.render(); } }, 'Done')));
+}
+resetters.push(() => { pview.edit = false; });
 
 // A folded card: the title and a one-line summary; tap to open the full section (kept open while you stay).
 // glance (optional, a .glance element): shown under the summary whether open or not.

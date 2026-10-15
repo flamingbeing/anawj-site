@@ -73,4 +73,21 @@ const cases = list => list.map(([date, ...cats], i) => ({ id: 'c' + i, date, cat
   assert.deepEqual(t.stale.map(r => r.id), ['r4', 'r2'], 'drafts untouched 30+ days, oldest first; complete ones never');
 }
 
+// Analytics Edit mode: the account's layout of the cards
+{
+  const { arrangeCards, moveCard, hideCard, cleanLayout } = await import('../js/analytics.js');
+  const ids = ['urgent', 'quiet', 'targets', 'refl', 'trends'];
+  assert.deepEqual(arrangeCards(ids, null), { shown: ids, hidden: [] });
+  assert.deepEqual(arrangeCards(ids, { order: ['trends', 'urgent'], hidden: ['quiet'] }), { shown: ['trends', 'urgent', 'targets', 'refl'], hidden: ['quiet'] });
+  assert.deepEqual(arrangeCards(['urgent', 'targets'], { order: ['trends', 'targets', 'urgent'] }).shown, ['targets', 'urgent'], 'cards a profile lacks are left out');
+  let l = moveCard(ids, null, 'trends', -10);
+  assert.deepEqual(arrangeCards(ids, l).shown, ['trends', 'urgent', 'quiet', 'targets', 'refl']);
+  l = hideCard(ids, l, 'quiet', true);
+  assert.deepEqual(arrangeCards(ids, l), { shown: ['trends', 'urgent', 'targets', 'refl'], hidden: ['quiet'] });
+  l = moveCard(ids, l, 'urgent', 1);
+  assert.deepEqual(arrangeCards(ids, l).shown, ['trends', 'targets', 'urgent', 'refl']);
+  assert.deepEqual(arrangeCards(ids, hideCard(ids, l, 'quiet', false)).shown, ['trends', 'targets', 'urgent', 'refl', 'quiet']);
+  assert.deepEqual(cleanLayout({ order: ['a', 'a', 'B!', 3], hidden: 'x' }), { order: ['a'], hidden: [] });
+}
+
 console.log('analytics tests passed');
