@@ -89,7 +89,8 @@ Rules that bite:
   an app's own files, write PRs as `#295 (logbook)`.
 
 Before merging, run (GitHub runs these too on every PR, plus the editor, feedback-button and hand browser tests: the
-"Checks" workflow; a red check means don't merge):
+"Checks" workflow; a red check means don't merge). On a PR the BIS to DSA, OT simulator, feedback-button and hand
+browser tests run only when the PR changes that app (owner, 15 Oct 2026; `.github/workflows/checks.yml`). The merge checklist:
 
 ```
 node tools/check.mjs
@@ -112,7 +113,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
   and the unit tests in `ntf-roster/test/`.
 - Hand log changes: run `node hand-log/test/e2e.mjs`.
 - OT simulator changes: run `tools/test-ot-sim.sh` (model tests, repo check, browser test; see `ot-sim/NOTES.md`).
-- BIS to DSA changes: run `node bis-dsa/test/e2e.mjs` (it also runs `adv.e2e.mjs` and `sed.e2e.mjs`) and `node bis-dsa/test/engine.check.mjs` (engine tuning, no browser).
+- BIS to DSA changes: run `node bis-dsa/test/e2e.mjs` (it also runs `adv`, `sed`, `pv` and `timeline.e2e.mjs`; `BIS_SPLIT=1` runs it alone, as the Checks do) and `node bis-dsa/test/engine.check.mjs` (engine tuning, no browser).
 - People changes, and evals changes to `cloud.js`, `ui-core.js` or the People panes in `ui-admin.js`: run `node people/test/e2e.mjs`.
 - Page editor changes (`edit/`): run `node edit/test/e2e.mjs` and `node hand-babies/test/e2e.mjs` (it opens the editor).
 - Feedback button or Worker changes (`feedback/`, `worker/`): run `node feedback/test/e2e.mjs` (through the real Worker).

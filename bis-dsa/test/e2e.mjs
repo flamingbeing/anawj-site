@@ -11,7 +11,7 @@ const errors = [];
 const bis = p => p.$eval('#vBis', e => +e.textContent);
 try {
   // the phone runs at 3x pixel density: at 1x a canvas-size bug (graphs growing every frame) never showed
-  for (const [viewport, deviceScaleFactor] of [[{ width: 390, height: 844 }, 3], [{ width: 1280, height: 900 }, 1]]) {
+  for (const [viewport, deviceScaleFactor] of [[{ width: 390, height: 844 }, 3], [{ width: 1280, height: 900 }, 1]].filter(([v]) => !process.env.BIS_VIEW || (process.env.BIS_VIEW === 'phone') === (v.width === 390))) { // BIS_VIEW=phone or desktop runs one size (the Checks run each as its own job)
     const page = await b.newPage({ viewport, deviceScaleFactor });
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)/.test(m.text())) errors.push(m.text()); });
@@ -40,10 +40,12 @@ try {
       assert.ok(r.l.length >= 3, `axis labels on the 1 hour scale (${r.l.length})`);
       for (const x of r.l) assert.ok(x.ts <= r.tN + 0.5 && x.x <= 143 + 323 - 17, 'no label beyond the newest column or the data area');
       for (let i = 1; i < r.l.length; i++) assert.equal(r.l[i].ts - r.l[i - 1].ts, 600, 'labels 10 min apart');
-      const px = await page.$eval('#c2Dsa', (c, pts) => { const k = c.width / 552, g = c.getContext('2d'); return pts.map(([x, y]) => [...g.getImageData(Math.round((x - 88) * k), Math.round((y - 232) * k), 1, 1).data]); }, [[173, 262], [173, 258 + 118 * (1 - 6 / 30)]]);
-      // the top row, read at nine places (the white SEF line can cross any one of them, as the DSA opens with earlier awake trend): the middle value
-      const top = await page.$eval('#c2Dsa', c => { const k = c.width / 552, g = c.getContext('2d'); const v = []; for (let x = 150; x <= 230; x += 10) v.push([...g.getImageData(Math.round((x - 88) * k), Math.round((262 - 232) * k), 1, 1).data]); const med = a => a.slice().sort((p, q) => p - q)[4]; return [med(v.map(q => q[0])), med(v.map(q => q[1])), med(v.map(q => q[2]))]; });
-      assert.ok(top[2] > 150 && top[0] < 160, `awake beta is cyan or green (${top})`); assert.ok(px[1][0] > 200 && px[1][2] < 90, `awake 6 Hz is orange-red (${px[1]})`); }
+      // colours of the DSA field itself (MT_OFF, the image before the SEF and MF lines are drawn over it: the white SEF line of the earlier
+      // awake trend runs near 28 Hz, so pixels read off the screen could land on it), the middle value of 5 x 5 points from 30 columns in
+      const fld = await page.evaluate(() => { const g = MT_OFF.getContext('2d'), med = a => a.slice().sort((p, q) => p - q)[a.length >> 1];
+        const at = hz => { const y0 = Math.round(MT_DH * (1 - hz / 30)), v = []; for (let x = 30; x <= 70; x += 10) for (let y = y0 - 2; y <= y0 + 2; y++) v.push([...g.getImageData(x, Math.max(0, Math.min(MT_DH - 1, y)), 1, 1).data]); return [0, 1, 2].map(i => med(v.map(q => q[i]))); };
+        return { beta: at(28), slow: at(6) }; });
+      assert.ok(fld.beta[2] > 150 && fld.beta[0] < 160, `awake beta is cyan or green (${fld.beta})`); assert.ok(fld.slow[0] > 200 && fld.slow[2] < 90, `awake 6 Hz is orange-red (${fld.slow})`); }
     // start-up message with a Dismiss button, as on the real monitor
     await page.waitForFunction(re => new RegExp(re).test(document.querySelector('#v2MsgT').textContent), String.raw`Factory settings restored`, { timeout: 4000 });
     await page.click('#v2Dismiss'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Msg', true], { timeout: 5000 });
@@ -290,9 +292,12 @@ try {
     await page.close();
   }
   assert.deepEqual(errors, [], 'page errors');
-  await import('./adv.e2e.mjs'); // the BIS Advance screen
-  await import('./sed.e2e.mjs'); // the Masimo SedLine screen
-  await import('./pv.e2e.mjs'); // the Philips IntelliVue screen
-  await import('./timeline.e2e.mjs'); // the case timeline (jump back and forward)
+  // the other screens' tests run after this one; BIS_SPLIT=1 runs this file alone (GitHub's Checks run each file as its own job)
+  if (!process.env.BIS_SPLIT) {
+    await import('./adv.e2e.mjs'); // the BIS Advance screen
+    await import('./sed.e2e.mjs'); // the Masimo SedLine screen
+    await import('./pv.e2e.mjs'); // the Philips IntelliVue screen
+    await import('./timeline.e2e.mjs'); // the case timeline (jump back and forward)
+  }
   console.log('bis-dsa e2e: ok');
 } finally { await b.close(); }

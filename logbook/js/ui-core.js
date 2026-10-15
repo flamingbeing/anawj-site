@@ -2,7 +2,7 @@
 
 import { BY_CODE, CATEGORIES, DEFAULT_NAMES, yearName, appYear } from './categories.js';
 import { tagSetOf, tagTree, flatTree, userCatNames, tagName as tagNameIn, tagLinks as tagLinksIn } from './tags.js';
-import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicYear, splitInitials, cleanInitials, ID_RE } from './engine.js';
+import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicYear, splitInitials, cleanInitials, ID_RE, setDetection, detectionFrom } from './engine.js';
 import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
 import { writes } from './writes.js';
@@ -36,7 +36,14 @@ export const S = {
 // Set by app.js: re-render the current screen, or tell it the case list changed.
 export const hooks = { render() {}, casesChanged() {} };
 
-export const settings = () => ({ suggestions: true, rYear: 1, ...(S.logbook && S.logbook.settings) });
+// (the account's detection settings follow along into engine.js, which reads initials everywhere: the box, pastes,
+// spreadsheets; redone only when the settings object changes)
+let detectFor;
+export const settings = () => {
+  const st = S.logbook && S.logbook.settings;
+  if (st !== detectFor) { detectFor = st; setDetection(detectionFrom(st)); }
+  return { suggestions: true, rYear: 1, ...st };
+};
 // Profiles (settings.mode, the whole account; at the top of Settings → Profile). Each is a preset of switches
 // (profiles.js): picking one shows what it turns on and off, then sets them; any switch can be changed after, and the
 // profile then reads "Custom (based on …)". Basic is the default for everyone (owner, 12 Oct 2026): a simpler app, the

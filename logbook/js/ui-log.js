@@ -39,8 +39,14 @@ const draftParts = (box = draft.details) => {
   const text = box.trim(), hint = draft.initialsHint;
   if (hint && text.slice(0, hint.length).toUpperCase() === hint && (!text.slice(hint.length) || /^\s/.test(text.slice(hint.length))))
     return { initials: hint, details: text.slice(hint.length).trim() };
-  return splitInitials(text);
+  settings();   // (brings the account's detection settings into engine.js first)
+  const p = splitInitials(text);
+  // tapped on the line under the box: these letters stay in the case text (Todoist-style undo; 15 Oct 2026)
+  return p.initials && draft.noIni === p.initials ? { initials: '', details: text } : p;
 };
+// the age read from the box, unless tapped off on the line under it
+const boxAge = details => { const { age } = settings().detectAgeSex !== false ? splitAge(details) : { age: '' }; return age && draft.noAge === age ? '' : age; };
+const ageOff = () => !!draft.noAge && splitAge(draftParts().details).age === draft.noAge;
 // Settings → Advanced logging → Separate initials box (device firstField 'initials'; an older 'date' counts as off)
 const firstField = () => (display().firstField === 'initials' ? 'initials' : 'details');
 // The Case tab opening the keyboard by itself (Logging → Advanced: "Open the keyboard when the Case tab opens"). On a
@@ -72,7 +78,7 @@ export const focusLog = () => {
   el?.focus({ preventScroll: true });
   if (el && document.activeElement === el) launchedAt = 0;
 };
-const suggestionKey = () => JSON.stringify([draftText(), curDate(), settings().detectAgeSex !== false]);
+const suggestionKey = () => JSON.stringify([draftText(), curDate(), settings().detectAgeSex !== false, draft.noIni || '', draft.noAge || '']);
 const draftKey = () => `${DRAFT_KEY}:${cloud.demo ? 'demo:' : ''}${(S.user && S.user.email) || ''}`;
 function loadDraft() {
   if (draftOwner === draftKey()) return;
@@ -707,14 +713,25 @@ function paintParsed(typed) {
   setText(ui.draftNote, draftError || (text ? 'Draft saved' : ''));
   if (!text) { if (ui.parsed.firstChild) fill(ui.parsed); ui.parsed.dataset.age = ''; ui.parsed.dataset.key = ''; if (ui.tooLong) ui.tooLong.hidden = true; marksSoon([]); return; }
   const { initials, details } = draftParts();
-  const { age } = settings().detectAgeSex !== false ? splitAge(details) : { age: '' };
+  const age = boxAge(details);
   // Labelled parts on: which parts the box has ("Parts Learning point · Plan"), so you see a label was read
   const lab = labels();
   const names = lab ? [...new Set(parseParts(details, lab).parts.filter(p => p.text.trim()).map(p => p.name.replace(/ \d+$/, '')))] : [];
-  const key = age + '|' + names.join('|');
+  // the initials as they'll be saved, only when read from the box (not typed in their own field); in the colour of
+  // their highlight in the box, as the age is (owner, 15 Oct 2026)
+  const ini = initials && !draft.initials ? initials : '';
+  const key = ini + '|' + age + '|' + (draft.noIni || '') + '|' + (draft.noAge || '') + '|' + names.join('|');
   if (ui.parsed.dataset.key !== key) {
     ui.parsed.dataset.key = key; ui.parsed.dataset.age = age;
-    fill(ui.parsed, age ? h('span', { class: 'pi' }, h('b', {}, age), ` = ${humanAge(age)}`) : null,
+    // each is a button: a tap keeps that text in the case instead (a tap on the struck line reads it again)
+    const undo = (cls, what, label, flag, on) => h('button', { type: 'button', class: `pi ${cls}${on ? '' : ' undone'}`, 'aria-pressed': String(!on),
+      title: on ? `Not ${label}: keep ${what} in the case text` : `Read ${what} as ${label} again`,
+      onclick: () => { draft[flag] = on ? what : ''; saveDraft(); paintParsed(true); suggestSoon(); } },
+      h('b', {}, what), on ? ` = ${label === 'the age' ? humanAge(what) : label}` : ` · not ${label} (tap to undo)`);
+    const offIni = !ini && !draft.initials && draft.noIni && splitInitials(text).initials === draft.noIni ? draft.noIni : '';
+    const rawAge = settings().detectAgeSex !== false ? splitAge(details).age : '', offAge = !age && rawAge && rawAge === draft.noAge ? rawAge : '';
+    fill(ui.parsed, ini ? undo('pi-ini', ini, 'initials', 'noIni', true) : offIni ? undo('pi-ini', offIni, 'initials', 'noIni', false) : null,
+      age ? undo('pi-age', age, 'the age', 'noAge', true) : offAge ? undo('pi-age', offAge, 'the age', 'noAge', false) : null,
       names.length ? h('span', { class: 'pi parts-read' }, h('small', {}, 'Parts '), names.join(' · ')) : null);
   }
   if (ui.tooLong) {
@@ -792,7 +809,7 @@ function paintMarks(marks) {
 
 // Suggestions, with your own shorthand for APMES tags (Tag editor) mixed in
 // (learning points left out: forTags)
-const suggest = (text, opts = {}) => suggestCodes(forTags(text), { ...opts, detectAgeSex: settings().detectAgeSex !== false, extra: apmesShorthand(tagSet()) });
+const suggest = (text, opts = {}) => suggestCodes(forTags(text), { detectAgeSex: settings().detectAgeSex !== false, ...opts, extra: apmesShorthand(tagSet()) });
 
 function paintSuggest() {
   if (!ui || !ui.sugg) return;
@@ -800,7 +817,7 @@ function paintSuggest() {
   ui.sugg.hidden = !on;
   if (!on) return;
   const text = draft.details.trim();
-  const found = text ? suggest(text, { limit: 8 }) : [];
+  const found = text ? suggest(text, { limit: 8, ...(ageOff() ? { detectAgeSex: false } : {}) }) : [];
   if (settings().autoTick && applyAutoTick(found, text)) return paintSel();   // paintSel paints these again
   const list = found.filter(s => !draft.cats.includes(s.code));
   // your own tags whose shorthand you typed (choosing one ticks what it counts towards)
@@ -962,7 +979,7 @@ async function saveCase({ another, tap }) {
     paintSuggest();
     const tags = settings().suggestions !== false && details ? shorthandTags(tagSet(), forTags(details)).filter(k => !(draft.tags || []).includes(k)) : [];
     // confident suggestions only (as "+ All" and a pasted list): a weak guess is never counted without a look
-    const codes = settings().suggestions !== false && details ? confident(suggest(box.trim(), { limit: 8 })) : [];
+    const codes = settings().suggestions !== false && details ? confident(suggest(box.trim(), { limit: 8, ...(ageOff() ? { detectAgeSex: false } : {}) })) : [];
     const cats = sortCodes(withParents([...codes, ...tags.flatMap(tagLinks)]));
     suggestedSave = cats.length ? { key: suggestionKey(), cats, tags, at: tap ? Date.now() : 0 } : null;
     paintEnterHint();
@@ -983,7 +1000,7 @@ async function saveCase({ another, tap }) {
   const norm = t => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
   const twin = (S.cases || []).find(x => x.date === curDate() && norm(caseText(x)) === norm(details));
   if (twin && !(await confirmBox('Possible duplicate', `You already logged “${caseText(twin).slice(0, 60)}” on ${fmtDate(twin.date)}. Save another one?`, 'Save anyway'))) return;
-  const parts = firstField() === 'initials' || draft.initialsHint ? draftParts(box) : splitInitials(details);
+  const parts = firstField() === 'initials' || draft.initialsHint || draft.noIni ? draftParts(box) : splitInitials(details);
   // over the 2000 characters a case holds: the rest into a linked note (asked first), never cut off silently
   if (!(await splitLong([parts]))) return;
   const owner = S.user?.email, inputAtSave = JSON.stringify(draft);
@@ -1000,7 +1017,7 @@ async function saveCase({ another, tap }) {
   const keepTags = next === 'keepTags' ? { cats: draft.cats, tags: draft.tags || [] } : { cats: [], tags: [] };
   // Undo puts the case back with the ticks the user took off still off (auto-tick)
   const ticksAtSave = { auto: [...(draft.auto || [])], rejected: [...(draft.rejected || [])] };
-  draft = { ...draft, details: '', initials: '', initialsHint: '', caseId: null, caseCreatedAt: null, ...keepTags, ...FRESH_TICKS(), date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false };
+  draft = { ...draft, details: '', initials: '', initialsHint: '', noIni: '', noAge: '', caseId: null, caseCreatedAt: null, ...keepTags, ...FRESH_TICKS(), date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false };
   if (ui.tagBox) ui.tagBox.querySelector('input').checked = false;
   saveDraft();
   if (ui.textarea) ui.textarea.value = '';
@@ -1112,12 +1129,13 @@ function paintBulk(out) {
   // the confident suggestions of every row, ticked in one tap (the bold chips)
   const strong = r => (on && r.details.trim() ? suggest(r.details).filter(s => s.score >= STRONG && !r.cats.includes(s.code)).map(s => s.code) : []);
   const anyStrong = bulkRows.some(r => strong(r).length);
+  // the count and Tick all on one line, so the rows start high on a phone
   fill(out, 
-    h('h3', {}, `${bulkRows.length} case${bulkRows.length === 1 ? '' : 's'}`),
-    anyStrong ? h('div', { class: 'bar', style: 'margin:0 0 8px' }, h('button', { class: 'small', onclick: () => {
-      for (const r of bulkRows) { const add = strong(r); if (add.length) r.cats = sortCodes(withParents([...r.cats, ...add])); }
-      paintBulk(out);
-    } }, 'Tick all suggestions'), h('span', { class: 'hint', style: 'margin:0 0 0 8px' }, 'The confident ones, in bold.')) : null,
+    h('div', { class: 'bar', style: 'margin:0 0 6px;align-items:center' }, h('h3', { style: 'margin:0' }, `${bulkRows.length} case${bulkRows.length === 1 ? '' : 's'}`), h('span', { style: 'flex:1' }),
+      anyStrong ? h('button', { class: 'small', title: 'The confident suggestions (in bold) on every case', onclick: () => {
+        for (const r of bulkRows) { const add = strong(r); if (add.length) r.cats = sortCodes(withParents([...r.cats, ...add])); }
+        paintBulk(out);
+      } }, 'Tick all suggestions') : null),
     missing ? h('p', { class: 'tip' }, `${missing} case${missing === 1 ? ' has' : 's have'} no tag yet.`) : null,
     h('div', { class: 'scroll' }, h('table', { class: 'bulk' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Details'), h('th', {}, 'Tags'), h('th', {}))), tbody)),
     h('div', { class: 'actions' }, h('button', { class: 'primary big', onclick: saveBulk }, `Save all ${bulkRows.length}`),
