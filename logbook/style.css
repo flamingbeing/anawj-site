@@ -316,7 +316,8 @@ ul.prog .info-text { grid-column: 2 / 4; margin: 2px 0 0; }
 
 table.totals th, table.totals td { padding: 4px 6px; font-size: calc(13px * var(--fs, 1)); }
 table.totals th.rot { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; vertical-align: bottom; max-height: 160px; }
-table.totals td.cat { position: sticky; left: 0; background: var(--panel); z-index: 1; max-width: 33vw; overflow-wrap: anywhere; }   /* at most a third of the width; long names wrap (owner, 15 Oct 2026) */
+table.totals td.cat { position: sticky; left: 0; background: var(--panel); z-index: 1; max-width: 33vw; }   /* at most a third of the width (owner, 15 Oct 2026) */
+table.totals td.cat .cat-in { max-width: 33vw; overflow-x: auto; }   /* long names wrap; a word too wide scrolls sideways */
 table.totals td.n { text-align: center; font-variant-numeric: tabular-nums; }
 table.totals td.late { background: #f8d7da; } table.totals td.due { background: #fff3cd; } table.totals td.done { background: #d4edda; }
 table.totals tr.total td { font-weight: 700; }
