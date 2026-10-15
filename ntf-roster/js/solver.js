@@ -12,8 +12,9 @@
 //      on one day, move one person's duty to another day, add or drop one. Scoring is incremental: a change re-checks
 //      only the touched person (person rules), the touched days (day rules) and the fairness sums (global rules).
 //   5. Back to the best roster found, then drop any duty that no rule needs (no stray shifts).
-//   Deterministic for a seed: own PRNG, and the search length is an iteration budget (the time limit only cuts it
-//   short on a slow device). Extra exports for the UI: applyAssignments, withAssignments, diffAssignments.
+//   Deterministic for a seed: own PRNG, and the search length is an iteration budget that ends early once the search
+//   has converged (the time limit only cuts it short on a slow device). Extra exports for the UI: applyAssignments,
+//   withAssignments, diffAssignments.
 
 import { getCell, setCell } from './model.js';
 import { buildContext, compileRules, compileWho, refresh, evaluate } from './rules.js';
@@ -238,12 +239,25 @@ export function solve(state, opts = {}) {
     }
   }
 
+  // the first draft's numbers straight away (the dialog shows them while the search goes on)
+  if (onProgress) onProgress({ best: { hard: hardCnt, soft: softCnt }, pct: 0 });
+
   // ----- local search (simulated annealing) -----
+  // The budget and the starting temperature were tuned on practice departments (Oct 2026): 500 tries per unfilled
+  // slot from a cool start (T0 1) gives the same quality as the first version's 1,500 per slot from T0 25, in a third
+  // of the time. The search also ends once it has converged: no must-fix problems left and no better roster found in
+  // the last `patience` tries. Both are counted in tries, not time, so a seed always gives the same roster.
+  // A tight department (the hard rules can only just be met) may still have must-fix problems at the end of that
+  // budget: the search then carries on up to the first version's budget (1,500 per slot, at most 300,000; the
+  // schedule stretches to it, so it warms up a little), or the time limit.
   const rangeDays = hi - lo + 1;
-  const iterMax = Math.max(0, opts.iterations ?? Math.min(300000, Math.max(30000, slots.length * 1500)));
-  const T0 = opts.t0 ?? 25, T1 = opts.t1 ?? 0.2;
+  const iterMax = Math.max(0, opts.iterations ?? Math.min(100000, Math.max(12000, slots.length * 500)));
+  const iterCap = opts.iterations != null ? iterMax : Math.max(iterMax, Math.min(300000, slots.length * 1500));
+  let iterLim = iterMax;
+  const T0 = opts.t0 ?? 1, T1 = opts.t1 ?? 0.2, TX = opts.tx ?? 25;
+  const patience = opts.patience ?? Math.max(5000, Math.round(iterMax * 0.6));
   const best = grid.slice();
-  let bestHardPen = hardPen, bestSoftPen = softPen, bestHard = hardCnt, bestSoft = softCnt;
+  let bestHardPen = hardPen, bestSoftPen = softPen, bestHard = hardCnt, bestSoft = softCnt, bestAt = 0;
   // better = fewer hard penalty points, then fewer soft
   const better = () => hardPen < bestHardPen - 1e-9 || (Math.abs(hardPen - bestHardPen) <= 1e-9 && softPen < bestSoftPen - 1e-9);
   let it = 0, lastProg = now();
@@ -299,22 +313,28 @@ export function solve(state, opts = {}) {
     const e = lo + ((rng() * rangeDays) | 0);                       // move to another day
     return e !== d && canTake(p, e, k) ? [[i, 0], [p * n + e, k]] : null;
   }
-  while (it < iterMax && total() > 1e-9) {
+  while (total() > 1e-9) {
+    if (it >= iterLim) {
+      if (bestHardPen <= 1e-9 || iterLim >= iterCap) break;
+      iterLim = iterCap;   // must-fix problems left: search on
+    }
     if ((it & 127) === 0) {
+      if (bestHardPen <= 1e-9 && it - bestAt > patience) break;   // converged
       const t = now();
       if (t - t0 > timeMs) break;
       if (onProgress && t - lastProg >= 100) {
         lastProg = t;
-        onProgress({ best: { hard: bestHard, soft: bestSoft }, pct: Math.min(99, Math.round(100 * Math.max(it / iterMax, (t - t0) / timeMs))) });
+        onProgress({ best: { hard: bestHard, soft: bestSoft }, pct: Math.min(99, Math.round(100 * Math.max(it / iterLim, (t - t0) / timeMs))) });
       }
     }
     it++;
-    const T = T0 * Math.pow(T1 / T0, it / iterMax);
+    // (the extra search starts hot again, like the first version, which met tight rules more often)
+    const T = it < iterMax ? T0 * Math.pow(T1 / T0, it / iterMax) : TX * Math.pow(T1 / TX, (it - iterMax) / Math.max(1, iterCap - iterMax));
     const changes = propose();
     if (!changes) continue;
     const delta = apply(changes);
     if (delta <= 1e-9 || rng() < Math.exp(-delta / T)) {
-      if (better()) { bestHardPen = hardPen; bestSoftPen = softPen; bestHard = hardCnt; bestSoft = softCnt; best.set(grid); }
+      if (better()) { bestHardPen = hardPen; bestSoftPen = softPen; bestHard = hardCnt; bestSoft = softCnt; bestAt = it; best.set(grid); }
     } else revert();
   }
   // back to the best roster found (through apply, so the score caches stay right)

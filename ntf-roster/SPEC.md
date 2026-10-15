@@ -11,10 +11,12 @@ Public repo: never commit real names, rosters or leave. Demo and tests use made-
 
 - Folder `ntf-roster/`, served at `https://ntfroster.anawj.com/` (own subdomain: it saves data). Static, no build step,
   vanilla ES modules, no framework. Every page has `<meta name="robots" content="noindex, nofollow">`.
-- Works on phone (390 px) and laptop. Phone: bottom tab bar, bottom sheets. Laptop: top tabs, side panels, popovers.
-- Design: NUHS tokens (`<link rel="stylesheet" href="../nuhsdesign/tokens.css">`), Open Sans, navy `#002f6c`; the top
-  band is four equal quarters orange `#e57200`, red `#e4002b`, blue `#178fd7`, navy `#002f6c`. Focus rings navy
-  (`--n-focus`). Light theme. Quality bar: QGenda / Amion / Lightning Bolt / RosterLab / Deputy (colour-coded duty
+- Works on phone (390 px) and laptop. Phone: bottom tab bar, bottom sheets. Laptop: a left rail, centred dialogs,
+  popovers.
+- Design (changed 15 Oct 2026, owner): the NTF Anaesthesia app language (anantf-site `DESIGN-APP.md`; the kit is
+  vendored in `css/app.css`, fonts in `fonts/`): warm paper ground and surfaces, ink, one wine accent `#633d3c`,
+  Fraunces titles, Inter text, JetBrains Mono values, light only. The NUHS tokens and band are not used here
+  (NOTES.md, Design). Quality bar: QGenda / Amion / Lightning Bolt / RosterLab / Deputy (colour-coded duty
   chips, sticky grid, request layer, live rule checks, fairness counts, one-click auto-fill with preview).
 - Storage: `localStorage` key `ntf-roster-v1` (demo: `ntf-roster-demo`). Demo = `?demo` (made-up department; never
   signs in). Optional Firebase team sync (inactive until `js/firebase-config.js` is filled).
@@ -329,7 +331,10 @@ What the code adds to the contract above. Keep this list in step with the code.
   `evaluateRule` checks a rule even when it is off. Lower-level exports (`buildContext`, `compileRules`, `refresh`,
   `runRule`, …) are for the solver. `spread` is always soft. The default rules are stored in `model.js` and
   re-exported by `rules.js` (no circular import); there are 21 (item 8 is two rules, item 9 six).
-- **Solver**: `unfilled[]` entries also carry `ruleId`; `before`/`after` also carry `score`. Extra exports
+- **Solver**: `unfilled[]` entries also carry `ruleId`; `before`/`after` also carry `score`. Options also `t0`, `t1`
+  (temperatures, default 1 and 0.2), `iterations` (default 500 per unfilled slot, 12,000 to 100,000) and `patience`
+  (stop once no must-fix problem is left and nothing better was found in that many tries; default 60% of the
+  budget); `onProgress` is called once with the first draft (`pct: 0`) before the search. Extra exports
   `applyAssignments(draft, assignments)`, `withAssignments(state, assignments)`, `diffAssignments(state, assignments)`
   (the roster's Auto-fill dialog uses its own `applyAssignments(draft, result, days)` in `ui-roster.js`). After the
   search it drops any duty no rule needs.
@@ -345,6 +350,27 @@ What the code adds to the contract above. Keep this list in step with the code.
   Firebase SDK are cached on first use. `version.js`: `registerSW({ onUpdate })`, `renderVersion(el)`, `getLatest()`,
   `appVersion()`, `versionLabel()`; More ends with the two version lines.
 - **Tests**: `test/e2e.mjs` (browser, desktop and phone, axe) is in the Checks workflow with the unit tests.
+  `test/perf.e2e.mjs` (speed budgets on a slowed phone) is in the Checks workflow too (a second run must fail too).
+- **Speed (Oct 2026)**: the grid patches changed cells and draws full redraws progressively (`NOTES.md`, Speed); a
+  spacer row `tr.r-spacer` can sit at the top of the grid's body for a few frames, and `flushRows()` draws whatever
+  is still to come. The rule builder's live check runs once per frame after a change (was a 120 ms pause). Over the
+  roster grid `sheet()` opens the `<dialog>` with `show()` (class `is-nonmodal`, `aria-modal="true"`, a `.sheet-scrim`
+  sibling, its own Tab loop) instead of `showModal()`; the roster sets `body.roster-grid` while the grid shows (the
+  page fits the screen and the grid scrolls), in place of a `body:has()` rule.
+- **Looks (15 Oct 2026)**: the NTF app kit (`css/app.css`; NOTES.md, Design). `sheet()` builds a `<dialog
+  class="app-sheet">` opened with `showModal()`; `className` adds classes (`is-grouped` puts grouped lists on the ground
+  colour; `wide` adds `is-wide`); a toast shown while a sheet is open sits inside it and moves to the page when the
+  sheet closes. Views mount in `#view`; `#screenhead` holds the large title, the month and Auto-fill. `ui-rules.js` also
+  exports `ruleIcon(name)` (line icons for rule types and templates) and `chipFilter()`; `seg()` returns a wrapper (with
+  `set(value)`) holding the kit's segmented control, or a check list when the labels are too long for one row.
+- **Second review (15 Oct 2026)**: `app.setHead({ title, back: { label, fn }, noAutofill })` (null: the tab's own
+  head) gives a view its own large title and a back button in the bar (`#back`; People always gets "‹ More");
+  `sheet()` also takes `closeLabel` (a word such as "Done" in the head instead of the X); the tab bar is five tabs at
+  every size (People under More); `#month` is a button to today with its own live region (`#month-live`). The roster
+  grid's `renderGrid({ focus: staffId })` draws that person's row in the first window. Solver options also `tx`
+  (default 25): while must-fix problems remain at the end of `iterations`, the search goes on from temperature `tx` up
+  to 1,500 tries per slot (at most 300,000; not when `iterations` is given). Default duty colours changed (SMO, OTC,
+  PHD, W, Creg) and invalid colours fall back to the kit's fill and ink (`#e6e1d6` / `#272722`).
 - **Review fixes (15 Oct 2026)**: `sheet()` also takes `beforeClose(reason)` (may return a Promise of false to keep the
   sheet open when closed by Back, Esc, the X or the backdrop) and adds a history entry so Back closes it.
   `evaluate()` also returns `failed[]` (ids of enabled rules it couldn't check); the shell's evaluation carries

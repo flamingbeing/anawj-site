@@ -4,8 +4,8 @@
 // coverage table (each "cover each day" rule, day by day).
 
 import * as M from './model.js';
-import { RULE_TYPES, describeRule } from './rules.js';
-import { whoMatches, whenMatches, chipStyle } from './ui-rules.js';
+import { describeRule } from './rules.js';
+import { whoMatches, whenMatches, chipStyle, ruleIcon } from './ui-rules.js';
 
 const PAGE = 6;   // problems shown per rule before "Show all"
 
@@ -27,10 +27,9 @@ export function mount(el, app) {
     root.innerHTML = '';
     const rulesOn = (st.rules || []).filter(r => r.enabled !== false).length;
     root.append(
-      h('div', { class: 'bx-head' }, h('div', { class: 'bx-head-text' },
-        h('h2', { class: 'bx-h' }, 'Check'),
+      h('div', { class: 'bx-head' },
         h('p', { class: 'bx-sub' }, `${M.fmtMonth(app.month)} against ${rulesOn} ${rulesOn === 1 ? 'rule' : 'rules'} that are on. `,
-          h('a', { href: '#rules' }, 'Change the rules')))),
+          h('a', { href: '#rules' }, 'Change the rules'))),
       h('div', { class: 'cv-sum' },
         stat(ev.hard, 'must fix', 'Hard rules broken', ev.hard ? 'bad' : 'ok'),
         stat(ev.soft, 'to improve', 'Preferences not met', ev.soft ? 'warn' : 'ok'),
@@ -43,11 +42,11 @@ export function mount(el, app) {
         ? 'The rule check failed, so problems may be missing. Check the rules (a rule imported from a file may be damaged), or reload.'
         : `${nFailed} ${nFailed === 1 ? 'rule' : 'rules'} can't be checked and ${nFailed === 1 ? 'is' : 'are'} left out: ${names.join('; ') || 'unknown rule type'}. Edit or delete ${nFailed === 1 ? 'it' : 'them'} under Rules.`));
     }
-    const tabs = h('div', { class: 'bx-tabs', role: 'tablist', 'aria-label': 'Check sections' },
-      [['problems', 'Problems'], ['fairness', 'Fairness'], ['coverage', 'Coverage']].map(([k, l]) => h('button', {
-        type: 'button', role: 'tab', class: 'bx-tab', id: `cv-tab-${k}`, 'aria-selected': String(view === k), onclick: () => { view = k; render(); },
-      }, l)));
-    const panel = h('div', { class: 'cv-panel', role: 'tabpanel', 'aria-labelledby': `cv-tab-${view}` });
+    // the three views: the kit's segmented control (radios; arrow keys move between them)
+    const tabs = h('fieldset', { class: 'app-segmented cv-views' }, h('legend', null, 'Check sections'),
+      [['problems', 'Problems'], ['fairness', 'Fairness'], ['coverage', 'Coverage']].map(([k, l]) => h('label', { class: 'app-seg' },
+        h('input', { type: 'radio', name: 'cv-view', id: `cv-tab-${k}`, value: k, checked: view === k, onchange: () => { view = k; render(); } }), h('span', null, l))));
+    const panel = h('div', { class: 'cv-panel', role: 'region', 'aria-labelledby': `cv-tab-${view}` });
     root.append(tabs, panel);
     if (view === 'problems') renderProblems(panel, st, ev);
     else if (view === 'fairness') renderFairness(panel, st);
@@ -63,22 +62,23 @@ export function mount(el, app) {
   function renderProblems(panel, st, ev) {
     const people = M.staffInMonth(st, app.month);
     const pid = fid();
-    const sel = h('select', { id: pid, 'data-k': 'person', onchange: () => { person = sel.value; render(); } },
+    const sel = h('select', { id: pid, class: 'app-input', 'data-k': 'person', onchange: () => { person = sel.value; render(); } },
       h('option', { value: '' }, 'Everyone'), people.map(p => h('option', { value: p.id }, p.name)));
     sel.value = person;
-    const ho = h('input', { type: 'checkbox', checked: hardOnly, 'data-k': 'hardonly', onchange: () => { hardOnly = ho.checked; render(); } });
+    const ho = h('input', { type: 'checkbox', class: 'app-switch', role: 'switch', checked: hardOnly, 'data-k': 'hardonly', onchange: () => { hardOnly = ho.checked; render(); } });
     const rmap = new Map((st.rules || []).map(r => [r.id, r]));
     panel.append(h('div', { class: 'cv-bar' },
       h('div', { class: 'cv-field' }, h('label', { for: pid }, 'Person'), sel),
-      h('label', { class: 'switch' }, ho, h('span', { class: 'sw-track' }), h('span', null, 'Only must-fix')),
-      ruleFocus && rmap.has(ruleFocus) ? h('span', { class: 'bx-pill is-on cv-only' }, `Only: ${title(rmap.get(ruleFocus), st)}`,
+      h('label', { class: 'sw-line cv-hard' }, h('span', null, 'Only must-fix'), ho),
+      ruleFocus && rmap.has(ruleFocus) ? h('span', { class: 'bx-picked cv-only' }, `Only: ${title(rmap.get(ruleFocus), st)}`,
         h('button', { type: 'button', class: 'bx-x', 'aria-label': 'Show every rule', onclick: () => { ruleFocus = ''; render(); } }, '×')) : null));
     const vs = (ev.violations || []).filter(v => (!hardOnly || v.hard) && (!ruleFocus || v.ruleId === ruleFocus)
       && (!person || v.staffId === person || (v.staffIds || []).includes(person)));
     if (!vs.length) {
       const any = (ev.violations || []).length;
-      panel.append(h('p', { class: 'ok-box' }, h('span', { html: app.icon('ok') }),
-        any ? 'Nothing for this filter.' : `No problems in ${M.fmtMonth(app.month)}. Every rule that is on holds.`));
+      panel.append(h('div', { class: 'app-card app-empty' }, h('span', { class: 'app-empty-icon', html: app.icon('ok') }),
+        h('p', { class: 'app-empty-title' }, any ? 'Nothing for this filter' : 'No problems'),
+        h('p', { class: 'app-empty-text' }, any ? 'Clear the filters to see every problem.' : `Every rule that is on holds in ${M.fmtMonth(app.month)}.`)));
       return;
     }
     const by = new Map();
@@ -87,22 +87,24 @@ export function mount(el, app) {
       .sort((a, b) => (b.hard - a.hard) || (b.pen - a.pen));
     const ul = h('div', { class: 'cv-groups' });
     for (const g of groups) {
-      const t = g.rule && RULE_TYPES[g.rule.type];
       const list = [...g.list].sort((a, b) => String(a.date || (a.dates || [])[0] || '').localeCompare(String(b.date || (b.dates || [])[0] || '')));
       const open = expanded.has(g.id) || list.length <= PAGE + 1;
       const shown = open ? list : list.slice(0, PAGE);
-      ul.append(h('section', { class: `card cv-group ${g.hard ? 'is-hard' : 'is-soft'}`, 'aria-label': g.rule ? title(g.rule, st) : 'Rule' },
-        h('div', { class: 'cv-gh' },
-          h('span', { class: 'rv-ic', 'aria-hidden': 'true' }, t ? t.icon : '?'),
-          h('div', { class: 'cv-gt' },
-            h('h3', null, g.rule ? title(g.rule, st) : 'A rule that no longer exists'),
-            h('p', { class: 'rv-meta' }, h('span', { class: `bx-badge ${g.hard ? 'hard' : 'soft'}` }, g.hard ? 'Must hold' : `Preference · ${g.rule ? g.rule.weight : ''}`),
-              h('span', { class: `bx-tag ${g.hard ? 'bad' : 'warn'}` }, `${list.length} ${list.length === 1 ? 'problem' : 'problems'}`))),
-          g.rule ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': `edit-${g.id}`, onclick: () => app.go('rules', { edit: g.id }), 'aria-label': `Edit rule: ${title(g.rule, st)}` }, 'Edit rule') : null),
-        h('ul', { class: 'cv-vs' }, shown.map((v, i) => h('li', null,
-          h('span', { class: 'cv-msg' }, v.msg),
-          canShow(v) ? h('button', { type: 'button', class: 'btn btn-ghost btn-xs', 'data-k': `show-${g.id}-${i}`, onclick: () => show(v), 'aria-label': `Show: ${v.msg}` }, 'Show') : null))),
-        open ? null : h('button', { type: 'button', class: 'linkish cv-more', 'data-k': `more-${g.id}`, onclick: () => { expanded.add(g.id); render(); } }, `Show all ${list.length}`)));
+      // one grouped list per rule: the rule's row first, then a row per problem
+      ul.append(h('section', { class: `app-section cv-group ${g.hard ? 'is-hard' : 'is-soft'}`, 'aria-label': g.rule ? title(g.rule, st) : 'Rule' },
+        h('ul', { class: 'app-list' },
+          h('li', null, h('div', { class: 'app-row cv-gh' },
+            h('span', { class: `app-row-icon ${g.hard ? 'app-row-icon--bad' : 'app-row-icon--warn'}`, html: ruleIcon(g.rule ? g.rule.type : '') }),
+            h('div', { class: 'app-row-body cv-gt' },
+              h('h3', { class: 'app-row-title' }, g.rule ? title(g.rule, st) : 'A rule that no longer exists'),
+              h('p', { class: 'rv-meta' }, h('span', { class: `rv-strength ${g.hard ? 'hard' : 'soft'}` }, g.hard ? 'Must hold' : `Preference · ${g.rule ? g.rule.weight : ''}`),
+                h('span', { class: `app-badge app-badge--${g.hard ? 'bad' : 'warn'}` }, `${list.length} ${list.length === 1 ? 'problem' : 'problems'}`))),
+            g.rule ? h('button', { type: 'button', class: 'app-btn app-btn--plain app-btn--compact', 'data-k': `edit-${g.id}`, onclick: () => app.go('rules', { edit: g.id }), 'aria-label': `Edit rule: ${title(g.rule, st)}` }, 'Edit') : null)),
+          shown.map((v, i) => h('li', null, h('div', { class: 'app-row cv-v' },
+            h('span', { class: 'app-row-body cv-msg' }, v.msg),
+            canShow(v) ? h('button', { type: 'button', class: 'app-btn app-btn--plain app-btn--compact', 'data-k': `show-${g.id}-${i}`, onclick: () => show(v), 'aria-label': `Show: ${v.msg}` }, 'Show') : null))),
+          open ? null : h('li', null, h('button', { type: 'button', class: 'app-row app-row--action cv-more', 'data-k': `more-${g.id}`, onclick: () => { expanded.add(g.id); render(); } },
+            h('span', { class: 'app-row-body' }, h('span', { class: 'app-row-title' }, `Show all ${list.length}`)))))));
     }
     panel.append(ul);
   }
@@ -150,7 +152,10 @@ export function mount(el, app) {
     }
     const keys = [...cols.map(d => ({ k: d.code, label: d.code, du: d, title: d.name })), { k: 'we', label: 'Wk', title: 'Weekend days with any of these duties (Wk, as on the roster)' }, { k: 'hol', label: 'PH', title: 'Public holidays with any of these duties' }, { k: 'total', label: 'Total', title: 'All of these duties' }];
     panel.append(h('p', { class: 'bx-help' }, `Counts for ${M.fmtMonth(app.month)}. Highlighted: well above or below the group's average, per FTE (part-timers are compared on their share).`),
-      h('p', { class: 'cv-legend' }, h('span', { class: 'cv-hi-k' }, 'More than average'), h('span', { class: 'cv-lo-k' }, 'Less than average')));
+      // the key shows sample cells, drawn as in the table (the cells also say it to screen readers)
+      h('p', { class: 'cv-legend' },
+        h('span', { class: 'cv-key-i' }, h('span', { class: 'cv-key cv-hi', 'aria-hidden': 'true' }, '6'), 'More than average'),
+        h('span', { class: 'cv-key-i' }, h('span', { class: 'cv-key cv-lo', 'aria-hidden': 'true' }, '1'), 'Less than average')));
     const table = h('table', { class: 'cv-table cv-fair' });
     table.append(h('thead', null, h('tr', null, h('th', { scope: 'col', class: 'cv-name' }, 'Name'),
       keys.map(k => h('th', { scope: 'col', title: k.title }, k.du ? h('span', { class: 'chip', style: chipStyle(k.du) }, k.label) : k.label)))));
@@ -208,11 +213,11 @@ export function mount(el, app) {
         const bad = [...row.under, ...row.over].sort((a, b) => a.s.localeCompare(b.s));
         const applies = row.cells.filter(c => !c.na).length;
         const none = row.r.when && row.r.when.holidays === 'only' ? 'No public holidays this month' : 'Doesn\'t apply to any day this month';
-        panel.append(h('section', { class: `card cv-cov-card ${row.under.length ? 'is-hard' : row.over.length ? 'is-soft' : ''}` },
-          h('h3', null, title(row.r, st)),
-          h('p', { class: bad.length ? '' : 'cv-okline' }, bad.length ? `${row.under.length} short, ${row.over.length} over, of ${applies} days` : applies ? `All ${applies} days OK` : none),
+        panel.append(h('section', { class: `app-card cv-cov-card ${row.under.length ? 'is-hard' : row.over.length ? 'is-soft' : ''}` },
+          h('h3', { class: 'cv-cov-h' }, title(row.r, st)),
+          h('p', { class: bad.length ? 'cv-covline' : 'cv-covline cv-okline' }, bad.length ? `${row.under.length} short, ${row.over.length} over, of ${applies} days` : applies ? `All ${applies} days OK` : none),
           bad.length ? h('ul', { class: 'cv-daylist' }, bad.map(c => h('li', null, h('button', { type: 'button', class: `cv-day ${c.status}`, onclick: () => goDay(c.s) },
-            `${M.fmtDay(c.s)}: ${c.n}`, h('span', { class: 'muted' }, c.status === 'under' ? ` needs ${c.min}` : ` max ${c.max}`))))) : null));
+            `${M.fmtDay(c.s)}: ${c.n}`, h('span', { class: 'cv-day-need' }, c.status === 'under' ? ` needs ${c.min}` : ` max ${c.max}`))))) : null));
       }
       return;
     }

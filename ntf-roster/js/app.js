@@ -1,6 +1,7 @@
-// NTF Roster: app shell. Loads the state (practice department with ?demo), draws the header, the tabs and the
-// bottom bar on phones, routes between views (#roster, #day, #people, #rules, #check, #more) and gives every view
-// the same small `app` toolkit: store, month, toasts, sheets, the cached rule check and a DOM helper.
+// NTF Roster: app shell. Loads the state (practice department with ?demo), draws the top bar, the screen head (large
+// title, month, Auto-fill) and the tab bar (bottom on phones, a left rail from 1024 px), routes between views (#roster,
+// #day, #people, #rules, #check, #more) and gives every view the same small `app` toolkit: store, month, toasts,
+// sheets, the cached rule check and a DOM helper. Looks: the NTF app kit (css/app.css, anantf-site DESIGN-APP.md).
 // Views are separate modules loaded on demand; a view that fails to load shows a friendly placeholder instead.
 
 let M = null;      // model.js
@@ -14,9 +15,13 @@ const TABS = {
   check: { label: 'Check', icon: 'check', mod: './ui-check.js' },
   more: { label: 'More', icon: 'more', mod: './ui-more.js' },
 };
-const DESKTOP_TABS = ['roster', 'day', 'people', 'rules', 'check', 'more'];
-const PHONE_TABS = ['roster', 'day', 'check', 'rules', 'more'];
+// One tab bar of five tabs (the kit's limit), at the bottom on phones and a left rail from 1024 px; People sits under
+// More (a pushed screen with a back button).
+const NAV_TABS = ['roster', 'day', 'check', 'rules', 'more'];
 const PHONE_MQ = '(max-width: 720px)';
+// Screens that show the month (and the Auto-fill button on some of them)
+const MONTH_TABS = ['roster', 'day', 'check', 'rules'];
+const AUTOFILL_TABS = ['roster', 'day', 'check'];
 
 // Line icons (24 px grid, stroke = currentColor). Views get them through app.icon(name).
 const ICON_PATHS = {
@@ -47,6 +52,10 @@ const ICON_PATHS = {
   ok: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
   back: '<path d="M19 12H5M11 18l-6-6 6-6"/>',
+  download: '<path d="M12 4v12M7 11l5 5 5-5M4 20h16"/>',
+  print: '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
+  sheet: '<path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7M12 11v8"/>',
+  restart: '<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/>',
 };
 function icon(name, cls = '') {
   const p = ICON_PATHS[name] || '';
@@ -99,10 +108,11 @@ const app = {
   selectedCell: null,
   h, icon, esc,
   isDemo: false,
-  setMonth, go, toast, sheet, confirm: confirmBox, evaluation, isPhone,
+  setMonth, go, toast, sheet, confirm: confirmBox, evaluation, isPhone, setHead,
   selectCell(date, staffId) { app.selectedCell = date && staffId ? { date, staffId } : null; },
   model: null,
   rules: null,
+  head: null,   // a view's own screen head: { title, back: { label, fn }, noAutofill } (setHead)
 };
 
 function isPhone() { return window.matchMedia(PHONE_MQ).matches; }
@@ -151,29 +161,39 @@ function evaluation() {
 }
 
 // ---------- toasts ----------
-// an error toast ("Not saved: …") goes as soon as something else happens: it must not linger over the fix
-function clearErrorToasts() { document.querySelectorAll('#toasts .toast-error').forEach(el => el.remove()); }
+// The kit's toast (ink, with an Undo-style action), stacked up to three. While a sheet is open the toast shows inside
+// it (a modal sheet covers everything else); when the sheet closes, its toasts move back to the page.
+// An error toast ("Not saved: …") goes as soon as something else happens: it must not linger over the fix.
+function clearErrorToasts() { document.querySelectorAll('.toasts .toast-error').forEach(el => el.remove()); }
+function topSheet() { return [...document.querySelectorAll('dialog.app-sheet[open]')].pop() || null; }
+function toastBox() {
+  const dlg = topSheet();
+  if (!dlg) return $('#toasts');
+  let box = dlg.querySelector(':scope > .toasts');
+  if (!box) { box = h('div', { class: 'toasts in-sheet', 'aria-live': 'polite' }); dlg.append(box); }
+  return box;
+}
 function toast(msg, { action, kind = 'ok', ms } = {}) {
-  const box = $('#toasts');
+  const box = toastBox();
   clearErrorToasts();
-  const el = h('div', { class: `toast toast-${kind}`, role: kind === 'error' ? 'alert' : 'status' },
-    h('span', { class: 'toast-msg' }, msg));
+  const el = h('div', { class: `toast app-toast is-visible toast-${kind}`, role: kind === 'error' ? 'alert' : 'status' },
+    h('span', { class: 'app-toast-text toast-msg' }, msg));
   let timer;
-  const close = () => { clearTimeout(timer); el.classList.add('out'); setTimeout(() => el.remove(), 180); };
+  const close = () => { clearTimeout(timer); el.classList.remove('is-visible'); setTimeout(() => el.remove(), 260); };
   if (action) {
-    el.append(h('button', { type: 'button', class: 'toast-act', onclick: () => { close(); action.fn(); } }, action.label));
+    el.append(h('button', { type: 'button', class: 'app-toast-action toast-act', onclick: () => { close(); action.fn(); } }, action.label));
   }
-  el.append(h('button', { type: 'button', class: 'toast-x', 'aria-label': 'Dismiss', html: icon('close'), onclick: close }));
+  el.append(h('button', { type: 'button', class: 'app-toast-action toast-x', 'aria-label': 'Dismiss', html: icon('close'), onclick: close }));
   box.append(el);
   while (box.children.length > 3) box.firstChild.remove();
-  if (ms !== 0) timer = setTimeout(close, ms || (action ? 6000 : 3500));   // ms: 0 stays until dismissed
+  if (ms !== 0) timer = setTimeout(close, ms || (action ? 6000 : 4000));   // ms: 0 stays until dismissed
   return close;
 }
 
-// ---------- sheets (modal on desktop, bottom sheet on phone) ----------
+// ---------- sheets: the kit's bottom sheet (<dialog>), a centred dialog from 768 px ----------
 // Each open sheet adds a history entry, so the phone's Back button closes the sheet instead of leaving the screen
-// underneath. beforeClose(reason) can ask first ("Discard changes?") when a sheet is closed by Back, Esc, the X or
-// a tap outside; buttons in the sheet's footer close it without asking.
+// underneath. beforeClose(reason) can ask first ("Discard changes?") when a sheet is closed by Back, Esc, the X,
+// a tap outside or a drag down; buttons in the sheet's footer close it without asking.
 let sheetCount = 0;
 let sheetSeq = 0;
 const sheetStack = [];       // [{ seq, pushed, push, onBack }] open sheets, oldest first
@@ -186,7 +206,7 @@ window.addEventListener('popstate', (e) => {
   // sheets opened while that back was on its way get their history entry now
   for (const s of sheetStack) if (!s.pushed) s.push();
 });
-function sheet({ title = '', body, actions = [], wide = false, onClose, beforeClose, className = '' } = {}) {
+function sheet({ title = '', body, actions = [], wide = false, onClose, beforeClose, className = '', closeLabel = '' } = {}) {
   const prevFocus = document.activeElement;
   const id = 'sheet-title-' + (++sheetCount);
   const seq = ++sheetSeq;
@@ -196,15 +216,22 @@ function sheet({ title = '', body, actions = [], wide = false, onClose, beforeCl
   entry.push = pushEntry;
   if (!backPending) pushEntry();   // else once the pending back has landed (popstate)
   sheetStack.push(entry);
-  const back = h('div', { class: 'sheet-back' });
-  const footer = actions.length ? h('div', { class: 'sheet-foot' }) : null;
-  const dlg = h('div', { class: `sheet${wide ? ' wide' : ''} ${className}`, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': id },
-    h('div', { class: 'sheet-grip', 'aria-hidden': 'true' }),
-    h('div', { class: 'sheet-head' },
-      h('h2', { id, class: 'sheet-title' }, title),
-      h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close', html: icon('close'), onclick: () => requestClose('x') })),
-    h('div', { class: 'sheet-body' }, body || null),
-    footer);
+  const btnRow = actions.length ? h('div', { class: 'app-btn-row' }) : null;
+  const footer = btnRow ? h('div', { class: 'app-sheet-foot' }, btnRow) : null;
+  const head = h('div', { class: 'app-sheet-head' },
+    h('span'),
+    h('h2', { id, class: 'app-sheet-title' }, title),
+    // the head's close: an X, or a word (closeLabel: 'Done') for a sheet that saves as you go
+    closeLabel ? h('button', { type: 'button', class: 'app-bar-btn sheet-x sheet-done', onclick: () => requestClose('x') }, closeLabel)
+      : h('button', { type: 'button', class: 'app-bar-btn sheet-x', 'aria-label': 'Close', html: icon('close'), onclick: () => requestClose('x') }));
+  const grabber = h('span', { class: 'app-sheet-grabber', 'aria-hidden': 'true' });
+  // Over the roster grid a sheet opens non-modal, with its own scrim and Tab loop, and looks and works the same. A
+  // modal dialog makes everything behind it inert, and the browser then restyles every element on the page: with the
+  // grid's ~5,000 elements that is about 0.25 s to open and again to close on a slowed phone (speed, Oct 2026).
+  const modal = !(app.tab === 'roster' && document.querySelector('#view table.grid'));
+  const dlg = h('dialog', { class: `app-sheet${wide ? ' is-wide' : ''}${modal ? '' : ' is-nonmodal'} ${className}`, 'aria-labelledby': id, 'aria-modal': modal ? null : 'true' },
+    grabber, head, h('div', { class: 'app-sheet-body' }, body || null), footer);
+  const scrim = modal ? null : h('div', { class: 'sheet-scrim', 'aria-hidden': 'true', onclick: () => requestClose('backdrop') });
   let closed = false, asking = false;
   async function requestClose(reason) {
     if (closed || asking) return;
@@ -228,38 +255,80 @@ function sheet({ title = '', body, actions = [], wide = false, onClose, beforeCl
       history.back();
     }
     document.removeEventListener('keydown', onKey, true);
-    back.classList.add('out');
-    setTimeout(() => back.remove(), 160);
+    const page = $('#toasts');
+    dlg.querySelectorAll('.toasts > .toast').forEach(t => page.append(t));   // "Rule added" outlives its sheet
+    if (dlg.open) dlg.close();
+    if (scrim) scrim.classList.remove('is-on');
+    setTimeout(() => { dlg.remove(); scrim?.remove(); }, 450);   // after the slide down
     if (typeof onClose === 'function') onClose(reason);
     if (prevFocus && document.contains(prevFocus)) prevFocus.focus({ preventScroll: true });
   }
   for (const a of actions) {
-    const b = h('button', { type: 'button', class: `btn ${a.primary ? 'btn-primary' : a.danger ? 'btn-danger' : 'btn-ghost'}` }, a.label);
+    // one primary (wine) per sheet; Cancel and the like are plain, removals red
+    const kind = a.primary ? 'app-btn--primary' : a.danger ? 'app-btn--danger' : 'app-btn--plain';
+    const b = h('button', { type: 'button', class: `app-btn ${kind}` }, a.label);
     b.addEventListener('click', async () => {
       let keep = false;
       try { keep = (await (a.fn ? a.fn(close) : undefined)) === false; } catch (e) { console.error(e); toast(String(e.message || e), { kind: 'error' }); keep = true; }
       if (!keep) close('action');
     });
-    footer.append(b);
+    btnRow.append(b);
   }
+  // Esc: only the top sheet reacts, and it may ask first (the browser's own Esc would close without asking)
   function onKey(e) {
-    if (!document.contains(dlg)) return;
-    const top = [...document.querySelectorAll('.sheet-back')].pop();
-    if (top !== back) return;   // only the top sheet reacts
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); requestClose('escape'); }
-    if (e.key === 'Tab') {   // keep focus inside the dialog
-      const f = [...dlg.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter(x => !x.disabled && x.offsetParent !== null);
-      if (!f.length) return;
-      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
-      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
-    }
+    if (e.key !== 'Escape' || topSheet() !== dlg) return;
+    e.preventDefault(); e.stopPropagation(); requestClose('escape');
   }
-  back.addEventListener('mousedown', (e) => { if (e.target === back) requestClose('backdrop'); });
-  back.append(dlg);
-  document.body.append(back);
+  dlg.addEventListener('cancel', (e) => { e.preventDefault(); requestClose('escape'); });
+  dlg.addEventListener('close', () => { if (!closed) close('escape'); });   // closed by the browser itself
+  // a tap on the backdrop (outside the sheet's box) closes it
+  dlg.addEventListener('click', (e) => {
+    if (e.target !== dlg) return;
+    const r = dlg.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) requestClose('backdrop');
+  });
+  // phones: drag the head down past 120 px (or flick it) to close
+  let drag = null;
+  const dragStart = (e) => {
+    if (window.innerWidth >= 768 || e.button > 0 || e.target.closest('button')) return;
+    drag = { y: e.clientY, t: e.timeStamp, dy: 0 };
+    dlg.classList.add('is-dragging');
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  };
+  const dragMove = (e) => { if (!drag) return; drag.dy = Math.max(0, e.clientY - drag.y); dlg.style.transform = `translateY(${drag.dy}px)`; };
+  const dragEnd = (e) => {
+    if (!drag) return;
+    const far = drag.dy > 120 || drag.dy / Math.max(1, e.timeStamp - drag.t) > 0.6;
+    drag = null;
+    dlg.classList.remove('is-dragging');
+    dlg.style.transform = '';
+    if (far) requestClose('drag');
+  };
+  for (const el of [head, grabber]) {
+    el.addEventListener('pointerdown', dragStart);
+    el.addEventListener('pointermove', dragMove);
+    el.addEventListener('pointerup', dragEnd);
+    el.addEventListener('pointercancel', dragEnd);
+  }
+  if (modal) {
+    document.body.append(dlg);
+    dlg.showModal();
+  } else {
+    // keep Tab inside the sheet (a modal dialog's page is inert; this one's isn't)
+    dlg.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      const f = [...dlg.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter(el => !el.disabled && el.offsetParent);
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey ? document.activeElement === first : document.activeElement === last) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+    });
+    scrim.classList.add('is-on');
+    document.body.append(scrim, dlg);
+    dlg.show();
+  }
   document.addEventListener('keydown', onKey, true);
   requestAnimationFrame(() => {
-    const first = dlg.querySelector('.sheet-body [autofocus], .sheet-body input, .sheet-body select, .sheet-body textarea, .sheet-body button, .sheet-foot .btn-primary') || dlg.querySelector('.sheet-head .icon-btn');
+    const first = dlg.querySelector('.app-sheet-body [autofocus], .app-sheet-body input, .app-sheet-body select, .app-sheet-body textarea, .app-sheet-body button, .app-sheet-foot .app-btn--primary') || dlg.querySelector('.sheet-x');
     if (first) first.focus({ preventScroll: true });
   });
   close.el = dlg;
@@ -283,10 +352,8 @@ function confirmBox(msg, { ok = 'OK', danger = false } = {}) {
 
 // ---------- header ----------
 function renderNav() {
-  const tabs = $('#tabs');
-  tabs.innerHTML = DESKTOP_TABS.map(t => `<a href="#${t}" class="tab" data-tab="${t}" title="${TABS[t].label}">${icon(TABS[t].icon)}<span>${TABS[t].label}</span></a>`).join('');
-  const bb = $('#bottombar');
-  bb.innerHTML = PHONE_TABS.map(t => `<a href="#${t}" class="bb-tab" data-tab="${t}">${icon(TABS[t].icon)}<span class="bb-label">${TABS[t].label}</span>${t === 'check' ? '<span class="bb-badge" hidden></span>' : ''}</a>`).join('');
+  // the kit's tab bar: a line icon in a pill (blush when active) over its label
+  $('#bottombar').innerHTML = '<div class="app-tabbar-inner">' + NAV_TABS.map(t => `<a href="#${t}" class="app-tab" data-tab="${t}"><span class="app-tab-icon" aria-hidden="true">${icon(TABS[t].icon, t === 'more' ? 'ic-dots' : '')}${t === 'check' ? '<span class="app-tab-badge" hidden></span>' : ''}</span><span class="app-tab-label">${TABS[t].label}</span></a>`).join('') + '</div>';
   $('#undo').innerHTML = icon('undo');
   $('#redo').innerHTML = icon('redo');
   $('#help').innerHTML = icon('keyboard');
@@ -296,18 +363,25 @@ function renderNav() {
 }
 
 function markTabs() {
-  const active = app.tab === 'people' && isPhone() ? 'more' : app.tab;
-  document.querySelectorAll('[data-tab]').forEach(a => {
-    if (a.dataset.tab === active || (a.classList.contains('tab') && a.dataset.tab === app.tab)) a.setAttribute('aria-current', 'page');
+  const active = app.tab === 'people' ? 'more' : app.tab;
+  document.querySelectorAll('#bottombar [data-tab]').forEach(a => {
+    if (a.dataset.tab === active) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   });
 }
 
+// Header parts are rewritten only when their text changes: it is redrawn after every edit, and rewriting the same
+// markup still makes the browser restyle it (speed).
+const headerSeen = new WeakMap();
+function setHTML(el, html) { if (headerSeen.get(el) !== html) { el.innerHTML = html; headerSeen.set(el, html); } }
+function setText(el, text) { if (el.textContent !== text) el.textContent = text; }
+
 function renderHeader() {
   const state = app.store.get();
-  $('#dept').textContent = state.settings?.dept || '';
   const longM = M.fmtMonth(app.month);   // 'October 2026'; phones show 'Oct 2026'
-  $('#month').innerHTML = `<span class="m-long">${esc(longM)}</span><span class="m-short" aria-hidden="true">${esc(longM.slice(0, 3) + ' ' + app.month.slice(0, 4))}</span>`;
+  // the month is also a button to today (phones have no Today button); its own live region announces a new month
+  setHTML($('#month'), `<span class="m-long">${esc(longM)}</span><span class="m-short" aria-hidden="true">${esc(longM.slice(0, 3) + ' ' + app.month.slice(0, 4))}</span><span class="sr-only">, go to today</span>`);
+  setText($('#month-live'), longM);
   $('#today').title = 'Go to today (' + M.fmtDay(M.iso(new Date())) + ')';
   const u = $('#undo'), r = $('#redo');
   u.disabled = !app.store.canUndo();
@@ -320,7 +394,8 @@ function renderHeader() {
   const ev = hasStaff ? evaluation() : EMPTY_EVAL();
   const p = $('#problems');
   // nothing to check or fill before there are staff (a fresh install): no green "No problems", no Auto-fill
-  p.hidden = !hasStaff;
+  // (the problems pill also hides on tabs without a month)
+  p.hidden = !hasStaff || !MONTH_TABS.includes(app.tab);
   $('#autofill').disabled = !hasStaff;
   $('#autofill').title = hasStaff ? 'Auto-fill this month from the rules' : 'Add staff first (People)';
   const nFailed = (ev.failed || []).length;
@@ -328,14 +403,49 @@ function renderHeader() {
   p.className = 'problems ' + (bad ? 'has-hard' : 'is-ok');
   const hardTxt = ev.error ? 'Rule check failed' : ev.hard ? `${ev.hard} problem${ev.hard === 1 ? '' : 's'}` : 'No problems';
   const extra = nFailed ? `${nFailed} rule${nFailed === 1 ? '' : 's'} can't be checked` : ev.soft ? `${ev.soft} to improve` : '';
-  p.innerHTML = `${icon(bad ? 'alert' : 'ok')}<span class="p-hard">${hardTxt}</span>${extra ? `<span class="p-soft">${extra}</span>` : ''}`;
+  setHTML(p, `${icon(bad ? 'alert' : 'ok')}<span class="p-hard">${hardTxt}</span>${extra ? `<span class="p-soft">${extra}</span>` : ''}`);
   p.setAttribute('aria-label', `${hardTxt}${extra ? `, ${extra}` : ''}. Open Check`);
   p.title = 'Rule check for ' + M.fmtMonth(app.month) + ': must-fix problems (hard rules) and things to improve (soft rules)';
-  const bb = document.querySelector('.bb-badge');
-  if (bb) { bb.hidden = !ev.hard; bb.textContent = ev.hard > 99 ? '99+' : String(ev.hard); }
-  const bbTab = document.querySelector('.bb-tab[data-tab="check"]');
+  const bb = document.querySelector('#bottombar .app-tab-badge');
+  if (bb) { bb.hidden = !ev.hard; setText(bb, ev.hard > 99 ? '99+' : String(ev.hard)); }
+  const bbTab = document.querySelector('#bottombar .app-tab[data-tab="check"]');
   if (bbTab) bbTab.setAttribute('aria-label', ev.hard ? `Check, ${ev.hard} problems` : 'Check');
+  // the screen head: the tab's large title (the bar shows it once it scrolls away), and the month where it matters
+  // (not before there are staff: nothing to plan yet). A view may set its own title and a back button (setHead).
+  const head = app.head && app.head.tab === app.tab ? app.head : null;
+  const label = head?.title || TABS[app.tab]?.label || 'NTF Roster';
+  const showMonth = hasStaff && MONTH_TABS.includes(app.tab);
+  setText($('#large-title'), label);
+  setText($('#bartitle'), showMonth && !head?.title ? `${label} · ${longM.slice(0, 3)} ${app.month.slice(0, 4)}` : label);
+  $('.monthnav').hidden = !showMonth;
+  $('#today').hidden = !showMonth;
+  $('#autofill').hidden = !hasStaff || !AUTOFILL_TABS.includes(app.tab) || !!head?.noAutofill;
+  // pushed screens (one person's month; People, under More) have a back button at the left of the bar
+  const back = head?.back || (app.tab === 'people' ? { label: 'More', fn: () => go('more') } : null);
+  const backBtn = $('#back');
+  backBtn.hidden = !back;
+  if (back) { setText(backBtn, back.label); backBtn.setAttribute('aria-label', `Back to ${back.label}`); backBtn.onclick = back.fn; }
+  // phones, on the roster grid: the month moves into the top bar (always solid) and the screen head folds away, so
+  // the grid gets the room (the grid itself never scrolls the page, so the large title could never collapse)
+  const inBar = isPhone() && app.tab === 'roster' && showMonth && !head && document.body.classList.contains('roster-grid');
+  const nav = $('.monthnav'), top = $('#top');
+  if (inBar !== (nav.parentElement !== $('#screenhead'))) {
+    if (inBar) $('#bartitle').after(nav);
+    else $('#large-title').after(nav);
+  }
+  top.classList.toggle('bar-month', inBar);
+  top.classList.toggle('app-bar--solid', inBar);
   markTabs();
+  headKey = headState();
+}
+
+// A view's own screen head (null: the tab's): { title, back: { label, fn }, noAutofill }. Views call it on every
+// render: the header is redrawn only when it changes (or the roster grid came or went: the month's place on phones).
+let headKey = '';
+const headState = () => JSON.stringify([app.tab, app.head?.title, app.head?.back?.label, !!app.head?.noAutofill, document.body.classList.contains('roster-grid'), isPhone()]);
+function setHead(head) {
+  app.head = head ? { ...head, tab: app.tab } : null;
+  if (headState() !== headKey) renderHeader();
 }
 
 // ---------- router ----------
@@ -381,33 +491,39 @@ async function doRoute() {
   }
   unmountView();
   current.tab = tab; current.key = key;
-  const main = $('#main');
+  const main = $('#view');
   main.innerHTML = '';
   main.dataset.tab = tab;
   document.body.dataset.tab = tab;
+  document.body.classList.remove('is-welcome');
+  if (window.scrollY) window.scrollTo(0, 0);   // a new tab starts at its large title
   const state = app.store.get();
   if (!(state.staff || []).length && (tab === 'roster' || tab === 'day' || tab === 'check')) {
     main.append(welcomeCard());
+    document.body.classList.add('is-welcome');   // (a centred column, also on the roster's full-width screen)
     current.view = { welcome: true };
     return;
   }
   const el = h('div', { class: `view view-${tab}` });
-  if (tab === 'more' && isPhone()) el.append(phoneMoreLinks());
+  if (tab === 'more') el.append(phoneMoreLinks());
   const host = h('div', { class: 'view-host' });
   el.append(host);
   main.append(el);
   current.el = el;
+  host.append(skeleton());   // the kit's loading rows (no spinner) while the screen's code loads the first time
   let mod;
   try {
     mod = await import(TABS[tab].mod);
   } catch (e) {
     console.warn(`Could not load ${TABS[tab].mod}`, e);
     if (current.tab !== tab) return;
+    host.innerHTML = '';
     host.append(placeholder(tab));
     current.view = { placeholder: true };
     return;
   }
   if (current.tab !== tab || current.el !== el) return;   // the person moved on while it loaded
+  host.innerHTML = '';
   const mount = mod.mount || mod.default?.mount;
   if (typeof mount !== 'function') { host.append(placeholder(tab)); current.view = { placeholder: true }; return; }
   try {
@@ -425,54 +541,75 @@ function unmountView() {
     try { current.view.unmount(); } catch (e) { console.error(e); }
   }
   current.view = null; current.el = null;
+  if (app.head) { app.head = null; renderHeader(); }
 }
 
 function placeholder(tab, err) {
-  return h('div', { class: 'card empty-card' },
-    h('div', { class: 'empty-ic', html: icon(TABS[tab].icon) }),
-    h('h2', null, `${TABS[tab].label} isn't ready yet`),
-    h('p', null, err ? 'Something went wrong while opening this screen. Your roster is safe; try reloading the page.'
+  return h('div', { class: 'app-card app-empty' },
+    h('span', { class: 'app-empty-icon', html: icon(TABS[tab].icon) }),
+    h('h2', { class: 'app-empty-title' }, `${TABS[tab].label} isn't ready yet`),
+    h('p', { class: 'app-empty-text' }, err ? 'Something went wrong while opening this screen. Your roster is safe; try reloading the page.'
       : 'This part of NTF Roster is still being built. Your roster is safe; the other screens work.'),
-    h('p', null, h('a', { href: '#roster', class: 'btn btn-ghost' }, 'Back to the roster')));
+    h('a', { href: '#roster', class: 'app-btn app-btn--secondary' }, 'Back to the roster'));
 }
 
+// Loading: rows in the shape of the real list, shimmering (the kit's skeleton), never a spinner.
+function skeleton() {
+  const row = () => h('li', null, h('div', { class: 'app-row' }, h('span', { class: 'app-skeleton app-skeleton--tile' }),
+    h('span', { class: 'app-row-body' }, h('span', { class: 'app-skeleton app-skeleton--line' }), h('span', { class: 'app-skeleton app-skeleton--short' }))));
+  return h('div', { class: 'app-section' }, h('ul', { class: 'app-list', 'aria-busy': 'true', 'aria-label': 'Loading' }, row(), row(), row()));
+}
+
+// People lives under More (five tabs at most): a grouped row at the top of More.
 function phoneMoreLinks() {
-  return h('a', { href: '#people', class: 'card link-card' },
-    h('span', { class: 'lc-ic', html: icon('people') }),
-    h('span', { class: 'lc-text' }, h('strong', null, 'People'), h('span', null, 'Staff, groups, tags and duty codes')),
-    h('span', { class: 'lc-go', html: icon('right') }));
+  return h('div', { class: 'app-section' }, h('ul', { class: 'app-list' }, h('li', null,
+    h('a', { href: '#people', class: 'app-row link-card' },
+      h('span', { class: 'app-row-icon', html: icon('people') }),
+      h('span', { class: 'app-row-body' }, h('span', { class: 'app-row-title' }, 'People'), h('span', { class: 'app-row-sub' }, 'Staff, groups, tags and duty codes')),
+      h('span', { class: 'app-row-chevron', 'aria-hidden': 'true' })))));
 }
 
 function welcomeCard() {
   return h('div', { class: 'welcome' },
-    h('div', { class: 'card welcome-card' },
-      h('div', { class: 'empty-ic', html: icon('grid') }),
-      h('h2', null, 'Welcome to NTF Roster'),
-      h('p', null, 'Plan the monthly calls, PM shifts and clinics together with leave and requests, check them against your rules, and fill the gaps automatically.'),
-      h('p', { class: 'muted' }, 'Start by bringing in the department list. Everything stays in this browser until team sync is set up.'),
+    h('section', { class: 'app-card app-empty welcome-card', 'aria-labelledby': 'welcome-h' },
+      h('span', { class: 'app-empty-icon', html: icon('grid') }),
+      h('h2', { class: 'app-empty-title', id: 'welcome-h' }, 'Welcome to NTF Roster'),
+      h('p', { class: 'app-empty-text' }, 'Plan the monthly calls, PM shifts and clinics together with leave and requests, check them against your rules, and fill the gaps automatically.'),
+      h('p', { class: 'app-empty-text' }, 'Start by bringing in the department list. Everything stays in this browser until team sync is set up.'),
+      // the first step's buttons straight away (on a phone the list below would push them under the tab bar)
+      h('div', { class: 'app-btn-stack welcome-actions' },
+        h('button', { type: 'button', class: 'app-btn app-btn--primary', onclick: () => go('more'), html: `${icon('upload')}<span>Import Excel sheet</span>` }),
+        h('button', { type: 'button', class: 'app-btn app-btn--secondary', onclick: () => go('people'), html: `${icon('plus')}<span>Add staff</span>` }),
+        h('a', { class: 'app-btn app-btn--plain', href: './?demo', target: '_blank', rel: 'noopener', html: `${icon('eye')}<span>Try the practice department</span>` })),
       // the next steps, in order; the default rules are already on, with numbers that are guesses
+      h('h3', { class: 'welcome-h' }, 'How it works'),
       h('ol', { class: 'welcome-steps' },
         h('li', null, 'Add your staff (import the Excel sheet, or add them under People).'),
         h('li', null, 'Enter leave and requests on the roster (the Excel import brings them in too).'),
         h('li', null, `Check the rules: ${(app.store.get().rules || []).filter(r => r.enabled !== false).length} default rules are already on, and their numbers (calls a month, people on call each night) are guesses.`),
-        h('li', null, 'Press Auto-fill, look at the preview, then Apply.')),
-      h('div', { class: 'welcome-actions' },
-        h('button', { type: 'button', class: 'btn btn-primary', onclick: () => go('more'), html: `${icon('upload')}<span>Import Excel sheet</span>` }),
-        h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => go('people'), html: `${icon('plus')}<span>Add staff</span>` }),
-        h('a', { class: 'btn btn-ghost', href: './?demo', target: '_blank', rel: 'noopener', html: `${icon('eye')}<span>Try the practice department</span>` }))));
+        h('li', null, 'Press Auto-fill, look at the preview, then Apply.'))));
 }
 
 // ---------- bars ----------
+// Practice: a badge at the left of the top bar on every screen; it opens a small sheet with Reset and Leave.
 function renderDemoBar() {
   const bar = $('#demobar');
   if (!app.isDemo) { bar.hidden = true; return; }
   bar.hidden = false;
   bar.innerHTML = '';
-  bar.append(
-    h('span', { class: 'demo-pill' }, 'Practice'),
-    h('span', { class: 'demo-text' }, '(made-up department)', h('span', { class: 'demo-long' }, '. Changes stay in this browser.')),
-    h('button', { type: 'button', class: 'linkish', onclick: resetDemo }, 'Reset'),
-    h('a', { class: 'linkish', href: './', 'aria-label': 'Leave practice' }, h('span', { class: 'demo-leave' }, 'Leave practice'), h('span', { class: 'demo-leave-s', 'aria-hidden': 'true' }, 'Leave')));
+  bar.append(h('button', { type: 'button', class: 'demo-pill', 'aria-label': 'Practice: a made-up department. Reset or leave practice', onclick: practiceSheet },
+    h('span', { class: 'app-badge app-badge--warn' }, 'Practice')));
+}
+
+function practiceSheet() {
+  sheet({
+    title: 'Practice department',
+    body: h('p', { class: 'confirm-msg' }, 'A made-up department for trying things out, with invented people, leave, requests and rules. Changes stay in this browser and never reach your own roster.'),
+    actions: [
+      { label: 'Reset practice', fn: () => { setTimeout(resetDemo, 0); } },
+      { label: 'Leave practice', primary: true, fn: () => { location.href = './'; } },
+    ],
+  });
 }
 
 async function resetDemo() {
@@ -489,8 +626,8 @@ function showSaveError() {
   bar.innerHTML = '';
   bar.append(
     h('span', null, 'This browser is out of storage space, so the last change was not saved.'),
-    h('button', { type: 'button', class: 'btn btn-sm btn-danger', onclick: downloadBackup }, 'Download backup'),
-    h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Dismiss', html: icon('close'), onclick: () => { bar.hidden = true; } }));
+    h('button', { type: 'button', class: 'app-btn app-btn--danger app-btn--compact', onclick: downloadBackup }, 'Download backup'),
+    h('button', { type: 'button', class: 'app-bar-btn', 'aria-label': 'Dismiss', html: icon('close'), onclick: () => { bar.hidden = true; } }));
 }
 
 // The saved roster couldn't be read: it is kept aside, and nothing is saved over it until the person chooses.
@@ -507,9 +644,9 @@ function showDamaged() {
   };
   bar.append(
     h('span', null, 'The roster saved in this browser is damaged and could not be opened. Nothing will be saved over it until you choose.'),
-    h('button', { type: 'button', class: 'btn btn-sm', onclick: download }, 'Download damaged copy'),
+    h('button', { type: 'button', class: 'app-btn app-btn--outline app-btn--compact', onclick: download }, 'Download damaged copy'),
     h('button', {
-      type: 'button', class: 'btn btn-sm btn-danger', onclick: async () => {
+      type: 'button', class: 'app-btn app-btn--danger app-btn--compact', onclick: async () => {
         const ok = await confirmBox('Start again here? The damaged copy is replaced by what you see now. Download it first if you may need it.', { ok: 'Start again' });
         if (!ok) return;
         app.store.clearDamaged();
@@ -533,7 +670,7 @@ function shortcutsSheet() {
     ['Enter', 'Open the cell editor'], ['Delete', 'Clear the cell'], ['Esc', 'Close the editor, forget a typed code'], ['?', 'This list'],
   ];
   const tbl = h('table', { class: 'kbd-table' }, h('tbody', null, rows.map(([k, v]) => h('tr', null, h('th', { scope: 'row' }, h('kbd', null, k)), h('td', null, v)))));
-  sheet({ title: 'Keyboard shortcuts', body: tbl, actions: [{ label: 'Close', primary: true }] });
+  sheet({ title: 'Keyboard shortcuts', body: tbl });   // read only: the X closes it
 }
 
 function isTyping(el) {
@@ -542,7 +679,7 @@ function isTyping(el) {
 
 function onKeydown(e) {
   const mod = e.ctrlKey || e.metaKey;
-  if (document.querySelector('.sheet-back') && !mod) return;
+  if (topSheet() && !mod) return;
   if (mod && !e.altKey && (e.key === 'z' || e.key === 'Z')) {
     if (isTyping(e.target)) return;
     e.preventDefault();
@@ -587,28 +724,50 @@ async function openAutofill() {
 
 // ---------- start ----------
 function fatal(msg) {
-  const main = $('#main');
+  const main = $('#view');
   main.innerHTML = '';
-  main.append(h('div', { class: 'card empty-card' }, h('h2', null, 'NTF Roster could not start'), h('p', null, msg)));
+  main.append(h('div', { class: 'app-card app-empty' }, h('h2', { class: 'app-empty-title' }, 'NTF Roster could not start'), h('p', { class: 'app-empty-text' }, msg)));
+}
+
+// The large title collapses into the top bar once it scrolls under it (the kit's IntersectionObserver).
+function watchLargeTitle() {
+  const bar = $('#top'), title = $('#large-title');
+  if (!('IntersectionObserver' in window)) { bar.classList.add('is-collapsed'); return; }
+  let io = null;
+  const observe = () => {
+    if (io) io.disconnect();
+    io = new IntersectionObserver(e => bar.classList.toggle('is-collapsed', !e[0].isIntersecting),
+      { rootMargin: `-${bar.offsetHeight}px 0px 0px 0px`, threshold: 0 });
+    io.observe(title);
+  };
+  observe();
+  return observe;   // call again when the bar's height changes (the practice band)
 }
 
 async function start() {
+  const demo = new URLSearchParams(location.search).has('demo');
+  // Ask for every module the first screen needs at once, not one after another (each is a round trip on a slow
+  // line): the model, rules, store, the practice department and the first screen's own view (from the link; phones
+  // open on Day). Each is still awaited, and handled, where it was before.
+  const quiet = p => { p.catch(() => {}); return p; };
+  const pM = quiet(import('./model.js')), pR = quiet(import('./rules.js')), pS = quiet(import('./store.js'));
+  const pD = demo ? quiet(import('./demo.js')) : null;
+  quiet(import((TABS[location.hash.replace(/^#/, '').split('?')[0]] || TABS[isPhone() ? 'day' : 'roster']).mod));
   try {
-    M = await import('./model.js');
+    M = await pM;
   } catch (e) {
     console.error(e);
     fatal('A part of the app did not load. Check your connection and reload the page.');
     return;
   }
-  try { R = await import('./rules.js'); } catch (e) { console.warn('rules.js not loaded; rule checks are off', e); }
+  try { R = await pR; } catch (e) { console.warn('rules.js not loaded; rule checks are off', e); }
   app.model = M; app.rules = R;
-  const demo = new URLSearchParams(location.search).has('demo');
   app.isDemo = demo;
   let demoState = null;
   if (demo) {
-    try { ({ demoState } = await import('./demo.js')); } catch (e) { console.warn('demo.js not loaded; starting empty', e); }
+    try { ({ demoState } = await pD); } catch (e) { console.warn('demo.js not loaded; starting empty', e); }
   }
-  const { createStore } = await import('./store.js');
+  const { createStore } = await pS;
   app.store = createStore({
     demo,
     fallback: () => (demo && typeof demoState === 'function' ? demoState(M.iso(new Date())) : M.defaultState()),
@@ -624,6 +783,8 @@ async function start() {
   renderNav();
   renderDemoBar();
   renderHeader();
+  const rewatchTitle = watchLargeTitle();
+  document.addEventListener('touchstart', () => {}, { passive: true });   // iOS shows :active press states only with this
 
   $('#undo').addEventListener('click', doUndo);
   $('#redo').addEventListener('click', doRedo);
@@ -631,6 +792,7 @@ async function start() {
   $('#prevm').addEventListener('click', () => setMonth(M.addMonths(app.month, -1)));
   $('#nextm').addEventListener('click', () => setMonth(M.addMonths(app.month, 1)));
   $('#today').addEventListener('click', goToday);
+  $('#month').addEventListener('click', goToday);
   $('#autofill').addEventListener('click', openAutofill);
   document.addEventListener('keydown', onKeydown);
   window.addEventListener('hashchange', route);
@@ -640,7 +802,8 @@ async function start() {
     const now = isPhone();
     if (now === wasPhone) return;
     wasPhone = now;
-    markTabs();
+    renderHeader();
+    if (rewatchTitle) rewatchTitle();
     if (current.view && typeof current.view.update === 'function') current.view.update(app.store.get(), { resize: true });
   });
 

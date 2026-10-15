@@ -169,9 +169,15 @@ export function compileCodes(ctx, codes) {
   }
   const has = set.size > 0;
   const flags = ctx.flags, cs = ctx.codes, rs = ctx.req;
+  // The kinds of the listed codes (an unknown code counts as "any code"): a person-day whose flags have none of
+  // them can't hold one, so most days are ruled out with one AND instead of scanning the cell (speed).
+  let need = 0;
+  for (const c of set) need |= ctx.kindBit.get(c) || F.ANY;
   const m = has
     ? i => {
-      if (flags[i] & mask) return true;
+      const f = flags[i];
+      if (f & mask) return true;
+      if (!(f & need)) return false;
       const a = cs[i];
       for (let k = 0; k < a.length; k++) if (set.has(a[k])) return true;
       const r = rs[i];
@@ -264,7 +270,7 @@ export function compileRule(ctx, raw) {
   const u = hard ? 1000 : Math.min(100, Math.max(1, num(rule.weight, 10)));
   let ev = null;
   try {
-    const T = textKit(ctx.state);
+    const T = ctx.T || (ctx.T = textKit(ctx.state));   // one word kit per check, shared by all its rules (speed)
     const X = {
       ctx, rule, hard, u, T,
       codes: list => compileCodes(ctx, list),
@@ -869,19 +875,34 @@ export const RULE_TYPES = {
       if (m.empty || !code) return null;
       const want = p.mode !== 'avoid', weekend = p.span === 'weekend';
       const { ctx, u } = X, n = ctx.n, ok = X.when, act = ctx.act, inWho = X.W.inWho;
-      const has = i => ctx.req[i].includes(code) || ctx.codes[i].includes(code);
+      // the flags say first whether the day holds a code of the request's kind at all (one AND; speed)
+      const cb = ctx.kindBit.get(code) || F.ANY, flags = ctx.flags;
+      const has = i => (flags[i] & cb) !== 0 && (ctx.req[i].includes(code) || ctx.codes[i].includes(code));
       const reqTxt = `${X.T.code(code)} (${code})`;
+      // a weekend request can sit up to 6 days before its weekend (Mon..Sun), and a weekend can straddle the
+      // range (Sat 31 Oct, Sun 1 Nov): scan those request days too, keep weekends with a day in the range
+      const dA = weekend ? Math.max(0, ctx.lo - 6) : ctx.lo, dB = weekend ? Math.min(n - 1, ctx.hi + 1) : ctx.hi;
+      // Speed: the days each person has a request code, listed once. Requests never change while a month is checked
+      // or auto-filled (Auto-fill places only shift codes), so the solver's re-checks look at those few days only.
+      // Any other kind of code (a misconfigured rule) is looked for on every day, as it could be placed.
+      let days = null;
+      if (cb === F.REQ) {
+        days = [];
+        for (let pi = 0; pi < ctx.P; pi++) {
+          const list = [];
+          if (inWho[pi]) for (let d = dA; d <= dB; d++) if (has(pi * n + d)) list.push(d);
+          days.push(list);
+        }
+      }
       return {
         info: { m, code, want, weekend, ok, inWho },
         person(pi, out) {
           if (!inWho[pi]) return 0;
           const base = pi * n;
           let pen = 0, lastSat = -99;
-          // a weekend request can sit up to 6 days before its weekend (Mon..Sun), and a weekend can straddle the
-          // range (Sat 31 Oct, Sun 1 Nov): scan those request days too, keep weekends with a day in the range
-          const dA = weekend ? Math.max(0, ctx.lo - 6) : ctx.lo, dB = weekend ? Math.min(n - 1, ctx.hi + 1) : ctx.hi;
-          for (let d = dA; d <= dB; d++) {
-            const i = base + d;
+          const list = days && days[pi], end = list ? list.length : dB - dA + 1;
+          for (let x = 0; x < end; x++) {
+            const d = list ? list[x] : dA + x, i = base + d;
             if (!ok[d] || !act[i] || !has(i)) continue;
             if (!weekend) {
               const hit = m(i);

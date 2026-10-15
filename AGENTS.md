@@ -13,7 +13,9 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`), at `nuhroster.anawj.com` (the old `anawj.com/nuh-roster/` redirects). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
 - `ntf-roster/`: NTF (Ng Teng Fong) anaesthesia monthly duty roster: calls, PM shifts, leave and requests on one grid,
   rules the owner adds in the app (combination restrictions included), and auto-fill; at `ntfroster.anawj.com`. Start with
-  `ntf-roster/NOTES.md` (department codes, data model, how to add a rule type), then `ntf-roster/SPEC.md`.
+  `ntf-roster/NOTES.md` (department codes, data model, how to add a rule type), then `ntf-roster/SPEC.md`. It follows NTF's
+  app design language (anantf-site `DESIGN-APP.md`; kit vendored in `ntf-roster/css/app.css`), not the NUHS style or band
+  (owner, 15 Oct 2026).
 - `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template); served at `prewarmstudy.anawj.com`. Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
 - `bis-dsa/`: BIS to DSA teaching simulator for anaesthesia residents (one static page, synthetic EEG, no data), at
   `anaes.anawj.com/bis/`. Start with `bis-dsa/NOTES.md`.
@@ -101,7 +103,8 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - NUH roster changes: run `node nuh-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe on every tab;
   under a minute; also in the Checks workflow).
 - NTF roster changes: run `node ntf-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe; also in the
-  Checks workflow) and the unit tests in `ntf-roster/test/`.
+  Checks workflow), `node ntf-roster/test/perf.e2e.mjs` (speed budgets on a slowed phone; also in the Checks workflow)
+  and the unit tests in `ntf-roster/test/`.
 - Hand log changes: run `node hand-log/test/e2e.mjs`.
 - OT simulator changes: run `tools/test-ot-sim.sh` (model tests, repo check, browser test; see `ot-sim/NOTES.md`).
 - BIS to DSA changes: run `node bis-dsa/test/e2e.mjs` (it also runs `adv.e2e.mjs` and `sed.e2e.mjs`) and `node bis-dsa/test/engine.check.mjs` (engine tuning, no browser).

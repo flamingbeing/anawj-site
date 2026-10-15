@@ -7,7 +7,8 @@
 const VERSION = 'ntf-roster-v1';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const SHELL = [
-  './', 'index.html', 'style.css', 'css/rules.css', 'manifest.webmanifest', '../nuhsdesign/tokens.css',
+  './', 'index.html', 'css/app.css', 'style.css', 'css/rules.css', 'manifest.webmanifest',
+  'fonts/inter.woff2', 'fonts/fraunces-roman.woff2', 'fonts/jetbrains-mono.woff2',
   'js/app.js', 'js/store.js', 'js/model.js', 'js/rules.js', 'js/solver.js', 'js/solver-worker.js',
   'js/ui-roster.js', 'js/ui-day.js', 'js/ui-rules.js', 'js/ui-people.js', 'js/ui-check.js', 'js/ui-more.js',
   'js/io.js', 'js/demo.js', 'js/cloud.js', 'js/firebase-config.js', 'js/ui-team.js', 'js/version.js',
@@ -55,7 +56,7 @@ self.addEventListener('fetch', e => {
     const hit = await cache.match(key, { ignoreSearch: req.mode === 'navigate' });
     if (hit) return hit;
     try {
-      // anything else same-origin (vendor/exceljs.min.js, fonts of the design tokens) is kept after its first use
+      // anything else same-origin (vendor/exceljs.min.js) is kept after its first use
       const res = await fetch(req);
       if (res.ok && res.type === 'basic') cache.put(key, res.clone());
       return res;

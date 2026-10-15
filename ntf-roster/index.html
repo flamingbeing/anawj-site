@@ -1,55 +1,53 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-GB" class="app" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="light">
 <title>NTF Roster</title>
 <meta name="description" content="Plan the NTF anaesthesia monthly duty roster with leave, requests, rules you edit and auto-fill.">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#002f6c">
+<meta name="theme-color" content="#f1ede4">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap">
-<link rel="stylesheet" href="../nuhsdesign/tokens.css">
+<link rel="preload" href="fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="css/rules.css">
 </head>
-<body>
-<a class="skip" href="#main">Skip to the roster</a>
-<div class="n-stripe" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
-<div id="demobar" class="demobar" hidden></div>
-<div id="savebar" class="savebar" hidden></div>
-<header class="top" id="top">
-  <div class="top-row">
-    <a class="brand" href="#roster" aria-label="NTF Roster, home">
-      <span class="brand-mark" aria-hidden="true">NTF</span>
-      <span class="brand-text"><span class="brand-name">NTF Roster</span><span class="brand-dept" id="dept"></span></span>
-    </a>
-    <nav class="tabs" id="tabs" aria-label="Sections"></nav>
-    <div class="top-tools">
-      <button type="button" class="icon-btn" id="undo" aria-label="Undo" title="Undo (Ctrl+Z)" disabled></button>
-      <button type="button" class="icon-btn" id="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled></button>
-      <button type="button" class="icon-btn" id="help" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)"></button>
-    </div>
-  </div>
-  <div class="ctx-row">
-    <div class="monthnav" role="group" aria-label="Month">
-      <button type="button" class="icon-btn" id="prevm" aria-label="Previous month" title="Previous month ([)"></button>
-      <h1 class="month-title" id="month" aria-live="polite"></h1>
-      <button type="button" class="icon-btn" id="nextm" aria-label="Next month" title="Next month (])"></button>
-      <button type="button" class="btn btn-ghost btn-sm" id="today">Today</button>
-    </div>
-    <div class="ctx-tools">
-      <a class="problems" id="problems" href="#check" aria-label="Problems"></a>
-      <button type="button" class="btn btn-primary" id="autofill" aria-label="Auto-fill" title="Auto-fill this month from the rules"></button>
+<body class="app-body app-has-tabbar">
+<a class="app-skip" href="#main">Skip to content</a>
+<header class="app-bar" id="top">
+  <div id="savebar" class="savebar" hidden></div>
+  <div class="app-bar-row">
+    <div class="app-bar-lead"><button type="button" class="app-bar-btn app-back" id="back" hidden></button><div id="demobar" class="demobar" hidden></div></div>
+    <p class="app-bar-title" id="bartitle" aria-hidden="true">NTF Roster</p>
+    <div class="app-bar-trail">
+      <button type="button" class="app-bar-btn" id="undo" aria-label="Undo" title="Undo (Ctrl+Z)" disabled></button>
+      <button type="button" class="app-bar-btn" id="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled></button>
+      <button type="button" class="app-bar-btn" id="help" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)"></button>
     </div>
   </div>
 </header>
-<main id="main" class="main" tabindex="-1"></main>
-<nav class="bottombar" id="bottombar" aria-label="Sections"></nav>
+<main id="main" class="app-main main" tabindex="-1">
+  <div class="screen-head" id="screenhead">
+    <h1 class="app-large-title" id="large-title">NTF Roster</h1>
+    <div class="monthnav" role="group" aria-label="Month">
+      <button type="button" class="app-bar-btn" id="prevm" aria-label="Previous month" title="Previous month ([)"></button>
+      <button type="button" class="month-title" id="month" title="Go to today"></button>
+      <span class="sr-only" id="month-live" aria-live="polite"></span>
+      <button type="button" class="app-bar-btn" id="nextm" aria-label="Next month" title="Next month (])"></button>
+    </div>
+    <div class="ctx-tools">
+      <button type="button" class="app-btn app-btn--plain app-btn--compact" id="today">Today</button>
+      <a class="problems" id="problems" href="#check" aria-label="Problems"></a>
+      <button type="button" class="app-btn app-btn--primary app-btn--compact" id="autofill" aria-label="Auto-fill" title="Auto-fill this month from the rules"></button>
+    </div>
+  </div>
+  <div id="view" class="view-slot"></div>
+</main>
+<nav class="app-tabbar" id="bottombar" aria-label="Sections"></nav>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 <noscript><p class="noscript">NTF Roster needs JavaScript.</p></noscript>
 <script type="module" src="js/app.js"></script>

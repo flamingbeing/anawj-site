@@ -52,7 +52,7 @@ export function mountTeam(el, app) {
   let busy = '', month = app.month, ready = false;
 
   const toastErr = e => app.toast(cloud.friendly(e), { kind: 'error' });
-  const btn = (label, fn, cls = 'btn btn-ghost') => h('button', { type: 'button', class: cls, disabled: !!busy, onclick: fn }, label);
+  const btn = (label, fn, cls = 'app-btn app-btn--secondary app-btn--compact') => h('button', { type: 'button', class: cls, disabled: !!busy, onclick: fn }, label);
 
   async function refresh() {
     if (!alive) return;
@@ -186,11 +186,11 @@ export function mountTeam(el, app) {
     if (!ready) { note('Checking sign-in…'); return; }
     if (!user) {
       note('Sign in with your Google account to share this roster with the team: save it for others to see, and load what they saved.');
-      root.append(h('div', { class: 'team-row' }, btn(busy || 'Sign in with Google', signIn, 'btn btn-primary')));
+      root.append(h('div', { class: 'team-row' }, btn(busy || 'Sign in with Google', signIn, 'app-btn app-btn--primary app-btn--compact')));
       return;
     }
     const email = (user.email || '').toLowerCase();
-    const signOutBtn = btn('Sign out', signOut, 'btn btn-ghost btn-sm');
+    const signOutBtn = btn('Sign out', signOut, 'app-btn app-btn--plain app-btn--compact');
     if (member === undefined) {
       root.append(h('p', { class: 'team-p' }, 'Signed in as ', h('strong', null, email), '. Checking your access…'));
       return;
@@ -201,7 +201,7 @@ export function mountTeam(el, app) {
     root.append(
       h('div', { class: 'team-row' },
         h('span', null, 'Signed in as ', h('strong', null, email)),
-        h('span', { class: 'team-role', 'data-role': role }, ROLE_LABEL[member.role] || `${member.role || 'no role'} (reads only)`),
+        h('span', { class: 'app-badge team-role', 'data-role': role }, ROLE_LABEL[member.role] || `${member.role || 'no role'} (reads only)`),
         signOutBtn),
       h('p', { class: 'team-p' }, ROLE_HELP[role]));
 
@@ -222,9 +222,9 @@ export function mountTeam(el, app) {
 
     const editor = cloud.canEdit(member);
     root.append(h('div', { class: 'team-row' },
-      editor ? btn(busy === 'Saving…' ? busy : 'Save to team', () => save(false), 'btn btn-primary') : null,
+      editor ? btn(busy === 'Saving…' ? busy : 'Save to team', () => save(false), 'app-btn app-btn--primary app-btn--compact') : null,
       btn(busy === 'Loading…' ? busy : 'Load from team', load),
-      btn('Refresh', () => refresh(), 'btn btn-ghost btn-sm')));
+      btn('Refresh', () => refresh(), 'app-btn app-btn--plain app-btn--compact')));
     root.append(h('p', { class: 'team-p' }, editor
       ? `Save to team sends the staff list, rules, duty codes, settings and ${fmtMonth(month)}; change month to save another.`
       : `Load from team brings in the staff list, rules and ${fmtMonth(month)}.`));
@@ -236,10 +236,10 @@ export function mountTeam(el, app) {
     root.append(h('div', { class: 'team-row' }, h('span', null, 'Signed in as ', h('strong', null, email)), signOutBtn));
     note("This account isn't on the team yet. Ask to join, and an admin can add you.");
     if (request) note(`You asked on ${when(request.requestedAt)}${request.name ? ` as ${request.name}` : ''}. An admin will add you; you can ask again to change your name.`);
-    const nameIn = h('input', { type: 'text', id: 'team-ask-name', maxlength: '100', autocomplete: 'name', value: (request && request.name) || user.displayName || '' });
+    const nameIn = h('input', { type: 'text', id: 'team-ask-name', class: 'app-input', maxlength: '100', autocomplete: 'name', value: (request && request.name) || user.displayName || '' });
     root.append(h('div', { class: 'team-row' },
       h('label', { for: 'team-ask-name' }, 'Your name'), nameIn,
-      btn(busy === 'Sending…' ? busy : (request ? 'Ask again' : 'Ask to join'), () => askToJoin(nameIn.value.trim()), 'btn btn-primary')));
+      btn(busy === 'Sending…' ? busy : (request ? 'Ask again' : 'Ask to join'), () => askToJoin(nameIn.value.trim()), 'app-btn app-btn--primary app-btn--compact')));
   }
 
   function renderAdmin(myEmail) {
@@ -249,31 +249,31 @@ export function mountTeam(el, app) {
       root.append(h('ul', { class: 'team-list', 'aria-label': 'Members' }, members.map(m => {
         const self = m.email === myEmail;
         const id = 'team-role-' + m.email.replace(/[^a-z0-9]/g, '-');
-        const sel = h('select', { id, disabled: self || !!busy, title: self ? "You can't change your own role" : null, onchange: e => setRole(m, e.target.value) },
+        const sel = h('select', { id, class: 'app-input', disabled: self || !!busy, title: self ? "You can't change your own role" : null, onchange: e => setRole(m, e.target.value) },
           cloud.ROLES.map(r => h('option', { value: r, selected: m.role === r }, ROLE_LABEL[r])));
         return h('li', { class: 'team-item' },
           h('span', { class: 'team-who' }, m.name || m.email, m.name ? h('small', null, m.email) : null, self ? h('small', null, 'You') : null),
           h('label', { for: id, class: 'sr-only' }, `Role for ${m.name || m.email}`), sel,
-          self ? null : btn('Remove', () => remove(m), 'btn btn-danger-ghost btn-sm'));
+          self ? null : btn('Remove', () => remove(m), 'app-btn app-btn--danger app-btn--compact'));
       })));
     }
 
-    const em = h('input', { type: 'email', id: 'team-add-email', autocomplete: 'off', placeholder: 'name@example.com' });
-    const nm = h('input', { type: 'text', id: 'team-add-name', maxlength: '100', autocomplete: 'off' });
-    const rl = h('select', { id: 'team-add-role' }, cloud.ROLES.map(r => h('option', { value: r, selected: r === 'viewer' }, ROLE_LABEL[r])));
+    const em = h('input', { type: 'email', id: 'team-add-email', class: 'app-input', autocomplete: 'off', placeholder: 'name@example.com' });
+    const nm = h('input', { type: 'text', id: 'team-add-name', class: 'app-input', maxlength: '100', autocomplete: 'off' });
+    const rl = h('select', { id: 'team-add-role', class: 'app-input' }, cloud.ROLES.map(r => h('option', { value: r, selected: r === 'viewer' }, ROLE_LABEL[r])));
     root.append(h('form', { class: 'team-add', 'aria-label': 'Add a member', onsubmit: e => { e.preventDefault(); if (em.value.trim()) add(em.value.trim(), nm.value.trim(), rl.value); } },
       h('label', null, 'Google account email', em),
       h('label', null, 'Name', nm),
       h('label', null, 'Role', rl),
-      h('button', { type: 'submit', class: 'btn btn-ghost', disabled: !!busy }, 'Add member')));
+      h('button', { type: 'submit', class: 'app-btn app-btn--secondary app-btn--compact', disabled: !!busy }, 'Add member')));
 
     root.append(h('h3', { class: 'team-h' }, 'Asking to join'));
     if (!requests || !requests.length) { note('Nobody is waiting.'); return; }
     root.append(h('ul', { class: 'team-list', 'aria-label': 'Asking to join' }, requests.map(r => h('li', { class: 'team-item' },
       h('span', { class: 'team-who' }, r.name || r.email, h('small', null, `${r.email}, asked ${when(r.requestedAt)}`)),
-      btn('Add as viewer', () => add(r.email, r.name || '', 'viewer'), 'btn btn-ghost btn-sm'),
-      btn('Add as rosterer', () => add(r.email, r.name || '', 'rosterer'), 'btn btn-ghost btn-sm'),
-      btn('Dismiss', () => dismiss(r), 'btn btn-danger-ghost btn-sm')))));
+      btn('Add as viewer', () => add(r.email, r.name || '', 'viewer'), 'app-btn app-btn--plain app-btn--compact'),
+      btn('Add as rosterer', () => add(r.email, r.name || '', 'rosterer'), 'app-btn app-btn--plain app-btn--compact'),
+      btn('Dismiss', () => dismiss(r), 'app-btn app-btn--danger app-btn--compact')))));
   }
 
   render();

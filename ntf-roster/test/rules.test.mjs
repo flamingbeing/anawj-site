@@ -51,7 +51,7 @@ eq(M.DEFAULT_TAGS.map(t => t.id), ['babymo', 'parttime', 'pain', 'icu']);
   eq(M.DEFAULT_DUTIES.filter(d => d.overnight).map(d => d.code), ['C', 'SMO', 'W']);
   eq(M.DEFAULT_DUTIES.filter(d => d.kind === 'request').map(d => d.code), ['Cr', 'Nc', 'Wr', 'Nw', 'Pr', 'NP']);
   eq(M.DEFAULT_DUTIES.filter(d => d.kind === 'leave').length, 14);
-  eq([dm.get('C').color, dm.get('C').ink, dm.get('x').kind], ['#c62828', '#fff', 'derived']);
+  eq([dm.get('C').color, dm.get('C').ink, dm.get('x').kind], ['#9c2b1e', '#fffaf0', 'derived']);
 }
 eq(M.iso(new Date(2026, 10, 3)), '2026-11-03');
 eq(M.addDays('2026-11-30', 1), '2026-12-01');
