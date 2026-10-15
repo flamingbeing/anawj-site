@@ -446,3 +446,11 @@ saved copy's name); only prewarm is dated (`DATED` in the script, add an app nam
 files do, so phones don't see extra updates; the Pages workflow now checks out full history (`fetch-depth: 0`) for that
 (without history the script uses today's date). The base in `sw.js` stays `prewarm-v79`: bump it only when the worker's own
 logic changes, as before. Test tap guard: after a pad closes, a tap within 48 px for 0.7 s is swallowed (the sync test waits).
+
+### No breaking changes (owner, 15 Oct 2026)
+"This is highly important app, it must stay up, so let's skip making breaking changes." Prewarm holds live study data: change it
+in small steps that keep every phone working (the same saved data, the same sync and rules, the old addresses redirecting), run
+`tools/test-prewarm.sh` and `tools/test-prewarm-sync.sh`, and never merge during a case. Big restyles, new shared kits,
+rules changes, moving or renaming files the service worker caches, or anything that could stop the app loading offline need
+the owner's explicit go-ahead first. The service worker's install is all-or-nothing, so a file listed in `SHELL` that does not
+exist blocks every update.
