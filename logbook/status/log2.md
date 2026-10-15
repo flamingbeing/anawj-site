@@ -61,6 +61,16 @@ Agreed queue (one PR each, in order, once he says go):
     link), Email (mailto), Telegram, Drafts, Bear, Things, Day One; a line for apps with no link (Keep, Notion, OneNote):
     use Share. Check each link on a real iPhone first (owner or Firetop).
 
+14. **Group by and Sort in the Logbook List view** (as Reflections has): Group by Month (default) / Day / Week / Residency
+    year / APMES tag (a case under each of its tags; heading shows count vs target) / Your tags / Flags (No tag yet,
+    ☆ Interesting, Plan for later) / None; Sort Newest / Oldest / Initials A–Z / Most tags. Headings fold with counts;
+    per device. Pages count cases ("(continued)" on a split group); when selecting, a group heading selects the
+    group (a case in several groups is selected once). After paging.
+15. **Reflections and linked notes inside the day's note** (Markdown export, Copy / Share, Send to, Sync): Settings →
+    Markdown → "Reflections in the day's note": Link (now) / Embed (Obsidian `![[…]]`, one copy of the text) / Full
+    text (copied under its case as a sub-heading; works everywhere; the zip can then skip the separate reflection
+    notes). The same three choices for linked notes. markdown.js (`mdDay`, `caseNotes`) with unit tests.
+
 No batching (owner, 15 Oct): build and merge in order, each PR on its own (bulk edit still gets the full tests and a
 Firetop run on a test account). All the Send to presets above are in. The app is alpha with almost no users (owner, 15 Oct): no compatibility
 links or migration niceties needed for moved pages.
