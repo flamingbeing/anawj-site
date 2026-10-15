@@ -86,8 +86,7 @@ Rules that bite:
 
 Before merging, run (GitHub runs these too on every PR, plus the editor, feedback-button and hand browser tests: the
 "Checks" workflow; a red check means don't merge). On a PR the BIS to DSA, OT simulator, feedback-button and hand
-browser tests run only when the PR changes that app (owner, 15 Oct 2026; `.github/workflows/checks.yml`), so run your own
-app's browser test locally:
+browser tests run only when the PR changes that app (owner, 15 Oct 2026; `.github/workflows/checks.yml`). The merge checklist:
 
 ```
 node tools/check.mjs
