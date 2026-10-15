@@ -2,6 +2,7 @@
 // frame loop. The UI reads sim.state and writes only through sim.act().
 
 import { createSim } from './model/sim.js';
+import { applyPreset, PRESETS } from './model/presets.js';
 import { NIBP_CYCLES } from './model/monitor.js';
 import { Loop, SPEEDS } from './ui/loop.js';
 import { Lane } from './ui/lanes.js';
@@ -24,6 +25,15 @@ const store = {
 };
 
 const sim = createSim({ seed: SEED });
+// deep links (DESIGN.md, "URL and deep links"): ?preset=<name> or ?case=electiveGA start from a built-in state, and
+// ?at=<seconds> fast-forwards further. The guided elective GA starts just induced and intubated (M3.2 slice 1; the
+// pre-op screen and the surgical timeline follow).
+const presetName = params.get('preset') || (params.get('case') === 'electiveGA' ? 'induced' : null);
+if (presetName && PRESETS[presetName]) {
+  applyPreset(sim, presetName);
+  const at = parseFloat(params.get('at'));
+  if (Number.isFinite(at) && at > sim.state.t) sim.runTo(at);
+}
 const lanes = [
   new Lane($('c-ecg'), { window: 6, sample: ecg, lo: -0.5, hi: 1.3, color: '#4be36a' }),
   new Lane($('c-pleth'), { window: 6, sample: pleth, lo: -0.05, hi: 1.2, color: '#3fd6ff' }),
