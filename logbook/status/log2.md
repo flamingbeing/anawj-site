@@ -134,6 +134,10 @@ Agreed queue (one PR each, in order, once he says go):
    header and tab bar), Instagram-style (owner: white or black ground, a pink-to-orange gradient accent on the
    active tab, buttons and the header band, thin borders, rounded cards; text stays solid for contrast) and TikTok-style
    (owner: black ground, cyan and pink-red accents, bold sans, high contrast, dark only).
+   Also Material-style in Inspired (owner: classic Material Design: a bold coloured top bar, raised cards with
+   shadows, a round floating Save-style button feel, Roboto-like sans; distinct from Pixel-style's Material You) and
+   Eye comfort in Classic (owner: warm sepia ground, soft dark-grey text instead of black, less blue, no pure white,
+   slightly roomier lines; its dark version is warm dark brown-grey, not blue-black).
    Layout of the Themes page (owner, 15 Oct): "Classic" as preview cards (NUHS, Flat, Soft, Paper, Dark navy, OLED,
    High contrast); "Inspired" (owner's name for it) as one searchable dropdown (type to filter; each row a small colour preview and
    the name; picking one previews it at once, Undo in the toast); a "Suggest a theme" button under it opens Send
