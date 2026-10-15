@@ -21,16 +21,16 @@ const round = (x, to) => Math.max(to, Math.round(x / to) * to);
 // what each drug row offers [D: usual adult doses, shown as choices, not advice]
 const ROWS = [
   { id: 'propofol', cls: 'induction', bolus: w => [round(w * 1, 10), round(w * 2, 10)], unit: 'mg', inf: { unit: 'mg/kg/h', def: 6, step: 0.5 }, tci: { unit: 'mcg/mL', def: 4, step: 0.1 } },
-  { id: 'ketamine', cls: 'induction', bolus: w => [round(w * 0.5, 5), round(w * 1, 10)], unit: 'mg' },
-  { id: 'midazolam', cls: 'benzo', bolus: () => [1, 2], unit: 'mg' },
+  { id: 'ketamine', more: true, cls: 'induction', bolus: w => [round(w * 0.5, 5), round(w * 1, 10)], unit: 'mg' },
+  { id: 'midazolam', more: true, cls: 'benzo', bolus: () => [1, 2], unit: 'mg' },
   { id: 'fentanyl', cls: 'opioid', bolus: () => [25, 50, 100], unit: 'mcg' },
-  { id: 'alfentanil', cls: 'opioid', bolus: () => [250, 500], unit: 'mcg' },
+  { id: 'alfentanil', more: true, cls: 'opioid', bolus: () => [250, 500], unit: 'mcg' },
   { id: 'remifentanil', cls: 'opioid', unit: 'mcg', inf: { unit: 'mcg/kg/min', def: 0.1, step: 0.05 }, tci: { unit: 'ng/mL', def: 3, step: 0.5 } },
   { id: 'rocuronium', cls: 'nmb', bolus: w => [round(w * 0.6, 5), round(w * 1.2, 5)], unit: 'mg' },
-  { id: 'suxamethonium', cls: 'nmb', bolus: w => [round(w * 1, 10), round(w * 1.5, 10)], unit: 'mg' },
+  { id: 'suxamethonium', more: true, cls: 'nmb', bolus: w => [round(w * 1, 10), round(w * 1.5, 10)], unit: 'mg' },
   { id: 'sugammadex', cls: 'reversal', bolus: w => [round(w * 2, 10), round(w * 4, 10), round(w * 16, 50)], unit: 'mg' },
   // neostigmine: 2.5 mg, or 50 mcg/kg up to the 5 mg maximum (MODEL.md section 2)
-  { id: 'neostigmine', cls: 'reversal', bolus: w => [...new Set([2.5, Math.min(5, round(w * 0.05, 0.5))])], unit: 'mg' },
+  { id: 'neostigmine', more: true, cls: 'reversal', bolus: w => [...new Set([2.5, Math.min(5, round(w * 0.05, 0.5))])], unit: 'mg' },
 ];
 // the Circulation tab's drugs (M2.3)
 export const CIRC_ROWS = [
@@ -38,12 +38,12 @@ export const CIRC_ROWS = [
   { id: 'ephedrine', cls: 'vasopressor', bolus: () => [3, 6], unit: 'mg' },
   { id: 'noradrenaline', cls: 'vasopressor', bolus: () => [5, 10], unit: 'mcg', inf: { unit: 'mcg/kg/min', def: 0.05, step: 0.01 } },
   { id: 'adrenaline', cls: 'vasopressor', bolus: () => [10, 50, 100, 1000], unit: 'mcg', inf: { unit: 'mcg/min', def: 2, step: 1 } },
-  { id: 'vasopressin', cls: 'vasopressor', bolus: () => [1, 2], unit: 'units' },
+  { id: 'vasopressin', more: true, cls: 'vasopressor', bolus: () => [1, 2], unit: 'units' },
   { id: 'atropine', cls: 'anticholinergic', bolus: () => [300, 600], unit: 'mcg' },
-  { id: 'glycopyrrolate', cls: 'anticholinergic', bolus: () => [200, 400], unit: 'mcg' },
+  { id: 'glycopyrrolate', more: true, cls: 'anticholinergic', bolus: () => [200, 400], unit: 'mcg' },
   { id: 'esmolol', cls: 'hypotensive', bolus: w => [round(w * 0.5, 5)], unit: 'mg', inf: { unit: 'mcg/kg/min', def: 100, step: 25 } },
-  { id: 'labetalol', cls: 'hypotensive', bolus: () => [5, 10], unit: 'mg' },
-  { id: 'gtn', cls: 'hypotensive', bolus: () => [50, 100], unit: 'mcg', inf: { unit: 'mcg/min', def: 25, step: 5 } },
+  { id: 'labetalol', more: true, cls: 'hypotensive', bolus: () => [5, 10], unit: 'mg' },
+  { id: 'gtn', more: true, cls: 'hypotensive', bolus: () => [50, 100], unit: 'mcg', inf: { unit: 'mcg/min', def: 25, step: 5 } },
 ];
 const MODEL_NAME = { schnider: 'Schnider', marsh: 'Marsh (ke0 1.2)', marsh026: 'Marsh (ke0 0.26)', minto: 'Minto' };
 
@@ -55,7 +55,10 @@ export class DrugsPanel {
   constructor(root, sim, onAct, { rows = ROWS, extras = true } = {}) {
     this.root = root; this.sim = sim; this.onAct = onAct; this.rows = rows; this.extras = extras;
     const w = sim.state.patient.weightKg;
-    root.innerHTML = `<p class="hint">Doses worked out for this synthetic patient (${esc(w)} kg). Choices to practise with, not advice.</p>` + rows.map(r => this.row(r, w)).join('') + (!extras ? '' :
+    const main = rows.filter(r => !r.more), more = rows.filter(r => r.more);
+    root.innerHTML = `<p class="hint">Doses worked out for this synthetic patient (${esc(w)} kg). Choices to practise with, not advice.</p>` + main.map(r => this.row(r, w)).join('') +
+      // the less common drugs fold away so the usual ones fit on a phone screen
+      (more.length ? `<details class="more-drugs"><summary>More drugs: ${more.map(r => esc(DRUGS[r.id].name)).join(', ')}</summary>${more.map(r => this.row(r, w)).join('')}</details>` : '') + (!extras ? '' :
       `<section class="drug" style="--tag:#c9a7ff" aria-labelledby="dn-tof"><h3 id="dn-tof">Neuromuscular monitor <span class="cls">TOF every 15 s at the thumb</span></h3>` +
       `<div class="act"><button type="button" data-tof="now">TOF now</button><button type="button" data-tof="ptc">Post-tetanic count</button></div></section>` +
       `<h3 class="sub">Given</h3><ol class="given" id="given"><li class="none">Nothing yet</li></ol>`);

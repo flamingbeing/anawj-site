@@ -26,7 +26,7 @@ export function actionText(a) {
   switch (a.type) {
     case 'bolus': return `${drugName(a.drug)} ${a.dose} ${a.unit}`;
     case 'infusion': return a.rate > 0 ? `${drugName(a.drug)} infusion ${a.rate} ${a.unit}` : `${drugName(a.drug)} infusion stopped`;
-    case 'tci': return `${drugName(a.drug)} TCI, ${a.mode === 'ce' ? 'effect-site' : 'plasma'} target ${a.target}`;
+    case 'tci': return a.stop ? `${drugName(a.drug)} TCI stopped` : `${drugName(a.drug)} TCI, ${a.mode === 'plasma' ? 'plasma' : 'effect-site'} target ${a.target}`;
     case 'o2': return `FiO₂ ${pct(a.fio2)}%`;
     case 'fgf': return `Fresh gas O₂ ${a.o2} / air ${a.air} / N₂O ${a.n2o} L/min`;
     case 'vaporiser': return a.dial > 0 ? `${cap(a.agent)} ${a.dial}%` : `${cap(a.agent)} off`;

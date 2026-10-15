@@ -275,6 +275,11 @@ for (const t of tabs) {
   });
 }
 
+// "How to use": open on a first visit, then remembered on the device once closed
+const howtoBox = $('howto-box');
+howtoBox.open = store.get('howto', '1') === '1';
+howtoBox.addEventListener('toggle', () => store.set('howto', howtoBox.open ? '1' : '0'));
+
 // "Behind the monitor": closed by default, remembered on the device
 const behindBox = $('behind-box');
 behindBox.open = store.get('behind', '0') === '1';

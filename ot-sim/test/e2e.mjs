@@ -327,7 +327,7 @@ try {
     // alarm shows on the bar; Silence pauses the audio (label + class) without clearing the alarm
     await page.goto(BASE + '?test&seed=1#theatre');
     await page.waitForFunction(() => window.otsim && document.getElementById('n-hr').textContent !== '--');
-    assert.ok(await page.evaluate(() => document.getElementById('alarmbar').hidden), `${name}: no alarm bar when all is well`);
+    assert.ok(!(await page.isVisible('#alarmbar')), `${name}: no alarm bar when all is well (really not drawn)`);
     await page.evaluate(() => {
       otsim.sim.act({ type: 'bolus', drug: 'propofol', dose: 200, unit: 'mg', route: 'iv' });
       otsim.sim.act({ type: 'bolus', drug: 'rocuronium', dose: 100, unit: 'mg', route: 'iv' });
@@ -335,7 +335,7 @@ try {
       otsim.step(6000);
     });
     assert.ok(await page.evaluate(() => otsim.state.mon.alarms.some(a => a.param === 'spo2' && a.priority === 'high')), `${name}: SpO2 high alarm active`);
-    assert.ok(!(await page.evaluate(() => document.getElementById('alarmbar').hidden)), `${name}: alarm bar shown`);
+    assert.ok(await page.isVisible('#alarmbar'), `${name}: alarm bar shown`);
     assert.ok(await page.evaluate(() => document.getElementById('alarmbar').classList.contains('high')), `${name}: alarm bar is high priority`);
     assert.match(await page.textContent('#alarm-msg'), /SpO/, `${name}: alarm bar names SpO2`);
     assert.equal(await page.getAttribute('#alarmbar', 'aria-live'), 'assertive', `${name}: high alarm is assertive`);
