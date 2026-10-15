@@ -63,9 +63,20 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
   Heart rate and blood pressure moved to `rhythm.js` and `cardio.js` (M2.1); the rest moves to `gas.js` and `resp.js`
   (M2.4) and `temp.js` (M2.6). `synth.js` and `monitor.js` read `state.vit` for those until then.
 - The Patient tab's stimuli and "Talk" (M1.4): replaced by the airway (M3.1) and the case flow with Examine (M3.2).
-- Pleural pressure reads `resp.pplMmHg` (0 until M2.4); MAC fraction reads `vol.mac` (0 until M2.5).
+- MAC fraction reads `vol.mac` (0 until M2.5), so the volatile terms in `pd.js`, `resp.js`, `gas.js` and `cardio.js`
+  stay off until then; the GA tests set `vol.mac` by hand. The airway (`aw.obstruction`) arrives in M3.1; until then
+  `resp.open` is true and the Patient tab's obstruction is only reachable in tests.
 
 ## Decisions log
+
+- 15 Oct 2026 (M2.4): `gas.js` (one lung store that collapses when obstructed, two blood O2 pools so SaO2 falls at a
+  realistic rate, a CO2 body store) and `resp.js` (Bouillon drive with the slope flattened, the ventilator closed-form,
+  pleural pressure to the circulation). Apnoea: healthy preox about 8.6 min, air about 1 min, obese 130 kg about 3.5
+  min; CO2 about 3-3.4 mmHg/min. Known misses, recorded in MODEL.md: no first-minute CO2 venous-equilibration jump
+  (first minute about 3, not 8-12); open-airway apnoeic oxygenation lasts over 20 min (no CO2 feedback into the
+  alveolar gas equation yet). VO2 scales with a metabolic weight (IBW plus 0.3 of the excess). The monitor's SpO2 has
+  a probe transport delay (25 s, longer at low output) so the displayed fall lags the arterial one. UI: a Breathing
+  tab (O2, ventilator), Paw/PEEP/MV on the monitor. `vitals.js` is now only temperature.
 
 - 15 Oct 2026 (M2.3): `vaso.js` holds receptor activations (Emax/EC50 per drug, combined as independent fractions)
   and their mapping to SVR, venous capacity, heart period and contractility; `cardio.js` applies them through the

@@ -22,7 +22,7 @@ function ageText(n, t) {
 
 export class Numerics {
   constructor() {
-    this.el = { hr: $('n-hr'), spo2: $('n-spo2'), etco2: $('n-etco2'), rr: $('n-rr'), nibp: $('n-nibp'), map: $('n-map'), age: $('n-nibp-age'), temp: $('n-temp'), clock: $('clock'), go: $('nibp-go'), tof: $('n-tof'), tofr: $('n-tofr'), ptc: $('n-ptc') };
+    this.el = { hr: $('n-hr'), spo2: $('n-spo2'), etco2: $('n-etco2'), rr: $('n-rr'), nibp: $('n-nibp'), map: $('n-map'), age: $('n-nibp-age'), temp: $('n-temp'), clock: $('clock'), go: $('nibp-go'), tof: $('n-tof'), tofr: $('n-tofr'), ptc: $('n-ptc'), ppeak: $('n-ppeak'), peep: $('n-peep'), mv: $('n-mv') };
     this.lastWrite = -1e9;
   }
   set(el, text) { if (el.textContent !== text) el.textContent = text; }
@@ -47,5 +47,9 @@ export class Numerics {
     this.set(e.tofr, tof.count === 4 && tof.ratio != null ? `${Math.round(Math.min(1, tof.ratio) * 100)}%` : '');
     const ptcRecent = tof.ptcT != null && state.t - tof.ptcT < 120;
     this.set(e.ptc, ptcRecent ? (tof.ptc == null ? 'PTC: TOF present' : `PTC ${tof.ptc}`) : '');
+    const rp = state.resp;
+    this.set(e.ppeak, rp && rp.ppeak > 0 ? r(rp.ppeak) : '--');
+    this.set(e.peep, rp ? r(rp.peep) : '--');
+    this.set(e.mv, rp ? rp.mv.toFixed(1) : '--');
   }
 }

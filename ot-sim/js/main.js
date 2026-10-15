@@ -46,6 +46,7 @@ function panels(force = false) {
   panelsAt = now;
   drugs.update(sim.state);
   if (!$('panel-circ').hidden) circDrugs.update(sim.state);
+  if (!$('panel-breath').hidden) { const r = sim.state.resp; const t = r.mode === 'spont' ? (r.apnoea ? 'Apnoeic (no spontaneous breaths).' : `Spontaneous: Vt ${Math.round(r.vt)} mL, rate ${r.rr.toFixed(0)}, MV ${r.mv.toFixed(1)} L/min.`) : `${r.mode === 'vc' ? 'Volume' : 'Pressure'} control: Vt ${Math.round(r.vt)} mL, Ppeak ${Math.round(r.ppeak)}, Pplat ${Math.round(r.pplat)}, MV ${r.mv.toFixed(1)} L/min${r.autoPeep > 0.05 ? `, auto-PEEP ${r.autoPeep.toFixed(1)}` : ''}.`; if ($('vent-state').textContent !== t) $('vent-state').textContent = t; }
   if (!$('panel-circ').hidden) { const t = fluidText(sim.state); if ($('fluid-state').textContent !== t) $('fluid-state').textContent = t; }
   if (!$('panel-pt').hidden) { const h = eventsHtml(sim.state); if ($('events').innerHTML !== h) $('events').innerHTML = h; }
   if ($('behind-box').open) { const h = behindHtml(sim.state); if ($('behind').innerHTML !== h) $('behind').innerHTML = h; }
@@ -68,6 +69,28 @@ function acted() {
 }
 const drugs = new DrugsPanel($('panel-drugs'), sim, acted);
 const circDrugs = new DrugsPanel($('circ-drugs'), sim, acted, { rows: CIRC_ROWS, extras: false });
+
+// Breathing tab: oxygen and the ventilator
+function setFio2(v) {
+  v = Math.min(1, Math.max(0.21, v || 0.21));
+  $('fio2').value = v;
+  sim.act({ type: 'o2', fio2: v });                       // spontaneous breathing
+  if (sim.state.resp.mode !== 'spont') sim.act({ type: 'vent', fio2: v }); // the ventilator's own FiO2
+  acted();
+}
+for (const b of document.querySelectorAll('[data-fio2]')) b.addEventListener('click', () => setFio2(+b.dataset.fio2));
+$('fio2').addEventListener('change', () => setFio2(+$('fio2').value));
+$('vmode').addEventListener('change', () => {
+  const m = $('vmode').value;
+  $('vc-set').hidden = m !== 'vc'; $('pc-set').hidden = m !== 'pc';
+});
+$('v-apply').addEventListener('click', () => {
+  const m = $('vmode').value;
+  const a = { type: 'vent', mode: m, peep: +$('v-peep').value, ie: 1 / (+$('v-ie').value || 2), fio2: Math.min(1, Math.max(0.21, +$('fio2').value || 0.21)) };
+  if (m === 'vc') { a.vt = +$('v-vt').value; a.rr = +$('v-rr').value; }
+  else if (m === 'pc') { a.pinsp = +$('v-pinsp').value; a.rr = +$('v-rr2').value; }
+  sim.act(a); acted();
+});
 
 // Patient tab: talk, stimuli, events (the full Examine tab comes with the case flow, M3.2)
 $('talk').addEventListener('click', () => {

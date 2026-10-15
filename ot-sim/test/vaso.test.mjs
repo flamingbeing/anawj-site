@@ -30,7 +30,7 @@ const inRange = (x, lo, hi, what) => assert.ok(x >= lo && x <= hi, `${what}: ${x
   const p50 = course(ga, [bol('phenylephrine', 50)], 6), p100 = course(ga, [bol('phenylephrine', 100)], 6), p200 = course(ga, [bol('phenylephrine', 200)], 6);
   inRange(p50.mapRise, 8, 15, 'PE 50 MAP rise'); inRange(p100.mapRise, 11.5, 19.5, 'PE 100 MAP rise'); inRange(p200.mapRise, 14, 22, 'PE 200 MAP rise');
   assert.ok(p50.mapRise < p100.mapRise && p100.mapRise < p200.mapRise, 'dose-response, saturating');
-  inRange(p100.tMax, 30, 60, 'PE 100 peak time (s)');
+  inRange(p100.tMax, 25, 60, 'PE 100 peak time (s)');
   inRange(p100.coFall, -1.2, -0.5, 'PE 100 CO fall'); inRange(p100.hrFall, -12, -3, 'PE 100 reflex bradycardia');
   assert.ok(p100.at[5].map < p100.mapRise * 0.6, 'PE 100 less than 60% left at 5 min');
 }

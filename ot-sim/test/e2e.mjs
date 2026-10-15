@@ -147,7 +147,21 @@ try {
     await page.evaluate(() => otsim.step(300));
     assert.ok(await page.evaluate(m => otsim.state.cv.map < m - 5, map0), `${name}: blood pressure falls after propofol`);
     assert.match(await page.textContent('#given'), /Propofol 140 mg/);
-    // the Patient tab: asleep after propofol; a stimulus shows in the events
+    // the Breathing tab: volume-control ventilation gives a plateau pressure and a minute volume; 100% O2 raises SpO2
+    await page.click('#tab-breath');
+    await page.evaluate(() => otsim.sim.act({ type: 'bolus', drug: 'rocuronium', dose: 0.6, unit: 'mg/kg', route: 'iv' }));
+    await page.selectOption('#vmode', 'vc');
+    await page.click('[data-fio2="1"]');
+    await page.click('#v-apply');
+    await page.evaluate(() => otsim.step(3000));
+    assert.match(await page.textContent('#vent-state'), /Volume control: Vt \d+ mL, Ppeak \d+/);
+    assert.ok(await page.evaluate(() => parseFloat(document.getElementById('n-ppeak').textContent)) > 8, `${name}: airway pressure shown`);
+    await page.evaluate(() => otsim.step(3000));
+    assert.ok(await page.evaluate(() => otsim.state.gas.sao2) > 98, `${name}: oxygenated on 100% (got ${await page.evaluate(() => otsim.state.gas.sao2)})`);
+    await axe(page, `${name} theatre, Breathing tab`);
+    await page.click('#tab-drugs');
+    // the Patient tab: asleep under TCI; a stimulus shows in the events
+    await page.evaluate(() => { otsim.sim.act({ type: 'tci', drug: 'propofol', target: 4 }); otsim.step(3000); });
     await page.click('#tab-pt');
     await page.click('#talk');
     assert.match(await page.textContent('#talk-reply'), /No answer|No response/);
@@ -172,7 +186,6 @@ try {
     await page.click('[data-infstop="propofol"]');
     assert.equal(await page.textContent('#inf-state-propofol'), '');
     // neuromuscular block: rocuronium takes the TOF to 0/4, a PTC can be counted, sugammadex brings it back
-    assert.equal(await page.textContent('#n-tof'), '4/4');
     await page.click('[data-bolus="rocuronium"]');
     await page.evaluate(() => otsim.step(1800));
     assert.equal(await page.textContent('#n-tof'), '0/4');
@@ -187,7 +200,7 @@ try {
     await page.click('#behind-box summary');
     await page.evaluate(() => otsim.step(1));
     const rows = await page.$$eval('.behind tbody tr', trs => trs.map(tr => tr.textContent));
-    assert.ok(rows.some(r => /^Remifentanil3\.0/.test(r)) && rows.some(r => /^Propofol––/.test(r)), `${name}: behind rows ${rows}`);
+    assert.ok(rows.some(r => /^Remifentanil3\.0/.test(r)) && rows.some(r => /^Propofol/.test(r)), `${name}: behind drug rows ${rows}`);
     assert.ok(rows.some(r => /^Twitch \(T1\)/.test(r)), `${name}: neuromuscular rows in Behind the monitor`);
     assert.ok(rows.some(r => /^To voice \(asleep\)/.test(r)), `${name}: depth rows in Behind the monitor`);
     assert.ok(rows.some(r => /^Cardiac output/.test(r)), `${name}: circulation rows in Behind the monitor`);

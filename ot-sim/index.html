@@ -62,7 +62,7 @@ h1{font-size:1.6rem;line-height:1.2;margin:.75rem 0 .25rem}
 .num .nu{font-size:11px;color:#c9d3e0}
 .num .sub{font-size:15px;font-variant-numeric:tabular-nums;margin-top:2px}
 .tof{color:var(--tof)}.ecg{color:var(--ecg)}.spo2{color:var(--spo2)}.co2{color:var(--co2)}.nibp{color:var(--nibp)}.temp{color:var(--temp)}
-.row{display:grid;grid-template-columns:1fr auto auto;gap:6px;padding-top:6px}
+.row{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 10px;padding-top:6px}
 .box{display:flex;flex-direction:column;justify-content:center;padding:4px 6px;line-height:1.1}
 .box .nl{font:13px/1.1 var(--f-narrow)}
 .box .nv{font-weight:700;font-size:30px;font-variant-numeric:tabular-nums}
@@ -143,6 +143,7 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
       </div>
       <div class="row">
         <div class="box nibp"><span class="nl">NIBP mmHg</span><span class="nv"><span id="n-nibp">--/--</span> <small id="n-map"></small></span><span class="age" id="n-nibp-age"></span></div>
+        <div class="box"><span class="nl">Paw cmH₂O</span><span class="nv"><span id="n-ppeak">--</span></span><span class="age">PEEP <span id="n-peep">--</span> · MV <span id="n-mv">--</span></span></div>
         <div class="box tof"><span class="nl">TOF</span><span class="nv"><span id="n-tof">4/4</span> <small id="n-tofr"></small></span><span class="age" id="n-ptc"></span></div>
         <div class="box temp"><span class="nl">Temp</span><span class="nv"><span id="n-temp">--</span><small>°C</small></span></div>
       </div>
@@ -151,6 +152,7 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
       <div class="tabs" role="tablist" aria-label="Controls">
         <button type="button" role="tab" id="tab-drugs" aria-controls="panel-drugs" aria-selected="true">Drugs</button>
         <button type="button" role="tab" id="tab-circ" aria-controls="panel-circ" aria-selected="false" tabindex="-1">Circulation</button>
+        <button type="button" role="tab" id="tab-breath" aria-controls="panel-breath" aria-selected="false" tabindex="-1">Breathing</button>
         <button type="button" role="tab" id="tab-pt" aria-controls="panel-pt" aria-selected="false" tabindex="-1">Patient</button>
       </div>
       <div class="panel" role="tabpanel" id="panel-drugs" aria-labelledby="tab-drugs"></div>
@@ -169,6 +171,28 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
         </div>
         <p class="state" id="fluid-state"></p>
       </div>
+      <div class="panel" role="tabpanel" id="panel-breath" aria-labelledby="tab-breath" hidden>
+        <h3 class="sub">Oxygen</h3>
+        <div class="act"><label>FiO<sub>2</sub> <input type="number" inputmode="decimal" min="0.21" max="1" step="0.05" id="fio2" value="0.21"></label>
+          <button type="button" data-fio2="0.21">Air</button><button type="button" data-fio2="1">100%</button></div>
+        <h3 class="sub">Ventilator</h3>
+        <div class="act"><label>Mode <select id="vmode"><option value="spont">Spontaneous</option><option value="vc">Volume control</option><option value="pc">Pressure control</option></select></label></div>
+        <div class="act" id="vc-set">
+          <label>V<sub>t</sub> <input type="number" inputmode="numeric" min="100" max="1000" step="10" id="v-vt" value="500"> mL</label>
+          <label>Rate <input type="number" inputmode="numeric" min="4" max="40" step="1" id="v-rr" value="12"></label>
+        </div>
+        <div class="act" id="pc-set" hidden>
+          <label>P<sub>insp</sub> <input type="number" inputmode="numeric" min="5" max="40" step="1" id="v-pinsp" value="15"> cmH<sub>2</sub>O</label>
+          <label>Rate <input type="number" inputmode="numeric" min="4" max="40" step="1" id="v-rr2" value="12"></label>
+        </div>
+        <div class="act">
+          <label>PEEP <input type="number" inputmode="numeric" min="0" max="20" step="1" id="v-peep" value="5"> cmH<sub>2</sub>O</label>
+          <label>I:E 1:<input type="number" inputmode="decimal" min="1" max="4" step="0.5" id="v-ie" value="2"></label>
+          <button type="button" id="v-apply">Set ventilator</button>
+        </div>
+        <p class="state" id="vent-state"></p>
+        <p class="hint">Airway control (mask, LMA, tube) and spontaneous-breathing support come with the airway update.</p>
+      </div>
       <div class="panel" role="tabpanel" id="panel-pt" aria-labelledby="tab-pt" hidden>
         <div class="act"><button type="button" id="talk">Talk to the patient</button></div>
         <p class="state" id="talk-reply" aria-live="polite"></p>
@@ -185,7 +209,7 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
         <ol class="given" id="events"><li class="none">Nothing yet</li></ol>
       </div>
       <details id="behind-box"><summary>Behind the monitor</summary><div id="behind"></div></details>
-      <p class="foot">Free run: a healthy synthetic adult. Drugs put the patient to sleep, block the muscles (TOF) and move heart rate and blood pressure; breathing, oxygen and CO2 respond from the next updates. Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
+      <p class="foot">Free run: a healthy synthetic adult. A full model: drugs, the airway gases, breathing and the ventilator, heart rate and blood pressure, oxygen and CO2 all respond. Temperature, the rhythms, the airway and the crises come next. Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
     </div>
   </div>
 </section>
