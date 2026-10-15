@@ -25,6 +25,8 @@ Each session keeps its own line in `status/<session>.md` (`hand.md`). Read them 
 
 ## Recently done
 
+- 2026-10-15: app kit (native look): app bar with section chips, large title, sections as cards, cases as grouped rows; links `../nuhsdesign/` again (every subdomain serves it).
+
 - #312: tendon tests checked; EDC now all fingers then press each; EIP and EDM one at a time against resistance.
 - #309: Elson figure: finger rests on the table, middle joint over the edge (no clipping); see-through table.
 - #306: no-WebGL phones (Firefox) get the GIFs instead of blank boxes; checked in Firefox.
