@@ -121,11 +121,12 @@ const PREDICTED = 'Predicted from the roster guide: confirm or change.';
 export const DEFAULT_RULES = [
   // cardiac (C3): seen on every night of 2025 and 2026
   R('r-c3-cover', 'cover', 'One cardiac call every night', { codes: ['C3'], min: 1, max: 1 }),
-  R('r-c3-onc', 'sameDay', 'Cardiac call only on a cardiac day', { codesA: ['C3'], codesB: ['C'], mode: 'require' }),
+  R('r-c3-onc', 'sameDay', 'Cardiac call only on a cardiac day', { codesA: ['C3'], codesB: ['C', 'C-e', 'C-p'], mode: 'require' }),
+  R('r-c3-echo', 'sameDay', 'Avoid cardiac calls in echo or perfusion weeks', { codesA: ['C3'], codesB: ['C-e', 'C-p'], mode: 'forbid' }, soft(30, { note: 'Real rosters: now and then, when the cardiac team is short.' })),
   R('r-c3-next', 'sequence', 'Post call falls inside the cardiac posting', { ifCodes: ['C3'], thenCodes: ['C', 'C-e', 'C-p'], mode: 'require', from: 1, to: 1 }, soft(40)),
   R('r-c3-gap', 'sequence', 'At least 3 days between cardiac calls', { ifCodes: ['C3'], thenCodes: ['C3'], mode: 'forbid', from: 1, to: 2 }),
-  R('r-c3-d1', 'postingStart', 'No cardiac call on day 1 of the posting', { codes: ['C3'], posting: 'C', days: 1 }, soft(50)),
-  R('r-c3-fair', 'spread', 'Share cardiac calls fairly', { codes: ['C3'], period: 'month', weekendWeight: 2, holidayWeight: 1.5, tolerance: 1, among: ['C'] }, soft(5)),
+  R('r-c3-d1', 'postingStart', 'No cardiac call on day 1 of the posting', { codes: ['C3'], posting: 'C', days: 1 }, soft(20)),
+  R('r-c3-fair', 'spread', 'Share cardiac calls fairly', { codes: ['C3'], period: 'month', weekendWeight: 2, holidayWeight: 1.5, tolerance: 1, among: ['C', 'C-e', 'C-p'] }, soft(10)),
   R('r-c3-sat', 'limit', 'At most 1 Saturday cardiac call a month', { codes: ['C3'], period: 'month', window: 7, min: null, max: 1, fte: false, prorate: false }, soft(20, { when: { days: [6] } })),
   // ICU (R1B): call, post call, a day off (PPC), back to ICU
   R('r-r1b-cover', 'cover', 'One ICU call every night', { codes: ['R1B'], min: 1, max: 1 }),
@@ -135,10 +136,10 @@ export const DEFAULT_RULES = [
   R('r-r1b-gap4', 'sequence', 'An ICU day between the day off and the next call', { ifCodes: ['R1B'], thenCodes: ['R1B'], mode: 'forbid', from: 3, to: 3 }, soft(15)),
   R('r-r1b-d1', 'postingStart', 'No ICU call on day 1 in ICU', { codes: ['R1B'], posting: 'ICU', days: 1 }),
   R('r-r1b-new', 'postingStart', 'New to ICU: calls from day 4', { codes: ['R1B'], posting: 'ICU', days: 3 }, { who: { tags: ['icunew'] } }),
-  R('r-r1b-rr', 'postingStart', 'Ortho / HRM residents: ICU calls from day 8', { codes: ['R1B'], posting: 'ICU', days: 7 }, { who: { tags: ['rrlate'] } }),
+  R('r-r1b-rr', 'postingStart', 'Ortho / HRM residents: ICU calls from day 8', { codes: ['R1B'], posting: 'ICU', days: 7 }, soft(40, { who: { tags: ['rrlate'] }, note: 'SICU rules: day 4 or 5 when manpower is short, never a weekend first call.' })),
   R('r-r1b-super', 'limit', 'Supernumerary: no ICU calls', { codes: ['R1B'], period: 'month', window: 7, min: null, max: 0, fte: false, prorate: false }, { who: { tags: ['supernum'] } }),
   R('r-r1b-fellow', 'limit', 'Fellows: at most 2 weekend ICU calls a month', { codes: ['R1B'], period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(30, { who: { groups: ['fellow'] }, when: { days: [0, 6] } })),
-  R('r-r1b-fair', 'spread', 'Share ICU calls fairly', { codes: ['R1B'], period: 'month', weekendWeight: 2, holidayWeight: 1.5, tolerance: 1, among: ['ICU'] }, soft(5)),
+  R('r-r1b-fair', 'spread', 'Share ICU calls fairly', { codes: ['R1B'], period: 'month', weekendWeight: 2, holidayWeight: 1.5, tolerance: 1, among: ['ICU'] }, soft(10)),
   R('r-r1b-sat', 'limit', 'At most 2 Saturday ICU calls a month', { codes: ['R1B'], period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(20, { when: { days: [6] } })),
   // everyone
   R('r-leave', 'sameDay', 'No calls on leave', { codesA: ['@leave'], codesB: ['@shift'], mode: 'forbid' }),
@@ -151,8 +152,8 @@ export const DEFAULT_RULES = [
   R('r-req-np', 'requests', 'No premed when asked (NP)', { request: 'NP', codes: ['P', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6'], mode: 'avoid', span: 'day' }, soft(30)),
   R('r-sat2', 'limit', 'At most 2 Saturday calls a month', { codes: CALLS, period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(20, { when: { days: [6] }, note: PREDICTED })),
   R('r-sat-run', 'sequence', 'No Saturday calls two weeks running', { ifCodes: CALLS, thenCodes: CALLS, mode: 'forbid', from: 7, to: 7 }, soft(30, { when: { days: [6] }, note: 'MedHub (the guide\'s first rule). ' + PREDICTED })),
-  R('r-sun-fri', 'sequence', 'MedHub: no Fri or Sat call after a Sunday call', { ifCodes: CALLS, thenCodes: CALLS, mode: 'forbid', from: 5, to: 6 }, soft(10, { when: { days: [0] }, note: PREDICTED })),
-  R('r-livot', 'sameDay', 'Avoid calls in liver transplant OT week', { codesA: ['LivOT'], codesB: CALLS, mode: 'forbid' }, soft(20, { note: PREDICTED })),
+  R('r-sun-fri', 'sequence', 'MedHub: no Fri or Sat call after a Sunday call', { ifCodes: CALLS, thenCodes: CALLS, mode: 'forbid', from: 5, to: 6 }, soft(2, { when: { days: [0] }, note: 'The guide: very hard to keep; real rosters break it often (1 in 3 cardiac calls). ' + PREDICTED })),
+  R('r-livot', 'sameDay', 'Avoid calls in liver transplant OT week', { codesA: ['LivOT'], codesB: CALLS, mode: 'forbid' }, soft(5, { note: PREDICTED })),
   R('r-og-eod', 'sequence', 'No every-other-day obstetric calls', { ifCodes: ['OGC'], thenCodes: ['OGC'], mode: 'forbid', from: 2, to: 2 }, soft(30, { note: PREDICTED })),
   R('r-baby', 'limit', 'Baby MOs: no calls', { codes: CALLS, period: 'month', window: 7, min: null, max: 0, fte: false, prorate: false }, soft(50, { who: { tags: ['babymo'] }, enabled: false, note: PREDICTED })),
   // the main calls (off until the rosterer starts filling them in the app)

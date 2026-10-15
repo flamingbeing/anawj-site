@@ -87,6 +87,26 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const ex2 = S.exportBlock(s, MONTH);
   ok(ex2.changes.length === 2 && ex2.changes[0].to === 'C3' && ex2.changes[1].to === 'PC', 'a new call and its post call');
 }
+// import fixes found by the backtest: leave inside a posting keeps the posting; someone listed twice
+{
+  const head = ['S/N', 'Grade', 'Name', ...days.map((d, i) => String(i + 1)), '1-Jan'];
+  const wd = ['', '', '', ...days.map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][M.weekday(d)]), ''];
+  const row = (sn, g, name, f) => [String(sn), g, name, ...days.map((d, i) => f(i)), ''];
+  const rows = [['x'], ['x'], ['', '', '', 'December 26'], ['x'], wd, head,
+    row(1, 'RES1', 'Icu Leave', i => (i === 6 ? 'TL' : i === 7 ? 'R1B' : i === 8 ? 'PC' : i === 9 ? 'PPC' : 'ICU')),
+    row(2, 'RES2', 'Twice Listed', () => 'Z'),
+    row(3, 'MOPEX', 'Twice Listed', i => (i < 10 ? 'CP' : 'AL'))];
+  const grid = S.parseGrid(rows);
+  const s = M.defaultState();
+  const plan = S.planImport(s, grid, MONTH);
+  ok(plan.people.filter(p => p.skip).length === 1 && plan.people[1].skip, 'the row of someone listed twice without their roster is left alone');
+  S.applyImport(s, plan, grid, {});
+  const p = s.staff.find(x => x.name === 'Icu Leave');
+  ok(M.getCell(s, days[6], p.id).a.includes('ICU'), 'a day of leave inside ICU keeps the posting underneath');
+  ok(!evaluate(s, { from: days[0], to: days[days.length - 1] }).violations.some(v => v.ruleId === 'r-r1b-d1' && v.staffId === p.id), 'leave inside ICU does not start a new posting');
+  const ex = S.exportBlock(s, MONTH);
+  ok(ex.changes.length === 0, 'and nothing is written back differently (' + ex.changes.map(c => c.cell + ' ' + c.from + '>' + c.to).join(', ') + ')');
+}
 // the practice department loads and its rules can be checked
 {
   const s = demoState('2026-10-15');

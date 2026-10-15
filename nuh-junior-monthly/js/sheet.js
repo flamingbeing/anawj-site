@@ -115,6 +115,17 @@ export function planImport(state, grid, month) {
     parsed.forEach(p => p.unknown.forEach(u => unknown.set(u, (unknown.get(u) || 0) + 1)));
     people.push({ ...row, group, match: match ? match.id : '', parsed });
   }
+  // someone listed twice (moved to another grade mid-month): keep the row with their roster, leave the other alone
+  const busy = p => (p.texts || []).filter(t => norm(t) && !/^(Z|WE|PH)$/i.test(norm(t))).length;
+  const seen = new Map();
+  for (const p of people) {
+    if (p.skip) continue;
+    const k = nameKey(p.name), other = seen.get(k);
+    if (!other) { seen.set(k, p); continue; }
+    const drop = busy(p) > busy(other) ? other : p;
+    drop.skip = true; drop.why = 'listed twice: this row is left as it is';
+    if (drop === other) seen.set(k, p);
+  }
   return { month, people, unknown };
 }
 
@@ -144,13 +155,26 @@ export function applyImport(draft, plan, grid, { addUnknown = true, tab = '' } =
     const postOf = p => p.a.find(c => dmap.get(c)?.kind === 'posting') || '';
     const covered = p => p.pc || p.ppc || p.a.some(c => dmap.get(c)?.kind === 'shift');
     const fill = parsedRow.map(postOf);
+    // last month's last days (already imported) count as the days before day 1
+    const prevPost = (() => { for (let b = 1; b <= 3; b++) { const c = M.getCell(draft, M.addDays(days[0], -b), id); const p = c && (c.a || []).find(x => dmap.get(x)?.kind === 'posting'); if (p) return p; } return ''; })();
     for (let k = 0; k < fill.length; k++) {
       if (fill[k] || !covered(parsedRow[k])) continue;
       let b = k - 1; while (b >= 0 && !postOf(parsedRow[b]) && covered(parsedRow[b])) b--;
       let f = k + 1; while (f < fill.length && !postOf(parsedRow[f]) && covered(parsedRow[f])) f++;
-      const before = b >= 0 ? postOf(parsedRow[b]) : '', after = f < fill.length ? postOf(parsedRow[f]) : '';
+      const before = b >= 0 ? postOf(parsedRow[b]) : prevPost, after = f < fill.length ? postOf(parsedRow[f]) : '';
       fill[k] = before || after;
       if (before && after && before !== after) fill[k] = before;
+    }
+    // leave or a blank day or two inside a posting (the same posting on both sides) keeps the posting underneath:
+    // the posting is planned by the week, and a day's leave doesn't start a new block
+    for (let k = 0; k < fill.length; k++) {
+      if (fill[k]) continue;
+      const p = parsedRow[k];
+      if (p.a.some(c => dmap.get(c)?.kind === 'shift')) continue;
+      let b = k - 1; while (b >= 0 && !fill[b] && k - b <= 6) b--;
+      let f = k + 1; while (f < fill.length && !fill[f] && f - k <= 6) f++;
+      const before = b >= 0 ? fill[b] : (k < 3 ? prevPost : ''), after = f < fill.length ? fill[f] : '';
+      if (before && before === after && (f - b - 1) <= 7) for (let j = Math.max(b + 1, 0); j < f; j++) if (!fill[j]) fill[j] = before;
     }
     days.forEach((d, k) => {
       const p = parsedRow[k];
@@ -168,34 +192,34 @@ export function applyImport(draft, plan, grid, { addUnknown = true, tab = '' } =
   return { added, cells };
 }
 
-// The text the sheet should show for one person-day: a call first, then PC / PPC, leave, other, the posting, requests.
+// The text the sheet should show for one person-day: a call first, then PC / PPC, leave, other, the posting; requests
+// follow ("P/X").
 export function cellText(state, date, staffId) {
   const dmap = M.dutyMap(state);
   const cell = M.getCell(state, date, staffId);
   const eff = M.effectiveCodes(state, date, staffId);
   const a = (cell && cell.a) || [];
-  const r = (cell && cell.r) || [];
+  const r = ((cell && cell.r) || []).map(c => (c === 'XX' ? '(XX)' : c));
   const of = k => a.filter(c => (dmap.get(c) || {}).kind === k);
+  let main = '';
   const shifts = of('shift');
-  if (shifts.length) return shifts.join('/');
-  if (eff.includes('x') || a.includes('PC')) return 'PC';
-  if (eff.includes('PPC')) return 'PPC';
-  const lv = of('leave');
-  if (lv.length) return lv.join('/');
-  const ot = of('other').filter(c => c !== 'PC' && c !== 'PPC');
-  if (ot.length) return ot.join('/');
-  const reqs = r.map(c => (c === 'XX' ? '(XX)' : c));
-  const post = of('posting');
-  if (post.length) return reqs.length ? `${post[0]}` : post[0];
-  return reqs.join('/');
+  if (shifts.length) main = shifts.join('/');
+  else if (of('leave').length) main = of('leave').join('/');   // leave the day after a call: the sheet shows the leave
+  else if (eff.includes('x') || a.includes('PC')) main = 'PC';
+  else if (eff.includes('PPC')) main = 'PPC';
+  else if (of('other').filter(c => c !== 'PC' && c !== 'PPC').length) main = of('other').filter(c => c !== 'PC' && c !== 'PPC').join('/');
+  else if (!r.length && of('posting').length) main = of('posting')[0];
+  return [main, ...r].filter(Boolean).join('/');
 }
 
-// Same meaning? (so an unchanged cell goes back exactly as typed)
+// Same meaning? (so an unchanged cell goes back exactly as typed). A posting the sheet didn't show (a weekend, a
+// request or a blank day inside a posting: the app fills the posting in underneath) doesn't count as a change.
 function sameMeaning(state, text, want) {
   const dmap = M.dutyMap(state);
   const upper = new Map([...dmap.keys()].map(c => [c.toUpperCase(), c]));
   const a = codesFromText(text, dmap, upper), b = codesFromText(want, dmap, upper);
-  const key = p => [...p.a, ...p.r.map(x => 'r:' + x), p.pc ? 'PC' : '', p.ppc ? 'PPC' : '', ...p.unknown].filter(Boolean).sort().join(',');
+  const shown = a.a.some(c => dmap.get(c)?.kind === 'posting');
+  const key = p => [...p.a.filter(c => shown || dmap.get(c)?.kind !== 'posting'), ...p.r.map(x => 'r:' + x), p.pc ? 'PC' : '', p.ppc ? 'PPC' : '', ...p.unknown].filter(Boolean).sort().join(',');
   return key(a) === key(b);
 }
 
