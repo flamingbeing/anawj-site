@@ -38,7 +38,7 @@ function header(title) {
   subEl.hidden = !cloud.demo;
   const r = route();
   backEl.hidden = !(r === 'intake' || r === 'check');
-  fill(meEl, S.user ? h('button', { type: 'button', class: 'e-appbar__me', title: S.user.email, 'aria-label': 'Account', onclick: account }, initials(S.user.name || S.user.email)) : null);
+  fill(meEl, S.user ? h('button', { type: 'button', class: 'a-bar-btn e-appbar__me', title: S.user.email, 'aria-label': 'Account', onclick: account }, h('span', { class: 'a-avatar', 'aria-hidden': 'true' }, initials(S.user.name || S.user.email))) : null);
 }
 backEl.addEventListener('click', () => { location.hash = '#residents'; });
 
@@ -48,8 +48,8 @@ function account() {
     h('p', { class: 'e-small' }, S.roles.admin ? 'Admin' : 'Programme director', ' · the same sign-in as the logbook and evals.'),
     h('p', { class: 'e-small' }, h('a', { href: '../logbook/' }, 'Open the logbook'), ' · ', h('a', { href: '../evals/' }, 'Open evals')),
     h('div', { class: 'e-actions' },
-      h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Close'),
-      h('button', { class: 'n-btn', type: 'button', onclick: async () => { m.close(); await cloud.signOut(); location.reload(); } }, 'Sign out')),
+      h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Close'),
+      h('button', { class: 'a-btn', type: 'button', onclick: async () => { m.close(); await cloud.signOut(); location.reload(); } }, 'Sign out')),
   ]);
 }
 
@@ -65,9 +65,9 @@ function residentsScreen() {
     h('ul', { class: 'p-years', 'aria-label': 'Active residents by year' },
       Object.keys(counts).sort().map(k => h('li', {}, `${k}: ${counts[k]}`))),
     h('div', { class: 'e-actions e-actions--start', style: 'margin-top:12px' },
-      h('a', { class: 'n-btn e-btn-small', href: '#intake' }, icon('plus'), 'Add a new intake'),
-      h('a', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', href: '#check' }, `Year check${issues.length ? ` (${issues.length})` : ''}`),
-      h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', type: 'button', onclick: exportAll }, 'Export CSV')));
+      h('a', { class: 'a-btn a-btn--sm e-btn-small', href: '#intake' }, icon('plus'), 'Add a new intake'),
+      h('a', { class: 'a-btn a-btn--tinted a-btn--sm e-btn-quiet e-btn-small', href: '#check' }, `Year check${issues.length ? ` (${issues.length})` : ''}`),
+      h('button', { class: 'a-btn a-btn--tinted a-btn--sm e-btn-quiet e-btn-small', type: 'button', onclick: exportAll }, 'Export CSV')));
   return h('div', { class: 'e-stack' }, top, residentsPane({ res, reload }));
 }
 
@@ -85,7 +85,7 @@ function intakeScreen() {
   const ta = h('textarea', { class: 'e-textarea', rows: 8, id: 'p-paste', spellcheck: 'false', autocapitalize: 'off',
     placeholder: 'Sam Example, sam.example@example.com\nAlex Example <alex.example@example.com>\n(or paste two columns from a spreadsheet: name, email)' });
   const out = h('ul', { class: 'e-paste-res', 'aria-live': 'polite' });
-  const btn = h('button', { class: 'n-btn e-go', type: 'button', disabled: true }, 'Add');
+  const btn = h('button', { class: 'a-btn e-go', type: 'button', disabled: true }, 'Add');
   let parsed = [];
   const check = () => {
     parsed = parseIntake(ta.value, data.res, { intake: yr.value, rYear: start.value || null });
@@ -118,7 +118,7 @@ function intakeScreen() {
       field('Names and emails, one per line', ta),
       h('p', { class: 'e-hint' }, 'An ID at the start of a line is kept (e.g. “R031, Sam Example, sam@example.com”). People already on the list are skipped.'),
       out,
-      h('div', { class: 'e-actions' }, h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#residents' }, 'Cancel'), btn)));
+      h('div', { class: 'e-actions' }, h('a', { class: 'a-btn a-btn--tinted e-btn-quiet', href: '#residents' }, 'Cancel'), btn)));
 }
 
 // Year check: residents whose year won't look after itself at the July change-over.
@@ -135,10 +135,10 @@ function checkScreen() {
     h('div', {}, h('div', { class: 'e-row__title' }, i.r.name || i.r.email),
       h('div', { class: 'e-row__meta' }, `${i.r.rid} · now R${residentYear(i.r) || '?'} · ${i.r.status}`),
       h('div', { class: 'e-row__meta e-flag-why' }, i.why)),
-    i.fix ? h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', type: 'button', onclick: () => fixOne(i) }, i.fixLabel)
+    i.fix ? h('button', { class: 'a-btn a-btn--tinted a-btn--sm e-btn-quiet e-btn-small', type: 'button', onclick: () => fixOne(i) }, i.fixLabel)
       : h('span', { class: 'e-small' }, 'Edit in Residents')))));
   if (fixable.length > 1) wrap.append(h('div', { class: 'e-actions' },
-    h('button', { class: 'n-btn', type: 'button', onclick: () => fixAll(fixable) }, `Apply all ${fixable.length} suggestions`)));
+    h('button', { class: 'a-btn', type: 'button', onclick: () => fixAll(fixable) }, `Apply all ${fixable.length} suggestions`)));
   return wrap;
 }
 async function fixOne(i) {
@@ -169,8 +169,8 @@ function pdsScreen() {
       catch (e2) { msg.hidden = false; msg.textContent = 'Couldn’t save. ' + err(e2); }
     } }, field('Name', name), field('Google account email', email), msg,
       h('div', { class: 'e-actions' },
-        h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Cancel'),
-        h('button', { class: 'n-btn', type: 'submit' }, 'Add'))));
+        h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Cancel'),
+        h('button', { class: 'a-btn', type: 'submit' }, 'Add'))));
   };
   const remove = async p => {
     if (!await confirmBox('Remove programme director?', `${p.name || p.email} loses PD access to the logbook, evals and People.`, 'Remove', true)) return;
@@ -179,11 +179,11 @@ function pdsScreen() {
   return h('div', { class: 'e-stack' },
     h('p', { class: 'e-small' }, 'PDs see every resident’s evaluations and the programme totals, and can keep the resident and faculty lists.',
       admin ? '' : ' Only admins change this list.'),
-    admin ? h('div', { class: 'e-toolbar' }, h('button', { class: 'n-btn e-btn-small', type: 'button', onclick: add }, icon('plus'), 'Add PD')) : null,
+    admin ? h('div', { class: 'e-toolbar' }, h('button', { class: 'a-btn a-btn--sm e-btn-small', type: 'button', onclick: add }, icon('plus'), 'Add PD')) : null,
     h('div', { class: 'e-card e-card--flush' }, pds.length ? h('div', { class: 'e-list' }, pds.map(p => h('div', { class: 'e-row e-row--static' },
       avatar(p.name || p.email),
       h('span', { class: 'e-row__body' }, h('span', { class: 'e-row__title' }, p.name || '(no name)'), h('span', { class: 'e-row__meta' }, p.email)),
-      admin ? h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', type: 'button', 'aria-label': `Remove ${p.name || p.email}`, onclick: () => remove(p) }, 'Remove') : null)))
+      admin ? h('button', { class: 'a-btn a-btn--tinted a-btn--sm e-btn-quiet e-btn-small', type: 'button', 'aria-label': `Remove ${p.name || p.email}`, onclick: () => remove(p) }, 'Remove') : null)))
       : h('p', { class: 'e-small', style: 'padding:12px 16px;margin:0' }, 'No PDs yet.')));
 }
 
@@ -196,7 +196,7 @@ async function render() {
   if (!(S.roles.admin || S.roles.pd)) {
     header('APMES People');
     fill(app, empty('For admins and PDs', `${S.user.email} isn’t an admin or programme director. Residents and faculty use the logbook and evals.`,
-      h('a', { class: 'n-btn', href: '../evals/' }, 'Open evals')));
+      h('a', { class: 'a-btn', href: '../evals/' }, 'Open evals')));
     return;
   }
   const r = route();
@@ -205,7 +205,7 @@ async function render() {
     fill(app, h('p', { class: 'e-loading' }, 'Loading…'));
     try { await loadAll(); } catch (e) {
       if (n !== seq) return;
-      fill(app, h('p', { class: 'e-alert' }, 'Couldn’t load the people lists: ' + err(e)), h('button', { class: 'n-btn', onclick: reload }, 'Try again'));
+      fill(app, h('p', { class: 'e-alert' }, 'Couldn’t load the people lists: ' + err(e)), h('button', { class: 'a-btn', onclick: reload }, 'Try again'));
       return;
     }
   }
@@ -214,9 +214,12 @@ async function render() {
   const tabbed = TABS.some(([id]) => id === r);
   const body = r === 'intake' ? intakeScreen() : r === 'check' ? checkScreen() : r === 'faculty' ? facultyPane({ fac: data.fac, reload })
     : r === 'pds' ? pdsScreen() : r === 'applications' ? applicationsPane({ apps: data.apps, fac: data.fac, res: data.res, reload }) : residentsScreen();
+  // the app kit's large title, then the segmented control for the four lists
   fill(app, h('div', { class: 'e-admin e-wide' },
+    h('div', { class: 'e-titlebox' }, h('h1', { class: 'a-title' }, r === 'residents' ? 'People' : SCREENS[r])),
     tabbed ? segment(TABS.map(([id, label]) => ({ id, label, count: id === 'applications' ? pending : 0 })), r, id => { location.hash = '#' + id; }) : null,
     body));
+  window.aRefreshBar?.();
 }
 hooks.render = () => reload();
 window.addEventListener('hashchange', () => render());
@@ -228,7 +231,7 @@ function signInScreen() {
   fill(app, h('section', { class: 'e-card', style: 'max-width:520px;margin:0 auto' },
     h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'APMES People'),
     h('p', {}, 'The resident, faculty and programme director lists the logbook and evals share. For admins and PDs.'),
-    h('button', { class: 'n-btn', type: 'button', onclick: async () => { try { await cloud.signIn(); } catch (e) { toast('Sign-in failed. ' + err(e)); } } }, 'Sign in with Google'),
+    h('button', { class: 'a-btn', type: 'button', onclick: async () => { try { await cloud.signIn(); } catch (e) { toast('Sign-in failed. ' + err(e)); } } }, 'Sign in with Google'),
     cloud.demo ? h('p', { class: 'e-small' }, 'Demo: made-up people, kept only in this browser.') : null));
 }
 

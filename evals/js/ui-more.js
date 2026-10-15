@@ -10,18 +10,21 @@ const store = {
 };
 
 export function renderMore() {
-  const root = h('div', { class: 'e-stack' });
+  // the app kit's settings screen: inset grouped lists with section captions
+  const root = h('div', { class: 'e-more' });
   if (!S.user) return root;
   root.append(accountCard());
   const apply = applyCard();
-  if (apply) root.append(apply);
-  if (cloud.demo) root.append(demoCard());
-  root.append(h('a', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', href: '#how' }, 'How evals work'));
+  if (apply) root.append(h('p', { class: 'a-section' }, 'Join'), apply);
+  if (cloud.demo) root.append(...demoCard());
+  root.append(h('p', { class: 'a-section' }, 'Help'),
+    h('ul', { class: 'a-list' }, h('li', {}, h('a', { class: 'a-row', href: '#how' }, h('span', { class: 'a-row-text' }, 'How evals work'), h('span', { class: 'a-chev', 'aria-hidden': 'true' })))));
   const inst = installCard();
   if (inst) root.append(inst);
-  root.append(settingsCard(), privacyCard(),
-    h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', type: 'button', onclick: signOut }, cloud.demo ? 'Sign out of the demo' : 'Sign out'),
-    versionLine());
+  root.append(...settingsCard(), ...privacyCard(),
+    h('ul', { class: 'a-list e-more__signout' }, h('li', {},
+      h('button', { class: 'a-row a-row--center a-row--danger', type: 'button', onclick: signOut }, cloud.demo ? 'Sign out of the demo' : 'Sign out'))),
+    ...versionLine());
   return root;
 }
 
@@ -36,11 +39,12 @@ function roleNames() {
 
 function accountCard() {
   const roles = roleNames();
-  return h('section', { class: 'e-card' },
-    h('div', { style: 'display:flex;gap:12px;align-items:center;margin-bottom:12px' }, avatar(S.user.name || S.user.email),
-      h('div', { style: 'min-width:0' }, h('h2', { class: 'e-h3', style: 'margin:0' }, S.user.name || S.user.email),
-        h('div', { class: 'e-small', style: 'overflow-wrap:anywhere' }, S.user.email))),
-    h('dl', { class: 'e-kv' }, h('dt', {}, 'Roles'), h('dd', {}, roles.length ? roles.join(', ') : 'None yet')));
+  return h('ul', { class: 'a-list e-more__account', 'aria-label': 'Account' },
+    h('li', {}, h('div', { class: 'a-row' }, avatar(S.user.name || S.user.email, 'e-avatar--lg'),
+      h('span', { class: 'a-row-text' }, h('h2', { class: 'e-more__name' }, S.user.name || S.user.email),
+        h('small', { style: 'overflow-wrap:anywhere' }, S.user.email)))),
+    h('li', {}, h('div', { class: 'a-row' }, h('span', { class: 'a-row-text' }, 'Roles'),
+      h('span', { class: 'e-more__roles' }, roles.length ? roles.join(', ') : 'None yet'))));
 }
 
 // Apply for the role I don't have (one application per account; the admin decides it).
@@ -48,18 +52,18 @@ function applyCard() {
   const wantRes = !isResident(), wantFac = !S.roles.faculty;
   if (!wantRes && !wantFac) return null;
   const appl = S.roles.application;
-  const card = h('section', { class: 'e-card' }, h('h2', { class: 'e-h3' }, wantRes && wantFac ? 'Join as resident or faculty' : wantRes ? 'Join as a resident' : 'Join as faculty'));
+  const card = h('section', { class: 'a-card e-card' }, h('h2', { class: 'e-h3' }, wantRes && wantFac ? 'Join as resident or faculty' : wantRes ? 'Join as a resident' : 'Join as faculty'));
   const label = r => (r === 'faculty' ? 'faculty' : 'a resident');
   if (isStaff()) {
     card.append(h('p', { class: 'e-small' }, 'As an admin or programme director you can add yourself in People.'),
-      h('div', { class: 'e-actions e-actions--start' }, h('a', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', href: '#people/faculty' }, 'Open People')));
+      h('div', { class: 'e-actions e-actions--start' }, h('a', { class: 'a-btn a-btn--tinted a-btn--sm e-btn-quiet e-btn-small', href: '#people/faculty' }, 'Open People')));
     return card;
   }
   if (appl && appl.status === 'pending') {
     card.append(h('p', { class: 'e-note' }, `Application to join as ${label(appl.role)} sent. An admin or programme director will approve it.`),
       h('div', { class: 'e-actions' },
-        h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', type: 'button', onclick: () => fill(card, h('h2', { class: 'e-h3' }, 'Change application'), applyForm(appl, wantRes, wantFac)) }, 'Change'),
-        h('button', { class: 'n-btn e-btn-small', type: 'button', onclick: async () => { await hooks.refreshRoles(); toast(S.roles.application?.status === 'pending' ? 'Not approved yet. You’ll see it here once it is.' : 'Updated'); } }, 'Check again')));
+        h('button', { class: 'a-btn a-btn--tinted a-btn--sm e-btn-quiet e-btn-small', type: 'button', onclick: () => fill(card, h('h2', { class: 'e-h3' }, 'Change application'), applyForm(appl, wantRes, wantFac)) }, 'Change'),
+        h('button', { class: 'a-btn a-btn--sm e-btn-small', type: 'button', onclick: async () => { await hooks.refreshRoles(); toast(S.roles.application?.status === 'pending' ? 'Not approved yet. You’ll see it here once it is.' : 'Updated'); } }, 'Check again')));
     return card;
   }
   if (appl && appl.status !== 'pending') {
@@ -78,7 +82,7 @@ function applyForm(prev, wantRes, wantFac) {
   const name = h('input', { class: 'e-input', id: 'more-apply-name', value: prev?.name || S.user.name || '', autocomplete: 'name', required: true });
   const note = h('textarea', { class: 'e-textarea', id: 'more-apply-note', rows: 2, placeholder: 'e.g. intake year, department' }, prev?.note || '');
   const msg = h('p', { class: 'e-alert', hidden: true, role: 'alert' });
-  const btn = h('button', { class: 'n-btn e-go', type: 'submit' }, 'Apply');
+  const btn = h('button', { class: 'a-btn e-go', type: 'submit' }, 'Apply');
   return h('form', { onsubmit: async e => {
     e.preventDefault();
     if (!name.value.trim()) { msg.hidden = false; msg.textContent = 'Enter your name.'; return; }
@@ -102,44 +106,43 @@ function applyForm(prev, wantRes, wantFac) {
 function demoCard() {
   const cur = cloud.demoRole ? cloud.demoRole() : S.demoRole;
   const base = location.pathname;
-  const opt = (role, q, label, who) => h('a', { class: `e-row ${cur === role ? 'is-current' : ''}`, href: base + q, 'aria-current': cur === role ? 'true' : null },
-    h('span', { class: 'e-row__body' }, h('span', { class: 'e-row__title' }, label), h('span', { class: 'e-row__meta' }, who)),
-    cur === role ? h('span', { class: 'e-chip e-chip--info' }, 'Current') : null);
-  return h('section', { class: 'e-card e-card--flush' },
-    h('h2', { class: 'e-section' }, 'Switch demo role'),
-    h('div', { class: 'e-list' },
+  // checkmark rows: the current role is ticked
+  const opt = (role, q, label, who) => h('li', {}, h('a', { class: `a-row e-row ${cur === role ? 'is-current' : ''}`, href: base + q, 'aria-current': cur === role ? 'true' : null },
+    h('span', { class: 'a-row-text' }, label, h('small', {}, who)),
+    cur === role ? h('span', { class: 'a-pill a-pill--tint e-chip e-chip--info' }, 'Current') : null));
+  return [
+    h('h2', { class: 'a-section' }, 'Switch demo role'),
+    h('ul', { class: 'a-list' },
       opt('resident', '?demo', 'Resident', 'Demo Resident'),
       opt('assessor', '?demo=assessor', 'Assessor', 'Dr Demo Faculty'),
-      opt('admin', '?demo=admin', 'Admin and programme director', 'Demo Admin')),
-    h('div', { style: 'padding:12px 16px' },
-      h('p', { class: 'e-small', style: 'margin:0 0 8px' }, 'The demo data is shared between roles in this browser. Open two tabs to play both sides.'),
-      h('button', { type: 'button', class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', onclick: () => import('./app.js').then(m => m.resetDemoData()) }, 'Reset demo data')));
+      opt('admin', '?demo=admin', 'Admin and programme director', 'Demo Admin'),
+      h('li', {}, h('button', { type: 'button', class: 'a-row a-row--center', onclick: () => import('./app.js').then(m => m.resetDemoData()) }, 'Reset demo data'))),
+    h('p', { class: 'a-footnote' }, 'The demo data is shared between roles in this browser. Open two tabs to play both sides.')];
 }
 
 function settingsCard() {
   const on = store.get(AUTOSCROLL_KEY) !== 'off';
-  const box = h('input', { type: 'checkbox', role: 'switch', id: 'more-autoscroll', checked: on, onchange: e => {
+  const box = h('input', { type: 'checkbox', class: 'a-switch', role: 'switch', id: 'more-autoscroll', checked: on, onchange: e => {
     store.set(AUTOSCROLL_KEY, e.target.checked ? null : 'off');
     toast(e.target.checked ? 'Auto-scroll on' : 'Auto-scroll off');
   } });
-  const theme = h('div', {});
+  const theme = h('div', { role: 'group', 'aria-labelledby': 'more-theme-l' });
   const paintTheme = () => fill(theme, segment(THEMES.map(([id, label]) => ({ id, label })), themePref(), id => { setTheme(id); paintTheme(); }));
   paintTheme();
-  return h('section', { class: 'e-card' },
-    h('h2', { class: 'e-h3' }, 'Settings'),
-    h('label', { class: 'e-check e-switch', for: 'more-autoscroll' }, box,
-      h('span', {}, h('b', {}, 'Scroll to the next question'), h('br'), h('span', { class: 'e-small' }, 'After you answer a question on a form. Saved on this device.'))),
-    h('p', { style: 'margin:16px 0 4px' }, h('b', {}, 'Theme')),
-    h('div', { class: 'e-more-theme' }, theme),
-    h('p', { class: 'e-small', style: 'margin:4px 0 0' }, 'Auto follows your phone’s light or dark setting. Saved on this device.'));
+  return [
+    h('h2', { class: 'a-section' }, 'Settings'),
+    h('ul', { class: 'a-list' },
+      h('li', {}, h('label', { class: 'a-row', for: 'more-autoscroll' },
+        h('span', { class: 'a-row-text' }, 'Scroll to the next question', h('small', {}, 'After you answer a question on a form. Saved on this device.')), box)),
+      h('li', {}, h('div', { class: 'a-row e-more-theme' }, h('span', { class: 'a-row-text', id: 'more-theme-l' }, 'Theme'), theme))),
+    h('p', { class: 'a-footnote' }, 'Auto follows your phone’s light or dark setting. Saved on this device.')];
 }
 
 function privacyCard() {
-  return h('section', { class: 'e-card' },
-    h('h2', { class: 'e-h3' }, 'About and privacy'),
+  return [h('h2', { class: 'a-section' }, 'About and privacy'), h('section', { class: 'a-card e-more__about' },
     h('p', { class: 'e-small' }, 'An unofficial tool for requesting and completing APMES DOPS, Mini-CEX and EBD evaluations. It does not replace the official record.'),
     h('p', { class: 'e-small' }, 'Patient details are limited to initials, age band and gender. Never enter names, NRIC/FIN, record numbers or phone numbers in any box.'),
-    h('p', { class: 'e-small' }, 'Evaluations are seen by the resident, the assessor and the programme’s admins and directors.'));
+    h('p', { class: 'e-small' }, 'Evaluations are seen by the resident, the assessor and the programme’s admins and directors.'))];
 }
 
 const signOut = () => signOutSafely();
@@ -149,9 +152,10 @@ const signOut = () => signOutSafely();
 // one can be spotted. The button clears only this app's saved copy (never the logbook's) and reloads; answers not
 // sent yet stay in Firestore's own offline store, but it still asks first.
 function versionLine() {
-  const ver = h('span', {}, 'App version: checking…');
-  const line = h('p', { class: 'e-appver' }, ver, ' · ',
-    h('button', { class: 'e-linkbtn', type: 'button', onclick: getLatest }, 'Get the latest version'));
+  // two lines of small muted text (AGENTS.md): the version, then the link-styled button
+  const ver = h('p', { class: 'e-appver' }, 'App version: checking…');
+  const line = [ver, h('p', { class: 'e-appver' },
+    h('button', { class: 'e-linkbtn', type: 'button', onclick: getLatest }, 'Not updating? Get the latest version'))];
   (window.caches ? caches.keys() : Promise.resolve([])).then(ks => {
     const k = ks.find(x => x.startsWith('evals-'));
     ver.textContent = k ? 'App version ' + k.replace(/^evals-/, '').replace(/-([0-9a-f]{8})$/, ' ($1)') : 'App version: not saved on this device';
@@ -211,7 +215,7 @@ function installCard() {
   return h('section', { class: 'e-card' },
     h('h2', { class: 'e-h3' }, 'Add Evals to your home screen'),
     h('p', { class: 'e-small' }, 'It opens like an app, works without signal, and shows a badge when something needs you.'),
-    installEvent ? h('button', { class: 'n-btn', type: 'button', onclick: async () => {
+    installEvent ? h('button', { class: 'a-btn', type: 'button', onclick: async () => {
       const ev = installEvent; installEvent = null;
       ev.prompt();
       try { const r = await ev.userChoice; if (r.outcome === 'accepted') toast('Added to your home screen'); } catch {}

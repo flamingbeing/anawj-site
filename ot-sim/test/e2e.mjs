@@ -196,6 +196,41 @@ try {
     assert.match(await page.textContent('#events'), /Incision/);
     assert.match(await page.textContent('#events'), /No longer responds to voice/);
     await axe(page, `${name} theatre, Patient tab`);
+    // the operation timeline: Start fires the incision, Skip fast-forwards model time to each next step (ongoing
+    // surgery stimulus, then a stronger phase), and the last step ends it
+    await page.click('#surg-start');
+    assert.match(await page.textContent('#surg-state'), /incision|Surgery/i, `${name}: operation started`);
+    await page.click('#surg-skip');
+    assert.ok(await page.evaluate(() => otsim.state.pd.stim && otsim.state.pd.stim.kind === 'surgery' && otsim.state.pd.stim.ongoing), `${name}: skip reaches the ongoing surgery stimulus`);
+    const surgT = await page.evaluate(() => otsim.state.t);
+    const surgI = await page.evaluate(() => otsim.state.pd.stim.I);
+    await page.click('#surg-skip');
+    assert.ok(await page.evaluate(() => otsim.state.t) > surgT, `${name}: skip fast-forwards model time`);
+    assert.ok(await page.evaluate(() => otsim.state.pd.stim.I) > surgI, `${name}: the next step is a stronger stimulus`);
+    await page.click('#surg-skip'); // closing
+    await page.click('#surg-skip'); // finished
+    assert.ok(await page.evaluate(() => !otsim.state.pd.stim || !otsim.state.pd.stim.ongoing), `${name}: the operation ends the surgery stimulus`);
+    assert.match(await page.textContent('#surg-state'), /complete/i, `${name}: timeline shows complete`);
+    assert.ok(await page.evaluate(() => document.getElementById('surg-skip').disabled), `${name}: skip is disabled at the end`);
+    // Examine: findings read from the model (the patient is asleep under TCI here), refreshed live
+    await page.click('#tab-exam');
+    await page.evaluate(() => otsim.step(1));
+    const exam = await page.textContent('#exam-list');
+    assert.match(exam, /Chest movement|Breath sounds/, `${name}: examine shows the chest/breath findings`);
+    assert.match(exam, /Pupils/, `${name}: examine shows pupils`);
+    assert.match(exam, /sluggishly|anaesthetised/, `${name}: an asleep patient's pupils`);
+    await axe(page, `${name} theatre, Examine tab`);
+    // Help: each button is a logged action that confirms and lands in the events feed
+    await page.click('#tab-help');
+    assert.ok((await page.$$('#help-acts [data-help]')).length >= 4, `${name}: help actions present`);
+    await page.click('[data-help="callHelp"]');
+    assert.match(await page.textContent('#help-ack'), /help is on the way/i, `${name}: help confirms`);
+    await page.click('[data-help="majorHaemorrhage"]');
+    await page.evaluate(() => otsim.step(2));
+    await axe(page, `${name} theatre, Help tab`);
+    await page.click('#tab-pt');
+    await page.evaluate(() => otsim.step(2));
+    assert.match(await page.textContent('#events'), /Called for help|major haemorrhage/i, `${name}: help actions show in the events feed`);
     // Rhythms: impose each from the Patient tab. The ECG keeps drawing and the circulation responds.
     await page.selectOption('#rhythm', 'vt');
     await page.evaluate(() => otsim.step(400));
@@ -273,7 +308,9 @@ try {
     assert.ok(rows.some(r => /^Twitch \(T1\)/.test(r)), `${name}: neuromuscular rows in Behind the monitor`);
     assert.ok(rows.some(r => /^To voice \(asleep\)/.test(r)), `${name}: depth rows in Behind the monitor`);
     assert.ok(rows.some(r => /^Cardiac output/.test(r)), `${name}: circulation rows in Behind the monitor`);
-    assert.equal(await page.evaluate(() => localStorage.getItem('otsim.behind')), '1');
+    // the open state is persisted on the details' `toggle` event, which fires asynchronously after the click, so wait
+    // for it rather than reading localStorage straight away (that race flaked on a loaded CI runner)
+    await page.waitForFunction(() => { try { return localStorage.getItem('otsim.behind') === '1'; } catch { return false; } }, null, { timeout: 3000 });
 
     // no horizontal scroll; axe on the paused theatre
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${name}: no horizontal scroll`);

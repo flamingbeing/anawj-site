@@ -13,7 +13,7 @@ residentCSS();
 const notAvailable = () => h('div', { class: 'e-empty' }, icon('info', 'e-empty__icon'),
   h('p', { class: 'e-empty__title' }, 'Can’t find this evaluation'),
   h('p', {}, 'It may still be syncing. If it keeps happening, check you’re signed in with the email it was sent to.'),
-  h('button', { class: 'n-btn', onclick: () => hooks.render() }, 'Try again'));
+  h('button', { class: 'a-btn', onclick: () => hooks.render() }, 'Try again'));
 
 async function find(id) {
   const local = [...S.mine, ...S.assigned, ...S.all].find(ev => ev.id === id);
@@ -52,18 +52,18 @@ function adminActions(ev) {
     const m = modal('Reassign to', [
       assessorPicker({ exclude: [ev.assessorEmail, ev.residentEmail], onpick: a => { m.close();
         run({ status: 'requested', assessorEmail: a.email, assessorName: a.name, assessment: null, metrics: null }, `Sent to ${a.name}`); } }),
-      h('div', { class: 'e-actions' }, h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => m.close() }, 'Cancel')),
+      h('div', { class: 'e-actions' }, h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', onclick: () => m.close() }, 'Cancel')),
     ]);
   };
   const confirmDo = (title, text, label, patch, done) => {
     const m = modal(title, [h('p', {}, text), h('div', { class: 'e-actions' },
-      h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => m.close() }, 'Back'),
-      h('button', { class: 'n-btn', onclick: () => { m.close(); run(patch, done); } }, label))]);
+      h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', onclick: () => m.close() }, 'Back'),
+      h('button', { class: 'a-btn', onclick: () => { m.close(); run(patch, done); } }, label))]);
   };
   const btns = [
-    open ? h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: reassign }, 'Reassign') : null,
-    open ? h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => confirmDo('Cancel this request?', 'The resident sees it as cancelled. Nothing is deleted.', 'Cancel request', { status: 'cancelled' }, 'Cancelled') }, 'Cancel request') : null,
-    ev.status === 'submitted' || ev.status === 'cancelled' ? h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => confirmDo('Reopen this evaluation?', `It goes back to ${ev.assessorName || ev.assessorEmail} as a request; their answers are kept.`, 'Reopen', { status: 'requested', submittedAt: null }, 'Reopened') }, 'Reopen') : null,
+    open ? h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', onclick: reassign }, 'Reassign') : null,
+    open ? h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', onclick: () => confirmDo('Cancel this request?', 'The resident sees it as cancelled. Nothing is deleted.', 'Cancel request', { status: 'cancelled' }, 'Cancelled') }, 'Cancel request') : null,
+    ev.status === 'submitted' || ev.status === 'cancelled' ? h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', onclick: () => confirmDo('Reopen this evaluation?', `It goes back to ${ev.assessorName || ev.assessorEmail} as a request; their answers are kept.`, 'Reopen', { status: 'requested', submittedAt: null }, 'Reopened') }, 'Reopen') : null,
   ].filter(Boolean);
   if (!btns.length) return null;
   return h('section', { class: 'e-card e-noprint' }, h('h2', { class: 'e-h3' }, 'Admin'), h('div', { class: 'e-actions' }, btns));
@@ -130,7 +130,7 @@ function resultView(ev) {
   const ovV = overall && a[overall.key] != null && a[overall.key] !== 'NA' ? Number(a[overall.key]) : null;
   const thr = ev.level === 3 ? 5 : ev.level === 4 ? 7 : null;
 
-  const gotIt = h('button', { class: 'n-btn e-go e-btn-big', onclick: async () => {
+  const gotIt = h('button', { class: 'a-btn a-btn--block e-go e-btn-big', onclick: async () => {
     gotIt.disabled = true;
     try { const next = await cloud.updateEvaluation(ev.id, { seenAt: Date.now() }); Object.assign(ev, next); toast('Marked as seen'); go('requests'); }
     catch (err) { gotIt.disabled = false; toast('Not saved. ' + errText(err)); }
@@ -199,6 +199,6 @@ function resultView(ev) {
     h('section', { class: 'e-card' }, h('h2', { class: 'e-h3', style: 'margin:0 0 8px' }, 'Case'), caseKV(ev),
       h('p', { class: 'e-small', style: 'margin:8px 0 0' }, 'Assessor: ', ev.assessorName || ev.assessorEmail)),
     h('div', { class: 'e-actions e-noprint' },
-      h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => window.print() }, 'Print'),
-      isMine ? h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#new/' + encodeURIComponent(ev.itemId || '') }, 'Request again') : null));
+      h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', onclick: () => window.print() }, 'Print'),
+      isMine ? h('a', { class: 'a-btn a-btn--tinted e-btn-quiet', href: '#new/' + encodeURIComponent(ev.itemId || '') }, 'Request again') : null));
 }

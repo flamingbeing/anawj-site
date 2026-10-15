@@ -61,8 +61,8 @@ export function renderRequests() {
       !S.loaded.mine ? h('p', { class: 'e-loading' }, 'Loading…')
         : list.length ? h('div', { class: 'e-list' }, list.map(ev => requestRow(ev, now)))
         : empty(filter === 'waiting' ? 'Nothing open' : 'No requests yet', filter === 'waiting' ? 'Requests you send show here until they are done.' : 'Send your first request from Home.',
-          h('a', { class: 'n-btn', href: '#new' }, icon('plus'), 'Request evaluation')),
-      list.length ? h('p', { class: 'e-small e-center', style: 'margin-top:16px' }, h('a', { href: '#new', class: 'n-btn e-go' }, icon('plus'), 'New request')) : null);
+          h('a', { class: 'a-btn', href: '#new' }, icon('plus'), 'Request evaluation')),
+      list.length ? h('a', { href: '#new', class: 'a-fab e-go', 'aria-label': 'New request', title: 'New request' }, icon('plus')) : null);
   };
   paint();
   return root;
@@ -205,8 +205,8 @@ export function renderRequestDetail(ev) {
       field('Note to assessor (optional)', 'ec-notes', notes),
       err,
       h('div', { class: 'e-actions' },
-        h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Cancel'),
-        h('button', { class: 'n-btn', type: 'button', onclick: save }, 'Save'))), { cls: 'e-sheet' });
+        h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Cancel'),
+        h('button', { class: 'a-btn', type: 'button', onclick: save }, 'Save'))), { cls: 'e-sheet' });
   };
 
   const cancel = async () => {
@@ -232,23 +232,26 @@ export function renderRequestDetail(ev) {
   const st = statusOf(ev, now);
   const started = !!(ev.assessment && Object.keys(ev.assessment).length);
   const canNudge = ev.status === 'requested' && ageHours(ev, now) >= NUDGE_HOURS;
-  const actions = [];
+  // one filled button for the main action, the others as a grouped list of rows (the app kit's detail screen)
+  const actions = [], rows = [];
+  const rowBtn = (label, onclick, danger = false, ic = null) => h('li', {}, h('button', { type: 'button', class: `a-row a-row--center${danger ? ' a-row--danger' : ''}`, onclick }, ic, label));
   if (ev.status === 'requested') {
-    actions.push(h('button', { class: 'n-btn e-btn-big', onclick: () => shareSheet(ev) }, icon('qr'), 'Show QR / share link'));
-    if (canNudge) actions.push(h('button', { class: 'n-btn n-btn--secondary e-btn-big', onclick: nudge }, icon('share'), 'Remind assessor'));
-    if (!started) actions.push(h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', onclick: changeAssessor }, 'Change assessor'));
-    if (!started) actions.push(h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', onclick: editCase }, 'Edit case details'));
-    actions.push(h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', onclick: cancel }, 'Cancel request'));
+    actions.push(h('button', { class: 'a-btn a-btn--block e-btn-big', onclick: () => shareSheet(ev) }, icon('qr'), 'Show QR / share link'));
+    if (canNudge) rows.push(rowBtn('Remind assessor', nudge, false, icon('share')));
+    if (!started) rows.push(rowBtn('Change assessor', changeAssessor));
+    if (!started) rows.push(rowBtn('Edit case details', editCase));
+    rows.push(rowBtn('Cancel request', cancel, true));
   } else if (ev.status === 'draft') {
-    actions.push(h('button', { class: 'n-btn e-go e-btn-big', onclick: sendDraft }, `Send to ${ev.assessorName || ev.assessorEmail}`));
-    actions.push(h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', onclick: changeAssessor }, 'Change assessor'));
-    actions.push(h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', onclick: delDraft }, icon('trash'), 'Delete draft'));
+    actions.push(h('button', { class: 'a-btn a-btn--block e-go e-btn-big', onclick: sendDraft }, `Send to ${ev.assessorName || ev.assessorEmail}`));
+    rows.push(rowBtn('Change assessor', changeAssessor));
+    rows.push(rowBtn('Delete draft', delDraft, true, icon('trash')));
   } else if (ev.status === 'declined') {
-    actions.push(h('button', { class: 'n-btn e-go e-btn-big', onclick: resend }, 'Send to another assessor'));
-    actions.push(h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', onclick: cancel }, 'Cancel request'));
+    actions.push(h('button', { class: 'a-btn a-btn--block e-go e-btn-big', onclick: resend }, 'Send to another assessor'));
+    rows.push(rowBtn('Cancel request', cancel, true));
   } else if (ev.status === 'cancelled' && itemById(ev.itemId)) {
-    actions.push(h('a', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', href: '#new/' + encodeURIComponent(ev.itemId) }, 'Request this item again'));
+    rows.push(h('li', {}, h('a', { class: 'a-row a-row--center', href: '#new/' + encodeURIComponent(ev.itemId) }, 'Request this item again')));
   }
+  if (rows.length) actions.push(h('ul', { class: 'a-list e-actrows' }, rows));
 
   fill(root,
     itemCard(ev),

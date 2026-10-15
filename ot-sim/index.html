@@ -186,6 +186,8 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
         <button type="button" role="tab" id="tab-breath" aria-controls="panel-breath" aria-selected="false" tabindex="-1">Breathing</button>
         <button type="button" role="tab" id="tab-aw" aria-controls="panel-aw" aria-selected="false" tabindex="-1">Airway</button>
         <button type="button" role="tab" id="tab-pt" aria-controls="panel-pt" aria-selected="false" tabindex="-1">Patient</button>
+        <button type="button" role="tab" id="tab-exam" aria-controls="panel-exam" aria-selected="false" tabindex="-1">Examine</button>
+        <button type="button" role="tab" id="tab-help" aria-controls="panel-help" aria-selected="false" tabindex="-1">Help</button>
       </div>
       <div class="panel" role="tabpanel" id="panel-drugs" aria-labelledby="tab-drugs"></div>
       <div class="panel" role="tabpanel" id="panel-circ" aria-labelledby="tab-circ" hidden>
@@ -257,13 +259,19 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
         <div class="act"><button type="button" id="talk">Talk to the patient</button></div>
         <p class="state" id="talk-reply" aria-live="polite"></p>
         <h3 class="sub">Stimulate</h3>
-        <p class="hint">Until the airway and the operation arrive, try a stimulus here and watch for movement.</p>
+        <p class="hint">Try a one-off stimulus and watch for movement and the autonomic response (heart rate and blood pressure), or run the operation below.</p>
         <div class="act">
           <button type="button" data-stim="tetanus">Tetanic stimulus</button>
           <button type="button" data-stim="laryngoscopy">Laryngoscopy</button>
           <button type="button" data-stim="incision">Skin incision</button>
-          <button type="button" id="surgery" aria-pressed="false">Surgery running</button>
         </div>
+        <h3 class="sub">Operation</h3>
+        <p class="hint">A standard operation's surgical stimulus over time: incision, steady surgery, a strongly-stimulating phase, then closing. Start it, then let it run or skip step by step — keep the patient asleep and still as the stimulus rises and falls.</p>
+        <div class="act">
+          <button type="button" id="surg-start">Start operation</button>
+          <button type="button" id="surg-skip" disabled>Skip to next step</button>
+        </div>
+        <p class="state" id="surg-state" aria-live="polite">Not started.</p>
         <div class="act"><button type="button" id="warmer" aria-pressed="false">Forced-air warmer</button></div>
         <div class="act"><label>Surgical bleeding <select id="bleed"><option value="0">None</option><option value="20">20 mL/min</option><option value="50">50 mL/min</option><option value="100">100 mL/min</option><option value="300">300 mL/min</option></select></label></div>
         <h3 class="sub">Rhythm</h3>
@@ -296,8 +304,17 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
         <h3 class="sub">Events</h3>
         <ol class="given" id="events"><li class="none">Nothing yet</li></ol>
       </div>
+      <div class="panel" role="tabpanel" id="panel-exam" aria-labelledby="tab-exam" hidden>
+        <p class="hint">Examine the patient at the bedside. The findings are read from the model, so they match the monitor and change as the case does.</p>
+        <dl class="dl" id="exam-list"></dl>
+      </div>
+      <div class="panel" role="tabpanel" id="panel-help" aria-labelledby="tab-help" hidden>
+        <p class="hint">Get help and tell the team. These are recorded in the events list (and the debrief); in a crisis they are the first things to do.</p>
+        <div class="act" id="help-acts"></div>
+        <p class="state" id="help-ack" aria-live="polite"></p>
+      </div>
       <details id="behind-box"><summary>Behind the monitor</summary><div id="behind"></div></details>
-      <p class="foot">Free run: a healthy synthetic adult. A full model: drugs, the airway gases, breathing and the ventilator, heart rate and blood pressure, oxygen and CO2, temperature, the heart rhythm, resuscitation (compressions, defibrillation, pacing) and the airway (obstruction, mask, LMA, tube, front-of-neck) all respond. The case flow and the crises come next. Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
+      <p class="foot">Free run: a healthy synthetic adult. A full model: drugs, the airway gases, breathing and the ventilator, heart rate and blood pressure, oxygen and CO2, temperature, the heart rhythm, resuscitation (compressions, defibrillation, pacing) and the airway (obstruction, mask, LMA, tube, front-of-neck) all respond. A guided case runs from pre-op through the operation (Examine and call for Help as you go); the crises come next. Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
     </div>
   </div>
 </section>

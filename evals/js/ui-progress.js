@@ -43,8 +43,8 @@ function itemSheet(item, p) {
     item.entrustQs && item.entrustQs.length ? h('details', { class: 'e-q__more' }, h('summary', {}, `Entrustment questions (${item.entrustQs.length})`),
       h('ul', { class: 'e-small' }, item.entrustQs.map(q => h('li', {}, q)))) : null,
     h('div', { class: 'e-actions' },
-      h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => m.close() }, 'Close'),
-      h('button', { class: 'n-btn e-go', onclick: () => { m.close(); go('new/' + item.id); } }, icon('plus'), 'Request this'))));
+      h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', onclick: () => m.close() }, 'Close'),
+      h('button', { class: 'a-btn e-go', onclick: () => { m.close(); go('new/' + item.id); } }, icon('plus'), 'Request this'))));
 }
 
 export function renderProgress() {
@@ -99,7 +99,7 @@ export function renderProgress() {
     h('div', { class: 'e-rq-legend', 'aria-hidden': 'true' }, Object.entries(STATE).map(([, [l, c]]) => h('span', { style: `--c:${c}` }, l))),
     epaBlocks.some(Boolean) ? h('div', { class: 'e-list' }, epaBlocks)
       : h('p', { class: 'e-small e-center' }, view === 'overdue' ? 'Nothing overdue.' : 'Nothing due this year.'),
-    h('a', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', href: '#summary' }, 'My record: print or download'));
+    h('a', { class: 'a-btn a-btn--tinted a-btn--block e-btn-quiet e-btn-big', href: '#summary' }, 'My record: print or download'));
 }
 
 function bar(done, min, state) {
@@ -137,8 +137,8 @@ export function renderSummary() {
   });
   return h('div', { class: 'e-stack e-summary' },
     h('div', { class: 'e-actions e-noprint' },
-      h('button', { class: 'n-btn', type: 'button', onclick: () => window.print() }, 'Print or save as PDF'),
-      h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: csv }, 'Download CSV')),
+      h('button', { class: 'a-btn', type: 'button', onclick: () => window.print() }, 'Print or save as PDF'),
+      h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: csv }, 'Download CSV')),
     h('section', { class: 'e-card' },
       h('h2', { class: 'e-h2', style: 'margin:0' }, res.name || S.user?.name || ''),
       h('p', { class: 'e-small', style: 'margin:4px 0 0' }, [res.rid, 'R' + yr, `${rows.filter(p => p.state === 'done').length} of ${rows.length} requirements done`, `printed ${fmtDate(todayISO())}`].filter(Boolean).join(' · ')),
