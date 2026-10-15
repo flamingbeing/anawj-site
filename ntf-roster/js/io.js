@@ -349,7 +349,7 @@ export function applyImport(draft, parsed, choices = {}) {
     if (how !== 'code') continue;
     const have = (draft.duties || []).find(d => d.code.toLowerCase() === code.toLowerCase());
     if (have) { asCode.set(code.toLowerCase(), have.code); continue; }
-    draft.duties.push({ code, name: code, kind: 'other', color: '#e6e1d6', ink: '#272722', overnight: false, auto: false, hours: 0 });
+    draft.duties.push({ code, name: code, kind: 'other', color: '#e0e0e0', ink: '#333', overnight: false, auto: false, hours: 0 });
     asCode.set(code.toLowerCase(), code);
     sum.codesAdded.push(code);
   }

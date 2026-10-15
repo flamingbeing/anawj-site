@@ -140,39 +140,32 @@ export function mount(el, app) {
   el.append(root);
 
   // Toolbar
-  // the kit's chip row (one row that scrolls sideways on phones); the selects and the search are chip-shaped too
-  const tb = h('div', { class: 'r-toolbar app-chips', role: 'toolbar', 'aria-label': 'Roster tools' });
-  const search = h('input', { type: 'search', class: 'r-search', placeholder: 'Find', 'aria-label': 'Find a person', value: ui.q });
+  const tb = h('div', { class: 'r-toolbar', role: 'toolbar', 'aria-label': 'Roster tools' });
+  const search = h('input', { type: 'search', class: 'input r-search', placeholder: 'Find', 'aria-label': 'Find a person', value: ui.q });
   const searchWrap = h('label', { class: 'r-searchwrap' }, h('span', { class: 'r-search-ic', html: icon('search') }), search);
-  const groupSel = h('select', { class: 'r-chipsel', 'aria-label': 'Show group' });
-  const tagSel = h('select', { class: 'r-chipsel', 'aria-label': 'Show tag' });
-  const hiSel = h('select', { class: 'r-chipsel', 'aria-label': 'Highlight a code' });
-  const selChip = (sel) => h('span', { class: 'r-selwrap' }, sel);
-  const reqBtn = h('button', { type: 'button', class: 'app-chip', 'aria-pressed': String(ui.showReq), title: 'Show or hide requests (Cr, Nc, Wr…)' });
-  const paintBtn = h('button', { type: 'button', class: 'app-chip', 'aria-pressed': 'false', title: 'Paint mode: pick a code, then tap or drag across cells' });
+  const groupSel = h('select', { class: 'input r-sel', 'aria-label': 'Show group' });
+  const tagSel = h('select', { class: 'input r-sel', 'aria-label': 'Show tag' });
+  const hiSel = h('select', { class: 'input r-sel', 'aria-label': 'Highlight a code' });
+  const reqBtn = h('button', { type: 'button', class: 'tbtn', 'aria-pressed': String(ui.showReq), title: 'Show or hide requests (Cr, Nc, Wr…)' });
+  const paintBtn = h('button', { type: 'button', class: 'tbtn', 'aria-pressed': 'false', title: 'Paint mode: pick a code, then tap or drag across cells' });
   reqBtn.innerHTML = `${icon('eye')}<span>Requests</span>`;
   paintBtn.innerHTML = `${icon('brush')}<span>Paint</span>`;
   // the grid's marks explained (they are small and otherwise unexplained)
-  const keyBtn = h('button', { type: 'button', class: 'app-chip', title: 'What the marks in the grid mean', onclick: showKey }, 'Key');
-  // phones: the screen's main action leads the chip row (the screen head folds away there to give the grid room)
-  const afBtn = h('button', { type: 'button', class: 'r-af', title: 'Auto-fill this month from the rules', html: `${icon('spark')}<span>Auto-fill</span>`, onclick: () => openAutofill(app) });
-  tb.append(afBtn, paintBtn, searchWrap, selChip(groupSel), selChip(tagSel), selChip(hiSel), reqBtn, keyBtn);
+  const keyBtn = h('button', { type: 'button', class: 'tbtn', title: 'What the marks in the grid mean', onclick: showKey }, 'Key');
+  tb.append(paintBtn, searchWrap, groupSel, tagSel, hiSel, reqBtn, keyBtn);
   function showKey() {
     const row = (mark, text) => h('li', { class: 'gk-row' }, h('span', { class: 'gk-mark', html: mark }), h('span', null, text));
-    const dm = M.dutyMap(app.store.get());
-    const look = (code, fb) => { const v = chipVars(dm.get(code) || fb); return `--c:${v['--c']};--i:${v['--i']}`; };
-    const call = look('C', { kind: 'shift', color: '#9c2b1e', ink: '#fffaf0' }), nc = look('Nc', { kind: 'request', color: '#633d3c' });
     app.sheet({
-      title: 'Key',   // read only: the X closes it
+      title: 'Key', actions: [{ label: 'Close', primary: true }],
       body: h('ul', { class: 'gk' },
-        row(`<span class="chip" style="${call}">C</span>`, 'A duty, leave or other code (filled chip)'),
-        row(`<span class="chip au" style="${call}">C</span>`, 'Placed by Auto-fill (light line under the chip); re-running Auto-fill may change it'),
-        row(`<span class="chip rq" style="${nc}">Nc</span>`, 'A request (outlined chip): what someone asked for, not what they are doing'),
+        row('<span class="chip" style="--c:#c62828;--i:#fff">C</span>', 'A duty, leave or other code (filled chip)'),
+        row('<span class="chip au" style="--c:#c62828;--i:#fff">C</span>', 'Placed by Auto-fill (light line under the chip); re-running Auto-fill may change it'),
+        row('<span class="chip rq" style="--c:#0b5394">Nc</span>', 'A request (outlined chip): what someone asked for, not what they are doing'),
         row('<span class="chip dx">x</span>', 'Post call: the day after an overnight duty (worked out, never typed)'),
         row('<span class="gk-cell"><span class="vx vh"></span></span>', 'Red corner: a must-fix problem in that cell (tap the cell to see it)'),
         row('<span class="gk-cell"><span class="vx vs"></span></span>', 'Amber corner: something to improve (a preference)'),
         row('<span class="vx-nm vh"></span>', 'Dot after a name: a problem about their whole month (fair share, a monthly minimum)'),
-        row('<span class="gk-cell"><span class="nd"></span></span>', 'Dot at the top left: a note on that cell'),
+        row('<span class="gk-cell"><span class="nd"></span></span>', 'Blue dot: a note on that cell'),
         row('<span class="gk-txt">Wk</span>', 'Weekend and public holiday calls this month (the totals at the end of each row)'),
         row('<span class="gk-txt">2/2</span>', 'Bottom rows: how many are on each cover rule that day, against what it needs')),
     });
@@ -219,7 +212,7 @@ export function mount(el, app) {
     if (!ui.paint) { paintKey = ''; return; }
     const duties = (state.duties || []).filter(d => d.kind !== 'derived');
     // ('__clear' is the Clear chip, not a duty: keep it)
-    if (ui.paintCode !== '__clear' && (!ui.paintCode || !duties.some(d => d.code === ui.paintCode))) ui.paintCode =(duties.find(d => d.code === 'AL') || duties[0] || {}).code || '';
+    if (ui.paintCode !== '__clear' && (!ui.paintCode || !duties.some(d => d.code === ui.paintCode))) ui.paintCode = (duties.find(d => d.code === 'AL') || duties[0] || {}).code || '';
     const k = JSON.stringify([ui.paintCode, duties.map(d => [d.code, d.name, d.kind, d.color, d.ink])]);
     if (k === paintKey) return;
     paintKey = k;
@@ -243,7 +236,7 @@ export function mount(el, app) {
       html: `${icon('eraser')}<span>Clear</span>`, onclick: () => { ui.paintCode = '__clear'; renderPaintBar(app.store.get()); },
     }));
     paintBar.append(h('span', { class: 'pb-hint' }, ui.paintCode === '__clear' ? 'Tap (or drag with a mouse) to clear cells' : `Tap cells to add ${ui.paintCode} (drag with a mouse); tap a cell that has it to remove`));
-    paintBar.append(h('button', { type: 'button', class: 'app-btn app-btn--secondary app-btn--compact pb-done', onclick: () => setPaint(false) }, `Done painting`));
+    paintBar.append(h('button', { type: 'button', class: 'btn btn-primary btn-sm pb-done', onclick: () => setPaint(false) }, `Done painting`));
   }
   function setPaint(on) {
     ui.paint = on; closeEditor(); renderPaintBar(app.store.get()); root.classList.toggle('painting', ui.paint);
@@ -276,16 +269,11 @@ export function mount(el, app) {
   const BATCH = 24;     // rows added per frame below the window
   function queueRows(rows, top, next) {
     pending = { rows, top, next, raf: 0, timer: 0 };
-    later(true);
+    later();
   }
-  // the next step after the next paint; the first one a frame later still, so the frame that shows the new rows is
-  // painted and the page answers a tap before the rest goes in (the rows above the window go in as one step)
-  function later(first) {
+  function later() {   // the next step after the next paint
     const p = pending;
-    p.raf = requestAnimationFrame(() => {
-      if (first) p.raf = requestAnimationFrame(() => { p.timer = setTimeout(step, 0); });
-      else p.timer = setTimeout(step, 0);
-    });
+    p.raf = requestAnimationFrame(() => { p.timer = setTimeout(step, 0); });
   }
   function step() {
     const p = pending;
@@ -330,10 +318,6 @@ export function mount(el, app) {
     pending = null;
   }
 
-  // usual heights of a group row and a person row (style.css: 44 px rows on touch screens), for rows not drawn yet
-  const touchRows = window.matchMedia('(max-width: 720px), (pointer: coarse)');
-  function rowHeights() { return { g: 28, p: touchRows.matches ? 45 : 35 }; }
-
   function filteredStaff(state) {
     let list = M.staffInMonth(state, app.month);
     const gmap = M.groupMap(state);
@@ -374,7 +358,7 @@ export function mount(el, app) {
     let css = (state.duties || []).map((d, i) => { const v = chipVars(d); return `.dc-${i}{--c:${v['--c']};--i:${v['--i']}}`; }).join('');
     if (ui.hi && ctx) {
       const i = ctx.dutyIdx.get(ui.hi);
-      css += i == null ? '' : `.grid.hi .chip:not(.dc-${i}){opacity:.14}.grid.hi .chip.dc-${i}{box-shadow:0 0 0 2px #633d3c}`;
+      css += i == null ? '' : `.grid.hi .chip:not(.dc-${i}){opacity:.14}.grid.hi .chip.dc-${i}{box-shadow:0 0 0 2px #002f6c}`;
     }
     // rewriting a <style> makes the browser restyle every element on the page (thousands in the grid): only when
     // the CSS really changed (speed: each edit used to pay for it)
@@ -447,9 +431,7 @@ export function mount(el, app) {
     return k;
   }
 
-  // opts.focus: a person whose row a full redraw should draw first and scroll to (the remembered cell after a month
-  // switch or back from another tab), so that cell is there without drawing every row at once
-  function renderGrid(opts = {}) {
+  function renderGrid() {
     const t0 = performance.now();
     const state = app.store.get();
     ctx = buildCtx(state);
@@ -611,8 +593,7 @@ export function mount(el, app) {
     } else {
       // (the scroll position is read only here: reading it makes the browser lay the page out first, which an edit
       // that patches rows doesn't need)
-      const st0 = scroll.scrollTop, sl = scroll.scrollLeft;
-      let st = st0;
+      const st = scroll.scrollTop, sl = scroll.scrollLeft;
       let top = 0, end = rows.length, gap = 0;   // draw rows [top, end) now; the rows above wait in a gap of this height
       if (document.body.classList.contains('ready') && rows.length > 30) {
         // heights of the rows drawn last time, by person or group (the same people are mostly in the same places),
@@ -621,16 +602,8 @@ export function mount(el, app) {
         if (trs && prevRender && prevRender.keys && trs.length === prevRender.keys.length && !table.querySelector('tr.r-spacer')) {
           for (let i = 0; i < trs.length; i++) old.set(prevRender.keys[i], trs[i].offsetHeight);
         }
-        const rh = rowHeights();
-        const est = i => old.get(keys[i]) || (keys[i].startsWith('g:') ? rh.g : rh.p);
+        const est = i => old.get(keys[i]) || (keys[i].startsWith('g:') ? 25 : 33);
         const view = scroll.clientHeight || 800;
-        // the remembered cell's row off screen: start the window there (keepVisible() fine-tunes the scroll)
-        const fi = opts.focus ? keys.indexOf(opts.focus) : -1;
-        if (fi >= 0) {
-          let yf = 0;
-          for (let k = 0; k < fi; k++) yf += est(k);
-          if (yf < st + 40 || yf + est(fi) > st + view - 40) st = Math.max(0, Math.round(yf - view / 3));
-        }
         let y = 0, i = 0;
         while (i < rows.length && y + est(i) <= st - 66) { y += est(i); i++; }   // keep two rows above the window
         top = i; gap = y;
@@ -639,8 +612,7 @@ export function mount(el, app) {
       }
       const spacer = top ? `<tr class="r-spacer" aria-hidden="true"><td colspan="${nCols}" style="height:${gap}px;padding:0;border:0"></td></tr>` : '';
       scroll.innerHTML = open + head + '<tbody>' + spacer + rows.slice(top, end).join('') + '</tbody>' + foot + '</table>';
-      // the scroller keeps its position through the swap; set it only when it moves (setting it lays the grid out)
-      if (st !== st0 || (st0 && !gap)) { scroll.scrollTop = st; scroll.scrollLeft = sl; }
+      scroll.scrollTop = st; scroll.scrollLeft = sl;
       if (top || end < rows.length) queueRows(rows, top, end);
     }
     prevRender = { shape, head, rows, foot, keys, parts, footParts };
@@ -668,7 +640,7 @@ export function mount(el, app) {
     banner.append(
       h('span', { class: 'rb-ic', html: icon('spark') }),
       h('span', { class: 'rb-text' }, h('strong', null, `No calls or shifts in ${M.fmtMonth(app.month)} yet. `), 'Enter leave and requests first, then let Auto-fill draft the calls and PM shifts around them.'),
-      h('button', { type: 'button', class: 'app-btn app-btn--secondary app-btn--compact', onclick: () => openAutofill(app) }, 'Auto-fill this month'));
+      h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => openAutofill(app) }, 'Auto-fill this month'));
   }
 
   // Bring a day's column into view (only scrolls when it is hidden behind the name column or off the right edge).
@@ -945,7 +917,7 @@ export function mount(el, app) {
               const on = (cellNow()[field] || []).includes(du.code);
               app.store.commit(`${on ? 'Remove' : 'Add'} ${du.code} · ${who()}`, draft => toggleCode(draft, d, sid, du.code, !on, M.dutyMap(draft)));
             },
-          }, h('span', { class: 'tc-code' }, du.code), h('span', { class: 'tc-name' }, String(du.name).replace(/\//g, '/\u200b')));   // (a long name may wrap after a slash)
+          }, h('span', { class: 'tc-code' }, du.code), h('span', { class: 'tc-name' }, du.name));
           chips.push({ b, code: du.code, kind, field });
           box.append(b);
         }
@@ -953,21 +925,21 @@ export function mount(el, app) {
         secs.push(sec);
         wrap.append(sec);
       }
-      const note = h('textarea', { class: 'app-input ced-note', rows: '2', placeholder: 'Note (e.g. 3-4.30pm meeting)', 'aria-label': 'Note' });
+      const note = h('textarea', { class: 'input ced-note', rows: '2', placeholder: 'Note (e.g. 3-4.30pm meeting)', 'aria-label': 'Note' });
       note.addEventListener('change', () => {
         const v = note.value.trim();
         if (v === (cellNow().note || '')) return;
         app.store.commit(`Note · ${who()}`, draft => M.setCell(draft, d, sid, { note: v }));
       });
       const lockId = 'lk-' + Math.random().toString(36).slice(2, 7);
-      const lock = h('input', { type: 'checkbox', id: lockId, class: 'app-switch', role: 'switch' });
+      const lock = h('input', { type: 'checkbox', id: lockId });
       lock.addEventListener('change', () => app.store.commit(`${lock.checked ? 'Lock' : 'Unlock'} ${who()}`, draft => M.setCell(draft, d, sid, { lock: lock.checked })));
       const noteSec = h('div', { class: 'ced-sec' }, h('h3', { class: 'ced-h' }, 'Note'), note);
       wrap.append(noteSec);
-      const clear = h('button', { type: 'button', class: 'app-btn app-btn--danger app-btn--compact', onclick: () => clearCell(d, sid) }, 'Clear');
+      const clear = h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm', onclick: () => clearCell(d, sid) }, 'Clear');
       wrap.append(h('div', { class: 'ced-row' },
-        h('label', { class: 'sw-line', for: lockId }, h('span', null, 'Lock (auto-fill won\'t change it)'), lock),
-        h('button', { type: 'button', class: 'app-btn app-btn--secondary app-btn--compact', onclick: () => { app.go('day', { d, m: app.month }); closeEditor(); } }, 'Open day'),
+        h('label', { class: 'switch', for: lockId }, lock, h('span', { class: 'sw-track', 'aria-hidden': 'true' }), h('span', null, 'Lock (auto-fill won\'t change it)')),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { app.go('day', { d, m: app.month }); closeEditor(); } }, 'Open day'),
         clear));
       built = { key, chips, firstSec: secs[0] || noteSec, noteSec, note, lock, clear, extras: [] };
     }
@@ -1024,19 +996,18 @@ export function mount(el, app) {
     if (!p) return;
     const title = `${p.name} · ${M.fmtDay(d)}`;
     const { wrap, fill } = editorBody(d, sid);
-    // a sheet on phones and touch screens (Back closes it, focus stays in it); a panel beside the cell with a mouse
-    if (app.isPhone() || window.matchMedia('(pointer: coarse)').matches) {
-      const close = app.sheet({ title, body: wrap, className: 'ced-sheet', closeLabel: 'Done', onClose: () => { if (editor && editor.close === close) editor = null; } });
+    if (app.isPhone()) {
+      const close = app.sheet({ title, body: wrap, className: 'ced-sheet', actions: [{ label: 'Done', primary: true }], onClose: () => { if (editor && editor.close === close) editor = null; } });
       editor = { d, s: sid, close, refresh: fill };
       return;
     }
     const pop = h('div', { class: 'popover', role: 'dialog', 'aria-label': title },
       h('div', { class: 'pop-head' }, h('h2', { class: 'pop-title' }, p.name, h('span', { class: 'pop-sub' }, M.fmtDay(d) + (M.isHoliday(state, d) ? ' · ' + (M.holidayName(state, d) || 'Public holiday') : ''))),
-        h('button', { type: 'button', class: 'app-bar-btn', 'aria-label': 'Close', html: app.icon('close'), onclick: () => closeEditor(true) })),
+        h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close', html: app.icon('close'), onclick: () => closeEditor(true) })),
       h('div', { class: 'pop-body' }, wrap));
     document.body.append(pop);
     const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closeEditor(true); } };
-    const onDown = (e) => { if (!pop.contains(e.target) && !e.target.closest?.('.cell') && !e.target.closest?.('.app-sheet, .sheet-scrim') && !e.target.closest?.('.toast')) closeEditor(false); };
+    const onDown = (e) => { if (!pop.contains(e.target) && !e.target.closest?.('.cell') && !e.target.closest?.('.sheet-back') && !e.target.closest?.('.toast')) closeEditor(false); };
     pop.addEventListener('keydown', onKey);
     setTimeout(() => document.addEventListener('mousedown', onDown), 0);
     editor = {
@@ -1108,13 +1079,12 @@ export function mount(el, app) {
     // problems about the whole month (fair share, a monthly minimum) have no day: list them first
     probs = (ev.violations || []).filter(v => v.staffId === sid && !v.date && !(v.dates || []).length).concat([...new Set(probs)]);
     personHost.innerHTML = '';
-    // a pushed screen: the person's name is the large title and the bar has "‹ Roster" (render() sets them)
     const head = h('div', { class: 'ps-head' },
-      h('div', { class: 'ps-id' }, h('p', { class: 'ps-meta' }, [g?.name, ...tags, p.note].filter(Boolean).join(' · '))),
-      // the people before and after on the sheet, by name (plain arrows read as a second month switch)
+      h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => app.go('roster', { m: app.month }), html: `${app.icon('back')}<span>Roster</span>` }),
+      h('div', { class: 'ps-id' }, h('h2', { class: 'ps-name' }, p.name), h('p', { class: 'ps-meta' }, [g?.name, ...tags, p.note].filter(Boolean).join(' · '))),
       h('div', { class: 'ps-nav' },
-        prev ? h('button', { type: 'button', class: 'app-bar-btn ps-step', title: prev.name, html: `${app.icon('left')}<span class="sr-only">Previous person: </span><span>${app.esc(prev.short || prev.name)}</span>`, onclick: () => app.go('roster', { m: app.month, p: prev.id }) }) : null,
-        next ? h('button', { type: 'button', class: 'app-bar-btn ps-step', title: next.name, html: `<span class="sr-only">Next person: </span><span>${app.esc(next.short || next.name)}</span>${app.icon('right')}`, onclick: () => app.go('roster', { m: app.month, p: next.id }) }) : null));
+        h('button', { type: 'button', class: 'icon-btn', 'aria-label': prev ? `Previous person: ${prev.name}` : 'No previous person', disabled: !prev, html: app.icon('left'), onclick: () => prev && app.go('roster', { m: app.month, p: prev.id }) }),
+        h('button', { type: 'button', class: 'icon-btn', 'aria-label': next ? `Next person: ${next.name}` : 'No next person', disabled: !next, html: app.icon('right'), onclick: () => next && app.go('roster', { m: app.month, p: next.id }) })));
     const stats = h('div', { class: 'ps-stats' });
     const order = (state.duties || []).filter(d => counts.has(d.code));
     for (const du of order) {
@@ -1167,7 +1137,7 @@ export function mount(el, app) {
 
     personHost.append(head, stats, cal);
     if (probs.length) {
-      personHost.append(h('section', { class: 'app-section ps-probs' }, h('h3', { class: 'app-section-header' }, `Problems this month (${probs.length})`),
+      personHost.append(h('div', { class: 'card ps-probs' }, h('h3', null, `Problems this month (${probs.length})`),
         h('ul', { class: 'plist' }, probs.map(v => h('li', { class: v.hard ? 'vh' : 'vs' }, h('span', { class: 'vi', html: app.icon('alert') }), h('span', null, v.msg))))));
     }
   }
@@ -1178,30 +1148,24 @@ export function mount(el, app) {
     const pid = app.params.p;
     const personMode = !!pid && (state.staff || []).some(x => x.id === pid);
     root.classList.toggle('person-mode', personMode);
-    document.body.classList.toggle('roster-grid', !personMode);   // the page fits the screen and the grid scrolls (style.css)
     tb.hidden = personMode; body.hidden = personMode; personHost.hidden = !personMode;
     if (personMode) {
       paintBar.hidden = true; banner.hidden = true;
-      const p = state.staff.find(x => x.id === pid);
-      app.setHead?.({ title: p.name, back: { label: 'Roster', fn: () => app.go('roster', { m: app.month }) }, noAutofill: true });
       dutyStyles(state);
       renderPerson(pid);
-      if (lastPerson !== pid) { window.scrollTo(0, 0); lastPerson = pid; }
+      if (lastPerson !== pid) { el.closest('.main')?.scrollTo(0, 0); lastPerson = pid; }
     } else {
       lastPerson = null;
-      app.setHead?.(null);   // (and, on phones, the month moves into the top bar: the grid is showing)
       fillSelects(state);
       renderPaintBar(state);
-      const reveal = firstRender || opts.month;
-      const sc = reveal ? app.selectedCell : null;
-      const scCell = !!(sc && sc.date && sc.date.startsWith(app.month) && sc.staffId);
-      if (scCell) sel = { ...sc };   // before drawing: its row is drawn first and its cell is the focusable one
-      renderGrid(scCell ? { focus: sc.staffId } : {});
-      if (reveal) {
-        if (scCell) {
-          // (unless a filter hides that person: then the grid chose another cell)
-          const b = sel && sel.staffId === sc.staffId && sel.date === sc.date ? selBtn() : null;
-          if (b) { b.tabIndex = 0; keepVisible(b); b.parentElement.classList.add('flash'); setTimeout(() => b.parentElement?.classList.remove('flash'), 1600); }
+      renderGrid();
+      if (firstRender || opts.month) {
+        const sc = app.selectedCell;
+        if (sc && sc.date && sc.date.startsWith(app.month) && sc.staffId) {
+          sel = { ...sc };
+          focusSel(false);
+          const b = selBtn();
+          if (b) { keepVisible(b); b.parentElement.classList.add('flash'); setTimeout(() => b.parentElement?.classList.remove('flash'), 1600); }
         } else if (sc && sc.date && sc.date.startsWith(app.month)) {
           const th = scroll.querySelector(`th.dh[data-d="${sc.date}"]`);
           if (th) {
@@ -1223,7 +1187,7 @@ export function mount(el, app) {
   return {
     update(state, info = {}) { render({ month: !!info.month }); },
     route(params) { render({ month: false }); },
-    unmount() { document.body.classList.remove('roster-grid'); closeEditor(); clearTimeout(typedTimer); if (pending) { cancelAnimationFrame(pending.raf); clearTimeout(pending.timer); pending = null; } },
+    unmount() { closeEditor(); clearTimeout(typedTimer); if (pending) { cancelAnimationFrame(pending.raf); clearTimeout(pending.timer); pending = null; } },
   };
 }
 
@@ -1249,7 +1213,7 @@ const contrastCache = new Map();
 export function readable(bg, ink) {
   const k = bg + '/' + ink;
   if (contrastCache.has(k)) return contrastCache.get(k);
-  let out = { c: safeColor(bg, '#e6e1d6'), i: safeColor(ink, '#272722') };
+  let out = { c: safeColor(bg, '#e0e0e0'), i: safeColor(ink, '#222') };
   const B = hexRgb(bg), I = hexRgb(ink);
   if (B && I && contrast(B, I) < 4.6) {
     const inkLight = lum(I) > lum(B);
@@ -1263,9 +1227,9 @@ export function readable(bg, ink) {
 }
 // CSS custom properties for a chip of this duty: { '--c', '--i' } (requests are outlined: their colour is the text)
 export function chipVars(du) {
-  if (!du) return { '--c': '#e6e1d6', '--i': '#272722' };   // (the kit's fill and ink)
-  if (du.kind === 'request') { const r = readable('#ffffff', du.color || '#633d3c'); return { '--c': r.i, '--i': r.i }; }
-  const r = readable(du.color || '#e6e1d6', du.ink || '#272722');
+  if (!du) return { '--c': '#e0e0e0', '--i': '#333' };
+  if (du.kind === 'request') { const r = readable('#ffffff', du.color || '#0b5394'); return { '--c': r.i, '--i': r.i }; }
+  const r = readable(du.color || '#e0e0e0', du.ink || '#222');
   return { '--c': r.c, '--i': r.i };
 }
 
@@ -1319,7 +1283,7 @@ export function openAutofill(app) {
     const n = counts(state);
     wrap.innerHTML = '';
     wrap.append(
-      h('p', { class: 'af-intro' }, 'Drafts ', h('strong', null, autoDuties.map(d => d.code).join(', ') || 'no codes'), ` for ${M.fmtMonth(app.month)} from your rules (cover, limits, requests, pairings), then improves it while you watch.`),
+      h('p', null, 'Drafts ', h('strong', null, autoDuties.map(d => d.code).join(', ') || 'no codes'), ` for ${M.fmtMonth(app.month)} from your rules (cover, limits, requests, pairings), then improves it while you watch.`),
       h('ul', { class: 'af-keep' },
         h('li', null, 'Kept as they are: leave, requests, notes and anything entered by hand', n.manual ? ` (${n.manual} hand-entered shift${n.manual > 1 ? 's' : ''})` : '', '.'),
         n.locked ? h('li', null, `${n.locked} locked cell${n.locked > 1 ? 's are' : ' is'} left alone.`) : null,
@@ -1327,19 +1291,18 @@ export function openAutofill(app) {
         h('li', null, 'Nothing changes until you press Apply, and Apply can be undone.')));
     // upper bounds: the search usually ends sooner, once it stops finding a better roster
     const times = [[3000, 'Quick', '3 s'], [6000, 'Normal', '6 s'], [15000, 'Thorough', '15 s']];
-    // the kit's segmented control (radios: arrow keys move between them)
-    const fs = h('fieldset', { class: 'app-segmented af-time' }, h('legend', null, 'Search for at most'));
+    const fs = h('fieldset', { class: 'af-time' }, h('legend', null, 'Search for at most'));
     for (const [ms, label, sub] of times) {
       const id = 'af-t-' + ms;
       const r = h('input', { type: 'radio', name: 'af-time', id, value: String(ms), checked: ms === timeMs });
       r.addEventListener('change', () => { timeMs = ms; try { localStorage.setItem('ntf-roster-af-time', String(ms)); } catch (e) { /* ignore */ } });
-      fs.append(h('label', { class: 'app-seg af-opt', for: id }, r, h('span', null, label, h('small', { class: 'af-opt-s' }, sub))));
+      fs.append(h('label', { class: 'af-opt', for: id }, r, h('span', { class: 'af-opt-l' }, label), h('span', { class: 'af-opt-s' }, sub)));
     }
-    wrap.append(h('div', null, h('p', { class: 'af-time-l', 'aria-hidden': 'true' }, 'Search for at most'), fs));
+    wrap.append(fs);
     if (!autoDuties.length) wrap.append(h('p', { class: 'warn-box' }, 'No duty is marked "auto-fill" yet. Mark codes under People › Duty codes.'));
     wrap.append(h('div', { class: 'af-actions' },
-      h('button', { type: 'button', class: 'app-btn app-btn--plain', onclick: () => close() }, 'Cancel'),
-      h('button', { type: 'button', class: 'app-btn app-btn--primary', disabled: !autoDuties.length, onclick: run, html: `${app.icon('spark')}<span>Start</span>` })));
+      h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => close() }, 'Cancel'),
+      h('button', { type: 'button', class: 'btn btn-primary', disabled: !autoDuties.length, onclick: run, html: `${app.icon('spark')}<span>Start</span>` })));
   }
 
   function stageProgress() {
@@ -1352,7 +1315,7 @@ export function openAutofill(app) {
         h('div', { class: 'af-num' }, h('span', { class: 'af-n af-hard' }, '–'), h('span', null, 'must-fix')),
         h('div', { class: 'af-num' }, h('span', { class: 'af-n af-soft' }, '–'), h('span', null, 'to improve')),
         h('div', { class: 'af-num' }, h('span', { class: 'af-n af-time-n' }, '0 s'), h('span', null, 'elapsed'))),
-      h('div', { class: 'af-actions' }, h('button', { type: 'button', class: 'app-btn app-btn--secondary', onclick: () => { stopWorker(); stageOptions(); }, html: `${app.icon('stop')}<span>Stop</span>` })));
+      h('div', { class: 'af-actions' }, h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => { stopWorker(); stageOptions(); }, html: `${app.icon('stop')}<span>Stop</span>` })));
     t0 = performance.now();
     shownPct = 0;
     tick = setInterval(() => {
@@ -1405,7 +1368,7 @@ export function openAutofill(app) {
         clearInterval(tick);
         wrap.innerHTML = '';
         wrap.append(h('p', { class: 'warn-box' }, 'Auto-fill could not run: ' + (e.message || e)),
-          h('div', { class: 'af-actions' }, h('button', { type: 'button', class: 'app-btn app-btn--secondary', onclick: () => close() }, 'Close')));
+          h('div', { class: 'af-actions' }, h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => close() }, 'Close')));
       }
     };
     try {
@@ -1449,7 +1412,7 @@ export function openAutofill(app) {
     wrap.innerHTML = '';
     const changedTxt = ch.added + ch.removed ? `${ch.added} shift${ch.added === 1 ? '' : 's'} added, ${ch.removed} removed` : 'No changes: the current roster is already the best found';
     wrap.append(
-      h('p', { class: 'af-headline' }, changedTxt, ' ', h('span', { class: 'muted' }, `${((result.ms || 0) / 1000).toFixed(1)} s${result.iterations ? `, ${Number(result.iterations).toLocaleString()} tries` : ''}`)),
+      h('p', { class: 'af-headline' }, changedTxt, h('span', { class: 'muted' }, ` · ${((result.ms || 0) / 1000).toFixed(1)} s${result.iterations ? `, ${Number(result.iterations).toLocaleString()} tries` : ''}`)),
       h('div', { class: 'af-compare' },
         cmp('Must-fix problems', now.hard, after.hard),
         cmp('To improve (soft)', now.soft, after.soft)));
@@ -1470,17 +1433,17 @@ export function openAutofill(app) {
       wrap.append(h('p', { class: 'ok-box', html: `${app.icon('ok')}<span>Every must-fix rule is met.</span>` }));
     }
     wrap.append(h('div', { class: 'af-actions' },
-      h('button', { type: 'button', class: 'app-btn app-btn--plain', onclick: () => close() }, 'Discard'),
-      h('button', { type: 'button', class: 'app-btn app-btn--secondary', onclick: run }, 'Try again'),
+      h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => close() }, 'Discard'),
+      h('button', { type: 'button', class: 'btn btn-ghost', onclick: run }, 'Try again'),
       h('button', {
-        type: 'button', class: 'app-btn app-btn--primary', autofocus: true,
+        type: 'button', class: 'btn btn-primary', autofocus: true,
         onclick: () => {
           app.store.commit(`Auto-fill ${M.fmtMonth(app.month)}`, draft => applyAssignments(draft, result, days));
           close();
           app.toast(`Auto-fill applied: ${changedTxt.toLowerCase()}`, { action: { label: 'Undo', fn: () => app.store.undo() } });
         },
       }, 'Apply')));
-    wrap.querySelector('.app-btn--primary')?.focus();
+    wrap.querySelector('.btn-primary')?.focus();
   }
 
   function cmp(label, a, b) {

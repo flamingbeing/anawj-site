@@ -1,7 +1,6 @@
 // NTF Roster: the People screen. Four parts: Staff (grouped like the department sheet: add, edit, bulk add, reorder,
 // remove), Groups (rename, senior/junior, order), Tags (Baby MO, Part time…) and Duty codes (colours, overnight,
 // auto-fill). Every change is one store.commit, so it can be undone; removals offer Undo straight away.
-// Looks: the NTF app kit (a segmented control for the four parts, grouped rows, chips, switches, sheets).
 
 import * as M from './model.js';
 import { chipStyle, contrast } from './ui-rules.js';
@@ -23,38 +22,34 @@ export function mount(el, app) {
   const undoAct = { label: 'Undo', fn: () => app.store.undo() };
 
   const root = h('div', { class: 'pv' });
-  const head = h('div', { class: 'bx-head' },
-    h('p', { class: 'bx-sub' }, 'Staff in sheet order, their groups and tags, and the duty codes used on the roster.'));
-  const nav = h('fieldset', { class: 'app-segmented pv-parts' });
+  const head = h('div', { class: 'bx-head' }, h('div', { class: 'bx-head-text' },
+    h('h2', { class: 'bx-h' }, 'People'),
+    h('p', { class: 'bx-sub' }, 'Staff in sheet order, their groups and tags, and the duty codes used on the roster.')));
+  const nav = h('div', { class: 'bx-tabs', role: 'tablist', 'aria-label': 'People sections' });
   const body = h('div', { class: 'pv-body' });
   root.append(head, nav, body);
   el.append(root);
 
-  // the four parts: the kit's segmented control (radios; arrow keys move between them), with counts on wider screens
   function renderNav() {
     const st = app.store.get();
     nav.innerHTML = '';
-    nav.append(h('legend', null, 'People sections'));
-    for (const [k, l, n] of [['staff', 'Staff', (st.staff || []).length], ['groups', 'Groups', (st.groups || []).length], ['tags', 'Tags', (st.tags || []).length], ['codes', 'Codes', (st.duties || []).length]]) {
-      nav.append(h('label', { class: 'app-seg' },
-        h('input', { type: 'radio', name: 'pv-part', id: `pv-tab-${k}`, value: k, checked: part === k, onchange: () => { part = k; render(); } }),
-        h('span', null, l, h('small', { class: 'seg-n' }, String(n)))));
+    for (const [k, l, n] of [['staff', 'Staff', (st.staff || []).length], ['groups', 'Groups', (st.groups || []).length], ['tags', 'Tags', (st.tags || []).length], ['codes', 'Duty codes', (st.duties || []).length]]) {
+      nav.append(h('button', { type: 'button', role: 'tab', class: 'bx-tab', 'aria-selected': String(part === k), id: `pv-tab-${k}`,
+        onclick: () => { part = k; render(); } }, l, h('span', { class: 'bx-count' }, String(n))));
     }
-    body.setAttribute('role', 'region');
+    body.setAttribute('role', 'tabpanel');
     body.setAttribute('aria-labelledby', `pv-tab-${part}`);
   }
 
   function render() {
     renderNav();
     const keep = document.activeElement && body.contains(document.activeElement) && document.activeElement.matches('input[type="search"]');
-    const keepPart = document.activeElement && nav.contains(document.activeElement);
     body.innerHTML = '';
     if (part === 'staff') renderStaff();
     else if (part === 'groups') renderGroups();
     else if (part === 'tags') renderTags();
     else renderCodes();
     if (keep) { const s = body.querySelector('input[type="search"]'); if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); } }
-    if (keepPart) nav.querySelector('input:checked')?.focus();
   }
 
   // =============== Staff ===============
@@ -62,15 +57,15 @@ export function mount(el, app) {
     const st = app.store.get();
     const today = M.iso(new Date());
     const hasLeft = p => p.active === false || (p.end && p.end < today);
-    const search = h('input', { type: 'search', class: 'app-input bx-search', placeholder: 'Search staff', 'aria-label': 'Search staff', value: q,
+    const search = h('input', { type: 'search', class: 'bx-search', placeholder: 'Search staff', 'aria-label': 'Search staff', value: q,
       oninput: () => { q = search.value.trim().toLowerCase(); renderStaffList(); } });
-    const leftCb = h('input', { type: 'checkbox', class: 'app-switch', role: 'switch', checked: showLeft, onchange: () => { showLeft = leftCb.checked; renderStaffList(); } });
+    const leftCb = h('input', { type: 'checkbox', checked: showLeft, onchange: () => { showLeft = leftCb.checked; renderStaffList(); } });
     const leftN = (st.staff || []).filter(hasLeft).length;
     body.append(h('div', { class: 'pv-bar' },
       h('div', { class: 'rv-search' }, h('span', { class: 'bx-search-ic', html: app.icon('search') }), search),
-      h('button', { type: 'button', class: 'app-btn app-btn--primary', onclick: () => editPerson(null), html: `${app.icon('plus')}<span>Add person</span>` }),
-      h('button', { type: 'button', class: 'app-btn app-btn--secondary', onclick: () => bulkAdd() }, 'Bulk add'),
-      leftN ? h('label', { class: 'sw-line pv-left' }, h('span', null, `Show ${leftN} who left`), leftCb) : null));
+      h('button', { type: 'button', class: 'btn btn-primary', onclick: () => editPerson(null), html: `${app.icon('plus')}<span>Add person</span>` }),
+      h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => bulkAdd() }, 'Bulk add'),
+      leftN ? h('label', { class: 'switch' }, leftCb, h('span', { class: 'sw-track' }), h('span', null, `Show ${leftN} who left`)) : null));
     const listBox = h('div', { class: 'pv-list' });
     body.append(listBox);
 
@@ -79,10 +74,8 @@ export function mount(el, app) {
       listBox.innerHTML = '';
       const staff = (s.staff || []).filter(p => (showLeft || !hasLeft(p)) && (!q || `${p.name} ${p.short} ${p.note}`.toLowerCase().includes(q)));
       if (!(s.staff || []).length) {
-        listBox.append(h('div', { class: 'app-card app-empty' }, h('span', { class: 'app-empty-icon', html: app.icon('people') }),
-          h('p', { class: 'app-empty-title' }, 'No staff yet'),
-          // (no button here: Add person and Bulk add are just above)
-          h('p', { class: 'app-empty-text' }, 'Add people one by one, paste a list with Bulk add, or import the department Excel sheet (More).')));
+        listBox.append(h('div', { class: 'card bx-empty' }, h('p', null, 'No staff yet. Add people one by one, paste a list with Bulk add, or import the department Excel sheet (More).'),
+          h('button', { type: 'button', class: 'btn btn-primary', onclick: () => bulkAdd() }, 'Bulk add names')));
         return;
       }
       const gids = new Set((s.groups || []).map(g => g.id));
@@ -92,13 +85,14 @@ export function mount(el, app) {
         const ps = staff.filter(p => (g.id === '__none' ? !gids.has(p.group) : p.group === g.id));
         if (!ps.length && (q || g.id === '__none')) continue;
         shown += ps.length;
-        const sec = h('section', { class: 'app-section pv-group', 'aria-label': g.name },
+        const sec = h('section', { class: 'pv-group', 'aria-label': g.name },
           h('div', { class: 'pv-group-h' },
-            h('h3', { class: 'app-section-header' }, g.name, h('span', { class: 'bx-count' }, String(ps.length))),
-            g.kind ? h('span', { class: `app-badge${g.kind === 'senior' ? '' : ' app-badge--ink'}` }, g.kind === 'senior' ? 'Senior' : 'Junior') : null,
-            g.id !== '__none' ? h('button', { type: 'button', class: 'app-btn app-btn--plain app-btn--compact pv-gadd', 'aria-label': `Add a person to ${g.name}`, onclick: () => editPerson(null, g.id), html: `${app.icon('plus')}<span>Add</span>` }) : null));
-        if (!ps.length) sec.append(h('p', { class: 'app-section-footer pv-emptyg' }, 'Nobody in this group.'));
-        else sec.append(h('ul', { class: 'app-list pv-rows' }, ps.map((p, i) => h('li', null, personRow(s, p, i, ps.length, hasLeft(p))))));
+            h('h3', null, g.name),
+            g.kind ? h('span', { class: `bx-badge ${g.kind === 'senior' ? 'sen' : 'jun'}` }, g.kind === 'senior' ? 'Senior' : 'Junior') : null,
+            h('span', { class: 'bx-count' }, String(ps.length)),
+            g.id !== '__none' ? h('button', { type: 'button', class: 'btn btn-ghost btn-xs pv-gadd', 'aria-label': `Add a person to ${g.name}`, onclick: () => editPerson(null, g.id) }, '+ Add') : null));
+        if (!ps.length) sec.append(h('p', { class: 'muted pv-emptyg' }, 'Nobody in this group.'));
+        else sec.append(h('ul', { class: 'pv-rows' }, ps.map((p, i) => h('li', null, personRow(s, p, i, ps.length, hasLeft(p))))));
         listBox.append(sec);
       }
       if (!shown && q) listBox.append(h('p', { class: 'bx-none' }, `Nobody matches "${q}".`));
@@ -113,15 +107,14 @@ export function mount(el, app) {
     if (p.start) meta.push(`from ${M.fmtDay(p.start)} ${p.start.slice(0, 4)}`);
     if (p.end) meta.push(`until ${M.fmtDay(p.end)} ${p.end.slice(0, 4)}`);
     if (p.active === false) meta.push('not active');
-    // a grouped row: the name opens the editor (the whole row is its target); the arrows reorder
-    return h('div', { class: `app-row pv-row${left ? ' is-left' : ''}` },
-      h('button', { type: 'button', class: 'pv-main app-row-body', onclick: () => editPerson(p) },
-        h('span', { class: 'app-row-title pv-name' }, p.name || '(no name)', p.short ? h('span', { class: 'pv-short' }, p.short) : null),
-        tags.length || meta.length ? h('span', { class: 'app-row-sub pv-meta' }, tags.map(t => h('span', { class: 'app-badge app-badge--ink' }, t.name)), meta.length ? h('span', null, meta.join(' · ')) : null) : null,
-        p.note ? h('span', { class: 'app-row-sub pv-note' }, p.note) : null),
+    return h('div', { class: `pv-row${left ? ' is-left' : ''}` },
+      h('button', { type: 'button', class: 'pv-main', onclick: () => editPerson(p) },
+        h('span', { class: 'pv-name' }, p.name || '(no name)', p.short ? h('span', { class: 'pv-short' }, p.short) : null),
+        tags.length || meta.length ? h('span', { class: 'pv-meta' }, tags.map(t => h('span', { class: 'pill' }, t.name)), meta.length ? h('span', null, meta.join(' · ')) : null) : null,
+        p.note ? h('span', { class: 'pv-note' }, p.note) : null),
       h('div', { class: 'pv-acts' },
-        h('button', { type: 'button', class: 'app-bar-btn', disabled: i === 0, 'aria-label': `Move ${p.name} up`, title: 'Move up', onclick: () => move(p.id, -1), html: arrow('up') }),
-        h('button', { type: 'button', class: 'app-bar-btn', disabled: i === n - 1, 'aria-label': `Move ${p.name} down`, title: 'Move down', onclick: () => move(p.id, 1), html: arrow('down') })));
+        h('button', { type: 'button', class: 'icon-btn', disabled: i === 0, 'aria-label': `Move ${p.name} up`, title: 'Move up', onclick: () => move(p.id, -1), html: arrow('up') }),
+        h('button', { type: 'button', class: 'icon-btn', disabled: i === n - 1, 'aria-label': `Move ${p.name} down`, title: 'Move down', onclick: () => move(p.id, 1), html: arrow('down') })));
   }
 
   function move(id, dir) {
@@ -165,21 +158,21 @@ export function mount(el, app) {
     const d = p ? structuredClone(p) : { id: M.uid('s'), name: '', short: '', group: groupId || ((st.groups || [])[0] || {}).id || 'mo', tags: [], fte: 1, start: '', end: '', note: '', active: true };
     const ids = { name: fid('pn'), short: fid('ps'), group: fid('pg'), fte: fid('pf'), start: fid('pst'), end: fid('pe'), note: fid('pno') };
     const err = h('p', { class: 'bx-err', role: 'alert' });
-    const name = h('input', { type: 'text', id: ids.name, class: 'app-input', value: d.name, autocomplete: 'off', maxlength: '80', required: true });
-    const short = h('input', { type: 'text', id: ids.short, class: 'app-input', value: d.short || '', maxlength: '20', placeholder: 'Shown on the grid' });
-    const group = h('select', { id: ids.group, class: 'app-input' }, (st.groups || []).map(g => h('option', { value: g.id }, g.name)));
+    const name = h('input', { type: 'text', id: ids.name, value: d.name, autocomplete: 'off', maxlength: '80', required: true });
+    const short = h('input', { type: 'text', id: ids.short, value: d.short || '', maxlength: '20', placeholder: 'Shown on the grid' });
+    const group = h('select', { id: ids.group }, (st.groups || []).map(g => h('option', { value: g.id }, g.name)));
     group.value = d.group;
-    const fte = h('input', { type: 'number', id: ids.fte, class: 'app-input', value: String(d.fte ?? 1), min: '0.1', max: '1', step: '0.1', inputmode: 'decimal' });
-    const start = h('input', { type: 'date', id: ids.start, class: 'app-input', value: d.start || '' });
-    const end = h('input', { type: 'date', id: ids.end, class: 'app-input', value: d.end || '' });
-    const note = h('textarea', { id: ids.note, class: 'app-input', rows: '2', placeholder: 'Rotation, dates, anything useful' }, d.note || '');
-    const active = h('input', { type: 'checkbox', class: 'app-switch', role: 'switch', checked: d.active !== false });
+    const fte = h('input', { type: 'number', id: ids.fte, value: String(d.fte ?? 1), min: '0.1', max: '1', step: '0.1', inputmode: 'decimal' });
+    const start = h('input', { type: 'date', id: ids.start, value: d.start || '' });
+    const end = h('input', { type: 'date', id: ids.end, value: d.end || '' });
+    const note = h('textarea', { id: ids.note, rows: '2', placeholder: 'Rotation, dates, anything useful' }, d.note || '');
+    const active = h('input', { type: 'checkbox', checked: d.active !== false });
     const tagBox = tagToggles(st, d.tags);
     const bodyEl = h('div', { class: 'bx-form' },
       field('Name', ids.name, name),
       h('div', { class: 'bx-two' }, field('Short name (optional)', ids.short, short), field('Group', ids.group, group)),
       (st.tags || []).length ? h('div', { class: 'bx-field' }, h('p', { class: 'bx-label' }, 'Tags'), tagBox) : null,
-      h('div', { class: 'bx-two' }, field('FTE (1 = full time)', ids.fte, fte), h('div', { class: 'bx-field bx-sw-field' }, h('label', { class: 'sw-line' }, h('span', null, 'Active'), active))),
+      h('div', { class: 'bx-two' }, field('FTE (1 = full time)', ids.fte, fte), h('div', { class: 'bx-field bx-sw-field' }, h('label', { class: 'switch' }, active, h('span', { class: 'sw-track' }), h('span', null, 'Active')))),
       h('div', { class: 'bx-two' }, field('Starts (optional)', ids.start, start), field('Leaves (optional)', ids.end, end)),
       field('Note (optional)', ids.note, note), err);
     const actions = [{ label: 'Cancel' }, {
@@ -204,17 +197,17 @@ export function mount(el, app) {
       },
     }];
     if (!isNew) actions.unshift({ label: 'Remove', danger: true, fn: () => removePerson(p) });
-    app.sheet({ title: isNew ? 'Add a person' : `Edit ${p.name}`, body: bodyEl, actions, className: 'is-grouped' });
+    app.sheet({ title: isNew ? 'Add a person' : `Edit ${p.name}`, body: bodyEl, actions });
   }
 
   function bulkAdd() {
     const st = app.store.get();
     const gid = fid('bg'), tid = fid('bt');
-    const group = h('select', { id: gid, class: 'app-input' }, (st.groups || []).map(g => h('option', { value: g.id }, g.name)));
+    const group = h('select', { id: gid }, (st.groups || []).map(g => h('option', { value: g.id }, g.name)));
     group.value = ((st.groups || []).find(g => g.id === 'mo') || (st.groups || [])[0] || {}).id || '';
     const tags = [];
     const count = h('p', { class: 'bx-help', 'aria-live': 'polite' }, 'One name per line.');
-    const ta = h('textarea', { id: tid, class: 'app-input', rows: '8', placeholder: 'Alex Tan\nPriya Nair\nNur Aisyah', oninput: () => { const n = names().length; count.textContent = n ? `${n} ${n === 1 ? 'name' : 'names'}` : 'One name per line.'; } });
+    const ta = h('textarea', { id: tid, rows: '8', placeholder: 'Alex Tan\nPriya Nair\nNur Aisyah', oninput: () => { const n = names().length; count.textContent = n ? `${n} ${n === 1 ? 'name' : 'names'}` : 'One name per line.'; } });
     const names = () => ta.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     app.sheet({
       title: 'Bulk add staff',
@@ -244,7 +237,7 @@ export function mount(el, app) {
 
   function tagToggles(st, arr) {
     return h('div', { class: 'bx-pills', role: 'group', 'aria-label': 'Tags' }, (st.tags || []).map(t => {
-      const b = h('button', { type: 'button', class: 'app-chip', 'aria-pressed': String(arr.includes(t.id)), title: t.help || null,
+      const b = h('button', { type: 'button', class: 'bx-pill', 'aria-pressed': String(arr.includes(t.id)), title: t.help || null,
         onclick: () => { const i = arr.indexOf(t.id); if (i >= 0) arr.splice(i, 1); else arr.push(t.id); b.setAttribute('aria-pressed', String(arr.includes(t.id))); } }, t.name);
       return b;
     }));
@@ -253,14 +246,15 @@ export function mount(el, app) {
   // =============== Groups ===============
   function renderGroups() {
     const st = app.store.get();
-    const ul = h('ul', { class: 'app-list pv-edit-list' });
+    body.append(h('p', { class: 'bx-help pv-intro' }, 'Groups are the sections of the department sheet, in order. Rules choose people by group; "senior" and "junior" decide who counts as a senior or junior.'));
+    const ul = h('ul', { class: 'pv-edit-list' });
     (st.groups || []).forEach((g, i) => {
       const n = (st.staff || []).filter(p => p.group === g.id).length;
       const nr = rulesUsing(st, r => (r.who.groups || []).includes(g.id) || ((r.params.other || {}).groups || []).includes(g.id));
       const nameId = fid('gn');
-      const name = h('input', { type: 'text', id: nameId, class: 'app-input', value: g.name, maxlength: '60',
+      const name = h('input', { type: 'text', id: nameId, value: g.name, maxlength: '60',
         onchange: () => { const v = name.value.trim(); if (!v) { name.value = g.name; return; } app.store.commit('Rename group', d => { d.groups[i].name = v; }); } });
-      const kindSel = h('select', { class: 'app-input', 'aria-label': `${g.name}: senior or junior`, onchange: () => app.store.commit('Change group kind', d => { d.groups[i].kind = kindSel.value; }) },
+      const kindSel = h('select', { 'aria-label': `${g.name}: senior or junior`, onchange: () => app.store.commit('Change group kind', d => { d.groups[i].kind = kindSel.value; }) },
         h('option', { value: 'senior' }, 'Senior'), h('option', { value: 'junior' }, 'Junior'));
       kindSel.value = g.kind === 'senior' ? 'senior' : 'junior';
       ul.append(h('li', { class: 'pv-edit' },
@@ -268,17 +262,15 @@ export function mount(el, app) {
           h('span', { class: 'bx-help' }, `${n} ${n === 1 ? 'person' : 'people'}${nr ? ` · used in ${nr} ${nr === 1 ? 'rule' : 'rules'}` : ''}`)),
         kindSel,
         h('div', { class: 'pv-acts' },
-          h('button', { type: 'button', class: 'app-bar-btn', disabled: i === 0, 'aria-label': `Move ${g.name} up`, onclick: () => moveIn('groups', i, -1, 'Reorder groups'), html: arrow('up') }),
-          h('button', { type: 'button', class: 'app-bar-btn', disabled: i === st.groups.length - 1, 'aria-label': `Move ${g.name} down`, onclick: () => moveIn('groups', i, 1, 'Reorder groups'), html: arrow('down') }),
-          h('button', { type: 'button', class: 'app-bar-btn pv-del', disabled: n > 0, title: n ? 'Move its people to another group first' : 'Remove group', 'aria-label': `Remove group ${g.name}`,
+          h('button', { type: 'button', class: 'icon-btn', disabled: i === 0, 'aria-label': `Move ${g.name} up`, onclick: () => moveIn('groups', i, -1, 'Reorder groups'), html: arrow('up') }),
+          h('button', { type: 'button', class: 'icon-btn', disabled: i === st.groups.length - 1, 'aria-label': `Move ${g.name} down`, onclick: () => moveIn('groups', i, 1, 'Reorder groups'), html: arrow('down') }),
+          h('button', { type: 'button', class: 'icon-btn pv-del', disabled: n > 0, title: n ? 'Move its people to another group first' : 'Remove group', 'aria-label': `Remove group ${g.name}`,
             onclick: () => {
               app.store.commit('Remove group', d => { d.groups.splice(i, 1); });
               app.toast(`Removed ${g.name}${nr ? ` (still named in ${nr} ${nr === 1 ? 'rule' : 'rules'})` : ''}`, { action: undoAct, kind: nr ? 'warn' : 'ok' });
             }, html: app.icon('close') }))));
     });
-    body.append(h('section', { class: 'app-section' }, h('h3', { class: 'app-section-header' }, 'Groups, in sheet order'), ul,
-      h('p', { class: 'app-section-footer' }, 'Groups are the sections of the department sheet. Rules choose people by group; "senior" and "junior" decide who counts as a senior or junior.')),
-    addRow('Add group', 'New group name', (v, kind) => {
+    body.append(ul, addRow('Add group', 'New group name', (v, kind) => {
       const id = slug(v, (st.groups || []).map(g => g.id));
       app.store.commit('Add group', d => { d.groups.push({ id, name: v, kind }); });
     }, true));
@@ -287,20 +279,21 @@ export function mount(el, app) {
   // =============== Tags ===============
   function renderTags() {
     const st = app.store.get();
-    const ul = h('ul', { class: 'app-list pv-edit-list' });
+    body.append(h('p', { class: 'bx-help pv-intro' }, 'Tags mark people across groups (Baby MO, Part time). Rules can apply to a tag; give each a short line of help.'));
+    const ul = h('ul', { class: 'pv-edit-list' });
     (st.tags || []).forEach((t, i) => {
       const n = (st.staff || []).filter(p => (p.tags || []).includes(t.id)).length;
       const nr = rulesUsing(st, r => (r.who.tags || []).includes(t.id) || ((r.params.other || {}).tags || []).includes(t.id));
       const nameId = fid('tn'), helpId = fid('th');
-      const name = h('input', { type: 'text', id: nameId, class: 'app-input', value: t.name, maxlength: '40',
+      const name = h('input', { type: 'text', id: nameId, value: t.name, maxlength: '40',
         onchange: () => { const v = name.value.trim(); if (!v) { name.value = t.name; return; } app.store.commit('Rename tag', d => { d.tags[i].name = v; }); } });
-      const help = h('input', { type: 'text', id: helpId, class: 'app-input', value: t.help || '', maxlength: '120', placeholder: 'What it means',
+      const help = h('input', { type: 'text', id: helpId, value: t.help || '', maxlength: '120', placeholder: 'What it means',
         onchange: () => app.store.commit('Edit tag help', d => { d.tags[i].help = help.value.trim(); }) });
       ul.append(h('li', { class: 'pv-edit' },
         h('div', { class: 'bx-field pv-tagname' }, h('label', { for: nameId }, 'Tag'), name),
         h('div', { class: 'bx-field pv-grow' }, h('label', { for: helpId }, 'Help'), help,
           h('span', { class: 'bx-help' }, `${n} ${n === 1 ? 'person' : 'people'}${nr ? ` · used in ${nr} ${nr === 1 ? 'rule' : 'rules'}` : ''}`)),
-        h('div', { class: 'pv-acts' }, h('button', { type: 'button', class: 'app-bar-btn pv-del', 'aria-label': `Remove tag ${t.name}`,
+        h('div', { class: 'pv-acts' }, h('button', { type: 'button', class: 'icon-btn pv-del', 'aria-label': `Remove tag ${t.name}`,
           onclick: async () => {
             if ((n || nr) && !(await app.confirm(`${t.name} is on ${n} ${n === 1 ? 'person' : 'people'}${nr ? ` and in ${nr} ${nr === 1 ? 'rule' : 'rules'}` : ''}. Remove it from them too?`, { ok: 'Remove tag', danger: true }))) return;
             app.store.commit('Remove tag', d => {
@@ -314,9 +307,7 @@ export function mount(el, app) {
             app.toast(`Removed tag ${t.name}`, { action: undoAct });
           }, html: app.icon('close') }))));
     });
-    body.append(h('section', { class: 'app-section' }, h('h3', { class: 'app-section-header' }, 'Tags'), ul,
-      h('p', { class: 'app-section-footer' }, 'Tags mark people across groups (Baby MO, Part time). Rules can apply to a tag; give each a short line of help.')),
-    addRow('Add tag', 'New tag name', v => {
+    body.append(ul, addRow('Add tag', 'New tag name', v => {
       const id = slug(v, (st.tags || []).map(t => t.id));
       app.store.commit('Add tag', d => { d.tags.push({ id, name: v, help: '' }); });
     }));
@@ -328,22 +319,21 @@ export function mount(el, app) {
     const use = codeUsage(st);
     body.append(h('div', { class: 'pv-bar' },
       h('p', { class: 'bx-help pv-grow' }, 'Codes are case-sensitive here (Excel import matches any case). Colours show on the grid; auto-fill only assigns shifts marked auto.'),
-      h('button', { type: 'button', class: 'app-btn app-btn--primary', onclick: () => editCode(null), html: `${app.icon('plus')}<span>Add code</span>` })));
+      h('button', { type: 'button', class: 'btn btn-primary', onclick: () => editCode(null), html: `${app.icon('plus')}<span>Add code</span>` })));
     for (const k of ['shift', 'leave', 'request', 'other', 'derived']) {
       const ds = (st.duties || []).filter(d => d.kind === k);
       if (!ds.length) continue;
-      body.append(h('section', { class: 'app-section pv-group', 'aria-label': KIND_LABEL[k] },
-        h('h3', { class: 'app-section-header' }, KIND_LABEL[k], h('span', { class: 'bx-count' }, String(ds.length))),
-        h('ul', { class: 'app-list pv-codes' }, ds.map(d => {
+      body.append(h('section', { class: 'pv-group', 'aria-label': KIND_LABEL[k] },
+        h('div', { class: 'pv-group-h' }, h('h3', null, KIND_LABEL[k]), h('span', { class: 'bx-count' }, String(ds.length))),
+        h('p', { class: 'bx-help pv-kh' }, KIND_HELP[k]),
+        h('ul', { class: 'pv-codes' }, ds.map(d => {
           const flags = [d.overnight ? 'overnight' : '', d.auto ? 'auto-fill' : '', Number(d.hours) ? `${d.hours} h` : ''].filter(Boolean).join(' · ');
           const u = use.get(d.code) || { rules: 0, cells: 0 };
-          return h('li', null, h('button', { type: 'button', class: 'app-row pv-code', onclick: () => editCode(d), 'aria-label': `Edit ${d.code}: ${d.name}` },
+          return h('li', null, h('button', { type: 'button', class: 'pv-code', onclick: () => editCode(d), 'aria-label': `Edit ${d.code}: ${d.name}` },
             h('span', { class: `chip pv-chip${d.kind === 'request' ? ' rq' : ''}`, style: chipStyle(d) }, d.code),
-            h('span', { class: 'app-row-body' }, h('span', { class: 'app-row-title' }, d.name), flags ? h('span', { class: 'app-row-sub' }, flags) : null),
-            h('span', { class: 'app-row-value pv-code-u' }, [u.cells ? `${u.cells} ${u.cells === 1 ? 'cell' : 'cells'}` : '', u.rules ? `${u.rules} ${u.rules === 1 ? 'rule' : 'rules'}` : ''].filter(Boolean).join(' · ')),
-            h('span', { class: 'app-row-chevron', 'aria-hidden': 'true' })));
-        })),
-        h('p', { class: 'app-section-footer' }, KIND_HELP[k])));
+            h('span', { class: 'pv-code-t' }, h('strong', null, d.name), flags ? h('span', { class: 'muted' }, flags) : null),
+            h('span', { class: 'pv-code-u muted' }, u.cells || u.rules ? `${u.cells} cells${u.rules ? ` · ${u.rules} rules` : ''}` : '')));
+        }))));
     }
   }
 
@@ -356,19 +346,19 @@ export function mount(el, app) {
     const err = h('p', { class: 'bx-err', role: 'alert' });
     const prev = h('span', { class: 'chip pv-chip-big' });
     const ratio = h('span', { class: 'bx-help' });
-    const code = h('input', { type: 'text', id: ids.code, class: 'app-input', value: d.code, maxlength: '10', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', disabled: derived, oninput: paint });
-    const name = h('input', { type: 'text', id: ids.name, class: 'app-input', value: d.name, maxlength: '60' });
-    const kind = h('select', { id: ids.kind, class: 'app-input', disabled: derived, onchange: () => { flagsBox.hidden = kind.value !== 'shift'; paint(); } },
+    const code = h('input', { type: 'text', id: ids.code, value: d.code, maxlength: '10', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', disabled: derived, oninput: paint });
+    const name = h('input', { type: 'text', id: ids.name, value: d.name, maxlength: '60' });
+    const kind = h('select', { id: ids.kind, disabled: derived, onchange: () => { flagsBox.hidden = kind.value !== 'shift'; paint(); } },
       ['shift', 'leave', 'request', 'other'].map(k => h('option', { value: k }, KIND_LABEL[k])), derived ? h('option', { value: 'derived' }, 'Worked out') : null);
     kind.value = d.kind;
-    const color = h('input', { type: 'color', id: ids.color, class: 'app-input', value: hex6(d.color, '#e6e1d6'), oninput: paint });
-    const ink = h('input', { type: 'color', id: ids.ink, class: 'app-input', value: hex6(d.ink, '#333333'), oninput: paint });
-    const overnight = h('input', { type: 'checkbox', class: 'app-switch', role: 'switch', checked: !!d.overnight });
-    const auto = h('input', { type: 'checkbox', class: 'app-switch', role: 'switch', checked: !!d.auto });
-    const hours = h('input', { type: 'number', id: ids.hours, class: 'app-input', value: String(d.hours || 0), min: '0', max: '24', step: '0.5', inputmode: 'decimal' });
+    const color = h('input', { type: 'color', id: ids.color, value: hex6(d.color, '#e0e0e0'), oninput: paint });
+    const ink = h('input', { type: 'color', id: ids.ink, value: hex6(d.ink, '#333333'), oninput: paint });
+    const overnight = h('input', { type: 'checkbox', checked: !!d.overnight });
+    const auto = h('input', { type: 'checkbox', checked: !!d.auto });
+    const hours = h('input', { type: 'number', id: ids.hours, value: String(d.hours || 0), min: '0', max: '24', step: '0.5', inputmode: 'decimal' });
     const flagsBox = h('div', { class: 'bx-form' },
-      h('label', { class: 'sw-line' }, h('span', null, 'Overnight (post call x the next day)'), overnight),
-      h('label', { class: 'sw-line' }, h('span', null, 'Auto-fill may assign it'), auto));
+      h('label', { class: 'switch' }, overnight, h('span', { class: 'sw-track' }), h('span', null, 'Overnight (post call x the next day)')),
+      h('label', { class: 'switch' }, auto, h('span', { class: 'sw-track' }), h('span', null, 'Auto-fill may assign it')));
     flagsBox.hidden = d.kind !== 'shift';
     function paint() {
       const look = { kind: kind.value, color: color.value, ink: ink.value };
@@ -415,7 +405,7 @@ export function mount(el, app) {
       },
     }];
     if (!isNew && !derived) actions.unshift({ label: 'Delete', danger: true, fn: () => deleteCode(du) });
-    app.sheet({ title: isNew ? 'Add a duty code' : `Edit ${du.code}`, body: bodyEl, actions, className: 'is-grouped' });
+    app.sheet({ title: isNew ? 'Add a duty code' : `Edit ${du.code}`, body: bodyEl, actions });
   }
 
   async function deleteCode(du) {
@@ -454,8 +444,8 @@ export function mount(el, app) {
 
   function addRow(btnLabel, placeholder, onAdd, withKind = false) {
     const id = fid('add');
-    const inp = h('input', { type: 'text', id, class: 'app-input', placeholder, maxlength: '60', onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); go(); } } });
-    const kind = withKind ? h('select', { class: 'app-input', 'aria-label': 'Senior or junior' }, h('option', { value: 'junior' }, 'Junior'), h('option', { value: 'senior' }, 'Senior')) : null;
+    const inp = h('input', { type: 'text', id, placeholder, maxlength: '60', onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); go(); } } });
+    const kind = withKind ? h('select', { 'aria-label': 'Senior or junior' }, h('option', { value: 'junior' }, 'Junior'), h('option', { value: 'senior' }, 'Senior')) : null;
     function go() {
       const v = inp.value.trim();
       if (!v) { inp.focus(); return; }
@@ -463,7 +453,7 @@ export function mount(el, app) {
       app.toast(`Added ${v}`, { action: undoAct, ms: 3000 });
     }
     return h('div', { class: 'pv-addrow' }, h('label', { class: 'sr-only', for: id }, placeholder), inp, kind,
-      h('button', { type: 'button', class: 'app-btn app-btn--secondary', onclick: go, html: `${app.icon('plus')}<span>${btnLabel}</span>` }));
+      h('button', { type: 'button', class: 'btn btn-ghost', onclick: go, html: `${app.icon('plus')}<span>${btnLabel}</span>` }));
   }
 
   function moveIn(key, i, dir, label) {

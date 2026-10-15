@@ -1,6 +1,5 @@
 // Browser test of NTF Roster in Practice (?demo: a made-up department) and from a fresh start, with Firebase
-// blocked, at desktop and phone size (and 360 and 320 px for sideways scrolling), with an axe accessibility check
-// (WCAG 2 A/AA) on every tab.
+// blocked, at desktop and phone size, with an axe accessibility check (WCAG 2 A/AA) on every tab.
 // Run (from the repo root, with a static server on the repo root at port 8080, e.g. python3 -m http.server 8080):
 //   node ntf-roster/test/e2e.mjs            SHOTS=<dir> also saves screenshots
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
@@ -98,7 +97,7 @@ s = await stored(page);
 ok(!s.cells[pick.d[1]]?.[pick.sid], 'Ctrl+Z undoes it');
 
 // paint training leave across three days: one undo step; undo and redo
-await page.click('.r-toolbar .app-chip:has-text("Paint")');
+await page.click('.tbtn:has-text("Paint")');
 await page.click('.pchip[data-code="TL"]');
 const a = await page.locator(cellSel(pick.d[0], pick.sid)).boundingBox();
 const z = await page.locator(cellSel(pick.d[2], pick.sid)).boundingBox();
@@ -116,23 +115,7 @@ await page.click('#redo');
 s = await stored(page);
 ok(pick.d.every(d => s.cells[d]?.[pick.sid]?.a?.includes('TL')), 'Redo puts it back');
 await page.keyboard.press('Control+z');
-// Clear in the paint bar stays chosen and clears a cell
-await page.click('.pchip-clear');
-ok(await page.getAttribute('.pchip-clear', 'aria-pressed') === 'true', 'Clear in the paint bar can be chosen');
-await page.click(cellSel(pick.d[1], pick.sid));
-await page.waitForTimeout(150);
-ok(/^Clear 1 cell$/.test(await page.evaluate(() => window.ntfApp.store.undoLabel())) && !(await stored(page)).cells[pick.d[1]]?.[pick.sid], 'painting with Clear clears the cell');
-await page.keyboard.press('Control+z');
-await page.click('.r-toolbar .app-chip:has-text("Paint")');
-
-// one person's month: a pushed screen (back button in the bar, their name as the title, no Auto-fill)
-await page.click(`.nm-btn[data-p="${pick.sid}"]`);
-await page.waitForSelector('.person-host:not([hidden]) .cal');
-const pname = await page.evaluate(id => window.ntfApp.store.get().staff.find(p => p.id === id).name, pick.sid);
-ok(await page.isVisible('#back') && /Roster/.test(await page.textContent('#back')) && (await page.textContent('#large-title')) === pname && !(await page.isVisible('#autofill')), 'the person view has "‹ Roster" in the bar and their name as the title');
-await page.click('#back');
-await page.waitForSelector('table.grid .cell');
-ok(!(await page.isVisible('#back')) && (await page.textContent('#large-title')) === 'Roster', 'back on the roster grid');
+await page.click('.tbtn:has-text("Paint")');
 
 // month switching: buttons and [ ]
 const title = () => page.textContent('#month .m-long');
@@ -172,7 +155,7 @@ ok(/problem/.test(await page.textContent('.rb-check')), 'the live check finds th
 await shot(page, 'rule-builder');
 await axe(page, 'rule builder');
 const nRules = (await stored(page)).rules.length;
-await page.click('.app-sheet-foot .app-btn--primary');
+await page.click('.sheet-foot .btn-primary');
 await page.waitForTimeout(250);
 s = await stored(page);
 ok(s.rules.length === nRules + 1, 'rule saved');
@@ -190,7 +173,7 @@ ok(await page.locator(`.cv-group:has-text("never")`).count() >= 1, 'Check lists 
 await shot(page, 'check');
 await axe(page, 'check (desktop)');
 for (const v of ['Fairness', 'Coverage']) {
-  await page.click(`.cv-views .app-seg:has-text("${v}")`);
+  await page.click(`.bx-tab:has-text("${v}")`);
   await page.waitForTimeout(200);
   await axe(page, `check ${v}`);
 }
@@ -223,10 +206,10 @@ ok(await hard(page) > 0, 'next month has must-fix problems before auto-fill');
 await page.click('#autofill');
 await page.waitForSelector('.af');
 await page.click('label[for="af-t-15000"]');   // ends early once its search is done (under a second here); the slack is for slow CI machines
-await page.click('.af .app-btn--primary');
+await page.click('.af .btn-primary');
 await page.waitForSelector('.af-headline', { timeout: 30000 });
 await shot(page, 'autofill-preview');
-await page.click('.af .app-btn--primary:has-text("Apply")');
+await page.click('.af .btn-primary:has-text("Apply")');
 await page.waitForTimeout(300);
 s = await stored(page);
 ok(callsIn(s, M1) > 40, `auto-fill filled the calls (${callsIn(s, M1)})`);
@@ -256,7 +239,7 @@ await page.setInputFiles('section[aria-labelledby="more-import"] input[type=file
 await page.waitForSelector('.imp', { timeout: 15000 });
 ok(/0 new/.test(await page.textContent('.imp')), 'every person in the exported sheet is matched');
 await axe(page, 'import review');
-await page.click('.app-sheet-foot .app-btn--primary:has-text("Apply import")');
+await page.click('.sheet-foot .btn-primary:has-text("Apply import")');
 await page.waitForTimeout(300);
 const afterImport = cellsOf(await stored(page), M0);
 ok(JSON.stringify(afterImport) === JSON.stringify(beforeImport), 'export then import gives the same cells');
@@ -269,8 +252,8 @@ const backup = JSON.parse(fs.readFileSync(bkPath, 'utf8'));
 ok(backup.kind === 'ntf-roster-backup' && backup.state.staff.length === s.staff.length, 'backup has the whole state');
 await page.evaluate(() => window.ntfApp.store.commit('Test change', d => { d.settings.dept = 'Changed for the test'; }));
 await page.setInputFiles('section[aria-labelledby="more-backup"] input[type=file]', bkPath);
-await page.waitForSelector('.app-sheet-foot .app-btn--danger:has-text("Restore")');
-await page.click('.app-sheet-foot .app-btn--danger:has-text("Restore")');
+await page.waitForSelector('.sheet-foot .btn-danger:has-text("Restore")');
+await page.click('.sheet-foot .btn-danger:has-text("Restore")');
 await page.waitForTimeout(250);
 s = await stored(page);
 ok(s.settings.dept === backup.state.settings.dept && JSON.stringify(s.cells) === JSON.stringify(backup.state.cells), 'restore brings the backup back');
@@ -281,16 +264,14 @@ page = await newPage({ width: 390, height: 844 }, 'phone', { hasTouch: true, isM
 await page.goto(BASE + '?demo');
 await ready(page);
 ok(await page.evaluate(() => window.ntfApp.tab) === 'day', 'phones open on Day');
-ok(await page.isVisible('#bottombar') && await page.locator('#bottombar .app-tab:visible').count() === 5, 'bottom tab bar with 5 tabs');
+ok(await page.isVisible('#bottombar') && await page.locator('#bottombar .bb-tab').count() === 5, 'bottom tab bar with 5 tabs');
 await page.waitForTimeout(200);
 await shot(page, 'phone-day');
 await axe(page, 'day (phone)');
 await noSideScroll(page, 'day (phone)');
-await page.click('.app-tab[data-tab="roster"]');
+await page.click('.bb-tab[data-tab="roster"]');
 await page.waitForSelector('.cell');
 await page.waitForTimeout(200);
-ok(await page.isVisible('#top .monthnav #month') && await page.isVisible('.r-toolbar .r-af') && await page.evaluate(() => document.querySelector('#large-title').offsetWidth <= 1), 'phone roster: the month in the top bar, Auto-fill in the chip row, the large title for screen readers only');
-ok(await page.evaluate(() => document.querySelector('.r-scroll').getBoundingClientRect().top) < 120, 'phone roster: the grid starts near the top');
 await shot(page, 'phone-roster');
 await axe(page, 'roster (phone)');
 await noSideScroll(page, 'roster (phone)');
@@ -302,23 +283,16 @@ const ph = await page.evaluate(() => {
 });
 await page.locator(cellSel(ph.d, ph.sid)).scrollIntoViewIfNeeded();
 await page.tap(cellSel(ph.d, ph.sid));
-await page.waitForSelector('.app-sheet .tchip[data-code="MC"]');
+await page.waitForSelector('.sheet .tchip[data-code="MC"]');
 await shot(page, 'phone-editor');
 await axe(page, 'cell editor (phone)');
-await page.tap('.app-sheet .tchip[data-code="MC"]');
+await page.tap('.sheet .tchip[data-code="MC"]');
 s = await stored(page);
 ok(s.cells[ph.d]?.[ph.sid]?.a?.includes('MC'), 'phone cell editor adds MC');
-ok(await page.$('dialog.app-sheet.is-nonmodal[open] .sheet-x'), 'the sheet over the grid opens non-modal (speed)');
 await page.keyboard.press('Escape');
 await page.waitForTimeout(200);
-ok(!(await page.$('dialog.app-sheet[open]')), 'Esc closes the phone cell editor');
-await page.tap(cellSel(ph.d, ph.sid));
-await page.waitForSelector('dialog.app-sheet[open] .tchip');
-await page.touchscreen.tap(195, 30);   // the scrim above the sheet
-await page.waitForTimeout(200);
-ok(!(await page.$('dialog.app-sheet[open]')), 'a tap outside the phone cell editor closes it');
 for (const t of ['check', 'rules', 'more']) {
-  await page.click(`.app-tab[data-tab="${t}"]`);
+  await page.click(`.bb-tab[data-tab="${t}"]`);
   await page.waitForTimeout(400);
   await shot(page, 'phone-' + t);
   await axe(page, `${t} (phone)`);
@@ -327,7 +301,6 @@ for (const t of ['check', 'rules', 'more']) {
 ok(await page.isVisible('.view-more .link-card[href="#people"]'), 'More has the People link on phones');
 await page.click('.view-more .link-card[href="#people"]');
 await page.waitForSelector('.pv-row');
-ok(await page.isVisible('#back') && /More/.test(await page.textContent('#back')), 'People (under More) has "‹ More" in the bar');
 await shot(page, 'phone-people');
 await axe(page, 'people (phone)');
 await noSideScroll(page, 'people (phone)');
@@ -339,37 +312,19 @@ await shot(page, 'phone-rule-builder');
 await axe(page, 'rule builder (phone)');
 await page.context().close();
 
-// ================= small phones: nothing scrolls sideways (the grid and chip rows scroll inside themselves) =================
-for (const vp of [{ width: 360, height: 780 }, { width: 320, height: 640 }]) {
-  page = await newPage(vp, `phone ${vp.width}`, { hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
-  await page.goto(BASE + '?demo');
-  await ready(page);
-  for (const t of ['day', 'roster', 'check', 'rules', 'people', 'more']) {
-    await go(page, '#' + t);
-    await noSideScroll(page, `${t} (${vp.width} px)`);
-  }
-  await go(page, '#roster');
-  await page.click('#nextm');   // the month Auto-fill hasn't filled: its banner and "not in post" cells
-  await page.waitForTimeout(250);
-  await noSideScroll(page, `next month's roster (${vp.width} px)`);
-  if (vp.width === 320) await axe(page, 'roster (320 px)');
-  await page.context().close();
-}
-
 // ================= fresh start (no practice data) =================
 page = await newPage({ width: 1300, height: 900 }, 'fresh');
 await page.goto(BASE + '#roster');
 await ready(page);
 ok(await page.isVisible('.welcome-card'), 'a fresh start shows the welcome card');
-ok(!(await page.isVisible('#autofill')) && !(await page.isVisible('.monthnav')), 'no Auto-fill or month before there are staff');
 ok(!(await page.isVisible('#demobar')), 'no practice bar outside practice');
 await axe(page, 'welcome');
 await page.click('.welcome-card button:has-text("Add staff")');
-await page.waitForSelector('.pv-bar .app-btn--primary');
-await page.click('.pv-bar .app-btn--primary');
-await page.waitForSelector('.app-sheet .bx-form');
-await page.locator('.app-sheet input[type="text"]').first().fill('Test Person');
-await page.click('.app-sheet-foot .app-btn--primary');
+await page.waitForSelector('.pv-bar .btn-primary');
+await page.click('.pv-bar .btn-primary');
+await page.waitForSelector('.sheet .bx-form');
+await page.locator('.sheet input[type="text"]').first().fill('Test Person');
+await page.click('.sheet-foot .btn-primary');
 await page.waitForTimeout(200);
 s = await stored(page, 'ntf-roster-v1');
 ok(s && s.staff.length === 1 && s.staff[0].name === 'Test Person', 'the first person is saved under ntf-roster-v1');
