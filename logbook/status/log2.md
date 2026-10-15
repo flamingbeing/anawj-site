@@ -108,8 +108,9 @@ Agreed queue (one PR each, in order, once he says go):
    toggle at the bottom of the table (beside All tags / Towards minimums). Excel downloads keep full names and full
    category names. Compact off: the table as now.
 9i. **Suggested colours** (owner, 15 Oct; replaces the 13 Oct "no preset swatches" call in ui-settings.js): Settings →
-   Display → Colour shows a row of swatches (NUHS navy, the default; the NUH orange, red and blue; teal; purple; green;
-   slate) and a last "Custom…" swatch that opens the device's own picker as now; a tick on the one in use (a custom
+   Display → Colour shows swatches in two rows (owner, 15 Oct): NUH (navy, the default; orange; red; blue; as they are)
+   and muted (desaturated teal, sage, dusty purple, slate); then pastels (blush pink, lavender, mint, peach, powder blue,
+   butter yellow: used as the tint, with a deeper shade of the same hue for text and buttons so they stay readable) and a last "Custom…" swatch that opens the device's own picker as now; a tick on the one in use (a custom
    colour shows in the Custom swatch). The same light / dark readability adjustment as today; each suggested colour
    checked for contrast in light, dark and OLED.
 9j. **Themes page above Display** (owner; with 9i): Settings → Themes holds the look: ready-made themes as preview
