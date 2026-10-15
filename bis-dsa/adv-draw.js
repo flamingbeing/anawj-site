@@ -68,7 +68,7 @@ const ADV_CELL=3; // DSA cell width in virtual pixels
 function advDsa(h,tL,win,side){const cols=Math.floor(ADV_PX/ADV_CELL),spc=win/cols;let o=ADV.dsaCv[side];if(!o||o.cv.width!==cols){const cv=document.createElement('canvas');cv.width=cols;cv.height=NB;o=ADV.dsaCv[side]={cv,img:cv.getContext('2d').createImageData(cols,NB)};}
  // the same display shaping as the Medtronic BIS screen (calibrated on the owner's photos): a tilt that flattens the 1/f slope, at least 10 s of
  // epochs averaged in every column, 2.5 Hz of vertical smoothing, suppressed seconds left out (an almost all-suppressed column is black)
- const sh=((mon.dbLo-DB_LO)+(mon.dbHi-DB_HI))/2,sc=(mon.dbHi-mon.dbLo)/(DB_HI-DB_LO),LO=MT_LO+sh,SPAN=MT_SPAN*sc;
+ const sh=0,sc=1,LO=MT_LO+sh,SPAN=MT_SPAN*sc;
  const tilt=Array.from({length:NB},(_,j)=>mtTilt((j+.5)*.5));
  const pc=new Float32Array(NB),pc2=new Float32Array(NB);let pcOk=false;const d=o.img.data,nData=Math.max(0,Math.min(cols,Math.ceil((advNow()-tL)/spc))),sef=[],mf=[],v=new Float32Array(NB),w=new Float32Array(NB);
  for(let c=0;c<cols;c++){const te=tL+(c+1)*spc,tb=tL+c*spc;

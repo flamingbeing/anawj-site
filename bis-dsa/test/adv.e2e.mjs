@@ -18,7 +18,8 @@ try {
     await page.goto(BASE);
     await page.click('#skinSeg [data-skin="advance"]');
     // start-up: modal messages first (then the sensor check by itself); Skip start-up under the screen starts the case with 35 minutes of earlier trend
-    assert.ok(await page.evaluate(() => !!ADV.boot), 'the monitor starts with its boot messages');
+    assert.equal(await page.evaluate(() => !ADV.boot && ADV.layout[4]), 'dsa,asym,eeg', 'the monitor opens on the main screen (DSA, ASYM and EEG), not the start-up'); await page.click('#advBootBtn');
+    assert.ok(await page.evaluate(() => !!ADV.boot), 'Replay start-up shows the boot messages');
     assert.deepEqual(await page.evaluate(() => ADV_BOOT.map(x => x[0])), ['Connect BISx to start monitoring', 'Initializing BISx', 'Connect sensor to start monitoring']); // the first two are brief; a slow machine can miss them, so only the last is awaited
     await page.waitForFunction(() => /Connect sensor to start monitoring/.test(document.querySelector('#advBoot').textContent) && document.querySelector('#advBoot [data-a="alarms"]'), null, { timeout: 5000 });
     await page.waitForFunction(() => ADV.sensor && document.querySelector('#advOv .th'), null, { timeout: 6000 }); // the sensor check opens by itself
@@ -146,10 +147,10 @@ try {
     await page.click('#aExitRv'); assert.equal(await page.evaluate(() => !!ADV.review), false); await page.click('[data-sim="disc"]');
     // demo mode for the unilateral sensor: 2-channel screen with one BIS panel, EEG selector shows one channel, SET RANGE, watermark, EXIT DEMO MODE
     await page.click('#aInfo'); await page.click('[data-a="demo"][data-v="2"]');
-    assert.equal(await page.$$eval('#aBisR', e => e.length), 0); assert.equal(await page.evaluate(() => ADV.ch + '|' + ADV.layout[2]), '2|bis,eeg'); assert.match(await txt(page, '#advHdr'), /SET RANGE/);
+    assert.equal(await page.$$eval('#aBisR', e => e.length), 0); assert.equal(await page.evaluate(() => ADV.ch + '|' + ADV.layout[2]), '2|dsa,eeg'); assert.match(await txt(page, '#advHdr'), /DSA.*EEG/);
     assert.equal(await page.$$eval('#aLr', e => e.length), 0, 'no L|R pill with a unilateral sensor'); assert.ok(await page.evaluate(() => ADV.demo));
     { const h = await page.evaluate(() => ({ a: ADV.pre.L[0].bis, z: ADV.pre.L[ADV.pre.L.length - 1].bis, e0: ADV.pre.L[0].emg, e1: ADV.pre.L[ADV.pre.L.length - 1].emg, off: !ADV.alarm.bis.on && !ADV.alarm.sr.on && !ADV.alarm.sef.on, live: bisS })); assert.ok(h.a > 90 && h.z < 55 && h.e0 > 40 && h.e1 < 34 && h.off, `the demo case runs from BIS ~97 to the low 40s (${JSON.stringify(h)})`); }
-    assert.match(await txt(page, '#advHdr'), /SET RANGE/); assert.equal(await txt(page, '#advLeft .rb:last-child .l'), 'EXIT DEMO MODE');
+    assert.match(await txt(page, '#advHdr'), /DSA.*EEG/); assert.equal(await txt(page, '#advLeft .rb:last-child .l'), 'EXIT DEMO MODE');
     await page.click('#speedSeg [data-speed="10"]'); await page.waitForFunction(() => COLS[COLS.length - 1].sqi >= 60, null, { timeout: 60000 }); await page.click('#speedSeg [data-speed="1"]');
     await page.click('#aSensor'); assert.match(await txt(page, '#advOv .th'), /UNILATERAL/); assert.match(await page.$eval('#advOv svg.sk', e => e.textContent), /1.*2.*4.*3/); await page.waitForFunction(() => !document.querySelector('#advOv .dlg'), null, { timeout: 15000 });
     await page.click('#aExitDemo'); assert.equal(await page.evaluate(() => ADV.ch), 4); assert.ok(await page.evaluate(() => !!ADV.boot), 'exiting the demo restarts the monitor'); await page.click('#advSkip');
