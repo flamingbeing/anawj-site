@@ -7,7 +7,7 @@ import { display, setDisplay } from './display.js';
 import { exportTotals } from './xlsxio.js';
 import { reflectionProgress, HEADING_BY_ID, suggestHeadings } from './reflections.js';
 import { logbookGlance, reflectionGlance, cohortGlance } from './glance.js';
-import { paceForecast, paceText, goneQuiet, reflectionTodos, arrangeCards, moveCard, hideCard, finishLine, monthSummary, milestones, ageMix, caseMix, loggingHabits } from './analytics.js';
+import { paceForecast, paceText, goneQuiet, reflectionTodos, arrangeCards, moveCard, hideCard, finishLine, monthSummary, milestones, ageMix, caseMix, loggingHabits, shortNames } from './analytics.js';
 import { reflectOnCase, openReflection } from './ui-reflect.js';
 import { gripDrag } from './drag-list.js';
 import { S, h, ic, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName, summaryOf, basicHides } from './ui-core.js';
@@ -450,13 +450,19 @@ export function renderTotals() {
   const mine = rYear();
   if (tview.year == null || !years.includes(tview.year)) tview.year = years.includes(mine) ? mine : years[0];
   const people = all.filter(s => (s.rYear || 0) === tview.year).sort((a, b) => String(a.name).localeCompare(String(b.name)));
-  const table = totalsTable(people);
+  // Compact (on by default, this device): initials across the top (a tap names the person), short category names, a
+  // key under the table; Show targets (on by default) at the bottom. The Excel downloads keep the full names.
+  const compact = display().totalsCompact !== false, targets = display().totalsTargets !== false;
+  const nameBar = h('p', { class: 'hint tname', 'aria-live': 'polite', style: 'margin:6px 0 0;min-height:1.2em' });
+  const table = totalsTable(people, { compact, targets, onName: (p, short) => { nameBar.textContent = `${short} = ${p.name} · ${p.smo ? 'SMO' : p.rYear ? yearName(p.rYear) : '?'}`; } });
+  const flip = (k, on) => () => { setDisplay({ [k]: on ? null : false }); hooks.render(); };
 
   add(card, 
     h('div', { class: 'bar' },
       h('h2', { style: 'margin:0' }, 'Programme totals'),
       h('select', { 'aria-label': 'Residency year', onchange: e => { tview.year = Number(e.target.value); hooks.render(); } },
         years.map(y => h('option', { value: String(y), selected: y === tview.year }, groupName(y, all)))),
+      h('button', { type: 'button', class: 'small', 'aria-pressed': String(compact), onclick: flip('totalsCompact', !compact) }, 'Compact'),
       h('span', { class: 'grow' }),
       h('button', { class: 'small', onclick: () => { tview.summaries = null; hooks.render(); } }, 'Refresh'),
       h('button', { class: 'small', onclick: () => downloadTotals(table.data) }, 'Download Excel'),
@@ -464,9 +470,12 @@ export function renderTotals() {
     legend(),
     // scrolls both ways inside the card (focusable and named so the keyboard can reach it), so the names row and the
     // category column stay put (owner, 15 Oct 2026)
+    compact ? nameBar : null,
     h('div', { class: 'scroll tscroll', style: 'margin-top:8px', tabindex: '0', role: 'region', 'aria-label': 'Totals table' }, table.el),
-    // how the counts add up, below the table (owner, 15 Oct 2026)
-    h('div', { class: 'bar', style: 'margin-top:10px' }, countSwitch()),
+    table.key ? h('p', { class: 'hint tkey', style: 'margin:6px 0 0' }, table.key.map(([sh, n]) => `${sh} = ${n}`).join(' · ')) : null,
+    // how the counts add up, below the table (owner, 15 Oct 2026); and the target lines
+    h('div', { class: 'bar', style: 'margin-top:10px;align-items:center' }, countSwitch(),
+      h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: targets, onchange: flip('totalsTargets', !targets) }), 'Show targets')),
     h('p', { class: 'hint help' }, countMode() === 'min'
       ? 'Towards minimums: each category counts up to its last target, so extra cases past it don’t add (categories without a target show –).'
       : 'All tags: every case with that category, all years added up. A case with 3 tags adds 3 to Total tags.'));
@@ -515,7 +524,8 @@ export function countSwitch() {
 // a Category cell: at most a third of the width; long names wrap, and a word too wide for it scrolls sideways inside
 // the cell (owner, 15 Oct 2026). No tooltips (tap and hold clashed with selecting text).
 const catCell = (...kids) => h('td', { class: 'cat' }, h('div', { class: 'cat-in' }, ...kids));
-export function totalsTable(people) {
+export function totalsTable(people, { compact = false, targets = true, onName = null } = {}) {
+  const shorts = compact ? shortNames(people.map(p => p.name)) : null;
   const prog = people.map(p => Object.fromEntries(progress(p.counts || {}, p.rYear || 1).map(x => [x.code, x])));
   const codes = CATEGORIES.filter(c => !c.retired || people.some(p => (p.counts || {})[c.code])).map(c => c.code);
   const meId = S.resident && S.resident.rid;
@@ -532,7 +542,7 @@ export function totalsTable(people) {
     const tgt = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${appYear(y)}`).join(' | ');
     const tgtR = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${y}`).join(' | ');   // the download keeps R4/R5
     data.rows.push({ label: catName(code) + (tgtR ? ` [${tgtR}]` : ''), values: vals, statuses: sts });
-    add(tbody, h('tr', {}, catCell(catName(code), tgt ? h('small', { class: 'tgt' }, tgt) : null),
+    add(tbody, h('tr', {}, catCell(compact ? catShort(code) : catName(code), tgt && targets ? h('small', { class: 'tgt' }, tgt) : null),
       vals.map((v, i) => h('td', { class: `n ${sts[i]}` }, v == null ? '–' : String(v)))));   // no tooltips: tap and hold clashed with selecting text (owner)
   }
   const totals = people.map(p => p.total || 0);
@@ -546,9 +556,11 @@ export function totalsTable(people) {
     h('tr', { class: 'total' }, catCell('Total cases'), totals.map(v => h('td', { class: 'n' }, String(v)))),
     h('tr', {}, catCell('Reflections', h('small', { class: 'tgt' }, 'towards the 96 needed')), refl.map(v => h('td', { class: 'n' }, String(v)))));
   const thead = h('thead', {}, h('tr', {}, h('th', {}, 'Category'),
-    people.map(p => h('th', { class: `rot ${p.rid === meId ? 'me' : ''}` }, `${p.name} · ${p.smo ? 'SMO' : p.rYear ? yearName(p.rYear) : '?'}`))));
+    people.map((p, i) => compact
+      ? h('th', { class: `ini-h ${p.rid === meId ? 'me' : ''}` }, h('button', { type: 'button', class: 'linkish ini-btn', 'aria-label': p.name, onclick: () => onName?.(p, shorts[i]) }, shorts[i]))
+      : h('th', { class: `rot ${p.rid === meId ? 'me' : ''}` }, `${p.name} · ${p.smo ? 'SMO' : p.rYear ? yearName(p.rYear) : '?'}`))));
   data.title = `${tview.year ? (tview.year === 3 && people.some(p => p.smo) ? 'R3 / SMO' : 'R' + tview.year) : 'Year unknown'} totals${min ? ' (towards the minimums)' : ''} — ${todayISO()}`;
-  return { el: h('table', { class: 'totals' }, thead, tbody), data };
+  return { el: h('table', { class: `totals${compact ? ' compact' : ''}` }, thead, tbody), data, key: compact ? people.map((p, i) => [shorts[i], p.name]) : null };
 }
 
 // every residency year's table, one Excel file each, in one zip (the count mode as shown)

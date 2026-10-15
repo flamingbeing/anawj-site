@@ -190,3 +190,18 @@ export function loggingHabits(cases, today) {
   }
   return { median, sameDay, logged: lag.length, best, now };
 }
+
+// Totals, Compact (owner, 15 Oct 2026): each name as its initials ("Ann Jones" -> "AJ"); names that would share them
+// add the next letters of the last word ("AJo", "AJa") until each is its own. -> [short] in the same order
+export function shortNames(names) {
+  const words = n => String(n || '').trim().split(/\s+/).filter(Boolean);
+  const base = n => words(n).map(w => w[0].toUpperCase()).join('').slice(0, 4) || '?';
+  const out = names.map(base);
+  for (let extra = 1; extra < 12; extra++) {
+    const seen = {};
+    out.forEach(s => { seen[s] = (seen[s] || 0) + 1; });
+    if (!out.some(s => seen[s] > 1)) break;
+    out.forEach((s, i) => { if (seen[s] > 1) { const last = words(names[i]).slice(-1)[0] || ''; out[i] = base(names[i]) + last.slice(1, 1 + extra).toLowerCase(); } });
+  }
+  return out;
+}

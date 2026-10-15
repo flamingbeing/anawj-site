@@ -1652,3 +1652,10 @@ h2.set-heading { margin: 18px 6px 4px; }
 .box-grab::before { content: ''; width: 44px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 22%, transparent); }
 .box-grab.dragging::before, .box-grab:hover::before { background: var(--accent); }
 .box-grab:focus-visible { outline: 3px solid var(--heading); outline-offset: -2px; border-radius: 6px; }
+/* Totals, Compact (on by default): initials across the top, short category names in at most a quarter of the width */
+table.totals.compact th, table.totals.compact td { padding: 3px 4px; }
+table.totals.compact th.ini-h { white-space: nowrap; vertical-align: bottom; }
+table.totals.compact .ini-btn { min-height: 32px; padding: 0 4px; font-weight: 700; color: inherit; }
+table.totals.compact th.me .ini-btn { color: var(--accent); }
+table.totals.compact td.cat, table.totals.compact td.cat .cat-in { max-width: 25vw; }
+table.totals.compact td.cat .cat-in { overflow-x: visible; overflow-wrap: anywhere; }   /* no sideways scroll in a narrow column */

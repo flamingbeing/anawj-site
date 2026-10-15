@@ -147,7 +147,7 @@ try { for (const width of [390, 1280]) {
   await p.locator('table.totals td.n').first().waitFor();
   // Totals: Category column, names row frozen, no tap-and-hold tooltips, the count switch below the table, every year as a zip
   assert.equal(await p.locator('table.totals thead th').first().innerText(), 'Category');
-  assert.equal(await p.locator('table.totals thead th.rot').first().evaluate(e => getComputedStyle(e).position), 'sticky');
+  assert.equal(await p.locator('table.totals thead th').nth(1).evaluate(e => getComputedStyle(e).position), 'sticky');
   assert.equal(await p.locator('table.totals td.n[title]').count(), 0);
   assert.equal(await p.locator('table.totals td.cat .cat-in').first().evaluate(e => getComputedStyle(e).overflowX), 'auto', 'a long category scrolls sideways');
   assert.equal(await p.locator('table.totals td[title]').count(), 0, 'no tooltips');
