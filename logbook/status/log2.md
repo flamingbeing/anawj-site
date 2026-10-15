@@ -124,6 +124,13 @@ Agreed queue (one PR each, in order, once he says go):
    never their logos or paid fonts: Obsidian-style (dark grey, violet accent, compact), Bear-style (warm off-white, red
    accent, roomy, soft serif headings), Evernote-style (white, green accent, clean sans), Notion-style (white, near-black
    text, grey hairlines, small corners, no shadows), Telegram-style (blue accent, rounded cards, pale blue-grey ground).
+   A theme sets the Advanced display settings too (owner, 15 Oct): fonts, line spacing and width, corners, borders,
+   shadows, compact, icons on buttons, icons-only tab bar, page titles in the header, plain calendar, shorter rows;
+   every one stays editable afterwards (the card then says "Custom (based on …)"), and a theme never touches layout
+   choices that aren't about looks (start tab, tab order, Case tab parts). New settings the themes need, each its own
+   editable switch in Themes → Advanced: heading font (separate from the body font; serif for Bear / Notion),
+   background tint (cream, blue-grey, pure white…), spacing scale (roomy / normal / tight), tab bar style (underline /
+   pill / plain), card style (raised / outlined / flat).
 10. **Grid as a spreadsheet:** thin lines, no boxed inputs; drag to resize columns (per device, double-tap resets);
     lines per row 1 / 2 / 3 / Fit to content.
 11. **Paging by default** (owner's call, 15 Oct): 100 per page, 25 / 50 / 100 / 300 / All (per device); "‹ Page 2 of
