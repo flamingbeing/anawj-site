@@ -704,6 +704,10 @@ async function run(label, ctxOpts) {
     assert(d2 === '75M TURP spinal\nconverted to GA', 'multi-line details ' + JSON.stringify(d2));
     // row 1 needs categories; empty row 2, then "Same as above"
     const codes = i => trs.nth(i).locator('.chips').first().locator('.chip[data-code]').evaluateAll(els => els.map(e => e.dataset.code));
+    // a pasted list ticks nothing unless "Tick confident suggestions automatically" is on; Tick all suggestions does
+    assert((await codes(0)).length === 0, 'pasted rows ticked without the setting: ' + (await codes(0)));
+    await p.getByRole('button', { name: 'Tick all suggestions' }).click(); await nap(150);
+    assert((await codes(0)).includes('20'), 'Tick all suggestions did not tick Paeds on the 5yo: ' + (await codes(0)));
     if (!(await codes(0)).length) await trs.nth(0).locator('.chip.sugg').first().click();
     while ((await codes(1)).length) await trs.nth(1).locator('.chips').first().locator('.chip').first().click();
     const c1 = await codes(0);

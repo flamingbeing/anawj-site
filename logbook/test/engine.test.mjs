@@ -687,3 +687,14 @@ console.log('engine tests passed');
  assert.equal(versionLabel('no-sw'),'no-sw');
  assert.equal(versionLabel(''),'unknown');
 }
+
+// an age over 120 years is a number, not an age (15 Oct 2026)
+{
+  const { splitAge, humanAge } = await import('../js/engine.js');
+  assert.deepEqual(splitAge('150M fake TKR'), { age: '', rest: '150M fake TKR' });
+  assert.deepEqual(splitAge('999 lap chole'), { age: '', rest: '999 lap chole' });
+  assert.equal(splitAge('120F fake TKR').age, '120F');
+  assert.equal(splitAge('300/12 fake').age, '300/12');   // months: left as typed
+  assert.equal(humanAge('150y'), '150y');
+  assert.equal(humanAge('99yoF'), '99 years · female');
+}

@@ -203,6 +203,9 @@ try { for (const width of [390, 1280]) {
   assert.equal(await row.locator('.chip[data-code="13"]').count() >= 1, true, 'the linked tag is not ticked');
   n = await nCases();
   await p.getByRole('button', { name: /^Save all 2/ }).click();
+  // (the LSCS row has no tag: a pasted list ticks suggestions only with the auto-tick setting)
+  const anyway = p.locator('dialog[open] button', { hasText: 'Save all' });
+  await anyway.waitFor({ timeout: 1500 }).then(() => anyway.click(), () => {});
   await until(async () => await nCases() === n + 2, 'list not saved');
   const saved = await p.evaluate(async () => (await import('./js/ui-core.js')).S.cases.filter(c => c.source === 'paste' && /appy|LSCS/.test(c.details)));
   assert.deepEqual(saved.find(c => /appy/.test(c.details)).tags, ['u:fakeappy']);
