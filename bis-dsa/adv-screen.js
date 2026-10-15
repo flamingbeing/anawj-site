@@ -4,7 +4,7 @@
 const aq=id=>document.getElementById(id);
 const ADV={
  built:false,ch:4,hemi:'L',view:'graphs',                    // channels 2 (unilateral sensor) or 4 (bilateral); selected side; graphs or chart
- layout:{2:'bis,eeg',4:'bis,asym,eeg'},sec:'emg',win:60,chartInt:1,
+ layout:{2:'dsa,eeg',4:'dsa,asym,eeg'},sec:'emg',win:60,chartInt:1,
  uvmm:{2:2,4:10},sweep:25,nch:{2:1,4:2},filters:true,imp:true,showVals:false,
  alarm:{bis:{on:false,lo:40,hi:60},sr:{on:false,hi:50},sef:{on:false,lo:12,hi:18}},vol:4,audioRem:false,
  audio:0,audioEnd:0,                                          // 0 audio on, 1 paused 120 s, 2 off (SILENT)
@@ -66,7 +66,7 @@ function advBuild(){if(ADV.built)return;ADV.built=true;
   <div class="mbar" id="advMbar"><span class="mi" id="aMi" hidden>${IC.bubble}</span><span class="bd" id="aMbd" hidden></span><span class="xmt" id="aMsgT" role="status" aria-live="polite"></span><span class="mn" id="aMn" hidden><span id="aMc">1/1</span><button type="button" id="aNext" data-a="next"><u>NEXT</u></button><i></i></span><button type="button" class="ck" id="aCheck" data-a="check" aria-label="Clear message" hidden>${IC.check}</button></div>
   <div id="advBoot" class="boot" hidden></div><div id="advOv"></div><div id="advPop"></div>
  </div><div class="advbrand"><b>Medtronic</b><span class="hk" role="group" aria-label="Hard keys on the case"><button type="button" id="aHkFn" data-hk="fn" aria-label="Function key: opens the main menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button><button type="button" id="aHkHome" data-hk="home" aria-label="Home key: closes any window or menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5L12 4.5l8 7M6.5 10.5V19h4.2v-5h2.6v5h4.2v-8.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button><button type="button" id="aHkPw" data-hk="pw" aria-label="Power key (not used in the simulator)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v8M7.2 6.8a7.2 7.2 0 1 0 9.6 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button></span></div></div></div>
- <div class="advsim" id="advSim" role="group" aria-label="Simulator controls, outside the monitor"><button type="button" id="advSkip" data-sim="skip">Skip start-up</button><span class="sl">Simulate:</span>
+ <div class="advsim" id="advSim" role="group" aria-label="Simulator controls, outside the monitor"><button type="button" id="advSkip" data-sim="skip">Skip start-up</button><button type="button" id="advBootBtn" data-sim="boot">Replay start-up</button><span class="sl">Simulate:</span>
   <button type="button" data-sim="disc" aria-pressed="false">Sensor disconnected</button><button type="button" data-sim="expired" aria-pressed="false">Sensor expired</button><button type="button" data-sim="batt" aria-pressed="false">Battery low</button><button type="button" data-sim="usb" aria-pressed="false">USB drive</button><span class="nt">Administrator password: 1234. As on the real monitor, Case Review and Alarms (main menu) work only with the sensor disconnected, or in Demo for Alarms.</span></div>`;
  advTop();advChrome();advHeaders();
  const S=aq('advS');S.addEventListener('click',advClick);document.addEventListener('keydown',advKey);aq('advSim').addEventListener('click',advSimClick);document.querySelector('#advWrap .advbrand').addEventListener('click',advHardKey);

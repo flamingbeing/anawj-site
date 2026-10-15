@@ -58,7 +58,7 @@ function advDemoSimOff(){const v=ADV.demoSave;ADV.demoSave=null;if(!v)return;try
 // opens by itself and the case starts when it ends. The Skip start-up link under the screen goes straight to the case.
 const ADV_BOOT=[['Connect BISx to start monitoring',1100],['Initializing BISx',2000],['Connect sensor to start monitoring',1800]];
 function advBootBegin(){ADV.boot={ph:0,t:Date.now()};ADV.review=null;ADV.sensor=null;ADV.dlg=null;ADV.menu=false;advOv();advBootUI();}
-function advBootUI(){const B=ADV.boot,S=aq('advS'),el=aq('advBoot');if(!S)return;S.classList.toggle('idle',!!B);el.hidden=!B;aq('advSkip').hidden=!B;
+function advBootUI(){const B=ADV.boot,S=aq('advS'),el=aq('advBoot');if(!S)return;S.classList.toggle('idle',!!B);el.hidden=!B;aq('advSkip').hidden=!B;aq('advBootBtn').hidden=!!B;
  if(!B){el.innerHTML='';el._ph=null;return;}
  if(B.ph>=3){el.innerHTML='';el._ph=3;return;}
  const ph=B.ph,txt=ADV_BOOT[ph][0];if(el._ph===ph)return;el._ph=ph;
@@ -69,7 +69,7 @@ function advBootTick(now){const B=ADV.boot;if(!B)return;
 function advBootEnd(){if(!ADV.boot)return;ADV.boot=null;if(ADV.sensor){ADV.sensor=null;if(ADV.dlg&&ADV.dlg.name==='sensor'){ADV.dlg=null;advOv();}}
  advStartCase('awake');advBootUI();advHeaders();advChrome();advInval();ADV.alarmDirty=true;}
 // the Simulate row under the screen (outside the monitor): the start-up skip, and the technical alarms the real monitor can raise
-function advSimClick(e){const b=e.target.closest('[data-sim]');if(!b)return;const k=b.dataset.sim;if(k==='skip'){advBootEnd();return;}
+function advSimClick(e){const b=e.target.closest('[data-sim]');if(!b)return;const k=b.dataset.sim;if(k==='skip'){advBootEnd();return;}if(k==='boot'){advBootBegin();return;}
  ADV[k]=!ADV[k];b.setAttribute('aria-pressed',String(ADV[k]));ADV.alarmDirty=true;ADV.numKey=null;
  // a drive pulled out while a live recording runs: the wording of the manual's message table
  if(k==='usb'&&!ADV.usb&&ADV.rec){ADV.rec=false;advMsg('Export failed - USB drive removed');if(ADV.dlg&&ADV.dlg.name==='download')advOv();}

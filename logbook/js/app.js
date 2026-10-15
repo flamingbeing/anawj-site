@@ -1092,14 +1092,10 @@ async function pickUpForm(user) {
   try {
     const entries = await cloud.listFormEntries(user.email);
     if (!entries.length || S.user !== user) return;
-    const [{ mergeFormEntries, pickupMessage, formCaseId }, bin] = await Promise.all([import('./form-inbox.js'), cloud.listBin(user.email).catch(() => [])]);
-    const binned = bin.filter(b => b.kind === 'case' && b.data && b.data.id).map(b => String(b.data.id));
-    const r = mergeFormEntries(entries, new Map((S.cases || []).map(c => [c.id, c])), Date.now(), { binned });
-    const byCase = new Map(r.save.map(c => [c.id, c]));
-    const items = r.done.map(id => ({ id, case: byCase.get(formCaseId(id)) || null }));
-    const done = new Set(await cloud.commitFormPickup(user.email, items));
-    const saved = items.filter(it => it.case && done.has(it.id)).map(it => it.case);
-    const msg = pickupMessage({ ...r, save: saved });
+    const { pickUp, pickupMessage } = await import('./form-inbox.js');
+    // (reads the bin and the deleted Form cases from the server; if it can't, nothing is written and the entries wait)
+    const r = await pickUp(cloud, user.email, entries, { cases: () => S.cases, still: () => S.user === user });
+    const msg = r && pickupMessage(r);
     if (msg && S.user === user) toast(msg);
   } finally { formBusy = false; }
 }

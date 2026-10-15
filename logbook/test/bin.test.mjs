@@ -113,6 +113,22 @@ await assert.rejects(B.restoreFromBin('nope'));
   } finally { writes.configure({ backend: cloud.commitRecord }); }
   S.resident = null;
 }
+// Google Form cases: listed for good (formGone, form-inbox.js) when they go to the bin, and again before their bin entry
+// goes (one deleted before the list existed); other cases never
+{
+  const form = id => ({ id: 'imp_form~003a' + id, date: '2026-10-15', initials: 'AB', details: '34F fake', cats: ['16'], source: 'form', importKey: `form:${id}~1@2`, createdAt: 1, updatedAt: 2 });
+  await cloud.saveCase(email, form('F1')); setCases(await cloud.listCases(email));
+  const other = S.cases.find(c => c.source !== 'form');
+  await B.moveToBin('case', [S.cases.find(c => c.id === form('F1').id), other]);
+  assert.deepEqual(await cloud.listFormGone(email), [form('F1').id]);
+  // binned by an older version (not listed): the purge and Delete forever list it first
+  const old2 = B.binEntry('case', form('F2'), Date.now() - 40 * DAY), old3 = B.binEntry('case', form('F3'));
+  await cloud.saveBinEntry(email, old2); await cloud.saveBinEntry(email, old3);
+  assert.equal(await B.purgeExpired({ force: true }), 1);
+  await B.deleteForever(old3.id);
+  assert.deepEqual((await cloud.listFormGone(email)).sort(), [form('F1').id, form('F2').id, form('F3').id].sort());
+  assert.equal((await cloud.listBin(email)).some(e => e.data.id === other.id), true);
+}
 // a reflection finished on another device while this one shows its outline: binning the outline is refused, the
 // finished text stays and no copy is left in the bin (a blind delete lost it, and the bin kept only the outline)
 const D = await import('../js/demo-backend.js');

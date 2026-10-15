@@ -51,6 +51,11 @@ p{margin:0}
 header p{color:var(--muted)}
 .apptitle{font-family:var(--f-display);font-weight:800;font-size:20px;line-height:1.2;margin:0;letter-spacing:0}
 .apptitle span{color:var(--muted);font-weight:600}
+.monhead{display:grid;gap:10px}
+.monswitch{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.monswitch button{min-height:44px;padding:6px 4px;font:600 13px/1.15 var(--f-body);color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.monswitch button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.monswitch button:focus-visible{outline:3px solid #fff;outline-offset:2px}
 section{display:grid;gap:16px;min-width:0}
 .sec-head{display:grid;gap:6px;max-width:72ch}
 .sec-head p{color:var(--muted)}
@@ -310,7 +315,8 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 <div class="band" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 <div class="wrap">
 <section id="monitor" aria-labelledby="h-mon">
-  <h1 class="apptitle" id="h-mon">BIS to DSA <span>simulator</span></h1>
+  <div class="monhead"><h1 class="apptitle" id="h-mon">BIS to DSA <span>simulator</span></h1>
+  <div class="monswitch" id="monSwitch" role="group" aria-label="Choose the monitor"><button type="button" data-skin="vista" aria-pressed="true">Medtronic BIS</button><button type="button" data-skin="advance" aria-pressed="false">BIS Advance</button><button type="button" data-skin="sedline" aria-pressed="false">SedLine</button><button type="button" data-skin="classic" aria-pressed="false">Teaching</button></div></div>
   <div class="sim">
     <div class="screens">
     <div class="screen vwrap" id="vistaWrap"><div class="vista" id="vista" role="group" aria-label="Monitor screen in the style of the owner's Medtronic BIS monitor">

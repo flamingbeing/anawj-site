@@ -55,6 +55,7 @@ The Firebase sign-in helper pages are self-hosted at `/__/auth/` (copied from `h
 | `logbooks/{email}/notes/{id}` | `{ id, date ('YYYY-MM-DD' or null), title (≤200), body (Markdown text ≤20000), caseId?, createdAt, updatedAt }`: personal notes (More → Notes; `js/notepad.js`). The app keeps at most 2,000. Never in the portfolio. | owner only; admins, PDs and the app owner have no access |
 | `logbooks/{email}/meta/noteIndex` | `{ days: ['YYYY-MM-DD'…] (≤100), cases: [caseId…] (≤100), n, updatedAt }`: which days and cases have notes, so the Logbook can mark them without reading notes (`js/ui-notepad.js`). No other `meta` docs. | owner only; admins, PDs and the app owner have no access |
 | `logbooks/{email}/bin/{id}` | `{ id, kind: case / reflection / note, data: the deleted case, reflection or note (≤40 top-level keys), deletedAt (ms) }`: the recycle bin (`js/bin.js`). Every case and reflection delete moves the item here; it can be restored (same id, or a new id if that id is in use again) for 30 days, then the app purges it after the next sign-in. A binned reflection's figures stay in `images/` until its entry is purged or deleted forever. | owner only; admins have no access |
+| `logbooks/{email}/formGone/{caseId}` | `{ id, deletedAt }`: Google Form cases the resident deleted (`js/form-inbox.js`), kept for good so an edited or re-sent response doesn't bring one back | owner only |
 | `summaries/{rid}` | `{ rid, name, intake, rYear, counts: { code: n }, total, reflections: { headingId: n }, reflectionsTotal, updatedAt }` | admins and programme residents read; admins or that resident write |
 | `imports/{rid}` | `{ email, keys: [importKey], updatedAt }` (keys reset if the resident's email changes) | the app owner |
 | `sharedTemplates/{id}` | `{ id, name, cats, details? }` | everyone signed in reads; admins write |
@@ -87,15 +88,26 @@ One way only: Form → logbook, never back.
    NRIC/long numbers replaced by "[ID removed]", unrecognised tags noted in the details) and deletes the entries.
 3. Duplicates: a response already imported from the workbook (Admin portal) is skipped by the inbox, and a re-run
    of the workbook import skips responses the inbox brought in (`sameResponse`: same day, same response second once
-   the sheet's time zone is taken off). A Form case the resident deleted (in the bin) doesn't come back. Each entry's
-   case and its delete go in one batch (`cloud.commitFormPickup`); at most 50 per pick-up, which runs again when the
-   app comes back to the front (every 10 minutes at most).
+   the sheet's time zone is taken off; for a Form case, its first submit or, once the app has picked up an edit, its
+   newest one). An old response edited in the Form arrives with its edit time: an imported case with the same day,
+   initials and categories counts as it (not added; the toast says so, as it may be another patient: log that one in
+   the app). An edit that changes the day, initials or categories still adds a second case. A Form case the resident
+   deleted doesn't come back: its id is kept in `formGone` (written when it goes to the bin and again before its bin
+   entry goes). An imported case the resident deleted stays gone only while it is in the bin, and only from its own
+   response (same time); a response that merely has its day, initials and categories is added (it may be a corrected
+   copy) and the toast points to the bin. The pick-up reads the bin and `formGone` from the server and stops if it
+   can't; the toast tells only what reached the server. Each entry's case and
+   its delete go in one batch (`cloud.commitFormPickup`); at most 50 per pick-up, which runs again when the app comes
+   back to the front (every 10 minutes at most).
 4. An edited response replaces the case it made, unless the resident has changed that case in the app since
-   (`importKey` `form:<responseId>@<ms written>`; a later `updatedAt` means theirs); what only the app adds (a linked
-   reflection, the star, personal tags) is kept.
+   (`importKey` `form:<responseId>~<newest submit>@<ms written>`, the `@` time being the `updatedAt` actually written;
+   a later `updatedAt` means theirs: then only the newest submit is noted in the key); what only the app adds (a
+   linked reflection, the star, personal tags) is kept.
 
-Tests: `test/form-inbox.test.mjs`, `test/form-script.test.mjs`, the rules suite (`tools/test-rules.sh`) and the emulator browser test
-(`tools/test-reads.sh`).
+Tests: `test/form-inbox.test.mjs`, `test/form-pickup.test.mjs` (cloud.js's real Firestore code against a stand-in SDK,
+`test/fake-firebase.mjs`), `test/form-script.test.mjs`, the rules suite (`tools/test-rules.sh`) and the emulator browser
+test (`tools/test-reads.sh`). A change to `form-script/Code.gs` must be pasted into the Form by the owner: list it in
+`form-script/CHANGES-PENDING.md`.
 
 ## Code
 

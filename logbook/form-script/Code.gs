@@ -155,11 +155,13 @@ function logbookInboxDryRun() {
   console.log(JSON.stringify(logbookInboxEntryOf_(rs[rs.length - 1]), null, 2));
 }
 
-// Optional, run by hand once: sends responses from a date onwards. The logbook leaves out ones it already has (from
-// the inbox or the workbook import) and ones the resident deleted. Safe to run again.
-// Edit SINCE first. Older responses are better brought in with the Admin portal's workbook import.
+// Optional, run by hand: sends responses from a date onwards (e.g. one whose send failed). The logbook leaves out
+// ones it already has (from the inbox or the workbook import) and Form cases the resident deleted. Safe to run again.
+// SINCE is the day the inbox went live (14 Oct 2026): responses before it came in with the Admin portal's workbook
+// import. An earlier SINCE sends those again: the logbook skips the ones the import brought in, but an imported case
+// the resident deleted more than 30 days ago (out of the recycle bin) would come back.
 function logbookInboxBackfill() {
-  var SINCE = new Date('2026-10-01T00:00:00+08:00');
+  var SINCE = new Date('2026-10-14T00:00:00+08:00');
   if (!logbookInboxVerified_()) throw new Error('Set Settings → Responses → Collect email addresses to "Verified" first.');
   var rs = FormApp.getActiveForm().getResponses(SINCE), sent = 0, skipped = 0, failed = 0;
   for (var i = 0; i < rs.length; i++) {
