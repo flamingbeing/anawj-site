@@ -63,9 +63,54 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
   Heart rate and blood pressure moved to `rhythm.js` and `cardio.js` (M2.1); the rest moves to `gas.js` and `resp.js`
   (M2.4) and `temp.js` (M2.6). `synth.js` and `monitor.js` read `state.vit` for those until then.
 - The Patient tab's stimuli and "Talk" (M1.4): replaced by the airway (M3.1) and the case flow with Examine (M3.2).
-- Pleural pressure reads `resp.pplMmHg` (0 until M2.4); MAC fraction reads `vol.mac` (0 until M2.5).
+- MAC fraction reads `vol.mac` (0 until M2.5), so the volatile terms in `pd.js`, `resp.js`, `gas.js` and `cardio.js`
+  stay off until then; the GA tests set `vol.mac` by hand. The airway (`aw.obstruction`) arrives in M3.1; until then
+  `resp.open` is true and the Patient tab's obstruction is only reachable in tests.
 
 ## Decisions log
+
+- 15 Oct 2026 (M2.6): `temp.js` (two compartments, core and periphery, energy balance in kcal). Anaesthesia opens the
+  core-peripheral conductance (K 23 awake, 37 asleep), which redistributes heat and gives the early fall (about -0.8 C
+  in hour 1, then slower); heat production falls 30% asleep; the periphery loses to a 21 C theatre; cold fluids cool
+  the core (1 L about -0.28 C mean, by specific heat); the forced-air warmer adds 55 W. The system is named `temp`
+  because `t` is the reserved clock field; `vitals.js` is gone (temperature was its last job). The monitor temperature
+  reads the core through the usual averaging. UI: a forced-air warmer on the Patient tab. No vasoconstriction-threshold
+  plateau yet, so a very long unwarmed case keeps drifting down slowly (recorded).
+
+- 15 Oct 2026 (M2.5): `volatile.js` (the circle circuit, three Gas Man tissue groups, agent effect sites, age-adjusted
+  MAC, the N2O concentration effect) owns `vol.fi/ce/pv/mac`. `pd.js` now reads the whole volatile MAC fraction as one
+  sevoflurane-equivalent, so every agent counts and the sevoflurane-written formulas hold (sevoflurane alone is
+  unchanged). The volatile circulation effect was strengthened (1 MAC about -21% MAP, 1.5 MAC about -28%, heart rate
+  about unchanged). Wash-in and washout match Yasuda. `patient.macStub` is a test-only hook for a steady volatile depth
+  without running the vaporiser to steady state (the fluids and vaso GA tests use it, in place of the old `vol` stub
+  that a live volatile system would overwrite). UI: a vaporiser and fresh-gas control on the Breathing tab, agent
+  Fi/Et/MAC on the monitor. Known miss, as in the prototype: low-flow Et/dial reads a little low; desflurane washout.
+
+- 15 Oct 2026 (M2.4): `gas.js` (one lung store that collapses when obstructed, two blood O2 pools so SaO2 falls at a
+  realistic rate, a CO2 body store) and `resp.js` (Bouillon drive with the slope flattened, the ventilator closed-form,
+  pleural pressure to the circulation). Apnoea: healthy preox about 8.6 min, air about 1 min, obese 130 kg about 3.5
+  min; CO2 about 3-3.4 mmHg/min. Known misses, recorded in MODEL.md: no first-minute CO2 venous-equilibration jump
+  (first minute about 3, not 8-12); open-airway apnoeic oxygenation lasts over 20 min (no CO2 feedback into the
+  alveolar gas equation yet). VO2 scales with a metabolic weight (IBW plus 0.3 of the excess). The monitor's SpO2 has
+  a probe transport delay (25 s, longer at low output) so the displayed fall lags the arterial one. UI: a Breathing
+  tab (O2, ventilator), Paw/PEEP/MV on the monitor. `vitals.js` is now only temperature.
+
+- 15 Oct 2026 (M2.3): `vaso.js` holds receptor activations (Emax/EC50 per drug, combined as independent fractions)
+  and their mapping to SVR, venous capacity, heart period and contractility; `cardio.js` applies them through the
+  existing reflex. PK in `pk.js` MODELS, short and [D] except the cited clearances and half-lives; phenylephrine keeps
+  the prototype's 5 L front end and a 20 s transit delay. Ephedrine releases noradrenaline from a store that runs down
+  (tachyphylaxis). Vasopressin is dosed in units (`mU` internally). Metaraminol is in the catalogue but hidden (not on
+  the HSA register; owner question). Known gaps: a noradrenaline infusion takes about 5 min, not 1-2, to wear off
+  (its level sits near the EC50); esmolol slows a resting heart only about 4/min, because resting HR here is mostly
+  vagal (it does blunt a stimulated rise, tested). Vasoactive rows sit on the Circulation tab with ISO 26825 colours
+  (vasopressors violet, hypotensive agents violet stripes, anticholinergics green).
+
+- 15 Oct 2026 (M2.2): `fluids.js` is called by `cardio.js` (state `cv.fl`), so volume stays in one slice; everything
+  enters or leaves through the veins. Crystalloid excess `cx` leaves to the interstitium and urine at Hahn's
+  MAP-dependent rates (k21 taken as 0); colloid leaves with t½ 2.5 h; red cells add 280 mL and 56 g of Hb; bleeding
+  removes whole blood (Hb, crystalloid and colloid in proportion). Bags run at 50 mL/min, a red-cell unit over about
+  10 min [D]. Haemorrhage reproduces the prototype awake; the GA haemorrhage test sets `vol.mac` 1.6 by hand until
+  M2.5 (sevoflurane's own drives get tuned there). Stub until scenarios (M4): surgical bleeding on the Patient tab.
 
 - 15 Oct 2026 (M2.1): `cardio.js` as in MODEL.md section 5 (as-built notes there): the prototype's structure and
   numbers reproduce (steady state exact, propofol 2 mg/kg SBP −17.9 at 2 min, steady Ce 1 −10.5%). `pd.auto` became a

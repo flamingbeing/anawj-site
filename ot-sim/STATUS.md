@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-14 by Claude Code (build session: M2.1 circulation).
+Last updated: 2026-10-15 by Claude Code (build session: M2.2-M2.6, one combined PR).
 
 ## Now
 

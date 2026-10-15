@@ -6,7 +6,10 @@ import { pk } from './pk.js';
 import { pd } from './pd.js';
 import { rhythm } from './rhythm.js';
 import { cardio } from './cardio.js';
-import { vitals } from './vitals.js';
+import { resp } from './resp.js';
+import { volatile } from './volatile.js';
+import { gas } from './gas.js';
+import { temp } from './temp.js';
 import { monitor } from './monitor.js';
 
-export const SYSTEMS = [pump, pk, pd, rhythm, cardio, vitals, monitor];
+export const SYSTEMS = [pump, pk, volatile, pd, rhythm, resp, gas, cardio, temp, monitor];
