@@ -231,6 +231,13 @@ try {
     await page.click('#tab-pt');
     await page.evaluate(() => otsim.step(2));
     assert.match(await page.textContent('#events'), /Called for help|major haemorrhage/i, `${name}: help actions show in the events feed`);
+    // Log tab: a timestamped record of what happened (the help actions just taken, newest first)
+    await page.click('#tab-log');
+    await page.evaluate(() => otsim.step(1));
+    assert.ok((await page.$$('#log-feed li')).length >= 1, `${name}: log has entries`);
+    assert.match(await page.textContent('#log-feed'), /help|haemorrhage/i, `${name}: log records the help actions`);
+    await axe(page, `${name} theatre, Log tab`);
+    await page.click('#tab-pt');
     // Rhythms: impose each from the Patient tab. The ECG keeps drawing and the circulation responds.
     await page.selectOption('#rhythm', 'vt');
     await page.evaluate(() => otsim.step(400));
@@ -320,7 +327,7 @@ try {
     // alarm shows on the bar; Silence pauses the audio (label + class) without clearing the alarm
     await page.goto(BASE + '?test&seed=1#theatre');
     await page.waitForFunction(() => window.otsim && document.getElementById('n-hr').textContent !== '--');
-    assert.ok(await page.evaluate(() => document.getElementById('alarmbar').hidden), `${name}: no alarm bar when all is well`);
+    assert.ok(!(await page.isVisible('#alarmbar')), `${name}: no alarm bar when all is well (really not drawn)`);
     await page.evaluate(() => {
       otsim.sim.act({ type: 'bolus', drug: 'propofol', dose: 200, unit: 'mg', route: 'iv' });
       otsim.sim.act({ type: 'bolus', drug: 'rocuronium', dose: 100, unit: 'mg', route: 'iv' });
@@ -328,7 +335,7 @@ try {
       otsim.step(6000);
     });
     assert.ok(await page.evaluate(() => otsim.state.mon.alarms.some(a => a.param === 'spo2' && a.priority === 'high')), `${name}: SpO2 high alarm active`);
-    assert.ok(!(await page.evaluate(() => document.getElementById('alarmbar').hidden)), `${name}: alarm bar shown`);
+    assert.ok(await page.isVisible('#alarmbar'), `${name}: alarm bar shown`);
     assert.ok(await page.evaluate(() => document.getElementById('alarmbar').classList.contains('high')), `${name}: alarm bar is high priority`);
     assert.match(await page.textContent('#alarm-msg'), /SpO/, `${name}: alarm bar names SpO2`);
     assert.equal(await page.getAttribute('#alarmbar', 'aria-live'), 'assertive', `${name}: high alarm is assertive`);

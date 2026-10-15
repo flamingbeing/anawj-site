@@ -14,6 +14,7 @@ import { CASES, SIGN_IN, patientSummary, clinicalSummary } from './ui/preop.js';
 import { OPERATION, phaseAt } from './ui/timeline.js';
 import { examine } from './ui/examine.js';
 import { HELP, HELP_EVENT } from './ui/help.js';
+import { logLines } from './ui/log.js';
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -112,6 +113,11 @@ function panels(force = false) {
   }
   if (!$('panel-aw').hidden) { const t = airwayText(sim.state); if ($('aw-state').textContent !== t) $('aw-state').textContent = t; }
   if (!$('panel-exam').hidden) { const h = dl(examine(sim.state)); if ($('exam-list').innerHTML !== h) $('exam-list').innerHTML = h; }
+  if (!$('panel-log').hidden) {
+    const lines = logLines(sim.state);
+    const h = lines.length ? lines.slice().reverse().map(e => `<li><span class="when">${clockText(e.t)}</span> <span>${e.text}</span></li>`).join('') : '<li class="none">Nothing yet</li>';
+    if ($('log-feed').innerHTML !== h) $('log-feed').innerHTML = h;
+  }
   if ($('behind-box').open) { const h = behindHtml(sim.state); if ($('behind').innerHTML !== h) $('behind').innerHTML = h; }
 }
 
@@ -268,6 +274,11 @@ for (const t of tabs) {
     if (j >= 0) { e.preventDefault(); selectTab(tabs[j], true); }
   });
 }
+
+// "How to use": open on a first visit, then remembered on the device once closed
+const howtoBox = $('howto-box');
+howtoBox.open = store.get('howto', '1') === '1';
+howtoBox.addEventListener('toggle', () => store.set('howto', howtoBox.open ? '1' : '0'));
 
 // "Behind the monitor": closed by default, remembered on the device
 const behindBox = $('behind-box');

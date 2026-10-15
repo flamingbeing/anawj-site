@@ -62,13 +62,61 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 - `js/model/vitals.js` (M0.1): steady awake SpO2, breathing, EtCO2 and temperature with seeded noise, and breaths.
   Heart rate and blood pressure moved to `rhythm.js` and `cardio.js` (M2.1); the rest moves to `gas.js` and `resp.js`
   (M2.4) and `temp.js` (M2.6). `synth.js` and `monitor.js` read `state.vit` for those until then.
-- The Patient tab's stimuli and "Talk" (M1.4): replaced by the airway (M3.1) and the case flow with Examine (M3.2).
-- MAC fraction reads `vol.mac` (0 until M2.5), so the volatile terms in `pd.js`, `resp.js`, `gas.js` and `cardio.js`
-  stay off until then; the GA tests set `vol.mac` by hand. The airway (`aw.obstruction`) arrives in M3.1; until then
-  `resp.open` is true and the Patient tab's obstruction is only reachable in tests.
+- The Patient tab still holds the rhythm picker and the resuscitation controls (a crisis will set the rhythm itself
+  from M4) and "Talk"; Examine and Help are their own tabs (M3.2).
+- Help actions are logged only; they gain effects with the scenarios (M4).
+
+## Lessons from the build sessions (14–15 Oct 2026)
+
+Model:
+- A new subsystem only ever reduces or modulates what exists, gated so the default state leaves earlier calibration
+  identical (airway `toLungs` defaults to 1; gas couplings act only below normal cardiac output; sinus rhythm output 1).
+  That is why each milestone could land without retuning the last.
+- Jacobi step: everything reads the previous step. A subsystem that returns its old slice unchanged must not carry
+  one-step data forward (the M2.7 duplicate-beat bug: `rhythm.step` returned stale `events`).
+- Tests drive the real model; never inject a partial slice (`aw`, etc.): the owning subsystem recomputes it next step.
+- Actions fail silently on a wrong shape. A bolus is `{type:'bolus', drug, dose, unit, route:'iv'}` (not `mg`), an
+  infusion `{drug, rate, unit}`; after acting in a test, assert the state actually changed.
+- Anything timed (the operation timeline, alarms) runs on model time and enters the model through `sim.act()` or a
+  subsystem's `step`, never on wall time, so it is identical at 1x, 5x and 20x and replays exactly. Per-device settings
+  that change model behaviour (future: alarm limits) must also enter as actions.
+- `act()` queues for the next step; when paused, step once after acting so the change shows.
+
+UI and browser tests:
+- Keep the query and change only the hash when moving between screens (pre-op "Begin"): a query change reloads the
+  page and builds a different patient, and drops `?test`.
+- A `<details>` `toggle` event fires after the click: wait for its effect (e.g. the localStorage value), don't read it
+  at once (flaked on a loaded CI runner).
+- Controls on a hidden tab panel can't be clicked: reselect the tab before using them in a test.
+- Late in `e2e.mjs` the patient carries every earlier step (intubated, ventilated, infusions): give a test that needs a
+  clean patient its own `page.goto(BASE + '?test&seed=1#theatre')`.
+- A scrollable list needs `tabindex="0"` and a label for axe (`scrollable-region-focusable`).
+
+CI and process:
+- The shared `browser` job runs bis-dsa's e2e before ot-sim's. `bis-dsa/test/e2e.mjs:46` (median of nine DSA pixels;
+  the white SEF line can cross the sample) is intermittently red with a different pixel each run; it is another
+  session's test, so don't edit it. Comment once on the PR, then get a fresh run by merging a newer `main` into the
+  branch (no empty commits). It blocked #598, #608 and #650.
+- After each merge: `git fetch origin main && git reset --hard origin/main` on the session branch, then the next slice.
+  Merge on `mergeable_state: clean` after the check suite completes. The GitHub MCP's `list_workflow_runs` ignores
+  `branch`/`head_sha` filters; use `pull_request_read` and the job logs (`get_job_logs` with `return_content`).
+- Slice big milestones (M3.2 went out in four PRs, M3.3 in three); each PR finished, tested, with a phone screenshot.
 
 ## Decisions log
 
+- 15 Oct 2026 (owner): **pause new scenarios** (M4) for now; make what exists usable first. The resume queue is in
+  `STATUS.md` "Next".
+- 15 Oct 2026 (M3.3, #628/#645/#650): alarms live in `monitor.js`, evaluated each step on the freshly computed
+  displayed values: per-parameter limits (`ALARM_LIMITS`, defaults ours, tabled in `MODEL.md` §14), IEC 60601-1-8
+  priorities, onset debounce 3/5/10 s, 2-minute silence, logged `{kind:'alarm'}`. Technical alarms: "No CO₂" (high;
+  ventilating with EtCO₂ ≈ 0) and "SpO₂ no pulse" (medium; non-perfusing rhythm, replaces the numeric SpO₂ alarm). The
+  alarm bar sits at the top of the monitor. The Log tab (`ui/log.js`) renders `sim.log` newest first; the debrief will
+  use the same record. Trainee-set limits deferred (they must be actions to keep replays exact).
+- 15 Oct 2026 (M3.2, #612/#614/#622): the pre-op screen (`ui/preop.js`; demographics from the model patient, a fit ASA
+  I narrative so the text matches the model, paraphrased WHO sign-in, not enforced); the operation timeline
+  (`ui/timeline.js`, replacing the "Surgery running" toggle; a scripted surgical-stimulus sequence fired through
+  `sim.act()`; not the M4 scenario engine); Examine (`ui/examine.js`, a read-only clinical read of the model) and Help
+  (`ui/help.js`, four team actions logged as `{type:'help'}`, no physiological effect until M4).
 - 15 Oct 2026 (M3.2, slice 1): start presets (`js/model/presets.js`, `test/presets.test.mjs`). `PRESETS` holds a
   reference action list (and a target time) per named state — awake, preoxygenated, sedation, induced, maintenance,
   emergence — parameterised by opts; `applyPreset(sim, name, opts)` replays them on an awake sim and fast-forwards, so
