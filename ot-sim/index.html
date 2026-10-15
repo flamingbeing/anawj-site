@@ -71,10 +71,28 @@ h1{font-size:1.6rem;line-height:1.2;margin:.75rem 0 .25rem}
 .nibpctl{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .nibpctl button,.nibpctl select{font-family:system-ui,sans-serif;font-size:14px;min-height:44px}
 .nibpctl label{display:flex;align-items:center;gap:6px;font:13px system-ui,sans-serif;color:var(--mut)}
-.side{margin-top:12px;color:var(--mut)}
-.side h2{color:var(--fg);font-size:1.05rem;margin:0 0 4px}
+.side{margin-top:12px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:10px;overflow-x:auto}
+.tabs [role=tab]{border-radius:8px 8px 0 0;border-bottom:0;background:transparent;color:var(--mut)}
+.tabs [role=tab][aria-selected=true]{background:var(--panel);color:var(--fg);font-weight:700;border-color:var(--line)}
+.hint{color:var(--mut);font-size:.9rem;margin:.25rem 0 .75rem}
+.drug{border-left:6px solid var(--tag);background:var(--panel);border-radius:0 10px 10px 0;padding:8px 10px;margin:0 0 10px}
+.drug h3{font-size:1rem;margin:0 0 6px}.drug .cls{font-weight:400;font-size:.8rem;color:var(--mut);margin-left:6px}
+.act{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0}
+.act label{display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--mut)}
+.act input{width:5.5em;font:inherit;min-height:44px;padding:0 8px;color:var(--fg);background:#0b111b;border:1px solid var(--line);border-radius:8px}
+.act .dose input{width:5em}
+.state{font-size:.85rem;color:#c9d3e0;margin:2px 0 0;min-height:1em}
+.sub{font-size:1rem;margin:12px 0 4px}
+.given{list-style:none;padding:0;margin:0;font-size:.9rem}.given li{padding:2px 0}.given .when{font-variant-numeric:tabular-nums;color:var(--mut);margin-right:6px}.given .none{color:var(--mut)}
+details{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin:12px 0}
+summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:700}
+.behind{width:100%;border-collapse:collapse;font-size:.85rem;font-variant-numeric:tabular-nums}
+.behind th,.behind td{padding:4px;text-align:right;border-bottom:1px solid var(--line)}.behind th[scope=row],.behind thead th:first-child{text-align:left}
+
 @media (min-width:960px){
-  .tbody{display:grid;grid-template-columns:2fr 1fr;gap:16px;max-width:1280px;margin:0 auto;padding:16px}
+  .tbody{display:grid;grid-template-columns:2fr 1fr;gap:16px;max-width:1280px;margin:0 auto;padding:16px;align-items:start}
+  .monitor{position:sticky;top:8px}
   .lane{grid-template-columns:1fr 130px;min-height:150px}
   .num .nv{font-size:56px}
   .side{margin-top:0}
@@ -129,13 +147,20 @@ h1{font-size:1.6rem;line-height:1.2;margin:.75rem 0 .25rem}
       </div>
     </div>
     <div class="side">
-      <div class="nibpctl">
-        <button type="button" id="nibp-go">Start NIBP</button>
-        <label>Cycle <select id="nibp-cycle"></select></label>
+      <div class="tabs" role="tablist" aria-label="Controls">
+        <button type="button" role="tab" id="tab-drugs" aria-controls="panel-drugs" aria-selected="true">Drugs</button>
+        <button type="button" role="tab" id="tab-circ" aria-controls="panel-circ" aria-selected="false" tabindex="-1">Circulation</button>
       </div>
-      <h2 style="margin-top:16px">Free run</h2>
-      <p>A healthy synthetic adult, awake. Drugs, airway and breathing controls come in the next updates.</p>
-      <p class="foot">Teaching only. The patient is synthetic and the numbers are a model, not clinical advice.</p>
+      <div class="panel" role="tabpanel" id="panel-drugs" aria-labelledby="tab-drugs"></div>
+      <div class="panel" role="tabpanel" id="panel-circ" aria-labelledby="tab-circ" hidden>
+        <div class="nibpctl">
+          <button type="button" id="nibp-go">Start NIBP</button>
+          <label>Cycle <select id="nibp-cycle"></select></label>
+        </div>
+        <p class="hint">Fluids, blood and the circulation's controls come in the next updates.</p>
+      </div>
+      <details id="behind-box"><summary>Behind the monitor</summary><div id="behind"></div></details>
+      <p class="foot">Free run: a healthy synthetic adult. The monitor does not respond to drugs yet (drug effects come next). Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
     </div>
   </div>
 </section>
