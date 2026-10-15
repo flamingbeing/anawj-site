@@ -120,6 +120,10 @@ Agreed queue (one PR each, in order, once he says go):
    Advanced display: Light or dark, Colour (the swatches and Custom), Colourful, corners, borders, shadows, fonts and
    line spacing. Display keeps the layout: compact, start tab, header and tab bar, Logbook rows, Case tab layout,
    Plain calendar, icons on buttons. Per device, as now. Reset this page on each.
+   Plus themes in the style of other apps (owner, 15 Oct), named "Obsidian-style" etc., colours, corners and type only,
+   never their logos or paid fonts: Obsidian-style (dark grey, violet accent, compact), Bear-style (warm off-white, red
+   accent, roomy, soft serif headings), Evernote-style (white, green accent, clean sans), Notion-style (white, near-black
+   text, grey hairlines, small corners, no shadows), Telegram-style (blue accent, rounded cards, pale blue-grey ground).
 10. **Grid as a spreadsheet:** thin lines, no boxed inputs; drag to resize columns (per device, double-tap resets);
     lines per row 1 / 2 / 3 / Fit to content.
 11. **Paging by default** (owner's call, 15 Oct): 100 per page, 25 / 50 / 100 / 300 / All (per device); "‹ Page 2 of
