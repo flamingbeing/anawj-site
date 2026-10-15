@@ -14,7 +14,7 @@ import { purgeExpired, openBin } from './bin.js';
 import { profile } from './ui-core.js';
 import { deviceOn, barAtBottom } from './device-presets.js';
 import { notesChanged } from './ui-notepad.js';
-import { privacyCard, creditsCard, signOutCard } from './more-cards.js';
+import { finePrint, signOutCard } from './more-cards.js';
 import { wipeSyncDevice } from './sync-forget.js';
 
 // ---------- pages that load on first use ----------
@@ -177,13 +177,20 @@ function renderMore() {
   const hidden = arrangeTabs(barCandidates(), display()).hidden.filter(id => !TABS.find(t => t.id === id).hidden)
     .sort((a, b) => rank(a) - rank(b));
   const descOf = t => (t.id === 'progress' && facultyMode() ? 'Who’s behind in each residency year' : t.desc || 'Hidden from the tab bar');
+  // two groups (owner, 15 Oct 2026): the pages under More's own title (hidden tabs first, Settings last), then
+  // "Account and help"; Install and Sign out; privacy and credits as fine print; the app version
+  const HELP = ['account', 'feedback', 'feedbackinbox', 'admin'];
+  const row = (t, desc) => menuItem(t.id, t.moreLabel || t.label, desc);
+  const first = [...hidden.map(id => TABS.find(t => t.id === id)).filter(t => !HELP.includes(t.id)).map(t => row(t, descOf(t))),
+    ...items.filter(t => !HELP.includes(t.id) && t.id !== 'settings').map(t => row(t, t.desc)),
+    ...items.filter(t => t.id === 'settings').map(t => row(t, t.desc))];
+  const help = HELP.map(id => visibleTabs().find(t => t.id === id) || (hidden.includes(id) ? TABS.find(t => t.id === id) : null)).filter(Boolean);
   return h('div', {},
-    h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
-      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.moreLabel || t.label, descOf(t))), items.map(t => menuItem(t.id, t.moreLabel || t.label, t.desc)))),
-    privacyCard(),
-    creditsCard(),
+    h('section', { class: 'card more-list' }, h('h2', {}, 'More'), h('ul', {}, first)),
+    help.length ? h('section', { class: 'card more-list more-help' }, h('h2', {}, 'Account and help'), h('ul', {}, help.map(t => row(t, t.desc)))) : null,
     installCard(),
     signOutCard(),
+    finePrint(),
     versionLine());
 }
 

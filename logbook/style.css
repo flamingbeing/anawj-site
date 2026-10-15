@@ -1638,3 +1638,7 @@ html:not(.rows-short) ul.cases .c-tags > * { max-width: 100%; }
 /* Settings, bottom: the app version and "Get the latest version", small and quiet */
 .app-ver { text-align: center; margin: -6px 0 6px; font-size: calc(12px * var(--fs, 1)); }
 .app-ver .linkish { background: none; border: 0; box-shadow: none; padding: 0 4px; min-height: 44px; color: var(--accent); font: inherit; text-decoration: underline; }
+/* More: privacy and credits as fine print (owner, 15 Oct 2026) */
+.fine-print { margin: 14px 6px 4px; font-size: calc(12px * var(--fs, 1)); color: var(--muted); line-height: calc(1.45 * var(--lh, 1)); }
+.fine-print p { margin: 0 0 6px; }
+.fine-print b { color: var(--muted); font-weight: 600; }

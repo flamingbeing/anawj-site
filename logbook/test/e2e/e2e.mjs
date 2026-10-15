@@ -137,9 +137,14 @@ async function run(label, ctxOpts) {
       await p.locator('.tabs button[data-tab="more"]').click();
       const more = await p.locator('.more-list a').evaluateAll(as => as.map(a => a.dataset.go));
       assert(more.includes('account') && more.includes('settings') && more.includes('data'), 'More list ' + more);
-      assert(/Code by Abigail Sim[\s\S]*Design and UX\/UI by Koh Wenjun/.test(await p.locator('section.credits').innerText()), 'credits card');
+      // two groups (15 Oct 2026): More's pages with Settings last, then Account and help; privacy and credits as fine print
+      const group1 = await p.locator('.more-list').first().locator('a').evaluateAll(as => as.map(a => a.dataset.go));
+      assert(group1[group1.length - 1] === 'settings' && !group1.includes('account'), 'More group 1: ' + group1);
+      assert((await p.locator('.more-help h2').innerText()) === 'Account and help' && await p.locator('.more-help a[data-go="account"]').count() === 1, 'Account and help group');
+      assert(/Code by Abigail Sim · Design and UX\/UI by Koh Wenjun/.test(await p.locator('.fine-print').innerText()), 'credits fine print');
+      assert(/Privacy · Only you can read your cases/.test(await p.locator('.fine-print').innerText()), 'privacy fine print');
       const lastCard = await p.locator('main section.card').last().innerText();
-      assert(/Sign out/.test(lastCard), 'sign out not at the bottom of More: ' + lastCard.slice(0, 80));
+      assert(/Sign out/.test(lastCard), 'sign out not the last card on More: ' + lastCard.slice(0, 80));
       await p.goto(BASE + '?demo#settings', { waitUntil: 'networkidle' });
       await p.waitForSelector('.more-list a[data-go="display"]', { timeout: 6000 });
       assert(p.url().endsWith('#settings'), 'hash rewritten: ' + p.url());
