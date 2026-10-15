@@ -866,6 +866,20 @@ function editor() {
   if (!editorSessions.has(r)) editorSessions.set(r, { base: JSON.parse(JSON.stringify(S.reflections.find(x => x.id === r.id) || null)), saving: null });
   const session = editorSessions.get(r);
   const status = h('span', { class: 'muted', 'aria-live': 'polite', style: 'font-size:calc(13px * var(--fs, 1))' }, r.id ? 'Saved' : 'Not saved yet');
+  // after a save the line follows the write queue live (pending → Synced, or a conflict), as the header does;
+  // it was read once after the save, so it could say pending under a header that said Synced (15 Oct 2026)
+  const paintSaved = () => {
+    const st = writes.status('reflection', r.id);
+    status.textContent = st === 'conflict' ? 'Changed elsewhere · open Recent changes' : st === 'failed' ? 'Save needs attention · open Recent changes'
+      : st === 'pending' ? 'Saved locally · pending sync' : 'Synced';
+  };
+  let shown = false;   // (a redrawn editor makes a new line; the old one stops listening once it has left the page)
+  const offLive = writes.onChange(() => {
+    if (!status.isConnected) { if (shown || rv.editing !== r) offLive(); return; }
+    shown = true;
+    if (session.live && !session.saving) paintSaved();
+  });
+  if (session.live) paintSaved();
   const persist = async quiet => {
     if (rv.editing !== r || S.user?.email !== owner) return false;
     while (session.saving) { await session.saving; if (rv.editing !== r || S.user?.email !== owner) return false; }
@@ -874,15 +888,14 @@ function editor() {
     r.createdAt ||= Date.now();
     lsSet({ ...r, restore: true });
     const payload = JSON.parse(JSON.stringify(r));
-    status.textContent = 'Saving…';
+    status.textContent = 'Saving…'; session.live = false;
     session.saving = (async () => {
       try {
         const saved = await writes.save('reflection', owner, payload, session.base);
         session.base = saved; session.failed = '';
-        const st = writes.status('reflection', r.id);
-        if (rv.editing === r && S.user?.email === owner) status.textContent = st === 'synced' ? 'Synced' : st === 'conflict' ? 'Changed elsewhere · open Recent changes' : 'Saved locally · pending sync';
+        if (rv.editing === r && S.user?.email === owner) { session.live = true; paintSaved(); }
         if (rv.editing !== r || S.user?.email !== owner) return false;
-        if (JSON.stringify(r) !== JSON.stringify(payload)) { status.textContent = 'Newer edits kept · save again'; return false; }
+        if (JSON.stringify(r) !== JSON.stringify(payload)) { session.live = false; status.textContent = 'Newer edits kept · save again'; return false; }
         return true;
       } catch (err) {
         // an autosave says it once (after a conflict each one fails until a version is chosen in Recent changes)

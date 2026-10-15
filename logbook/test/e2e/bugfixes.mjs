@@ -368,6 +368,22 @@ try { for (const width of [390, 1280]) {
   await poll(() => p.evaluate(async () => (await import('./js/ui-core.js')).S.reflections.some(r => r.id === 'fake-refl-stale' && r.summary === '900 finished words')), 'the newer reflection shows');
   assert.equal(await p.evaluate(async () => { const { S, cloud } = await import('./js/ui-core.js'); return (await cloud.listBin(S.user.email)).filter(e => e.data.id === 'fake-refl-stale').length; }), 0, 'no copy left in the bin');
 
+  // ---- the reflection editor's save line follows the queue: pending while the server is held, then Synced (it was
+  // read once after the save, so it said pending under a header that said Synced; 15 Oct 2026) ----
+  await core(async () => {
+    const { S, cloud, writes } = await import('./js/ui-core.js');
+    let release; window.__held = new Promise(r => { release = r; }); window.__release = release;
+    writes.configure({ backend: async (...a) => { await window.__held; return cloud.commitRecord(...a); } });
+    const r = await cloud.saveReflection(S.user.email, { id: 'fake-refl-live', headingId: 'thyroid', initials: 'ZY', title: 'Fake live', summary: 'saved text', status: 'draft' });
+    (await import('./js/ui-reflect.js')).openReflection(r);
+  });
+  await p.waitForSelector('.refl-editor input[placeholder="Title"]');
+  await p.locator('.refl-editor input[placeholder="Title"]').fill('Fake live, typed');
+  const line = p.locator('.refl-editor span[aria-live="polite"]', { hasText: /pending sync|Synced|Saving/ }).first();
+  await line.filter({ hasText: 'Saved locally · pending sync' }).waitFor({ timeout: 6000 });
+  await core(async () => { const { writes, cloud } = await import('./js/ui-core.js'); window.__release(); writes.configure({ backend: cloud.commitRecord }); });
+  await poll(async () => (await line.textContent()) === 'Synced', 'the save line did not follow the queue to Synced');
+
   assert.deepEqual(errors, [], 'console errors');
   await ctx.close();
   console.log(`PASS bug fixes ${width < 600 ? 'phone' : 'desktop'}`);
