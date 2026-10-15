@@ -195,6 +195,19 @@ try {
       // here), counted it as a conflict and never reached the server, while this device kept hiding it
       if (!appGone || !ok) throw new Error('a delete from a second device never reached the server');
     }
+    // the deleted Form case is listed for good (formGone, written through the real rules): once its bin entry has gone
+    // (the 30-day purge, Delete forever), an edit of that response still doesn't bring it back, and it leaves the inbox
+    {
+      const listed = async () => (await fetch(`${DB}/${lb}/formGone/${encodeURIComponent('imp_form~003a2_FakeResp1')}`, { headers: H })).status === 200;
+      for (const t0 = Date.now(); !(await listed()); await new Promise(r => setTimeout(r, 200))) if (Date.now() - t0 > 15000) throw new Error('the deleted Form case was never listed in formGone');
+      for (const d of (await (await fetch(`${DB}/${lb}/bin`, { headers: H })).json()).documents || []) await fetch(`http://127.0.0.1:${FS}/v1/${d.name}`, { method: 'DELETE', headers: H });
+      await put('formInbox/2_FakeResp1', entry('GH 29F fake Form case, edited after it was deleted', Date.now()));
+      await open('Form 2b (deleted, bin emptied, response edited)', { check: async p => {
+        for (const t0 = Date.now(); !(await inboxEmpty()); await p.waitForTimeout(200)) if (Date.now() - t0 > 15000) throw new Error('inbox not emptied');
+        await quiet(p);
+        assert.equal(await S(p, 'S.cases.some(c => c.source === "form")'), false, 'the deleted Form case came back');
+      } });
+    }
     // deleting the Form case in the app reaches the server (it goes to the recycle bin)
     await open('Form 3 (delete the Form case)', { check: async p => {
       const id = await S(p, 'S.cases.find(c => c.source === "form")?.id || null');

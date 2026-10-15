@@ -59,8 +59,11 @@ export async function moveToBin(kind, item, extra = {}) {
   const stamped = it => (hasBase && extra.base && Number(extra.base.updatedAt) > (Number(it.updatedAt) || 0) ? { ...it, updatedAt: extra.base.updatedAt } : it);
   const entries = items.map((it, i) => binEntry(kind, stamped(it), now + i));   // distinct ids for same-id items
   if (hasBase) deleteBase.set(entries[0], extra.base);
-  // in parallel: offline, each write waits up to ACK_WAIT before it counts as queued
-  await Promise.all(entries.map(e => cloud.saveBinEntry(owner, e)));
+  // in parallel: offline, each write waits up to ACK_WAIT before it counts as queued. A Google Form case is also listed
+  // for good (form-inbox.js), so its response doesn't bring it back once the bin entry has gone; if that fails, the bin
+  // entry still stops it, and the list is written again before the entry goes (keepFormGone)
+  await Promise.all([...entries.map(e => cloud.saveBinEntry(owner, e)),
+    kind === 'case' ? cloud.addFormGone(owner, entries.map(e => e.data.id)).catch(err => console.warn('Deleted Form case not listed yet', err)) : null]);
   if (S.user?.email !== owner) throw new Error('Account changed; the original record has not been deleted');
   binCache = [...entries, ...binCache];
   // if deleting an original fails it is still there: its copy leaves the bin again, or other devices would hide the
@@ -196,8 +199,13 @@ export async function restoreFromBin(id) {
   return out;
 }
 
+// a Form case's id is listed (again) before its bin entry goes for good: the listing at delete time may have failed, or
+// the case was deleted before the list existed. If it can't be, the entry stays.
+const keepFormGone = (who, entries) => cloud.addFormGone(who, entries.filter(e => e && e.kind === 'case' && e.data).map(e => e.data.id));
+
 export async function deleteForever(id) {
   const e = await findEntry(id);
+  if (e) await keepFormGone(mine(), [e]);
   await cloud.deleteBinEntry(mine(), id);
   binCache = binCache.filter(x => x.id !== id);
   if (e) await dropImages([e]);
@@ -228,6 +236,7 @@ export async function purgeExpired({ now = Date.now(), force = false } = {}) {
   try { localStorage.setItem(PURGED_KEY + who, String(now)); } catch { /* storage blocked */ }
   const old = binCache.filter(e => isExpired(e, now));
   if (!old.length) return 0;
+  await keepFormGone(who, old);
   for (const e of old) await cloud.deleteBinEntry(who, e.id);
   binCache = binCache.filter(e => !old.includes(e));
   await dropImages(old);

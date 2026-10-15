@@ -539,4 +539,12 @@ export async function deleteBinEntry(email, id) {
   save(s);
   notifyBin(email);
 }
+// Google Form cases deleted (logbooks/{email}/formGone/{caseId}; cloud.js filters the ids)
+export async function addFormGone(email, ids) {
+  email = lc(email);
+  const s = load(), lb = book(s, email), now = Date.now();
+  for (const id of ids) (lb.formGone ||= {})[id] = { id, deletedAt: now };
+  save(s);
+}
+export async function listFormGone(email) { const lb = load().logbooks[lc(email)]; return lb && lb.formGone ? Object.keys(lb.formGone) : []; }
 // ---- end recycle bin ----
