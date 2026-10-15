@@ -125,7 +125,8 @@ Agreed queue (one PR each, in order, once he says go):
    accent, roomy, soft serif headings), Evernote-style (white, green accent, clean sans), Notion-style (white, near-black
    text, grey hairlines, small corners, no shadows), Telegram-style (blue accent, rounded cards, pale blue-grey ground),
    Office-style (owner: white, a dark blue title band, light grey ground, square-ish corners, thin borders, outlined
-   cards, underline tab bar, a clean system sans).
+   cards, underline tab bar, a clean system sans), WhatsApp-style (owner: teal-green accent, beige ground, rounded
+   cards, the dark version in deep teal-grey).
    A theme sets the Advanced display settings too (owner, 15 Oct): fonts, line spacing and width, corners, borders,
    shadows, compact, icons on buttons, icons-only tab bar, page titles in the header, plain calendar, shorter rows;
    every one stays editable afterwards (the card then says "Custom (based on …)"), and a theme never touches layout
