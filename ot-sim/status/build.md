@@ -16,5 +16,10 @@
   device; mask seal → delivery + pre-ox entrainment; tube placement tracheal/oesophageal/endobronchial). resp.js reads
   `aw.toLungs`/entrain/oneLung; gas.js reads `resp.shuntAdd` (one lung). Airway tab; `test/airway.test.mjs`; two gas
   tests updated to the real airway. All green under `tools/test-ot-sim.sh` locally.
-- Next in DESIGN.md: M3.2 case flow (`presets.js`, the elective GA pre-op → extubation, surgical-stimulus timeline,
-  Examine/Help tabs), M3.3 alarms, then M4.x (scenario drugs + the crisis scenarios — the "diverse use cases").
+- M3.2 (case flow) is being delivered in slices. Slice 1 built on this branch (from main after #607): `presets.js`
+  (awake/preoxygenated/sedation/induced/maintenance/emergence start states, replayed from awake; `applyPreset`),
+  `?preset=`/`?case=electiveGA`/`?at=` deep links, an Elective GA library card, `test/presets.test.mjs`. All green
+  under `tools/test-ot-sim.sh`.
+- M3.2 still to come (slice 2+): the pre-op screen (patient summary + sign-in checklist), the surgical-stimulus
+  timeline with "skip to next event", the Examine and Help tabs. Then M3.3 alarms, then M4.x (scenario drugs + the
+  crisis scenarios — the "diverse use cases").

@@ -280,6 +280,14 @@ try {
     await axe(page, `${name} theatre, Drugs tab and Behind the monitor`);
 
     // an unknown screen falls back to the library
+    // the library has an Elective GA card; its deep link boots the theatre already induced and intubated
+    await page.goto(BASE);
+    assert.ok(await page.$('a.card[href="?case=electiveGA#theatre"]'), `${name}: Elective GA card present`);
+    await page.goto(BASE + '?test&seed=3&case=electiveGA#theatre');
+    await page.waitForFunction(() => window.otsim && document.getElementById('n-hr').textContent !== '--');
+    assert.ok(await page.evaluate(() => otsim.state.pd.asleep && otsim.state.aw.device === 'ett' && otsim.state.resp.mode === 'vc'), `${name}: Elective GA starts induced, intubated, ventilated`);
+    assert.ok(await page.evaluate(() => otsim.state.gas.sao2 > 97), `${name}: Elective GA oxygenated`);
+
     await page.goto(BASE + '#nowhere');
     await page.waitForSelector('#library', { state: 'visible', timeout: 3000 });
     await page.close();
