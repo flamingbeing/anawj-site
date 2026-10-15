@@ -1,5 +1,6 @@
 // Fake data only. Regressions from the bug hunt of 13 Oct 2026 that need a browser: a move to the recycle bin whose
-// delete fails takes its copy out of the bin again (at once, or when it fails after being accepted); Settings search
+// delete fails takes its copy out of the bin again (at once, or when it fails after being accepted); Tag N cases, a tag
+// merge and a spreadsheet's changed rows keep a case changed on another device (audit, 14 Oct 2026); Settings search
 // finds the Settings page's own cards and Account; a settings file from before the `show` map wins over the account's
 // switches, and one that changes the profile moves this device's tabs as picking it does; the APMES switches that need
 // the targets' counts say so while those are off.
@@ -44,6 +45,63 @@ try { for (const width of [390, 1280]) {
   // version, so devices whose bin feed hid it show it again
   const jobs = await p.evaluate(async id => (await import('./js/ui-core.js')).writes.entries().filter(x => x.record.id === id).map(x => [x.state, !!x.record._deleted]), ids[1]);
   assert.deepEqual(jobs[0], ['synced', false]); assert.ok(jobs.some(([s, del]) => s === 'archived' && del), JSON.stringify(jobs));
+
+  // ---- Tag N cases, a tag merge and a spreadsheet's changed rows keep a case changed on another device (audit, 14 Oct
+  // 2026: they put this device's stale copy over it). The other device's edit goes straight into the demo store, so
+  // this page doesn't hear of it, as a phone offline in theatre wouldn't. ----
+  await p.evaluate(async () => {
+    const { S, cloud, patchLogbook, tagSet } = await import('./js/ui-core.js');
+    for (const [i, x] of ['a', 'b', 'c', 'd', 'e'].entries()) await cloud.saveCase(S.user.email, { id: 'fake-bulk-' + x, date: `2020-01-0${i + 1}`, initials: 'ZZ', details: 'Fakebulk case ' + x, cats: ['16'], createdAt: i + 1, updatedAt: Date.now(), source: 'app' });
+    await patchLogbook({ settings: { tagSet: [...tagSet(), { k: 'u:fakeone', n: 'Fake one' }, { k: 'u:faketwo', n: 'Fake two' }, { k: 'u:fakethree', n: 'Fake three' }] } });
+  });
+  const elsewhere = x => p.evaluate(id => { const k = 'apmes-logbook-demo-v1', s = JSON.parse(localStorage.getItem(k)); Object.assign(s.logbooks['demo@example.com'].cases[id], { details: 'Fakebulk changed elsewhere', cats: ['16', '17'], updatedAt: Date.now() }); localStorage.setItem(k, JSON.stringify(s)); }, 'fake-bulk-' + x);
+  const onServer = x => p.evaluate(async id => (await (await import('./js/ui-core.js')).cloud.listCases('demo@example.com')).find(c => c.id === id), 'fake-bulk-' + x);
+  const toastSays = async re => { await poll(async () => re.test(await p.locator('#toast').innerText()), 'toast ' + re); };
+  await elsewhere('a');
+  await goHash('logbook');
+  await p.getByLabel('Search cases').fill('Fakebulk case');
+  await p.getByRole('button', { name: 'Filter' }).click();
+  await p.locator('button.lb-fold', { hasText: 'More' }).click();
+  await p.locator('button', { hasText: /^Tag 5 cases/ }).click();
+  await p.locator('dialog[open] select').nth(1).selectOption('u:fakeone');
+  await p.locator('dialog[open]').getByRole('button', { name: 'Apply' }).click();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Add', exact: true }).click();
+  await toastSays(/4 cases updated\. 1 kept as it was changed on another device \(keep that version in Recent changes, then tag them again\)/);
+  assert.equal((await onServer('a')).details, 'Fakebulk changed elsewhere', 'Tag N cases: the edit made elsewhere stays');
+  assert.equal((await onServer('a')).tags, undefined); assert.deepEqual((await onServer('b')).tags, ['u:fakeone']);
+  const fakeTags = () => p.evaluate(async () => (await import('./js/ui-core.js')).tagSet().filter(x => /^u:fake/.test(x.k)).map(x => x.k));
+  const merge = async (from, to) => {
+    await goHash('tags');
+    await p.locator(`.te-list li[data-k="${from}"] .te-name`).click();
+    await p.locator('dialog.tag-info').getByRole('button', { name: 'Edit', exact: true }).click();
+    await p.locator('dialog[open]').getByRole('button', { name: 'Merge…', exact: true }).click();
+    await p.locator('dialog[open]').getByLabel('Merge into').selectOption(to);
+    await p.locator('dialog[open]').getByRole('button', { name: 'Merge', exact: true }).click();
+  };
+  // merged with every case saved: the old tag comes off the list
+  await merge('u:fakeone', 'u:faketwo');
+  await toastSays(/Merged into Fake two: 4 cases updated/);
+  assert.deepEqual(await fakeTags(), ['u:faketwo', 'u:fakethree']);
+  // one changed elsewhere: kept, and the old tag stays on the list (that case still has it)
+  await elsewhere('c');
+  await merge('u:faketwo', 'u:fakethree');
+  await toastSays(/Merged into Fake three: 3 of 4 cases; “Fake two” stays on your list\. 1 kept .*then merge again/);
+  assert.deepEqual(await fakeTags(), ['u:faketwo', 'u:fakethree']);
+  assert.equal((await onServer('c')).details, 'Fakebulk changed elsewhere', 'merge: the edit made elsewhere stays');
+  assert.deepEqual((await onServer('c')).tags, ['u:faketwo']); assert.deepEqual((await onServer('b')).tags, ['u:fakethree']);
+  // a spreadsheet's changed rows (an ID column): the same
+  await elsewhere('e');
+  await goHash('data');
+  const csv = 'ID,Date,Initials,Case summary,Tags\r\nfake-bulk-d,4/1/2020,ZZ,Fakebulk case d from the sheet,16\r\nfake-bulk-e,5/1/2020,ZZ,Fakebulk case e from the sheet,16\r\n';
+  await p.locator('label', { hasText: 'Upload Excel/CSV' }).locator('input').setInputFiles({ name: 'fake-cases.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await p.locator('dialog[open]', { hasText: 'match the columns' }).getByRole('button', { name: 'Review changes' }).click();
+  const rev = p.locator('dialog[open]', { hasText: 'Review changes' });
+  assert.match(await rev.locator('p').first().innerText(), /^2 changed, 0 new, 0 deleted/);
+  await rev.getByRole('button', { name: 'Apply' }).click();
+  await toastSays(/Applied: 1 changed, 0 new, 0 deleted\. 1 kept as it was changed on another device(?! \()/);   // (no "tag again": a row is no transform)
+  assert.equal((await onServer('d')).details, 'Fakebulk case d from the sheet');
+  assert.equal((await onServer('e')).details, 'Fakebulk changed elsewhere', 'import: the edit made elsewhere stays');
+  await p.evaluate(async () => { const { writes } = await import('./js/ui-core.js'); for (const j of writes.entries().filter(x => x.state === 'conflict')) await writes.archive(j.key); });
 
   // ---- Settings search: the Settings page's own cards, the bin, and Account ----
   await goHash('settings');

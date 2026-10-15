@@ -83,7 +83,8 @@ function healDayNotes() {
     s.saving = mergeDaySave(n, s, me).then(ok => { if (ok) s.status?.(s.dirty ? 'Not saved yet' : 'Saved'); return !!ok; },
       err => { s.dirty = true; s.status?.('Not saved: ' + err.message); return false; }).finally(() => { s.saving = null; });
   }
-  if (!me) return;
+  // (every save of anything comes through here: entries() copies them all, so only when a note's save needs attention)
+  if (!me || !writes.attention('note')) return;
   for (const job of writes.entries()) {
     const id = job.record && job.record.id;
     if (job.kind !== 'note' || job.state !== 'conflict' || job.owner !== me || !isDayNote(job.record) || open.has(id) || healing.has(id)) continue;
