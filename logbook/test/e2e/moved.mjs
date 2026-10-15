@@ -16,7 +16,7 @@ try {
       seen.push(u.href);
       // a module still loading when the test closes its page is no failure (the race failed a loaded full run once)
       try { await route.fulfill({ response: await route.fetch({ url: `http://localhost:${port}${u.pathname}${u.search}` }) }); }
-      catch (err) { if (!/closed/i.test(err.message)) throw err; }
+      catch (err) { if (!/closed|disposed/i.test(err.message)) throw err; }   // (or its response already gone)
     });
     const p = await ctx.newPage(), errors = [];
     p.on('pageerror', e => errors.push(e.message));

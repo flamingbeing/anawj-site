@@ -624,6 +624,9 @@ button.icon-btn { min-width: 40px; }
 /* the initials and age read from the box, in the colours of their highlights there */
 .parsed .pi-ini b { color: var(--accent); }
 .parsed .pi-age b { color: var(--warn, #b45309); }
+/* each is a button: a tap keeps that text in the case instead; struck through until tapped again */
+.parsed button.pi { display: inline-block; white-space: nowrap; width: auto; background: none; border: 0; padding: 0 2px; margin: 0; min-height: 24px; font: inherit; color: inherit; cursor: pointer; border-radius: 4px; box-shadow: none; }
+.parsed button.pi.undone b { text-decoration: line-through; color: var(--muted); }
 .parsed .pi.none { color: var(--warn); }
 .parsed .pi.grow { flex: 1 1 8em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tag-row { display: flex; align-items: center; gap: 8px; }
@@ -1477,10 +1480,10 @@ html.flat body { background: var(--panel); }
 html.flat :is(section.card, details.card) { background: transparent; border-color: transparent; box-shadow: none; padding-inline: 4px; margin-bottom: 4px; }
 html.flat .tabs, html.flat header.top { box-shadow: none; }
 /* Button style: the buttons that aren't the main one */
-html:is(.btn-filled, .btn-tinted, .btn-plain) :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.demo-flag):not(.grid-cats):not(.danger) { border-color: transparent; }
-html.btn-filled :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.demo-flag):not(.grid-cats) { background: color-mix(in srgb, var(--ink) 8%, var(--panel)); }
-html.btn-tinted :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.demo-flag):not(.grid-cats) { background: var(--accent-soft); color: var(--accent); }
-html.btn-plain :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.demo-flag):not(.grid-cats) { background: transparent; color: var(--accent); }
+html:is(.btn-filled, .btn-tinted, .btn-plain) :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.pi):not(.demo-flag):not(.grid-cats):not(.danger) { border-color: transparent; }
+html.btn-filled :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.pi):not(.demo-flag):not(.grid-cats) { background: color-mix(in srgb, var(--ink) 8%, var(--panel)); }
+html.btn-tinted :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.pi):not(.demo-flag):not(.grid-cats) { background: var(--accent-soft); color: var(--accent); }
+html.btn-plain :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.pi):not(.demo-flag):not(.grid-cats) { background: transparent; color: var(--accent); }
 /* Icons instead of words: common buttons (class ib) show their icon and keep the word for screen readers */
 .ib .ib-ico, .ib .ib-n { display: none; }
 html.icon-btns .ib .ib-n { display: inline; font-weight: 700; }
