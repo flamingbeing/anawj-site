@@ -605,6 +605,14 @@ portfolio content.
   Edit mode (per device) drags the tab bar and More's own list (`display().moreOrder`), Pin / Take off (a full bar asks
   which tab it replaces). The drag code is shared: `drag-list.js`.
 
+- **Recover** (More; owner, 15 Oct 2026): one page for Needs attention (unsynced or clashing changes: Retry, Keep mine
+  / Keep theirs), Recently deleted (the recycle bin, all devices), Unfinished drafts and Earlier versions (this device),
+  each folded with a count. The bin is no longer in Settings; search "recycle" finds it here.
+- **Case box height** (this device): the grab bar under the box sets a kept height (`display().boxHeight`; double-tap
+  resets); Grow as I type (`boxGrow`, on by default) grows it to two thirds of the screen.
+- **Totals Compact** (this device, on by default): initials across the top (`analytics.js` shortNames; a tap names the
+  person), short category names, a key under the table; Show targets at the bottom. Excel keeps full names.
+
 ## Data, roles and photos (`firestore.rules`)
 
 - **App owner:** `owners/{email}`, set by hand in the Firebase console. May read logbooks and cases and import

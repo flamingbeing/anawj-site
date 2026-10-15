@@ -14,8 +14,9 @@ import {
 import { dayHasNotes, caseHasNotes, openNotes, ensureNotes, dayNoteCard } from './ui-notepad.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
-import { reflectOnCase } from './ui-reflect.js';
+import { reflectOnCase, openReflection } from './ui-reflect.js';
 import { moveToBin } from './bin.js';
+import { display, setDisplay } from './display.js';
 import { destinations, openSend } from './ui-send.js';
 import { syncButton } from './ui-sync.js';
 import { shareText, copyText, caseText as shareCaseText, dayTextWithNotes } from './share.js';
@@ -483,6 +484,11 @@ function calendarView(rows, flagsOf, repaint) {
   // decoration, each day's button says its own date
   const grid = h('div', { class: 'lb-cal', role: 'group', 'aria-label': `Days of ${MONTHS[m - 1]} ${y}` }, weekdayNames(ws).map(d => h('div', { class: 'lb-dow', 'aria-hidden': 'true' }, d)));
   for (let i = 0; i < lead; i++) add(grid, h('div', { class: 'lb-day blank' }));
+  // Show reflections (owner, 15 Oct 2026; this device, off by default): a mark on days with a reflection, and each
+  // reflection in the day's list under its case (or on its own when it isn't linked to one)
+  const reflOn = !!display().calRefl && !basicHides('reflect');
+  const reflByDay = new Map();
+  if (reflOn) for (const r of S.reflections || []) if (r.date) (reflByDay.get(r.date) || reflByDay.set(r.date, []).get(r.date)).push(r);
   let monthN = 0;
   for (let d = 1; d <= days; d++) {
     const iso = `${y}-${pad(m)}-${pad(d)}`;
@@ -492,11 +498,15 @@ function calendarView(rows, flagsOf, repaint) {
     const tint = cs.length ? Math.min(4, cs.length) : 0;
     add(grid, h('button', {
       class: `lb-day t${tint} ${iso === today ? 'today' : ''} ${iso === view.day ? 'sel' : ''}`,
-      'aria-label': `${d} ${MONTHS[m - 1]}: ${cs.length} case${cs.length === 1 ? '' : 's'}${dayHasNotes(iso) ? ', has notes' : ''}`, 'aria-pressed': String(iso === view.day),
+      'aria-label': `${d} ${MONTHS[m - 1]}: ${cs.length} case${cs.length === 1 ? '' : 's'}${dayHasNotes(iso) ? ', has notes' : ''}${reflByDay.has(iso) ? ', has a reflection' : ''}`, 'aria-pressed': String(iso === view.day),
       onclick: () => { view.day = view.day === iso ? null : iso; repaint(); if (view.day) showDay(); },
     }, h('span', { class: 'n' }, d), h('span', { class: 'lb-count' + (cs.length ? '' : ' none'), 'aria-hidden': cs.length ? null : 'true' }, cs.length || ''), flagged ? h('i', { class: 'lb-dot', title: 'Has a flagged case' }) : null,
-      dayHasNotes(iso) ? h('i', { class: 'lb-note', title: 'Has notes' }) : null));
+      dayHasNotes(iso) ? h('i', { class: 'lb-note', title: 'Has notes' }) : null,
+      reflByDay.has(iso) ? h('i', { class: 'lb-refl', title: 'Has a reflection' }) : null));
   }
+  const dayRefl = view.day ? reflByDay.get(view.day) || [] : [];
+  const reflRow = r => h('li', { class: 'refl-under' }, h('button', { type: 'button', class: 'linkish', onclick: () => { location.hash = '#reflect'; openReflection(r); } },
+    rowIcon('reflect'), ` ${r.title || r.diagnosis || 'Reflection'}`, h('small', { class: 'muted' }, ` · ${r.status === 'complete' ? 'complete' : 'draft'}`)));
   const dayCases = view.day ? (byDay.get(view.day) || []) : [];
   const dayNotes = dayHasNotes(view.day);
   // the day's Copy includes its notes, and its daily note shows under the heading: have them ready (drawn again once
@@ -511,7 +521,8 @@ function calendarView(rows, flagsOf, repaint) {
         !MONTH_INPUT ? null : h('input', { type: 'month', 'aria-label': 'Pick a month', value: view.month, onclick: e => { try { e.target.showPicker(); } catch { /* the native tap opens it */ } },
           onchange: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { view.month = e.target.value; view.day = null; repaint(); } } })),
       h('button', { class: 'small icon-btn', 'aria-label': 'Next month', onclick: () => shift(1) }, '›'),
-      h('button', { class: 'small', onclick: () => { view.month = today.slice(0, 7); view.day = today; repaint(); } }, 'Today')),
+      h('button', { class: 'small', onclick: () => { view.month = today.slice(0, 7); view.day = today; repaint(); } }, 'Today'),
+      basicHides('reflect') ? null : h('label', { class: 'check lb-reflsw', style: 'margin:0' }, h('input', { type: 'checkbox', checked: reflOn, onchange: e => { setDisplay({ calRefl: e.target.checked || null }); repaint(); } }), 'Show reflections')),
     grid,
     view.day ? h('div', { class: 'lb-daydetail', style: 'margin-top:12px' },
       // the day, then its buttons together on one row (none left alone on a line of its own)
@@ -527,7 +538,9 @@ function calendarView(rows, flagsOf, repaint) {
           // log on this day (the Log page opens with the date already picked): last, at the right like a main action
           h('button', { class: 'small primary', title: 'Log a case on this day', 'aria-label': 'Log a case on this day', onclick: () => logOnDate(view.day) }, '+ Add'))),
       dayNoteCard(view.day),
-      dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : emptyState('calendar', view.day === today ? 'No cases yet today' : 'No cases on this day'))
+      dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => [caseRow(c, flagsOf), ...dayRefl.filter(r => r.caseId === c.id).map(reflRow)]),
+        dayRefl.filter(r => !dayCases.some(c => c.id === r.caseId)).map(reflRow)) : emptyState('calendar', view.day === today ? 'No cases yet today' : 'No cases on this day'),
+      !dayCases.length && dayRefl.length ? h('ul', { class: 'cases' }, dayRefl.map(reflRow)) : null)
       : h('p', { class: 'hint help', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
     undated.length ? h('details', { style: 'margin-top:12px' },
       h('summary', {}, `No date (${undated.length})`),

@@ -1659,3 +1659,8 @@ table.totals.compact .ini-btn { min-height: 32px; padding: 0 4px; font-weight: 7
 table.totals.compact th.me .ini-btn { color: var(--accent); }
 table.totals.compact td.cat, table.totals.compact td.cat .cat-in { max-width: 25vw; }
 table.totals.compact td.cat .cat-in { overflow-x: visible; overflow-wrap: anywhere; }   /* no sideways scroll in a narrow column */
+/* Logbook calendar, Show reflections (off by default): a mark on days with a reflection, the reflection under its case */
+.lb-refl { position: absolute; right: 4px; top: 4px; width: 7px; height: 7px; border-radius: 2px; background: var(--ok, #1a7f37); opacity: .85; }
+ul.cases li.refl-under { padding: 2px 0 8px 28px; border-top: 0; }
+ul.cases li.refl-under button { min-height: 32px; text-align: left; }
+.lb-reflsw { font-size: calc(13px * var(--fs, 1)); }
