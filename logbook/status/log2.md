@@ -62,7 +62,7 @@ Agreed queue (one PR each, in order, once he says go):
 8. **Built (with the bars PR).** **Profile page:** Profile card; "Show or hide" as a section heading, not a card; groups in tab order: Case tab,
    Logbook (Grid moves here), Reflections (Reflect buttons / ☆, figures and references move here), Analytics (the
    analytics extras move here), Header and tabs, Tips and help, APMES last. The Extras card goes (owner).
-8b. **One "Recover" page** (in More; can go on the bar), replacing Recent changes / Recover drafts and the Settings →
+8b. **Built (Recover PR).** **One "Recover" page** (in More; can go on the bar), replacing Recent changes / Recover drafts and the Settings →
    Data Recycle bin (no link left there: alpha, no old habits; owner). Sections, each folded with a count and a line
    saying all devices or this device: Needs attention (only when any: unsynced / clashing changes, Retry, Keep mine /
    theirs), Recently deleted (the bin, all devices, 30 days), Unfinished drafts (this device), Earlier versions (this

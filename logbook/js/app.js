@@ -11,7 +11,7 @@ import { gripDrag, moveIn } from './drag-list.js';
 import { createNavigation } from './navigation.js';
 import { renderNotes, leaveNotes, openDayNote, renderNoteSettings } from './ui-notepad.js';
 import { fromQuery, keepShared, readInbox } from './share-in.js';
-import { purgeExpired, openBin } from './bin.js';
+import { purgeExpired } from './bin.js';
 import { profile } from './ui-core.js';
 import { deviceOn, barAtBottom } from './device-presets.js';
 import { notesChanged } from './ui-notepad.js';
@@ -132,7 +132,7 @@ const TABS = [
   { id: 'points', label: 'Learning points', render: page(['parts'], m => m.parts.renderPoints()), hidden: true, under: 'logbook', unlisted: true },
   { id: 'account', bar: true, label: 'Account', render: page(['account', 'settings'], m => m.account.renderAccount()), hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
   { id: 'settings', bar: true, label: 'Settings', render: page(['settings', 'send', 'sync', 'settingsFile'], () => renderSettingsMenu()), hidden: true, under: 'more', desc: 'Profile, look, logging, reflections, notes and sharing, data' },
-  { id: 'recovery', bar: true, short: 'Recover', label: 'Recent changes / Recover drafts', render: page(['recovery'], m => m.recovery.renderRecovery()), hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },
+  { id: 'recovery', bar: true, short: 'Recover', label: 'Recover', render: page(['recovery'], m => m.recovery.renderRecovery()), hidden: true, under: 'more', desc: 'Changes waiting to sync, recently deleted, unfinished drafts and earlier versions' },
   { id: 'data', bar: true, short: 'Export', label: 'Export / Import', render: page(['logbook', 'notesExport', 'cloudSave', 'backup'], () => renderDataPage()), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
@@ -302,7 +302,7 @@ function buildSettingsIndex() {
     const text = card.querySelector('h2').textContent.trim();
     out.push({ id: 'settings', page: 'Settings', text, hint: [...card.querySelectorAll('button, a, label'), ...card.querySelectorAll('p')].map(x => x.textContent.trim()).join(' · ').slice(0, 160) });
   }
-  out.push({ id: 'bin', page: 'Settings', text: 'Recycle bin', hint: 'Deleted cases, reflections and notes, kept for 30 days', open: openBin });
+  out.push({ id: 'recovery', page: 'More', text: 'Recycle bin', hint: 'Recover → Recently deleted: cases, reflections and notes, kept for 30 days' });
   return out;
 }
 const searchSettings = (index, q) => {
@@ -361,7 +361,6 @@ const SETTINGS_GROUPS = [
   ['Logging', ['logging', 'tags']],
   ['Reflections', ['reflset']],
   ['Notes and sharing', ['notesset', 'sharefmt', 'sendto', 'sync']],
-  ['Data', ['bin']],
   ['Advanced', ['displayadv', 'loggingadv']],
 ];
 // the groups, then any Settings page none of them names (so a new page is never left out of the menu)
@@ -372,8 +371,7 @@ function settingsGroups() {
 }
 function renderSettingsMenu() {
   if (lastRendered !== 'settings') { settingsIndex = null; settingsQuery = ''; }   // drawn again on the first search of this visit
-  const item = id => (id === 'bin' ? menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin())
-    : (t => menuItem(t.id, t.label, t.desc))(TABS.find(t => t.id === id)));
+  const item = id => (t => menuItem(t.id, t.label, t.desc))(TABS.find(t => t.id === id));
   return h('div', {},
     settingsSearch(),
     h('section', { class: 'card more-list settings-menu' }, h('h2', {}, 'Settings'),

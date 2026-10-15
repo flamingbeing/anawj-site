@@ -870,7 +870,7 @@ function editor() {
   // it was read once after the save, so it could say pending under a header that said Synced (15 Oct 2026)
   const paintSaved = () => {
     const st = writes.status('reflection', r.id);
-    status.textContent = st === 'conflict' ? 'Changed elsewhere · open Recent changes' : st === 'failed' ? 'Save needs attention · open Recent changes'
+    status.textContent = st === 'conflict' ? 'Changed elsewhere · open Recover' : st === 'failed' ? 'Save needs attention · open Recover'
       : st === 'pending' ? 'Saved locally · pending sync' : 'Synced';
   };
   let shown = false;   // (a redrawn editor makes a new line; the old one stops listening once it has left the page)
@@ -899,7 +899,7 @@ function editor() {
         return true;
       } catch (err) {
         // an autosave says it once (after a conflict each one fails until a version is chosen in Recent changes)
-        if (rv.editing === r && S.user?.email === owner) { status.textContent = 'Save failed · retry or open Recent changes'; if (quiet !== true || session.failed !== err.message) toast('Could not save: ' + err.message); }
+        if (rv.editing === r && S.user?.email === owner) { status.textContent = 'Save failed · retry or open Recover'; if (quiet !== true || session.failed !== err.message) toast('Could not save: ' + err.message); }
         session.failed = err.message;
         return false;
       }

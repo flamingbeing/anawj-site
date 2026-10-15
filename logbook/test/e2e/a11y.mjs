@@ -87,7 +87,7 @@ const SCREENS = [
     await p.getByText(/^Synced \d+ of/).waitFor();
   }, true],
   ['Export / Import', hash('data'), false],
-  ['Recover drafts', hash('recovery'), false],
+  ['Recover', hash('recovery'), false],
   ['Admin portal', hash('admin'), false],
   ['Send feedback', async p => { await hash('feedback')(p); await p.getByLabel('Your feedback').waitFor(); }, true],
   ['Feedback (owner)', async p => {

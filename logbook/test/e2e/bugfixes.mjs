@@ -68,7 +68,7 @@ try { for (const width of [390, 1280]) {
       if (!rec._deleted) return cloud.commitRecord(email, kind, rec, bs);
       await new Promise(r => setTimeout(r, 600));
       const remote = await cloud.saveCase(email, { ...c, details: 'fake hernia repair, edited on another device', updatedAt: Date.now() });
-      throw Object.assign(new Error('This record changed elsewhere. Both versions are kept in Recent changes'), { code: 'write-conflict', remote });
+      throw Object.assign(new Error('This record changed elsewhere. Both versions are kept in Recover'), { code: 'write-conflict', remote });
     } });
     await moveToBin('case', S.cases.find(x => x.id === c.id));
     return c.id;
@@ -96,7 +96,7 @@ try { for (const width of [390, 1280]) {
   await p.locator('dialog[open] select').nth(1).selectOption('u:fakeone');
   await p.locator('dialog[open]').getByRole('button', { name: 'Apply' }).click();
   await p.locator('dialog[open]').getByRole('button', { name: 'Add', exact: true }).click();
-  await toastSays(/4 cases updated\. 1 kept as it was changed on another device \(keep that version in Recent changes, then tag them again\)/);
+  await toastSays(/4 cases updated\. 1 kept as it was changed on another device \(keep that version in Recover, then tag them again\)/);
   assert.equal((await onServer('a')).details, 'Fakebulk changed elsewhere', 'Tag N cases: the edit made elsewhere stays');
   assert.equal((await onServer('a')).tags, undefined); assert.deepEqual((await onServer('b')).tags, ['u:fakeone']);
   const fakeTags = () => p.evaluate(async () => (await import('./js/ui-core.js')).tagSet().filter(x => /^u:fake/.test(x.k)).map(x => x.k));
@@ -142,19 +142,19 @@ try { for (const width of [390, 1280]) {
   await search('export settings', 'Settings file', 'Settings');
   await search('import settings', 'Settings file', 'Settings');
   await search('connect claude', 'Connect Claude', 'Settings');
-  await search('recycle', 'Recycle bin', 'Settings');
+  await search('recycle', 'Recycle bin', 'More');
   await search('delete account', 'Delete account', 'Account');
   await search('section 1', 'Portfolio details (Section 1)', 'Account');
   // (the year picker is on Account for people not on the programme list)
   if (!(await p.evaluate(async () => !!(await import('./js/ui-core.js')).S.resident))) await search('residency', 'Residency year', 'Account');
-  // a result on this page scrolls to its card; the bin opens
+  // a result on this page scrolls to its card; the bin is Recover's Recently deleted
   await p.getByLabel('Search settings').fill('export settings');
   await p.locator('.settings-search li a', { hasText: 'Settings file' }).click();
   await p.locator('section.flash h2', { hasText: 'Settings file' }).waitFor();
   await p.getByLabel('Search settings').fill('recycle');
   await p.locator('.settings-search li a', { hasText: 'Recycle bin' }).click();
-  await p.locator('dialog[open]').getByText('Recycle bin', { exact: true }).first().waitFor();
-  await p.locator('dialog[open]').getByRole('button', { name: 'Close' }).click();
+  await p.locator('.recover-sec[data-sec=deleted][open] .bin-view').waitFor();
+  await p.evaluate(() => { location.hash = '#settings'; });
 
   // ---- a settings file from before `show` (basicOn, caseHide) wins over the account's switches ----
   await p.evaluate(async () => {

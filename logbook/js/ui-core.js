@@ -554,9 +554,9 @@ export async function updateMany(pairs, { onprogress = savingToast } = {}) {
 // device's older copy back over the other device's change
 export function updatedToast(text, r, again = '') {
   if (!r.kept && !r.failed) return toast(text);
-  const not = [r.kept ? `${r.kept} kept as ${r.kept === 1 ? 'it was' : 'they were'} changed on another device${again ? ` (keep that version in Recent changes, then ${again})` : ''}` : '',
+  const not = [r.kept ? `${r.kept} kept as ${r.kept === 1 ? 'it was' : 'they were'} changed on another device${again ? ` (keep that version in Recover, then ${again})` : ''}` : '',
     r.failed ? `${r.failed} not saved (${r.error?.message || 'error'})` : ''].filter(Boolean).join('; ');
-  toast(`${text}. ${not}`, { action: 'Recent changes', onaction: () => { location.hash = '#recovery'; }, ms: 12000 });
+  toast(`${text}. ${not}`, { action: 'Recover', onaction: () => { location.hash = '#recovery'; }, ms: 12000 });
 }
 
 // New cases only (pasted lists, plans, a backup's missing cases): one blind batch, with no base to check against; a

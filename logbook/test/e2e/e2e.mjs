@@ -149,7 +149,7 @@ async function run(label, ctxOpts) {
       await p.waitForSelector('.more-list a[data-go="display"]', { timeout: 6000 });
       assert(p.url().endsWith('#settings'), 'hash rewritten: ' + p.url());
       assert(await p.locator('.acct').count() === 0, 'portfolio details on Settings');
-      assert(await p.locator('.more-list a[data-go="bin"]').count() === 1, 'no recycle bin in Settings');
+      assert(await p.locator('.more-list a[data-go="bin"]').count() === 0, 'the recycle bin is on Recover now, not in Settings');
       await tab('display');
       assert(await p.locator('.card', { hasText: 'Compact mode' }).count() === 1, 'no Compact mode on Display');
       await tab('account');

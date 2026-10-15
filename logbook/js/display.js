@@ -213,7 +213,7 @@ export const roundLevel = d => (Number.isInteger(d.round) && d.round >= 0 && d.r
 // (Settings live there), at least two and at most seven (MAX_BAR, More included) stay on the bar; hidden main tabs
 // are listed first on the More page. Every page in the More list can go on the bar too (Admin portal: admins only).
 export const BAR_TABS = [['caselogs', 'Case logs'], ['log', 'Case'], ['logbook', 'Logbook'], ['totals', 'Totals'], ['notes', 'Notes'], ['reflect', 'Reflections'], ['progress', 'Analytics'],
-  ['account', 'Account'], ['settings', 'Settings'], ['recovery', 'Recover drafts'], ['data', 'Export / Import'], ['admin', 'Admin portal'], ['more', 'More']];
+  ['account', 'Account'], ['settings', 'Settings'], ['recovery', 'Recover'], ['data', 'Export / Import'], ['admin', 'Admin portal'], ['more', 'More']];
 // Totals: programme residents, faculty, PDs and admins, with the totals switch on (off in Personal)
 export const barTabs = () => BAR_TABS.filter(([id]) => (id !== 'admin' || S.admin) && (id !== 'caselogs' || facultyRole()) && (id !== 'totals' || ((facultyRole() || S.resident) && shows('totals'))));
 // tabs off the bar until someone puts them there (they live in More by default), and the ones each profile moves:
