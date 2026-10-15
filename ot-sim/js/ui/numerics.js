@@ -22,7 +22,7 @@ function ageText(n, t) {
 
 export class Numerics {
   constructor() {
-    this.el = { hr: $('n-hr'), spo2: $('n-spo2'), etco2: $('n-etco2'), rr: $('n-rr'), nibp: $('n-nibp'), map: $('n-map'), age: $('n-nibp-age'), temp: $('n-temp'), clock: $('clock'), go: $('nibp-go'), tof: $('n-tof'), tofr: $('n-tofr'), ptc: $('n-ptc'), ppeak: $('n-ppeak'), peep: $('n-peep'), mv: $('n-mv'), agent: $('n-agent'), agentName: $('n-agent-name') };
+    this.el = { hr: $('n-hr'), rhythm: $('n-rhythm'), spo2: $('n-spo2'), etco2: $('n-etco2'), rr: $('n-rr'), nibp: $('n-nibp'), map: $('n-map'), age: $('n-nibp-age'), temp: $('n-temp'), clock: $('clock'), go: $('nibp-go'), tof: $('n-tof'), tofr: $('n-tofr'), ptc: $('n-ptc'), ppeak: $('n-ppeak'), peep: $('n-peep'), mv: $('n-mv'), agent: $('n-agent'), agentName: $('n-agent-name') };
     this.lastWrite = -1e9;
   }
   set(el, text) { if (el.textContent !== text) el.textContent = text; }
@@ -34,6 +34,7 @@ export class Numerics {
     const m = state.mon, e = this.el, n = m.nibp;
     this.set(e.clock, clockText(state.t));
     this.set(e.hr, r(m.hr));
+    if (e.rhythm && state.rh) this.set(e.rhythm, state.rh.rhythm === 'sinus' ? '' : state.rh.label);
     this.set(e.spo2, r(Math.min(100, m.spo2)));
     this.set(e.etco2, r(m.etco2));
     this.set(e.rr, r(m.rr));

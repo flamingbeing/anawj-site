@@ -56,6 +56,7 @@ h1{font-size:1.6rem;line-height:1.2;margin:.75rem 0 .25rem}
 .lane .trace{position:relative}
 .lane canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .lane .lab{position:absolute;left:4px;top:2px;font:12px/1 var(--f-narrow);z-index:1}
+.lane .rhy{position:absolute;left:4px;bottom:2px;font:11px/1 var(--f-narrow);color:var(--ecg);z-index:1}
 .num{display:flex;flex-direction:column;justify-content:center;align-items:flex-end;padding:2px 4px 2px 6px;line-height:1}
 .num .nl{font:13px/1.1 var(--f-narrow);letter-spacing:.02em}
 .num .nv{font-weight:700;font-size:40px;font-variant-numeric:tabular-nums}
@@ -131,7 +132,7 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
     <div class="monitor" id="monitor" role="group" aria-label="Patient monitor">
       <div class="fastnote" id="fastnote" hidden></div>
       <div class="lane">
-        <div class="trace"><span class="lab ecg" aria-hidden="true">II</span><canvas id="c-ecg" aria-hidden="true"></canvas></div>
+        <div class="trace"><span class="lab ecg" aria-hidden="true">II</span><canvas id="c-ecg" aria-hidden="true"></canvas><span class="rhy" id="n-rhythm" aria-hidden="true"></span></div>
         <div class="num ecg"><span class="nl">HR</span><span class="nv" id="n-hr">--</span><span class="nu">/min</span></div>
       </div>
       <div class="lane">
@@ -221,11 +222,22 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
         </div>
         <div class="act"><button type="button" id="warmer" aria-pressed="false">Forced-air warmer</button></div>
         <div class="act"><label>Surgical bleeding <select id="bleed"><option value="0">None</option><option value="20">20 mL/min</option><option value="50">50 mL/min</option><option value="100">100 mL/min</option><option value="300">300 mL/min</option></select></label></div>
+        <h3 class="sub">Rhythm</h3>
+        <p class="hint">Impose a heart rhythm (the scenarios will do this for you). The circulation responds: the fast and poorly-filled rhythms drop the output, and VF, torsades, asystole and PEA make no pulse.</p>
+        <div class="act"><label>Set rhythm <select id="rhythm">
+          <optgroup label="Sinus"><option value="sinus">Sinus rhythm</option><option value="brady">Sinus bradycardia</option><option value="tachy">Sinus tachycardia</option></optgroup>
+          <optgroup label="Blocks"><option value="av1">First-degree AV block</option><option value="wenckebach">Second-degree, Wenckebach</option><option value="mobitz2">Second-degree, Mobitz II</option><option value="chb">Complete heart block</option></optgroup>
+          <optgroup label="Supraventricular"><option value="junctional">Junctional</option><option value="af">Atrial fibrillation</option><option value="flutter">Atrial flutter</option><option value="svt">SVT</option></optgroup>
+          <optgroup label="Ventricular"><option value="bigeminy">Bigeminy</option><option value="vt">Ventricular tachycardia</option><option value="torsades">Torsades de pointes</option><option value="vf">Ventricular fibrillation</option></optgroup>
+          <optgroup label="Paced"><option value="paced">Paced rhythm</option></optgroup>
+          <optgroup label="Arrest"><option value="pea">PEA</option><option value="asystole">Asystole</option></optgroup>
+          <optgroup label="Hyperkalaemia"><option value="hyperk1">Peaked T waves</option><option value="hyperk2">Wide QRS</option><option value="hyperk3">Sine wave</option></optgroup>
+        </select></label></div>
         <h3 class="sub">Events</h3>
         <ol class="given" id="events"><li class="none">Nothing yet</li></ol>
       </div>
       <details id="behind-box"><summary>Behind the monitor</summary><div id="behind"></div></details>
-      <p class="foot">Free run: a healthy synthetic adult. A full model: drugs, the airway gases, breathing and the ventilator, heart rate and blood pressure, oxygen and CO2 all respond. Temperature, the rhythms, the airway and the crises come next. Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
+      <p class="foot">Free run: a healthy synthetic adult. A full model: drugs, the airway gases, breathing and the ventilator, heart rate and blood pressure, oxygen and CO2, temperature and the heart rhythm all respond. The airway and the crises come next. Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
     </div>
   </div>
 </section>

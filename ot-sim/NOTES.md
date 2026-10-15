@@ -69,6 +69,24 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Decisions log
 
+- 15 Oct 2026 (M2.7): rhythms and the ECG. `rhythm.js` grew from sinus-only into an atrial clock, an AV node and a
+  ventricular clock with a rhythm catalogue (`CATALOG`): sinus (brady, tachy), junctional, the AV blocks (first-degree,
+  Wenckebach, Mobitz II, complete), AF, flutter, SVT, bigeminy, VT, torsades, VF, PEA, asystole, paced and the three
+  hyperkalaemia stages. Each rhythm carries `rh.output` (mechanical effectiveness, 0..1) and `rh.perfusing`; cardio
+  multiplies cardiac output by `output`, so the fast and poorly-filled rhythms drop the pressure and VF/torsades/
+  asystole/PEA make no pulse. Sinus keeps `output: 1`, so the whole M2.1 circulation calibration is untouched (that was
+  the key constraint — all earlier tests still pass unchanged). Beats carry a `morph` the ECG renderer (`ui/synth.js`)
+  draws (narrow, wide, paced spike, no-P, peaked/broad hyperK T), and the disorganised rhythms add a continuous
+  baseline (AF fibrillation, flutter sawtooth, VF chaos coarsening over minutes, torsades twist, asystole flat, hyperK
+  sine, and marching P waves for the blocks). The monitor reads no HR for VF/torsades and 0 for asystole. In a
+  non-perfusing rhythm cardio keeps arteriolar tone (×6 drainage resistance) so the arterial pressure decays on roughly
+  the Schipke curve (~29 mmHg at 13 s vs ~24) instead of collapsing at once. Known misses: the arrest decay is a little
+  fast and its plateau a little high vs Schipke; SpO2 does not yet fall during an arrest (output–oxygenation coupling
+  comes with resuscitation, M2.8). UI: a rhythm picker and a rhythm label on the ECG, both on the Patient tab (the
+  scenarios will drive the same `{ type: 'rhythm', to }` action). A ventricular beat that was not cleared on no-beat
+  steps caused duplicate beats in an early draft — the step now returns a fresh slice whenever the previous step had
+  events, so `rh.events` is emptied.
+
 - 15 Oct 2026 (M2.6): `temp.js` (two compartments, core and periphery, energy balance in kcal). Anaesthesia opens the
   core-peripheral conductance (K 23 awake, 37 asleep), which redistributes heat and gives the early fall (about -0.8 C
   in hour 1, then slower); heat production falls 30% asleep; the periphery loses to a 21 C theatre; cold fluids cool

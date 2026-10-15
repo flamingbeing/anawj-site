@@ -114,6 +114,7 @@ $('surgery').addEventListener('click', () => {
 for (const b of document.querySelectorAll('[data-fluid]')) b.addEventListener('click', () => { sim.act({ type: 'fluid', product: b.dataset.fluid, ml: +b.dataset.ml }); acted(); });
 $('bleed').addEventListener('change', () => { sim.act({ type: 'bleed', mlPerMin: +$('bleed').value }); acted(); });
 $('warmer').addEventListener('click', () => { const on = $('warmer').getAttribute('aria-pressed') !== 'true'; $('warmer').setAttribute('aria-pressed', String(on)); sim.act({ type: 'warming', on }); acted(); });
+$('rhythm').addEventListener('change', () => { sim.act({ type: 'rhythm', to: $('rhythm').value }); acted(); });
 const PRODUCT_NAME = { crystalloid: 'crystalloid', colloid: 'colloid', rbc: 'red cells' };
 function fluidText(state) {
   const fl = state.cv.fl, run = fl.running.map(r => `${PRODUCT_NAME[r.product]} ${Math.round(r.left)} mL to go`);
