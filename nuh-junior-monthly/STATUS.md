@@ -2,7 +2,8 @@
 
 ## Now
 - First version (15 Oct 2026): sheet import/copy-back, Postings tab, cardiac and ICU rules and auto-fill, predicted
-  rules marked To confirm. Built in one session on the NTF roster app.
+  rules marked To confirm. Built in one session on the NTF roster app. Then the NUHS app kit, and rules and import
+  tuned on a backtest of 22 months of real rosters (NOTES.md, Backtest).
 
 ## Waits on the owner
 - The rosterer's review of the December 2026 trial copy (owner's Drive, "NUH junior monthly – trials") and of the

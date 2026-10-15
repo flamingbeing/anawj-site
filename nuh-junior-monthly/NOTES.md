@@ -61,6 +61,17 @@ posting": no ICU call on day 1, new to ICU from day 4 (tag `icunew`), Ortho/HRM 
 `spread` has an optional `among` (only people on that posting, their share by days on it). Tags `mo1`–`mo3` are the
 call levels; `supernum` = in ICU without calls.
 
+**Backtest (15 Oct 2026)**: the app's import, rules and Auto-fill were run on 22 months of the real rosters (the
+scripts and results are in the private repo, `life/data/nuh-junior-monthly/`). The real rosters break the must-hold
+rules 25 times (genuine exceptions: a cardiac call covered by someone not on cardiac, a call on the first day of a
+posting); Auto-fill twice (nights with nobody eligible, which it flags), with fairer shares of calls and weekend
+calls than the real rosters. Import then copy-back gives every month back cell for cell except the PC / PPC the
+sheet was missing. Changes it led to: a cardiac call may fall in an echo/perfusion week (a preference against); the
+Ortho/HRM day-8 ICU rule is a preference; MedHub Sun-then-Fri/Sat weight 2 and liver OT week weight 5 (real rosters
+break them often); fair shares weight 10, counting echo/perfusion weeks as cardiac days; import keeps the posting
+under leave and blank days inside a posting and across the month boundary; someone listed twice keeps the row with
+their roster; copy-back never writes a posting the sheet didn't show, and leave beats PC.
+
 How to add a rule type: as in `ntf-roster/NOTES.md` ("How to add a new rule type"); the engine is the same file.
 
 ## Tests
