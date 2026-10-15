@@ -162,7 +162,7 @@ function advDemo(ch){ADV.boot=null;advBootUI();ADV.sensor=null;ADV.dlg=null;ADV.
  advMsgDrop(/^System is in Demo Mode/);const S=advDemoSimOn();advStartCase('case',S);advMsg('System is in Demo Mode',{latch:true});advRelayout();advOv();}
 function advDemoExit(){advDemoSimOff();ADV.demo=false;ADV.ch=4;advMsgDrop(/^System is in Demo Mode/);advRelayout();advBootBegin();}
 // ----- defaults -----
-function advDefaults(){ADV.layout={2:'bis,eeg',4:'bis,asym,eeg'};ADV.sec='emg';ADV.win=60;ADV.chartInt=1;ADV.uvmm={2:2,4:10};ADV.sweep=25;ADV.nch={2:1,4:2};ADV.filters=true;ADV.imp=true;ADV.showVals=false;
+function advDefaults(){ADV.layout={2:'dsa,eeg',4:'dsa,asym,eeg'};ADV.sec='emg';ADV.win=60;ADV.chartInt=1;ADV.uvmm={2:2,4:10};ADV.sweep=25;ADV.nch={2:1,4:2};ADV.filters=true;ADV.imp=true;ADV.showVals=false;
  ADV.alarm={bis:{on:false,lo:40,hi:60},sr:{on:false,hi:50},sef:{on:false,lo:12,hi:18}};ADV.vol=4;ADV.audioRem=false;ADV.hr24=true;ADV.dateFmt='DD MMM YYYY';mon.smooth=15;ADV.view='graphs';advRelayout();}
 // ----- actions -----
 function advMenuAct(a,v,el,e){const d=ADV.dlg,t=d&&d.tmp;

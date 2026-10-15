@@ -601,11 +601,11 @@ function trendUI(){$('kTrend').textContent=`Trend ${mon.trend} min`;$('kBottom')
  txt('dsaRange',(mon.dbLo===DB_LO&&mon.dbHi===DB_HI?'':`${mon.dbLo}…${mon.dbHi} dB · `)+`last ${mon.trend} min`);}
 let menuOpen=false; // the on-screen Menu (VISTA and two-sided screens)
 function applySkin(s,reset,init){mon.skin=s;mtApply();$('vistaWrap').hidden=s!=='vista';$('sedWrap').hidden=s!=='sedline';if(s==='sedline')sedApply();$('advWrap').hidden=s!=='advance';if(s==='advance')advApply();$('classicWrap').hidden=s!=='classic';$('teachStrip').hidden=s==='classic';$('bilSum').hidden=s!=='sedline'&&s!=='advance';
- document.querySelectorAll('#skinSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.skin===s));
+ document.querySelectorAll('#skinSeg button,#monSwitch button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.skin===s));
  $('keySeg').hidden=s!=='classic';if(s==='classic')closeMenu(true);
  if(reset){mon.scale=s==='classic'?100:50;mon.sweep=s==='classic'?'auto':8;}
  scaleUI();dispUI(false);trendUI();if(!init){dirty=true;try{localStorage.setItem('bisdsa.skin',s);}catch(e){}if(reset)saveDisp();}}
-document.querySelectorAll('#skinSeg button').forEach(b=>b.onclick=()=>applySkin(b.dataset.skin,true));
+document.querySelectorAll('#skinSeg button,#monSwitch button').forEach(b=>b.onclick=()=>applySkin(b.dataset.skin,true));
 // the Menu: tap an item to step through its values; settings are the same ones the soft keys and Display panel change
 const RANGES=[[-3,31],[0,25],[5,20],[-9,40]],SKINS=[['vista','Medtronic BIS'],['advance','BIS Advance'],['sedline','SedLine']];
 const MENU=[

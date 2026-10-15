@@ -581,3 +581,14 @@ checked against a photo of a Root. Look chosen: the 2017/2018 builds (ADULT pill
 - `node bis-dsa/test/e2e.mjs` runs the teaching-layout and Medtronic checks, then `adv.e2e.mjs` and `sed.e2e.mjs`; the whole run takes over 10 minutes, so give a shell command a background run.
 - An earlier note said `adv.e2e.mjs` was flaky. The cause was the battery-low check: it read `#aBatT` straight after switching the Simulate button off, before the next frame had redrawn it
   (`'10%' !== '100%'`, about one run in two). The test now waits for the text; the assertion is unchanged. Six runs in a row passed after the fix.
+
+## Owner feedback, 15 Oct 2026 (phone, real use)
+
+- The Medtronic and Advance DSAs went solid red: they used the Display panel's saved DSA colour range (a lowered ceiling saved
+  on the device). The real monitors have no colour range, so both now always use their own fixed scale; the range sliders
+  only affect the Teaching layout and SedLine.
+- BIS Advance opens straight on the main screen (no start-up or sensor check); "Replay start-up" under the screen shows the
+  boot messages and sensor check again. Default layouts show the DSA and the raw EEG together on all three monitors
+  (Advance: DSA, ASYM, EEG; 2-channel: DSA, EEG).
+- A monitor switch (Medtronic BIS, BIS Advance, SedLine, Teaching) sits at the top of the page, in step with the Display
+  panel's screen-layout buttons.
