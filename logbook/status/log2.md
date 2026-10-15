@@ -34,6 +34,11 @@ Agreed queue (one PR each, in order, once he says go):
 8. **Profile page:** Profile card; "Show or hide" as a section heading, not a card; groups in tab order: Case tab,
    Logbook (Grid moves here), Reflections (Reflect buttons / ☆, figures and references move here), Analytics (the
    analytics extras move here), Header and tabs, Tips and help, APMES last. The Extras card goes (owner).
+8b. **One "Recover" page** (in More; can go on the bar), replacing Recent changes / Recover drafts and the Settings →
+   Data Recycle bin (no link left there: alpha, no old habits; owner). Sections, each folded with a count and a line
+   saying all devices or this device: Needs attention (only when any: unsynced / clashing changes, Retry, Keep mine /
+   theirs), Recently deleted (the bin, all devices, 30 days), Unfinished drafts (this device), Earlier versions (this
+   device, last 100; folded by default).
 9. **Bulk select and edit:** press and hold (desktop: a Select button) in List and in Calendar's day list; bar: N
    selected, Select all (whole search, across pages), Select none, Bulk edit…, Done. Bulk edit: a row per field (date,
    initials, case summary replace / append / find-replace, APMES and own tags add / remove / replace, ☆ Interesting),
@@ -45,6 +50,13 @@ Agreed queue (one PR each, in order, once he says go):
     lines per row 1 / 2 / 3 / Fit to content.
 11. **Paging by default** (owner's call, 15 Oct): 100 per page, 25 / 50 / 100 / 300 / All (per device); "‹ Page 2 of
     14 ›" with a jump list showing each page's dates; a search goes back to page 1; Calendar stays monthly.
+12. **More Send to presets** (iPhone users especially): Apple Notes via a Shortcut (setup steps or a shared Shortcut
+    link), Email (mailto), Telegram, Drafts, Bear, Things, Day One; a line for apps with no link (Keep, Notion, OneNote):
+    use Share. Check each link on a real iPhone first (owner or Firetop).
+
+Release in three batches (proposed 15 Oct): fixes (1–3), layout (4–8b), power features (9–12; bulk edit gets the full
+tests and a Firetop run on a test account). The app is alpha with almost no users (owner, 15 Oct): no compatibility
+links or migration niceties needed for moved pages.
 
 Earlier work (all merged): the reliability fixes (#569–#589; follow-ups in `status/wip/README.md`), the app → sheet sync,
 the drift-check skill and the private dashboard "Logbook Sync Check" (claude.ai/artifact/TFa1Dvn9b4uA4oAedz5111).
