@@ -73,7 +73,6 @@ hooks.showCases = opts => { need('logbook').then(() => hooks.showCases(opts)).ca
 // Tab icons: tiny inline SVG paths (24x24, stroked), so they look the same on every phone.
 const ICONS = {
   caselogs: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 7M18 14a6 6 0 0 1 4 7',   // people
-  programme: 'M4 4h16v16H4zM4 10h16M4 15h16M10 4v16M15 4v16',   // a table
   caselog: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0',
   log: 'M12 5v14M5 12h14',
   logbook: 'M4 5h16M4 10h16M4 15h16M4 20h10',
@@ -113,22 +112,20 @@ const icon = id => {
 };
 
 const TABS = [
-  // Faculty / PCs profile (faculty, PDs and admins): Programme totals first (owner, 15 Oct 2026), then residents'
-  // compiled case logs (in More in that profile), both from the counts summaries
-  { id: 'programme', label: 'Totals', moreLabel: 'Programme totals', render: page(['progress'], m => m.progress.renderTotals()), faculty: true, desc: 'Every resident’s case counts per tag, by residency year; Excel download' },
+  // Faculty / PCs profile (faculty, PDs and admins): residents' compiled case logs, from the counts summaries (in More)
   { id: 'caselogs', label: 'Case logs', render: page(['caselogs'], m => m.caselogs.renderCaseLogs()), faculty: true, desc: 'Residents’ case logs: counts per tag against the targets' },
   { id: 'log', label: 'Case', render: renderLog },
   { id: 'logbook', label: 'Logbook', render: page(['logbook'], m => m.logbook.renderLogbook()) },
+  // Programme totals, its own tab (owner, 15 Oct 2026): the first tab in Faculty / PCs, after the Logbook for residents
+  { id: 'totals', label: 'Totals', moreLabel: 'Programme totals', render: page(['progress'], m => m.progress.renderTotals()), desc: 'Every resident’s case counts per tag, by residency year' },
   { id: 'reflect', label: 'Reflections', render: page(['reflect'], m => m.reflect.renderReflect()), desc: 'Your reflections' },
-  // not in Faculty / PCs (owner, 15 Oct 2026): it has Totals instead
-  { id: 'progress', label: 'Analytics', render: page(['progress'], m => m.progress.renderProgress()), desc: 'Your progress against the APMES targets' },
+  // in More (owner, 15 Oct 2026); Faculty / PCs: programme analytics instead of your own (Totals has its own tab)
+  { id: 'progress', label: 'Analytics', render: page(['progress', 'caselogs'], m => (facultyMode() ? m.caselogs.renderProgramme() : m.progress.renderProgress())), desc: 'Your progress against the APMES targets' },
   // a personal notepad: on the bar only if chosen (Arrange tabs); otherwise first in More
   { id: 'notes', label: 'Notes', moreLabel: 'Notes (beta)', render: renderNotes, desc: 'Your own notes: private, never in your portfolio' },
   // five tabs on the bar; the rest live under More (still reachable by #totals, #account, #settings)
   { id: 'more', label: 'More', render: () => renderMore() },
   { id: 'caselog', label: 'Case log', render: page(['caselogs'], m => m.caselogs.renderCaseLog()), faculty: true, hidden: true, under: 'caselogs', unlisted: true },
-  // under Analytics: how your counts compare with your intake
-  { id: 'totals', label: 'Totals', render: page(['progress'], m => m.progress.renderTotals()), hidden: true, under: 'progress', unlisted: true },
   // under the Logbook: every learning point (or other labelled part), from Filter (Labelled parts on)
   { id: 'points', label: 'Learning points', render: page(['parts'], m => m.parts.renderPoints()), hidden: true, under: 'logbook', unlisted: true },
   { id: 'account', bar: true, label: 'Account', render: page(['account', 'settings'], m => m.account.renderAccount()), hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
@@ -173,13 +170,14 @@ const menuItem = (id, label, desc, onclick) => h('li', {}, h('a', { href: '#' + 
 function renderMore() {
   const items = visibleTabs().filter(t => t.under === 'more' && !t.unlisted);
   // tabs hidden from the bar (Advanced display) come first, so they are one tap away
-  // (Case logs and Totals, for faculty, PDs and admins: first in their own profile, after the person's own tabs in others)
-  const prog = id => id === 'caselogs' || id === 'programme', first = facultyMode() ? -1 : 1;
+  // (Faculty / PCs: Case logs, then Analytics, then the person's own tabs; other profiles: Case logs last)
+  const rank = facultyMode() ? id => ['caselogs', 'progress'].indexOf(id) + 1 || 9 : id => (id === 'caselogs' ? 9 : 0);
   const hidden = arrangeTabs(barCandidates(), display()).hidden.filter(id => !TABS.find(t => t.id === id).hidden)
-    .sort((a, b) => first * (prog(a) - prog(b)));
+    .sort((a, b) => rank(a) - rank(b));
+  const descOf = t => (t.id === 'progress' && facultyMode() ? 'Who’s behind in each residency year' : t.desc || 'Hidden from the tab bar');
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
-      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.moreLabel || t.label, t.desc || 'Hidden from the tab bar')), items.map(t => menuItem(t.id, t.moreLabel || t.label, t.desc)))),
+      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.moreLabel || t.label, descOf(t))), items.map(t => menuItem(t.id, t.moreLabel || t.label, t.desc)))),
     privacyCard(),
     creditsCard(),
     installCard(),
@@ -454,7 +452,7 @@ const banner = document.getElementById('banner');
 // ---------- tabs and routing (#log, #logbook, ...) ----------
 
 // Totals (names and counts of programme residents) is for the programme only; the rules agree.
-const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (!t.owner || S.owner) && (!t.faculty || facultyRole()) && (t.id !== 'totals' || S.admin || S.pd || S.resident) && (t.id !== 'progress' || !facultyMode()));
+const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (!t.owner || S.owner) && (!t.faculty || facultyRole()) && (t.id !== 'totals' || ((facultyRole() || S.resident) && !basicHides('totals'))));
 // the tabs that can sit on the bar: the main ones, and the pages in the More list (bar: true), when put there
 const barCandidates = () => visibleTabs().filter(t => !t.hidden || t.bar).map(t => t.id);
 const TAB_ALIASES = { reflections: 'reflect' };

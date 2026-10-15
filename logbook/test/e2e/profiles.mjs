@@ -69,7 +69,7 @@ try { for (const width of [390, 1280]) {
   await dlg.getByRole('button', { name: 'Apply' }).click();
   await p.locator('.profile-now', { hasText: 'Now: Personal' }).waitFor();
   assert.equal((await st()).mode, 'personal');
-  assert.deepEqual(await tabs(), [...tabsAdvanced.filter(t => t !== 'more'), 'notes', 'more']);
+  assert.deepEqual(await tabs(), [...tabsAdvanced.filter(t => t !== 'more' && t !== 'totals'), 'notes', 'more'], 'Notes on the bar; no Totals (totals off)');
   assert.equal(await p.title(), 'Logbook');
   for (const el of await group('apmes').locator('input[role=switch]').all()) assert.equal(await el.isChecked(), false);
   for (const el of await group('extras').locator('input[role=switch]').all()) assert.equal(await el.isChecked(), true);
@@ -84,8 +84,8 @@ try { for (const width of [390, 1280]) {
   await p.locator('textarea.details').press('Control+Enter');
   await p.locator('#toast', { hasText: /^Saved/ }).waitFor();
   assert.doesNotMatch(await p.locator('#toast').innerText(), /now \d+\/\d+/);
-  // Analytics: cases per tag (your own tags too), no year, no Compare with your intake
-  await p.locator('[role=tab][data-tab=progress]').click();
+  // Analytics (in More): cases per tag (your own tags too), no year
+  await goHash('progress');
   await p.locator('.an-sec summary', { hasText: 'Tags' }).click();
   await p.locator('.an-list li', { hasText: 'Lower Segment Caesarean Section' }).first().waitFor();
   assert.equal(await p.locator('.legend.tally').count(), 0);
@@ -152,10 +152,10 @@ try { for (const width of [390, 1280]) {
   await p.locator('.profile-card input[value=basic]').check();
   const toBasic = await dlg.locator('.profile-changes li').allInnerTexts();
   assert.ok(toBasic.some(l => /^Turns on: Counts against the APMES targets/.test(l)) && toBasic.some(l => /^Turns off: The Logbook grid view/.test(l)), toBasic.join(' | '));
-  assert.ok(toBasic.some(l => /^Into More \(this device\): Analytics, Notes$/.test(l)), toBasic.join(' | '));
+  assert.ok(toBasic.some(l => /^Into More \(this device\): Notes$/.test(l)), toBasic.join(' | '));
   await dlg.getByRole('button', { name: 'Apply' }).click();
   await p.locator('.profile-now', { hasText: 'Now: Basic' }).waitFor();
-  assert.deepEqual(await tabs(), tabsAdvanced.filter(t => t !== 'progress'));
+  assert.deepEqual(await tabs(), tabsAdvanced);
   assert.equal(await p.title(), 'APMES Logbook');
   // Notes put on the bar by hand: still plain Basic (tabs no profile moves aren't counted), and it stays on the bar
   // going to Advanced
@@ -168,7 +168,7 @@ try { for (const width of [390, 1280]) {
   await dlg.getByRole('button', { name: 'Apply' }).click();
   await p.locator('.profile-now', { hasText: 'Now: Advanced' }).waitFor();
   const advTabs = await tabs();
-  assert.ok(advTabs.includes('notes') && advTabs.includes('progress'), advTabs.join());
+  assert.ok(advTabs.includes('notes') && advTabs.includes('totals'), advTabs.join());
   // Settings search: a profile reads as its name
   await goHash('settings');
   await p.getByLabel('Search settings').fill('personal');
