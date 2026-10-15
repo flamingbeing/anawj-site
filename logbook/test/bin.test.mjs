@@ -78,5 +78,56 @@ await B.deleteForever(es[1].id);
 assert.equal((await cloud.listBin(email)).length, 0);
 await assert.rejects(B.restoreFromBin('nope'));
 
+// a reflection finished on another device while this one shows its outline: binning the outline is refused, the
+// finished text stays and no copy is left in the bin (a blind delete lost it, and the bin kept only the outline)
+const { writes } = await import('../js/ui-core.js');
+const D = await import('../js/demo-backend.js');
+const reflOf = id => D.reflectionsOf(email.toLowerCase()).find(x => x.id === id);
+// just enough page for the toasts (what they say is kept)
+const toasts = [];
+const node = () => ({ nodeType: 1, children: [], classList: { add() {}, remove() {} }, addEventListener() {}, setAttribute() {}, append(...k) { this.children.push(...k); }, replaceChildren(...k) { this.children = k; } });
+const text = n => (n.nodeType === 3 ? n.textContent : (n.children || []).map(text).join(''));
+const toastEl = { ...node(), replaceChildren(...k) { toasts.push(k.map(text).join(' ')); } };
+globalThis.document = { createElement: node, createTextNode: t => ({ nodeType: 3, textContent: String(t) }), getElementById: () => toastEl };
+const vOld = await cloud.saveReflection(email, { id: 'r9', headingId: 'thyroid', initials: 'AB', title: 'Made-up', summary: 'outline', status: 'draft' });
+await cloud.saveReflection(email, { ...vOld, summary: '900 finished words' });
+S.reflections = [vOld];
+await assert.rejects(B.moveToBin('reflection', vOld), /changed elsewhere/);
+assert.equal(reflOf('r9')?.summary, '900 finished words', 'the newer version kept');
+assert.match(toasts.at(-1), /A reflection you deleted was changed on another device, so it was kept/);
+assert.equal((await cloud.listBin(email)).filter(e => e.data.id === 'r9').length, 0, 'no copy left in the bin');
+assert.ok(!writes.entries().some(x => x.kind === 'reflection' && x.record.id === 'r9' && (x.state === 'conflict' || x.state === 'failed')), 'the refused delete is set aside');
+// the same reflection, up to date here: it goes, through the write queue
+S.reflections = [reflOf('r9')];
+const rOk = await B.moveToBin('reflection', S.reflections[0]);
+assert.equal(reflOf('r9'), undefined, 'deleted on the server');
+assert.equal(S.reflections.length, 0, 'gone from the list at once');
+assert.equal(rOk.data.summary, '900 finished words');
+assert.equal(writes.status('reflection', 'r9'), 'synced');
+await B.restoreFromBin(rOk.id);
+// the editor: the bin keeps what is on screen (unsaved typing too) and the delete checks the version it last saved;
+// the bin copy carries that version's stamp, so other devices remove their copy of it
+const saved = reflOf('r9');
+const onScreen = { ...saved, summary: '900 finished words and a few typed', updatedAt: saved.updatedAt - 5000 };
+S.reflections = [saved];
+const rEd = await B.moveToBin('reflection', onScreen, { base: saved });
+assert.equal(reflOf('r9'), undefined);
+assert.equal(rEd.data.summary, '900 finished words and a few typed');
+assert.equal(rEd.data.updatedAt, saved.updatedAt);
+await B.restoreFromBin(rEd.id);
+// ...and one changed elsewhere since the editor last saved is kept
+const ed2 = reflOf('r9');
+await cloud.saveReflection(email, { ...ed2, summary: 'edited on the laptop' });
+await assert.rejects(B.moveToBin('reflection', { ...ed2, summary: 'typed here' }, { base: ed2 }), /changed elsewhere/);
+assert.equal(reflOf('r9')?.summary, 'edited on the laptop');
+// a delete that fails (not a conflict): the copy leaves the bin and nothing is written over the server's copy
+writes.configure({ backend: async (em, kind, rec, bs) => { if (rec._deleted) throw Object.assign(new Error('Fake refusal'), { code: 'permission-denied' }); return cloud.commitRecord(em, kind, rec, bs); } });
+const cur = reflOf('r9');
+S.reflections = [cur];
+await assert.rejects(B.moveToBin('reflection', cur), /Fake refusal/);
+writes.configure({ backend: cloud.commitRecord });
+assert.equal(reflOf('r9')?.summary, 'edited on the laptop');
+assert.equal((await cloud.listBin(email)).filter(e => e.data.id === 'r9').length, 0);
+
 resetCaches();
 console.log('bin tests passed');

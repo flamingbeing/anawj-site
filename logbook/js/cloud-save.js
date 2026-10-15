@@ -17,9 +17,11 @@ import { makeNotesZip } from './ui-notes.js';
 export const driveReady = () => !!GOOGLE_CLIENT_ID;
 export const dropboxReady = () => !!DROPBOX_APP_KEY;
 
-// what goes up: the backup file, and the notes zip if chosen
+// what goes up: the backup file, and the notes zip if chosen. Both as the server has them (the cases, reflections and
+// notes, or "Not saved" after 30 s): the file replaces the day's, and this device's notes may be weeks old. The zip
+// then reads the same notes.
 async function filesToSave() {
-  const data = await makeBackup();
+  const data = await makeBackup({ fromServer: true });
   const out = [{ name: `logbook-backup-${todayISO()}.json.gz`, type: 'application/gzip', blob: await gzipBlob(JSON.stringify(data)) }];
   if (cleanCloudBackup(settings().cloudBackup).md) out.push({ name: `apmes-logbook-notes-${todayISO()}.zip`, type: 'application/zip', blob: (await makeNotesZip()).blob });
   return { files: out, cases: data.cases.length };

@@ -485,6 +485,15 @@ export async function restoreCase(c, base = S.cases.find(x => x.id === c.id) || 
   applyLocal(list => [saved, ...list.filter(x => x.id !== c.id)]);
 }
 
+// Restore from a backup: only the cases the server doesn't have (cloud.addMissing: one already there is never
+// replaced by the backup's older copy). -> the cases added
+export async function addMissingCases(cases) {
+  const owner = mine();
+  const added = await cloud.addMissing(owner, 'case', cases);
+  if (added.length && S.user?.email === owner) applyLocal(list => { const have = new Set(list.map(c => c.id)); return [...list, ...added.filter(c => !have.has(c.id))]; });
+  return added;
+}
+
 // opts.sheet: cases made now by pasting (also queued for the response sheet); restores and edits are not
 export async function saveMany(cases, { sheet = false } = {}) {
   applyLocal(list => {

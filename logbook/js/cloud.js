@@ -563,6 +563,39 @@ export async function saveCases(email, cases) {
   return docs;
 }
 
+// Restore from a backup (kind 'case' or 'reflection'): writes only the records the server doesn't have. One already
+// there is never written, even when it differs: it may have been changed since the backup was made (a restore used to
+// write the backup's older copy over it), and a restore only adds what is missing. The ids are looked up on the server
+// first, 30 at a time (a read for each one found, at least one per lookup), then the missing ones go in batches. Needs
+// signal. -> the docs written
+export async function addMissing(email, kind, records) {
+  const coll = COLLECTION[kind];
+  const docs = [...new Map(records.map(r => CLEAN[kind](r)).map(d => [d.id, d])).values()];
+  if (demo) {
+    const have = new Set((kind === 'case' ? await D.listCases(email) : D.reflectionsOf(lc(email))).map(x => x.id));
+    const out = docs.filter(d => !have.has(d.id));
+    if (kind === 'case') return out.length ? D.saveCases(email, out) : [];
+    const saved = [];
+    for (const d of out) saved.push(await D.saveReflection(email, d));
+    return saved;
+  }
+  email = lc(email);
+  const { db, F } = await sdk();
+  const have = new Set();
+  try {
+    for (let i = 0; i < docs.length; i += 30) {
+      const ids = docs.slice(i, i + 30).map(d => d.id);
+      const snap = await F.getDocsFromServer(F.query(F.collection(db, 'logbooks', email, coll), F.where(F.documentId(), 'in', ids)));
+      if (reads) count(coll, 'billed', Math.max(1, snap.size));
+      for (const d of snap.docs) have.add(d.id);
+    }
+  } catch (e) { throw e && e.code === 'unavailable' ? new Error('no signal (a restore first checks what your logbook already has). Try again with signal.') : e; }
+  const out = docs.filter(d => !have.has(d.id));
+  await inBatches(out, (b, d, F, db) => b.set(F.doc(db, 'logbooks', email, coll, d.id), d),
+    (b, part) => queued(b.commit(), late(email, coll, part.map(d => d.id))));
+  return out;
+}
+
 // for good (no bin entry): Undo of a plan's "done" or of a pasted list, and after the bin copy
 export async function deleteCases(email, ids) {
   await hub.drop(lc(email), 'cases', ids.map(String));

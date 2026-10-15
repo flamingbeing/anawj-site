@@ -304,6 +304,63 @@ const scenarios = {
     assert.ok(!(await outbox()).has('sheet2'), 'off: nothing queued');
     return 'queued, masked, edit ignored, removed on delete, paste yes, restore no, off';
   },
+  // a reflection finished on B while A, offline, still shows the outline and moves it to the bin: back online the
+  // delete is refused, B's text stays (on the server and on A), and no copy is left in the bin (audit, 14 Oct 2026)
+  async reflectionBinStale(A, B) {
+    const now = Date.now();
+    await put(`logbooks/${E}/reflections/refl1`, { id: 'refl1', headingId: 'thyroid', initials: 'AB', title: 'Fake reflection', summary: 'outline', status: 'draft', createdAt: now, updatedAt: now });
+    await reopen(A); await reopen(B);
+    const summaryOn = d => d.p.evaluate(async () => (await import('./js/ui-core.js')).S.reflections.find(x => x.id === 'refl1')?.summary ?? null);
+    for (const d of [A, B]) for (const t = Date.now(); (await summaryOn(d)) !== 'outline'; await d.p.waitForTimeout(150)) if (Date.now() - t > 15000) throw new Error(d.name + ' never showed the reflection');
+    await A.ctx.setOffline(true);
+    await B.p.evaluate(async () => { const { S, writes } = await import('./js/ui-core.js'); const r = S.reflections.find(x => x.id === 'refl1'); await writes.save('reflection', S.user.email, { ...r, summary: '900 finished words' }, r); });
+    await settle(B);
+    const ra = await A.p.evaluate(async () => {
+      const { S } = await import('./js/ui-core.js'), bin = await import('./js/bin.js');
+      try { await bin.moveToBin('reflection', S.reflections.find(x => x.id === 'refl1')); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }
+    });
+    await A.ctx.setOffline(false); await settle(A); await A.p.waitForTimeout(1500); await settle(A);
+    const server = (await list(E, 'reflections')).find(d => d.name.endsWith('/refl1'));
+    assert.equal(server?.fields.summary?.stringValue, '900 finished words', 'B’s finished text is on the server');
+    assert.equal((await list(E, 'bin')).filter(d => d.fields.data?.mapValue?.fields?.id?.stringValue === 'refl1').length, 0, 'no copy left in the bin');
+    await reopen(A);
+    assert.equal(await summaryOn(A), '900 finished words', 'A shows the finished text');
+    return `delete ${ra.ok ? 'accepted offline, then refused' : 'refused: ' + ra.error}; finished text kept`;
+  },
+  // Restore from a backup writes only what the server lacks (cloud.addMissing: ids looked up 30 at a time), never the
+  // backup's older copy over a case that is there; with no signal it says so and writes nothing
+  async restoreAddsOnlyMissing(A) {
+    await reopen(A);
+    const ids = [];
+    for (let i = 0; i < 32; i++) ids.push(await seedCase('fake case: restore keeps ' + i));
+    const r = await A.p.evaluate(async ids => {
+      const cloud = await import('./js/cloud.js'), { S } = await import('./js/ui-core.js');
+      const backup = [...ids, 'restored1'].map(id => ({ id, date: '2026-10-01', initials: 'AB', details: id === 'restored1' ? 'fake case only in the backup' : 'fake OLD backup copy', cats: ['08'], createdAt: 1, updatedAt: 1, source: 'app' }));
+      const added = await cloud.addMissing(S.user.email, 'case', backup);
+      const refl = await cloud.addMissing(S.user.email, 'reflection', [{ id: 'refl1', headingId: 'thyroid', initials: 'AB', title: 'Fake reflection', summary: 'old backup text', status: 'draft' },
+        { id: 'reflR', headingId: 'thyroid', initials: 'AB', title: 'Fake restored', summary: 'only in the backup', status: 'draft' }]);
+      return { added: added.map(c => c.id), refl: refl.map(x => x.id) };
+    }, ids);
+    await settle(A);
+    assert.deepEqual(r.added, ['restored1']);
+    const on = await serverCases();
+    ids.forEach((id, i) => assert.equal(on.get(id), 'fake case: restore keeps ' + i, id + ' was written over'));
+    assert.equal(on.get('restored1'), 'fake case only in the backup');
+    const refls = new Map((await list(E, 'reflections')).map(d => [d.name.split('/').pop(), d.fields.summary?.stringValue]));
+    assert.deepEqual(r.refl, ['reflR']);
+    if (refls.has('refl1')) assert.notEqual(refls.get('refl1'), 'old backup text');
+    assert.equal(refls.get('reflR'), 'only in the backup');
+    await A.ctx.setOffline(true);
+    const off = await A.p.evaluate(async () => {
+      const cloud = await import('./js/cloud.js'), { S } = await import('./js/ui-core.js');
+      try { await cloud.addMissing(S.user.email, 'case', [{ id: 'restored2', date: '2026-10-01', initials: 'AB', details: 'fake offline restore', cats: ['08'], createdAt: 1, updatedAt: 1, source: 'app' }]); return 'written'; }
+      catch (e) { return e.message; }
+    });
+    await A.ctx.setOffline(false); await settle(A);
+    assert.match(off, /no signal/);
+    assert.ok(!(await serverCases()).has('restored2'), 'nothing written offline');
+    return '1 of 33 cases and 1 of 2 reflections added; offline: ' + off.slice(0, 40);
+  },
   // signing out with unsent work asks first; Cancel keeps it and it lands later; "Sign out anyway" leaves nothing for the
   // next account on the device
   async signOut(A) {

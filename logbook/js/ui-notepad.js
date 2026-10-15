@@ -100,13 +100,14 @@ async function healClosed(job, me) {
   await writes.archive(job.key);
   await writes.save('note', me, mergeDayNote(local, base, job.remote), job.remote || null);
 }
-// the notes as the server has them (not a possibly stale offline copy), for anything that must not miss one (Sync)
-export async function notesFromServer(ms = 30e3) {
+// the notes as the server has them (not a possibly stale offline copy), for anything that must not miss one (Sync,
+// the backups and a restore); again: the button the error tells to tap
+export async function notesFromServer(ms = 30e3, again = 'Sync') {
   const me = mine();
   if (!me) return [];
   await ensureNotes();
   for (const t0 = Date.now(); !(synced && owner === me); await new Promise(r => setTimeout(r, 250)))
-    if (Date.now() - t0 > ms || mine() !== me) throw new Error('your notes didn’t finish loading (no signal?). Tap Sync again.');
+    if (Date.now() - t0 > ms || mine() !== me) throw new Error(`your notes didn’t finish loading (no signal?). Tap ${again} again.`);
   return S.notes || [];
 }
 
