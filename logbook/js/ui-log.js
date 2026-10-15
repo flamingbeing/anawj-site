@@ -632,7 +632,7 @@ function renderOne(card) {
   // one quiet line under the box: the star on the left, the draft and sync state on the right, then a short
   // link to Recent changes / Recover drafts (its words say what needs doing when a save needs attention)
   const syncNote = h('a', { href: '#recovery', class: 'draft-note sync-note', title: 'Recent changes / Recover drafts', 'aria-live': 'polite' });
-  const paintSync = () => { const jobs = writes.entries(); syncNote.textContent = writes.error() || (jobs.some(x => x.state === 'failed' || x.state === 'conflict') ? 'Save needs attention' : writes.pending() ? 'Pending sync' : jobs.length ? 'Synced' : 'Recover'); };
+  const paintSync = () => { syncNote.textContent = writes.error() || (writes.attention() ? 'Save needs attention' : writes.pending() ? 'Pending sync' : writes.entries().length ? 'Synced' : 'Recover'); };
   const offSync = writes.onChange(() => { if (syncNote.isConnected) paintSync(); else offSync(); });
   paintSync();
   const tagRow = h('div', { class: 'tag-row' }, tagBox, draftNote, syncNote);
