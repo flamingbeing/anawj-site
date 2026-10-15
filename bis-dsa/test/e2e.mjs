@@ -11,7 +11,7 @@ const errors = [];
 const bis = p => p.$eval('#vBis', e => +e.textContent);
 try {
   // the phone runs at 3x pixel density: at 1x a canvas-size bug (graphs growing every frame) never showed
-  for (const [viewport, deviceScaleFactor] of [[{ width: 390, height: 844 }, 3], [{ width: 1280, height: 900 }, 1]]) {
+  for (const [viewport, deviceScaleFactor] of [[{ width: 390, height: 844 }, 3], [{ width: 1280, height: 900 }, 1]].filter(([v]) => !process.env.BIS_VIEW || (process.env.BIS_VIEW === 'phone') === (v.width === 390))) { // BIS_VIEW=phone or desktop runs one size (the Checks run each as its own job)
     const page = await b.newPage({ viewport, deviceScaleFactor });
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)/.test(m.text())) errors.push(m.text()); });
@@ -292,9 +292,12 @@ try {
     await page.close();
   }
   assert.deepEqual(errors, [], 'page errors');
-  await import('./adv.e2e.mjs'); // the BIS Advance screen
-  await import('./sed.e2e.mjs'); // the Masimo SedLine screen
-  await import('./pv.e2e.mjs'); // the Philips IntelliVue screen
-  await import('./timeline.e2e.mjs'); // the case timeline (jump back and forward)
+  // the other screens' tests run after this one; BIS_SPLIT=1 runs this file alone (GitHub's Checks run each file as its own job)
+  if (!process.env.BIS_SPLIT) {
+    await import('./adv.e2e.mjs'); // the BIS Advance screen
+    await import('./sed.e2e.mjs'); // the Masimo SedLine screen
+    await import('./pv.e2e.mjs'); // the Philips IntelliVue screen
+    await import('./timeline.e2e.mjs'); // the case timeline (jump back and forward)
+  }
   console.log('bis-dsa e2e: ok');
 } finally { await b.close(); }

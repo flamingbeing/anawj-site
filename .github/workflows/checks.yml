@@ -3,7 +3,8 @@
 # (logbook, prewarm, evals) stay with the session that changes those apps (AGENTS.md lists them).
 # On a PR, four browser suites run only when the PR changes their app (owner, 15 Oct 2026): BIS to DSA (bis-dsa/), OT simulator (ot-sim/),
 # feedback button (feedback/ or worker/) and hand pages (hand-babies/ or edit/, since the hand test opens the editor). A PR that changes
-# this workflow, and every push to main, runs them all.
+# this workflow, and every push to main, runs them all. The browser suites run side by side, one job each (the five BIS files too);
+# the job named "browser" sums them up.
 name: Checks
 
 on:
@@ -38,14 +39,19 @@ jobs:
       - name: Proof-read (pages and documents)
         run: node tools/proofread.mjs
 
-  browser:
+  # which apps a PR changes: four browser suites run on a PR only when it changes their app (see the top of this file)
+  changes:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
+    outputs:
+      bis: ${{ steps.ch.outputs.bis }}
+      ot: ${{ steps.ch.outputs.ot }}
+      feedback: ${{ steps.ch.outputs.feedback }}
+      hand: ${{ steps.ch.outputs.hand }}
     steps:
-      - uses: actions/checkout@v4
       - name: Which apps this PR changes
         id: ch
         env:
@@ -65,31 +71,70 @@ jobs:
           echo "feedback=$(has '^(feedback|worker)/')" >> "$GITHUB_OUTPUT"
           echo "hand=$(has '^(hand-babies|edit)/')" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
+
+  # the browser suites side by side, one job each (owner, 15 Oct 2026): a failure no longer stops the suites after it,
+  # and the five BIS files (about 8 minutes in a row) run in parallel. `run: always` means every PR.
+  browser-suite:
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: page editor and Ask Claude, run: always, cmd: "node edit/test/e2e.mjs && node ask/test/e2e.mjs" }
+          - { name: feedback button, run: feedback, cmd: "node feedback/test/e2e.mjs" }
+          - { name: hand pages, run: hand, cmd: "node hand-babies/test/e2e.mjs" }
+          - { name: BIS Medtronic and Teaching (phone), run: bis, cmd: "BIS_SPLIT=1 BIS_VIEW=phone node bis-dsa/test/e2e.mjs" }
+          - { name: BIS Medtronic and Teaching (desktop), run: bis, cmd: "BIS_SPLIT=1 BIS_VIEW=desktop node bis-dsa/test/e2e.mjs" }
+          - { name: BIS Advance (phone), run: bis, cmd: "BIS_VIEW=phone node bis-dsa/test/adv.e2e.mjs" }
+          - { name: BIS Advance (desktop), run: bis, cmd: "BIS_VIEW=desktop node bis-dsa/test/adv.e2e.mjs" }
+          - { name: BIS SedLine (phone), run: bis, cmd: "BIS_VIEW=phone node bis-dsa/test/sed.e2e.mjs" }
+          - { name: BIS SedLine (desktop), run: bis, cmd: "BIS_VIEW=desktop node bis-dsa/test/sed.e2e.mjs" }
+          - { name: BIS IntelliVue, run: bis, cmd: "node bis-dsa/test/pv.e2e.mjs" }
+          - { name: BIS timeline, run: bis, cmd: "node bis-dsa/test/timeline.e2e.mjs" }
+          - { name: OT simulator, run: ot, cmd: "node ot-sim/test/e2e.mjs" }
+          - { name: NUH roster, run: always, cmd: "node nuh-roster/test/e2e.mjs" }
+          # speed budgets: timings vary, so perf fails only if a second run is over too
+          - { name: NTF roster, run: always, cmd: "node ntf-roster/test/e2e.mjs && node ntf-roster/test/tour.e2e.mjs && (node ntf-roster/test/perf.e2e.mjs || node ntf-roster/test/perf.e2e.mjs)" }
+          - { name: People, run: always, cmd: "node people/test/e2e.mjs" }
+    name: browser (${{ matrix.name }})
+    env:
+      GO: ${{ matrix.run == 'always' || needs.changes.outputs[matrix.run] == 'true' }}
+    steps:
+      - name: Skipped (this PR does not change the app)
+        if: env.GO != 'true'
+        env:
+          SUITE: ${{ matrix.name }}
+        run: echo "$SUITE skipped (this PR does not change the app)"
+      - uses: actions/checkout@v4
+        if: env.GO == 'true'
       - uses: actions/setup-node@v4
+        if: env.GO == 'true'
         with:
           node-version: 22
       - name: Install a browser
+        if: env.GO == 'true'
         run: |
           npm install -g playwright@1.56.1
           playwright install --with-deps chromium
-      - name: Page editor, feedback button, Ask Claude, hand pages, NUH roster, NTF roster, People
-        env:
-          RUN_BIS: ${{ steps.ch.outputs.bis }}
-          RUN_OT: ${{ steps.ch.outputs.ot }}
-          RUN_FEEDBACK: ${{ steps.ch.outputs.feedback }}
-          RUN_HAND: ${{ steps.ch.outputs.hand }}
+      - name: Test
+        if: env.GO == 'true'
         run: |
           export PLAYWRIGHT_PATH="$(npm root -g)/playwright/index.mjs"
           (python3 -m http.server 8080 >/dev/null 2>&1 &)
           sleep 1
-          node edit/test/e2e.mjs
-          if [ "$RUN_FEEDBACK" = true ]; then node feedback/test/e2e.mjs; else echo "feedback e2e: skipped (this PR does not change feedback/ or worker/)"; fi
-          node ask/test/e2e.mjs
-          if [ "$RUN_HAND" = true ]; then node hand-babies/test/e2e.mjs; else echo "hand e2e: skipped (this PR does not change hand-babies/ or edit/)"; fi
-          if [ "$RUN_BIS" = true ]; then node bis-dsa/test/e2e.mjs; else echo "bis-dsa e2e: skipped (this PR does not change bis-dsa/)"; fi
-          if [ "$RUN_OT" = true ]; then node ot-sim/test/e2e.mjs; else echo "ot-sim e2e: skipped (this PR does not change ot-sim/)"; fi
-          node nuh-roster/test/e2e.mjs
-          node ntf-roster/test/e2e.mjs
-          node ntf-roster/test/tour.e2e.mjs
-          node ntf-roster/test/perf.e2e.mjs || node ntf-roster/test/perf.e2e.mjs   # speed budgets: timings vary, so it fails only if a second run is over too
-          node people/test/e2e.mjs
+          ${{ matrix.cmd }}
+
+  # one result under the old name, so anything that waits on "browser" still works: green only when every suite passed or was skipped
+  browser:
+    needs: browser-suite
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      RESULT: ${{ needs.browser-suite.result }}
+    steps:
+      - run: |
+          echo "browser suites $RESULT"
+          [ "$RESULT" = success ]
