@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-14 by Claude Code (build session: M1.1 IV PK).
+Last updated: 2026-10-14 by Claude Code (build session: M2.1 circulation).
 
 ## Now
 
@@ -19,12 +19,23 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next
 
-1. M1.2 (syringe pumps and TCI, the Drugs tab, "Behind the monitor"), then the PR order in `DESIGN.md`, one PR at a
-   time, each merged before the next.
+1. M2.2 (fluids and bleeding), M2.3 (vasoactive drugs), M2.4 (gas exchange and breathing), then the rest of the PR
+   order in `DESIGN.md`, one PR at a time, each merged before the next.
 
 ## Recently done
 
-- M1.1 (14 Oct 2026): `pk.js` and `drugs.js`: propofol (Schnider, haemodynamic effect site), remifentanil (Minto),
+- M2.1 (15 Oct 2026): circulation (`cardio.js`, `rhythm.js`): three compartments, beat-latched stroke volumes, the
+  baroreflex, empty-ventricle decompensation, propofol, opioid and stimulus drives. Heart rate, blood pressure and the
+  waveforms now follow the model; "Behind the monitor" shows output, SVR, CVP and the reflex.
+- M1.4 (15 Oct 2026, #577): hypnosis (asleep by one rule for everyone, the patient's own sensitivity), the stimulus response
+  (movement unless paralysed), the BIS-like index and the autonomic drive; a Patient tab (talk, stimuli, events).
+- M1.3 (15 Oct 2026, #576): neuromuscular block: rocuronium, suxamethonium, sugammadex, neostigmine; TOF on the monitor
+  every 15 s, PTC on request; the block by muscle in "Behind the monitor". Tuned to the trials' acceleromyography;
+  known misses in MODEL.md.
+- M1.2 (15 Oct 2026, #575): syringe pumps with their own predicted model (Schnider, Marsh, Minto), plasma and effect-site
+  TCI; the Drugs tab (boluses for the patient's weight, custom doses, infusions, TCI), the Circulation tab (NIBP) and
+  "Behind the monitor" (the pump's prediction beside the true level).
+- M1.1 (14 Oct 2026, #573): `pk.js` and `drugs.js`: propofol (Schnider, haemodynamic effect site), remifentanil (Minto),
   fentanyl, alfentanil, midazolam, ketamine, Marsh for the pump; boluses and infusions as actions; between-patient
   PK variation. Model only (the Drugs tab comes with M1.2).
 - M0.2 (14 Oct 2026, #572): first monitor at `#theatre`: library screen, sweeping ECG, pleth and capnogram lanes (real pace

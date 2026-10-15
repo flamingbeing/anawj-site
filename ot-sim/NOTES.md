@@ -59,11 +59,46 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Stubs in place (replaced by their PR, DESIGN.md "PR order")
 
-- `js/model/vitals.js` (M0.1): steady awake vitals with seeded noise, beats and breaths. Replaced by `rhythm.js` and
-  `cardio.js` (M2.1), `gas.js` and `resp.js` (M2.4), `temp.js` (M2.6). `synth.js` and `monitor.js` read `state.vit`
-  for now; they move to the real slices with those PRs.
+- `js/model/vitals.js` (M0.1): steady awake SpO2, breathing, EtCO2 and temperature with seeded noise, and breaths.
+  Heart rate and blood pressure moved to `rhythm.js` and `cardio.js` (M2.1); the rest moves to `gas.js` and `resp.js`
+  (M2.4) and `temp.js` (M2.6). `synth.js` and `monitor.js` read `state.vit` for those until then.
+- The Patient tab's stimuli and "Talk" (M1.4): replaced by the airway (M3.1) and the case flow with Examine (M3.2).
+- Pleural pressure reads `resp.pplMmHg` (0 until M2.4); MAC fraction reads `vol.mac` (0 until M2.5).
 
 ## Decisions log
+
+- 15 Oct 2026 (M2.1): `cardio.js` as in MODEL.md section 5 (as-built notes there): the prototype's structure and
+  numbers reproduce (steady state exact, propofol 2 mg/kg SBP −17.9 at 2 min, steady Ce 1 −10.5%). `pd.auto` became a
+  graded response, because a probability could not give the laryngoscopy rise; brief stimuli now last 60 s. Beat
+  events now come from `cardio.js` (with stroke volume and pressures); `rhythm.js` keeps exact beat times with 1.5%
+  beat-to-beat variation. `createSim` takes `dt` for tests. Cost about 13 µs a step with two pumps running (2.6 ms of
+  CPU a second at 20x).
+
+- 15 Oct 2026 (M1.4): `pd.js` holds hypnosis (asleep when P(no response to voice) > the patient's q), the stimulus
+  surface (movement at stimulus onset when P(no response) < q and the thumb twitch is over 10%), the BIS-like index
+  (arousal adds up to 8) and `pd.auto` (a second surface at 1.6 x with the opioid C50 0.5 ng/mL, from the MAC-BAR
+  ratios; rises with a 20 s and fades with a 90 s time constant; brief stimuli last 30 s, surgery runs until stopped,
+  intensity 0.6-1.0, default 0.8). The volatile term reads `vol.ce.sevoflurane` once M2.5 exists (MAC40 1.80%). Stub
+  until M3.1/M3.2: the Patient tab (talk, stimuli, events); "Talk" reads the state and logs nothing. Midazolam and
+  ketamine have no hypnotic effect yet: MODEL.md section 4 gives no surface for them (a research step before the
+  case flow, M3.2).
+
+- 15 Oct 2026 (M1.3): neuromuscular drugs live in `nmb.js` (state `pk.nm`), the readout in `pd.js` (`pd.nmb`), the TOF
+  module in `monitor.js` (every 15 s; PTC on request, once per 2 min). The TOF readout is fitted to acceleromyography,
+  because every reversal trial used it; that forced a retune: rocuronium ke0 0.2 on / 0.9 off (onset: 80% block at
+  0.92 min; sugammadex 2 mg/kg at T2 1.36 min, 4 mg/kg at PTC 1 2.2, 16 mg/kg 1.5), neostigmine max x 2, EC50 20.
+  Known misses, recorded in MODEL.md: spontaneous T2 to TOFR 0.9 50 vs 21 min (Sorgenfrei 2006, small placebo arm),
+  neostigmine from a deep block 32 vs 50 min (Jones 2008). Suxamethonium: cholinesterase as `patient.che` (profile
+  `che`: 0.5 heterozygous, 0.01 homozygous); phase II fades from 3 mg/kg total. Glycopyrrolate and atropine (with
+  neostigmine) come with the vasoactive drugs (M2.3); suxamethonium's potassium rise comes with `gas.js` (M2.4).
+
+- 14 Oct 2026 (M1.2): the pump's effect-site TCI runs in two phases. While loading it targets the predicted
+  effect-site peak (Shafer & Gregg style); once the prediction reaches the target it holds plasma at the target.
+  Peak-targeting alone switched between bursts and zero every 10 s. A running pump keeps its model. Syringes are
+  propofol 10 mg/mL and remifentanil 50 mcg/mL, maximum 1200 mL/h (to confirm with NUH pumps). Drug rows carry the
+  ISO 26825 class colour as a stripe, with the class written beside the name. The Drugs and Circulation tabs follow
+  the ARIA tabs pattern (arrow keys, Home, End). "Behind the monitor" is closed by default and remembered per device
+  (`otsim.behind`). The monitor does not respond to drugs until M1.4 and M2.1.
 
 - 14 Oct 2026 (M1.1): `pk.js` steps only drugs that have been given. Amounts are in mg (propofol, ketamine) or mcg
   (opioids, midazolam), so concentrations read in the papers' units. The patient's PK multipliers act on V1 and the

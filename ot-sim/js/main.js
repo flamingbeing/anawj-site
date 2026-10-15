@@ -6,7 +6,9 @@ import { NIBP_CYCLES } from './model/monitor.js';
 import { Loop, SPEEDS } from './ui/loop.js';
 import { Lane } from './ui/lanes.js';
 import { ecg, pleth, co2, modelSource, FastSource } from './ui/synth.js';
-import { Numerics } from './ui/numerics.js';
+import { Numerics, clockText } from './ui/numerics.js';
+import { DrugsPanel } from './ui/drugs.js';
+import { behindHtml } from './ui/behind.js';
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -36,13 +38,81 @@ const modelT = frac => sim.state.t + frac * sim.state.dt - DELAY;
 const source = () => (fast || modelSource(sim.state));
 function refill() { const src = source(); for (const l of lanes) l.refill(src, tDisp); }
 
+// panels: written at most twice a second of wall time, like the numerics
+let panelsAt = -1e9;
+function panels(force = false) {
+  const now = performance.now();
+  if (!force && now - panelsAt < 500) return;
+  panelsAt = now;
+  drugs.update(sim.state);
+  if (!$('panel-pt').hidden) { const h = eventsHtml(sim.state); if ($('events').innerHTML !== h) $('events').innerHTML = h; }
+  if ($('behind-box').open) { const h = behindHtml(sim.state); if ($('behind').innerHTML !== h) $('behind').innerHTML = h; }
+}
+
 function frame({ frac, wallDt }) {
   if (fast) { tDisp += wallDt; fast.advance(sim.state, tDisp); } else tDisp = Math.max(tDisp, modelT(frac));
   const src = source();
   for (const l of lanes) l.draw(src, tDisp);
   nums.update(sim.state, performance.now());
+  panels();
 }
 const loop = new Loop(sim, frame);
+
+// an action from a control: when paused, run one step so it shows at once
+function acted() {
+  if (loop.paused) sim.step(1);
+  nums.update(sim.state, performance.now(), true);
+  panels(true);
+}
+const drugs = new DrugsPanel($('panel-drugs'), sim, acted);
+
+// Patient tab: talk, stimuli, events (the full Examine tab comes with the case flow, M3.2)
+$('talk').addEventListener('click', () => {
+  const pd = sim.state.pd;
+  $('talk-reply').textContent = !pd.asleep ? 'Opens their eyes and answers.' : pd.pAsleep < 0.95 ? 'No answer. Stirs a little to a louder voice.' : 'No response.';
+});
+for (const b of document.querySelectorAll('[data-stim]')) b.addEventListener('click', () => { sim.act({ type: 'stimulus', kind: b.dataset.stim }); acted(); });
+$('surgery').addEventListener('click', () => {
+  const on = $('surgery').getAttribute('aria-pressed') !== 'true';
+  $('surgery').setAttribute('aria-pressed', String(on));
+  sim.act({ type: 'stimulus', kind: 'surgery', level: on ? 0.8 : 0 });
+  acted();
+});
+const EVENT_TEXT = {
+  asleep: () => 'No longer responds to voice', awake: () => 'Responds to voice again',
+  movement: e => `Moved at ${e.stimulus === 'surgery' ? 'the start of surgery' : e.stimulus}`,
+  stimulus: e => (e.stimulus === 'surgery' ? 'Surgery under way' : `${e.stimulus[0].toUpperCase()}${e.stimulus.slice(1)}`),
+  nibp: e => `NIBP ${e.sys}/${e.dia}`, ptc: e => (e.ptc == null ? 'PTC: TOF present' : `PTC ${e.ptc}`),
+};
+function eventsHtml(state) {
+  const ev = state.log.filter(e => EVENT_TEXT[e.kind] && e.kind !== 'nibp').slice(-8).reverse();
+  return ev.length ? ev.map(e => `<li><span class="when">${clockText(e.t)}</span> ${EVENT_TEXT[e.kind](e)}</li>`).join('') : '<li class="none">Nothing yet</li>';
+}
+
+// tabs (ARIA tabs pattern: arrow keys move between tabs)
+const tabs = [...document.querySelectorAll('[role=tab]')];
+function selectTab(tab, focus = false) {
+  for (const t of tabs) {
+    const on = t === tab;
+    t.setAttribute('aria-selected', String(on));
+    t.tabIndex = on ? 0 : -1;
+    $(t.getAttribute('aria-controls')).hidden = !on;
+  }
+  if (focus) tab.focus();
+}
+for (const t of tabs) {
+  t.addEventListener('click', () => { selectTab(t); panels(true); });
+  t.addEventListener('keydown', e => {
+    const i = tabs.indexOf(t), n = tabs.length;
+    const j = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i + n - 1) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1;
+    if (j >= 0) { e.preventDefault(); selectTab(tabs[j], true); }
+  });
+}
+
+// "Behind the monitor": closed by default, remembered on the device
+const behindBox = $('behind-box');
+behindBox.open = store.get('behind', '0') === '1';
+behindBox.addEventListener('toggle', () => { store.set('behind', behindBox.open ? '1' : '0'); panels(true); });
 
 // speed and pause
 function setSpeed(s, save = true) {
@@ -75,8 +145,7 @@ cyc.value = String(sim.state.mon.nibp.cycle);
 cyc.addEventListener('change', () => { sim.act({ type: 'nibp', cycle: +cyc.value }); });
 $('nibp-go').addEventListener('click', () => {
   sim.act({ type: 'nibp', do: sim.state.mon.nibp.start != null ? 'stop' : 'start' });
-  if (loop.paused) sim.step(1);
-  nums.update(sim.state, performance.now(), true);
+  acted();
 });
 
 // screens by hash
@@ -84,7 +153,7 @@ function route() {
   const id = location.hash.slice(1);
   const screen = id === 'theatre' ? 'theatre' : 'library';
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== screen;
-  if (screen === 'theatre') { loop.start(); requestAnimationFrame(() => { refill(); nums.update(sim.state, performance.now(), true); }); }
+  if (screen === 'theatre') { loop.start(); requestAnimationFrame(() => { refill(); nums.update(sim.state, performance.now(), true); panels(true); }); }
   else loop.stop();
 }
 addEventListener('hashchange', route);
@@ -103,7 +172,7 @@ if (TEST) {
   window.otsim = {
     sim,
     get state() { return sim.state; },
-    step(n = 1) { sim.step(n); if (!fast) tDisp = modelT(loop.acc); refill(); nums.update(sim.state, performance.now(), true); return sim.state.t; },
+    step(n = 1) { sim.step(n); if (!fast) tDisp = modelT(loop.acc); refill(); nums.update(sim.state, performance.now(), true); panels(true); return sim.state.t; },
     pause(p = true) { setPaused(p); },
     speed: s => setSpeed(s),
     lanes,

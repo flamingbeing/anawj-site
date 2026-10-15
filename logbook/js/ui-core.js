@@ -128,7 +128,7 @@ export function setCases(cases) {
   return true;
 }
 let rawCases = [];
-writes.configure({ backend: cloud.commitRecord, normalize: cloud.cleanWrite, getOwner: () => S.user?.email || null });
+writes.configure({ backend: cloud.commitRecord, normalize: cloud.cleanWrite, getOwner: () => S.user?.email || null, notice: msg => { toast(msg); toast.notice = { msg, at: Date.now() }; } });
 // a change to many cases (updateMany) holds these and repaints once a batch: one each time a save's state changed (three
 // a case) sorted, overlaid and counted the whole list again (300 cases: half a minute, 14 Oct 2026)
 let holding = 0, held = false;
@@ -227,6 +227,9 @@ export const emptyState = (icon, title, hint, action) => h('div', { class: 'empt
 export const UNDO_SECS = [[5, '5 seconds (default)'], [10, '10 seconds'], [20, '20 seconds'], [30, '30 seconds']];
 const undoMs = () => (UNDO_SECS.some(([n]) => n === Number(settings().undoSecs)) ? Number(settings().undoSecs) * 1000 : 4500);
 export function toast(msg, { action, onaction, ms } = {}) {
+  // the write queue's notice rides along with the toast the save itself shows next ('Case updated'), or it is lost
+  const n = toast.notice; toast.notice = null;
+  if (n && typeof msg === 'string' && msg !== n.msg && Date.now() - n.at < 3000) msg += ' · ' + n.msg;
   ms = action ? Math.max(ms || 0, undoMs()) : ms || 4500;
   const t = document.getElementById('toast');
   fill(t, h('span', {}, msg), action ? h('button', { onclick: () => { t.classList.remove('show'); onaction(); } }, action) : null);

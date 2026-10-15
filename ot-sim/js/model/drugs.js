@@ -12,6 +12,11 @@ export const DRUGS = {
   alfentanil:   { name: 'Alfentanil',   amount: 'mcg', conc: 'ng/mL',  model: 'maitre' },                  // [V] Maitre 1987
   midazolam:    { name: 'Midazolam',    amount: 'mcg', conc: 'ng/mL',  model: 'albrecht' },                // [V] Albrecht 1999
   ketamine:     { name: 'Ketamine',     amount: 'mg',  conc: 'mcg/mL', model: 'domino' },                  // PK [S] Domino 1982; ke0 [D]
+  // neuromuscular drugs: kinetics in nmb.js (M1.3)
+  rocuronium:    { name: 'Rocuronium',    amount: 'mg',  conc: 'mcg/mL', model: 'nmb' },                   // [V] Kleijn 2011 PK
+  suxamethonium: { name: 'Suxamethonium', amount: 'mg',  conc: 'mcg/mL', model: 'nmb' },                   // [V] Roy 2002 PK
+  sugammadex:    { name: 'Sugammadex',    amount: 'mg',  conc: 'mcg/mL', model: 'nmb' },                   // [V] Kleijn 2011
+  neostigmine:   { name: 'Neostigmine',   amount: 'mcg', conc: 'ng/mL',  model: 'nmb' },                   // effect model [D]
 };
 
 // mass units relative to a microgram
