@@ -27,7 +27,7 @@ jobs:
       - name: Repo check
         run: node tools/check.mjs
       - name: Unit tests
-        run: for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do echo "== $f"; node "$f" || exit 1; done
+        run: for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs ntf-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do echo "== $f"; node "$f" || exit 1; done
       - name: BIS to DSA engine tuning
         run: node bis-dsa/test/engine.check.mjs
       - name: OT simulator model tests
@@ -47,7 +47,7 @@ jobs:
         run: |
           npm install -g playwright@1.56.1
           playwright install --with-deps chromium
-      - name: Page editor, feedback button, Ask Claude, hand pages, NUH roster, People
+      - name: Page editor, feedback button, Ask Claude, hand pages, NUH roster, NTF roster, People
         run: |
           export PLAYWRIGHT_PATH="$(npm root -g)/playwright/index.mjs"
           (python3 -m http.server 8080 >/dev/null 2>&1 &)
@@ -59,4 +59,5 @@ jobs:
           node bis-dsa/test/e2e.mjs
           node ot-sim/test/e2e.mjs
           node nuh-roster/test/e2e.mjs
+          node ntf-roster/test/e2e.mjs
           node people/test/e2e.mjs

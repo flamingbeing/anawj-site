@@ -316,11 +316,16 @@ ul.prog .info-text { grid-column: 2 / 4; margin: 2px 0 0; }
 
 table.totals th, table.totals td { padding: 4px 6px; font-size: calc(13px * var(--fs, 1)); }
 table.totals th.rot { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; vertical-align: bottom; max-height: 160px; }
-table.totals td.cat { white-space: nowrap; position: sticky; left: 0; background: var(--panel); z-index: 1; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; }
+table.totals td.cat { position: sticky; left: 0; background: var(--panel); z-index: 1; max-width: 33vw; }   /* at most a third of the width (owner, 15 Oct 2026) */
+table.totals td.cat .cat-in { max-width: 33vw; overflow-x: auto; }   /* long names wrap; a word too wide scrolls sideways */
 table.totals td.n { text-align: center; font-variant-numeric: tabular-nums; }
 table.totals td.late { background: #f8d7da; } table.totals td.due { background: #fff3cd; } table.totals td.done { background: #d4edda; }
 table.totals tr.total td { font-weight: 700; }
 table.totals th.me { color: var(--accent); }
+/* Totals: the table scrolls inside its card, so the names row (and the tag column) stay frozen (owner, 15 Oct 2026) */
+.tscroll { max-height: calc(100vh - 150px); max-height: calc(100dvh - 150px); overflow: auto; }
+table.totals thead th { position: sticky; top: 0; background: var(--panel); z-index: 2; }
+table.totals thead th:first-child { left: 0; z-index: 3; }
 
 /* ---------- landing ---------- */
 
@@ -682,7 +687,7 @@ ul.cases li.monthhead { display: flex; align-items: center; justify-content: spa
 .digest .bar .grow { min-width: 0; }
 
 /* Totals: targets under the name; shortfall beside a count */
-table.totals td.cat .tgt { display: block; font-size: calc(11px * var(--fs, 1)); color: var(--muted); font-weight: 400; white-space: nowrap; }
+table.totals td.cat .tgt { display: block; font-size: calc(11px * var(--fs, 1)); color: var(--muted); font-weight: 400; }
 table.totals td .gap { font-size: calc(11px * var(--fs, 1)); font-weight: 700; }
 table.totals td.late .gap { color: var(--err); }
 table.totals td.due .gap { color: var(--warn); }

@@ -110,24 +110,25 @@ const PARTS = ['interesting', 'parsed', 'sugg', 'recent', 'still', 'groupsave', 
   assert.deepEqual(switchChanges({ mode: 'personal', show: { targets: true } }, 'personal'), { on: [], off: ['targets'] });
 }
 
-// tabs: Personal puts Notes on the bar, Faculty / PCs Case logs and the Admin portal; the Basic profiles keep
-// Analytics (and logbook only Reflections) in More
+// tabs: Analytics starts in More everywhere (Case, Logbook, Totals, Reflections, More); Personal puts Notes on the bar,
+// Faculty / PCs the Admin portal (Case logs and Analytics in More); Basic: logbook only keeps Reflections in More
 {
   assert.ok(!offBar('personal').includes('notes'));
   assert.ok(offBar('advanced').includes('notes'));
-  assert.ok(!offBar('faculty').includes('caselogs') && !offBar('faculty').includes('admin'));
+  assert.ok(!offBar('faculty').includes('totals') && !offBar('faculty').includes('admin') && offBar('faculty').includes('caselogs') && offBar('faculty').includes('progress'));
+  assert.ok(offBar('advanced').includes('progress') && !offBar('advanced').includes('totals'));
   assert.ok(offBar('basic').includes('progress') && !offBar('basic').includes('reflect'));
   assert.ok(offBar('logbook').includes('reflect'));
   assert.equal(presetHidesTab('faculty', 'log'), true);
   assert.equal(tabsAfter(null, 'advanced', 'basic'), null, 'a device with no saved tabs follows the profile by itself');
   assert.deepEqual(new Set(tabsAfter(['account'], 'advanced', 'basic')), new Set(['account', 'progress']));
   const personal = new Set(tabsAfter(['progress', 'reflect', 'account', 'notes'], 'logbook', 'personal'));
-  assert.ok(!personal.has('notes') && !personal.has('progress') && !personal.has('reflect') && personal.has('account'));
+  assert.ok(!personal.has('notes') && personal.has('progress') && !personal.has('reflect') && personal.has('account'), 'Analytics stays in More');
   const fac = new Set(tabsAfter([], 'advanced', 'faculty'));
-  assert.ok(fac.has('log') && fac.has('logbook') && fac.has('reflect') && !fac.has('caselogs') && !fac.has('admin'));
+  assert.ok(fac.has('log') && fac.has('logbook') && fac.has('reflect') && fac.has('caselogs') && fac.has('progress') && !fac.has('totals') && !fac.has('admin'));
   // tabs placed by hand that neither profile moves stay put: Notes on the bar and Logbook hidden, Basic to Advanced
   const hand = ['account', 'settings', 'recovery', 'data', 'progress', 'caselogs', 'admin', 'logbook'];
-  assert.deepEqual(new Set(tabsAfter(hand, 'basic', 'advanced')), new Set(hand.filter(id => id !== 'progress')));
+  assert.deepEqual(new Set(tabsAfter(hand, 'basic', 'advanced')), new Set(hand), 'Analytics stays in More');
   assert.deepEqual(tabsAfter(hand, 'basic', 'basic'), hand, 'the same profile moves nothing');
   // Personal to Advanced takes Notes back into More (Personal put it on the bar)
   assert.ok(tabsAfter(['account'], 'personal', 'advanced').includes('notes'));

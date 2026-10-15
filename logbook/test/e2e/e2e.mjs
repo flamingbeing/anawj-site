@@ -65,14 +65,13 @@ async function run(label, ctxOpts) {
   const shot = async name => { if (phone) await p.screenshot({ path: `${DIR}shots/${name}.png`, fullPage: true }); else await p.screenshot({ path: `${DIR}shots/desk-${name}.png` }); };
   const sub = () => p.evaluate(() => document.getElementById('sub').textContent);
   const nCases = async () => parseInt(await p.evaluate(() => document.body.dataset.cases), 10);
-  // Account, Settings, Export / Import and Admin live under More; Settings is a menu of pages
+  // Account, Settings, Export / Import, Admin and Analytics live under More; Settings is a menu of pages
   const SETTINGS_PAGES = ['display', 'access', 'logging', 'tags', 'reflset', 'sharefmt', 'bin'];
   const tab = async t => {
     // a settings page's Advanced page: open the page, then its Advanced link
     if (t === 'displayadv' || t === 'loggingadv') { await tab(t.replace('adv', '')); await p.locator(`a[data-go="${t}"]`).click(); await nap(350); return; }
     if (SETTINGS_PAGES.includes(t)) { await tab('settings'); await p.locator(`.more-list a[data-go="${t}"]`).click(); }
-    else if (t === 'totals') { await tab('progress'); await p.evaluate(() => { location.hash = '#totals'; }); }
-    else if (['account', 'settings', 'admin', 'data'].includes(t)) { await p.locator('.tabs button[data-tab="more"]').click(); await nap(150); await p.locator(`.more-list a[data-go="${t}"]`).click(); }
+    else if (['account', 'settings', 'admin', 'data', 'progress'].includes(t)) { await p.locator('.tabs button[data-tab="more"]').click(); await nap(150); await p.locator(`.more-list a[data-go="${t}"]`).click(); }
     else await p.locator(`.tabs button[data-tab="${t}"]`).click();
     await nap(350);
   };
@@ -1722,7 +1721,7 @@ async function run(label, ctxOpts) {
     await tab('displayadv');
     await p.getByLabel('Show Reflections').uncheck();
     await p.locator('.tab-order li', { hasText: 'Logbook' }).getByRole('button', { name: 'Move up' }).click(); await nap(150);
-    assert(JSON.stringify(await p.locator('.tabs button').evaluateAll(bs => bs.map(b => b.dataset.tab))) === JSON.stringify(['logbook', 'log', 'progress', 'more']), 'tab bar not rearranged');
+    assert(JSON.stringify(await p.locator('.tabs button').evaluateAll(bs => bs.map(b => b.dataset.tab))) === JSON.stringify(['logbook', 'log', 'totals', 'more']), 'tab bar not rearranged');
     await p.locator('.tabs button[data-tab="more"]').click(); await nap(300);
     assert(/Reflections/.test(await p.locator('.more-list li').first().innerText()), 'hidden tab not first on More');
     await tab('displayadv');
@@ -1752,14 +1751,14 @@ async function run(label, ctxOpts) {
         el.dispatchEvent(new TouchEvent('touchstart', { touches: [mk(x0)], changedTouches: [mk(x0)], bubbles: true }));
         el.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [mk(x1)], bubbles: true }));
       }, [x0, x1, sel]);
-      await swipe(300, 100, 'main section.card'); await p.waitForURL(/#reflect$/);
+      await swipe(300, 100, 'main section.card'); await p.waitForURL(/#totals$/);
       await swipe(100, 300, 'main section.card'); await p.waitForURL(/#logbook$/);
       await tab('log'); await p.waitForSelector('textarea.details');
       await swipe(300, 100, 'textarea.details'); await nap(300);
       assert(/#log$/.test(p.url()), 'a swipe in the case box changed tab');
-      // a page under a tab counts as that tab: Settings → Display is under More, so a swipe right goes to Analytics
+      // a page under a tab counts as that tab: Settings → Display is under More, so a swipe right goes to Reflections
       await tab('display');
-      await swipe(100, 300, 'main section.card'); await p.waitForURL(/#progress$/);
+      await swipe(100, 300, 'main section.card'); await p.waitForURL(/#reflect$/);
       await until(async () => !(await p.locator('main#app').evaluate(el => el.style.transform)), 'page left mid-slide');
       // switched off: no change of tab
       await tab('access');

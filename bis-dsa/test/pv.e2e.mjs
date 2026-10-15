@@ -21,7 +21,7 @@ try {
     // the waves are drawn: the EEG band has yellow pixels (BIS's colour) and the ECG band green ones
     await page.waitForFunction(() => PV.wv && PV.wv.x > 50, null, { timeout: 8000 });
     const px = await page.evaluate(() => { const cv = PV.cv, k = cv.width / 1440, c = cv.getContext('2d'); const band = (y0, y1, f) => { const d = c.getImageData(Math.round(100 * k), Math.round(y0 * k), Math.round(700 * k), Math.max(1, Math.round((y1 - y0) * k))).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (f(d[i], d[i + 1], d[i + 2])) n++; return n; };
-      return { eeg: band(556, 656, (r, g, b) => r > 180 && g > 170 && b < 150), ecg: band(110, 290, (r, g, b) => g > 150 && r < 140), pl: band(412, 494, (r, g, b) => b > 150 && r < 120) }; });
+      return { eeg: band(556, 656, (r, g, b) => r > 180 && g > 170 && r - b > 40), ecg: band(110, 290, (r, g, b) => g > 150 && r < 140), pl: band(412, 494, (r, g, b) => b > 150 && r < 120) }; });
     assert.ok(px.eeg > 30 && px.ecg > 30 && px.pl > 30, `EEG, ECG and Pleth waves drawn (${JSON.stringify(px)})`);
     // the numerics and the summary line
     await page.waitForFunction(() => /^BIS \d+, SQI \d+, EMG \d+ dB, SR \d+%/.test(document.querySelector('#bilSum').textContent));
