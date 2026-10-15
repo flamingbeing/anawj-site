@@ -101,11 +101,19 @@
   <!-- Requests (a long list with search) -->
   <section data-screen="list" hidden>
     <h1 class="a-title">Requests</h1>
+    <div class="a-split" id="reqSplit">
+    <div class="a-split-list">
     <div class="a-search"><input class="a-field" type="search" placeholder="Search" aria-label="Search requests"></div>
     <p class="a-section">This week</p>
     <ul class="a-list" id="longList"></ul>
     <p class="a-section">Earlier</p>
     <div class="a-empty"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H5.2L4 17.2z"/></svg><h2>Nothing earlier</h2><p>Requests older than a week show here.</p></div>
+    </div>
+    <div class="a-split-detail" id="reqDetail">
+      <div class="a-empty a-split-empty"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><h2>No request open</h2><p>Pick one from the list.</p></div>
+      <div id="reqPane" hidden></div>
+    </div>
+    </div>
   </section>
 
   <!-- A pushed detail screen -->
@@ -207,6 +215,7 @@
   const tabs = [...document.querySelectorAll('.a-tabbar [role="tab"]')];
   const titles = { home: 'Home', form: 'New case', list: 'Requests', detail: 'Request', kit: 'More' };
   const stack = [];
+  const wide = matchMedia('(min-width: 1000px)');
   function show(name) {
     screens.forEach(s => { s.hidden = s.dataset.screen !== name; });
     const tabName = name === 'detail' ? stack[stack.length - 1] || 'home' : name;
@@ -218,6 +227,18 @@
   tabs.forEach(t => t.addEventListener('click', () => { stack.length = 0; current = t.dataset.screen; aGo(() => show(current)); }));
   document.addEventListener('click', e => {
     const go = e.target.closest('[data-go]');
+    if (go && go.closest('#longList') && wide.matches) {
+      // computer: open the request beside the list instead of on a new screen
+      e.preventDefault();
+      document.querySelectorAll('#longList .a-row').forEach(r => r.removeAttribute('aria-current'));
+      go.setAttribute('aria-current', 'true');
+      const pane = document.getElementById('reqPane');
+      pane.innerHTML = document.querySelector('section[data-screen="detail"]').innerHTML.replace('Preoperative assessment', go.querySelector('.a-row-text').firstChild.textContent);
+      pane.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+      pane.hidden = false;
+      document.getElementById('reqSplit').dataset.show = 'detail';
+      return;
+    }
     if (go) { e.preventDefault(); if (go.dataset.go === 'detail') stack.push(current); current = go.dataset.go; aGo(() => show(current)); }
     const op = e.target.closest('[data-open]');
     if (op) { e.preventDefault(); aSheet.open(document.getElementById(op.dataset.open)); }

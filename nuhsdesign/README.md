@@ -127,6 +127,12 @@ Add both files to the app's `sw.js` SHELL list so the app works offline.
   phone asks for reduced motion.
 - **No web-page habits**: no tap flash, no text selection or long-press menu on buttons, no double-tap zoom, no
   pull-to-refresh, focus rings only for keyboards (navy, 3px).
+- **Computers and big tablets** (1000px and wider): the same markup becomes a desktop app, like Mail or Settings on a
+  Mac. The tab bar turns into a sidebar on the left, the content gets a wider column, buttons keep their natural
+  width, and rows and buttons react to the mouse (hover, pointer cursor, copyable text). Tablets (700 to 999px) get the
+  tabs as a strip under the bar. Use `.a-main--wide` for screens that need the full width (tables, the roster grid)
+  and `.a-split` (`.a-split-list` + `.a-split-detail`, `data-show="detail"` on phones) to show a list and the open item
+  side by side on a computer while phones open the item as its own screen (`app.html`, Requests).
 - **Dark mode**: add `data-theme="auto"` on `<html>` to follow the phone, once the app's own colours have been checked
   in dark. Light only until then.
 

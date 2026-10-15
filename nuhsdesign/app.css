@@ -48,6 +48,7 @@
   --a-gutter: 16px;
   --a-bar-h: 52px;
   --a-tab-h: 56px;
+  --a-side-w: 248px;         /* sidebar on computers */
   --a-band: 3px;             /* the four-quarter NUHS band along the very top */
   --a-safe-t: env(safe-area-inset-top, 0px);
   --a-safe-b: env(safe-area-inset-bottom, 0px);
@@ -183,8 +184,8 @@ html:has(> .a-app) { overscroll-behavior-y: none; background: var(--a-bg); }
 .a-tabbar > :active svg { transform: scale(.88); }
 .a-tabbar svg { transition: transform .15s var(--a-ease); }
 .a-tabbar .a-badge { position: absolute; top: 4px; left: calc(50% + 6px); }
-@media (min-width: 900px) {
-  /* tablets and laptops: tabs sit under the bar, as in iPad apps */
+@media (min-width: 700px) and (max-width: 999.98px) {
+  /* tablets: tabs sit in a strip under the bar, as in iPad apps (computers get a sidebar: see "Computers" below) */
   .a-tabbar {
     position: sticky; top: calc(var(--a-safe-t) + var(--a-band) + var(--a-bar-h)); bottom: auto; justify-content: center;
     gap: 4px; padding: 6px; border-top: 0; border-bottom: .5px solid var(--a-sep);
@@ -241,6 +242,7 @@ a.a-row:active, button.a-row:active, label.a-row:active { background: var(--a-su
 .a-chev { flex: none; width: 8px; height: 8px; margin-left: 2px; border: solid var(--a-ink-3); border-width: 2px 2px 0 0; transform: rotate(45deg); opacity: .7; }
 .a-row--danger { color: var(--a-danger); }
 .a-row--center { justify-content: center; color: var(--a-tint); }
+.a-row--center.a-row--danger { color: var(--a-danger); }
 .a-footnote { margin: 7px 16px 0; color: var(--a-ink-2); font-size: var(--a-text-xs); line-height: 1.4; }
 
 /* card: a single grouped block with padding, for content that isn't a list */
@@ -447,6 +449,76 @@ select.a-field { padding-right: 32px; background-image: linear-gradient(45deg, t
 .a-app:has(.a-tabbar) .a-toast { bottom: calc(12px + var(--a-tab-h) + var(--a-safe-b)); }
 .a-toast.is-shown { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
 .a-toast button { border: 0; background: none; color: #8cc4ff; font-weight: 600; padding: 4px; min-height: 32px; cursor: pointer; }
+
+/* ---------- computers and large tablets (1000px and wider) ---------- */
+/* The same markup becomes a desktop app, like Mail or Settings on a Mac: the tab bar turns into a sidebar on the
+   left, the bar spans the window, content gets a wider readable column, buttons keep their natural width, and
+   rows and buttons react to the mouse. .a-main--wide lets a screen use the full width (tables, the roster grid);
+   .a-split shows a list and the open item side by side (on phones only one shows: data-show="detail"). */
+
+.a-split > .a-split-detail { display: none; }
+.a-split[data-show="detail"] > .a-split-list { display: none; }
+.a-split[data-show="detail"] > .a-split-detail { display: block; }
+.a-split-empty { display: none; }
+
+@media (min-width: 700px) {
+  /* buttons in an action group sit side by side at their natural width instead of stretching */
+  .a-actions { flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .a-actions > .a-btn--block { display: inline-flex; width: auto; flex: 0 0 auto; min-width: 200px; }
+  .a-empty .a-btn { min-width: 200px; }
+}
+
+@media (min-width: 1000px) {
+  .a-app:has(.a-tabbar) { padding-left: calc(var(--a-side-w) + var(--a-safe-l)); }
+  .a-app:has(.a-tabbar) .a-bar { margin-left: calc(-1 * var(--a-side-w)); }
+  .a-app:has(.a-tabbar) .a-bar-row { max-width: none; padding-left: calc(var(--a-side-w) + 8px); padding-right: 16px; }
+  .a-main { max-width: 880px; padding-left: 32px; padding-right: 32px; }
+  .a-app:has(.a-tabbar) .a-main { padding-bottom: calc(32px + var(--a-safe-b)); }
+  .a-main--wide { max-width: none; }
+  .a-title { padding-top: 20px; }
+
+  .a-tabbar {
+    position: fixed; top: calc(var(--a-safe-t) + var(--a-band) + var(--a-bar-h)); bottom: 0; left: 0; right: auto;
+    width: calc(var(--a-side-w) + var(--a-safe-l)); flex-direction: column; justify-content: flex-start; gap: 2px;
+    padding: 12px 10px calc(12px + var(--a-safe-b)) calc(10px + var(--a-safe-l)); overflow-y: auto;
+    border-top: 0; border-right: .5px solid var(--a-sep);
+  }
+  .a-tabbar > * {
+    flex: 0 0 auto; flex-direction: row; justify-content: flex-start; gap: 10px; width: 100%; height: 40px;
+    padding: 0 12px; border-radius: 8px; color: var(--a-ink); font-size: var(--a-text-sm); font-weight: 500; text-align: left;
+  }
+  .a-tabbar svg { width: 20px; height: 20px; color: var(--a-tint); stroke-width: 2; }
+  .a-tabbar [aria-selected="true"], .a-tabbar [aria-current="page"] { background: var(--a-tint-soft); color: var(--a-tint); font-weight: 600; }
+  .a-tabbar .a-badge { position: static; margin-left: auto; }
+  .a-tabbar > :active svg { transform: none; }
+
+  .a-app:has(.a-tabbar) .a-toast { bottom: calc(24px + var(--a-safe-b)); left: calc(50% + var(--a-side-w) / 2); }
+  .a-app:has(.a-tabbar) .a-fab { bottom: calc(24px + var(--a-safe-b)); }
+
+  /* list and detail side by side */
+  .a-split { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 24px; align-items: start; }
+  .a-split > .a-split-list, .a-split > .a-split-detail, .a-split[data-show="detail"] > .a-split-list { display: block; }
+  .a-split > .a-split-detail { position: sticky; top: calc(var(--a-safe-t) + var(--a-band) + var(--a-bar-h) + 16px); }
+  .a-split:not([data-show="detail"]) .a-split-empty { display: block; }
+  .a-split .a-row[aria-current="true"] { background: var(--a-tint-soft); }
+  .a-main:has(.a-split) { max-width: 1200px; }
+}
+
+/* mouse and trackpad: hover feedback and pointers (never on touch screens, where hover sticks after a tap) */
+@media (hover: hover) and (pointer: fine) {
+  a.a-row:hover, button.a-row:hover, label.a-row:hover { background: var(--a-surface-2); }
+  .a-btn:hover { filter: brightness(1.08); }
+  .a-btn--tinted:hover, .a-btn--danger:hover { filter: brightness(.97); }
+  .a-btn--plain:hover, .a-bar-btn:hover { background: var(--a-tint-soft); filter: none; }
+  .a-tabbar > :hover:not([aria-selected="true"]):not([aria-current="page"]) { background: var(--a-surface-2); color: var(--a-ink); }
+  .a-chip:hover:not([aria-pressed="true"]) { background: var(--a-surface-2); }
+  .a-seg > :hover:not([aria-selected="true"]):not([aria-pressed="true"]) { background: rgba(127, 127, 127, .12); }
+  .a-alert-actions > :hover { background: var(--a-surface-2); }
+  .a-row, .a-btn, .a-chip, .a-seg > *, .a-tabbar > *, .a-bar-btn { cursor: pointer; }
+  div.a-row { cursor: default; }
+  .a-app :where(button, a, [role="tab"], label) { -webkit-user-select: none; user-select: none; }
+  .a-main { -webkit-user-select: text; user-select: text; }   /* text can be copied on a computer */
+}
 
 /* ---------- motion ---------- */
 
