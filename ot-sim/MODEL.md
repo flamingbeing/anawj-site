@@ -32,7 +32,7 @@ only writer of its slice (`DESIGN.md`, the model loop):
 | `resp` | `resp.{mode, vt, rr, mv, va, ppeak, pplat, peep, autoPeep, compliance, resistance, spont, pplMmHg, breaths[]}` |
 | `gas` | `gas.{fa[species], fio2, pao2, sao2, paco2, etco2, pvo2, svo2, ph, hco3, be, lactate, k, ica, shunt, vdAlvFrac, uptake[agent]}` |
 | `airway` | `aw.{device, patent, obstruction, seal, leak, cuff, position, view}` (glottic closure is owned by `cond.laryngospasm.level`; `airway.js` reads it as obstruction) |
-| `temp` | `t.{core, periph, ambient, warming}` |
+| `temp` | `temp.{core, periph, ambient, warming}` |
 | `cond` | `cond[name].{level, ...}` (the disease processes, section 11), `cond.haemorrhage.coag.{fibrinogen, platelets}` |
 | `resus` | `rs.{cpr, quality, coFraction, lastShock, paced, capture}` |
 | `monitor` | `mon.{shown values, alarms[], nibp state, probe states}` |

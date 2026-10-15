@@ -16,7 +16,7 @@ assert.deepEqual(a.state, b.state, '1-step and 200-step chunks give the same sta
 
 // a different seed gives a different run (and a different patient)
 const c = createSim({ seed: 43 }).step(N);
-assert.notDeepEqual(c.state.vit, b.state.vit);
+assert.notDeepEqual(c.state.cv, b.state.cv);
 assert.notEqual(c.state.patient.q, b.state.patient.q);
 
 // snapshot and restore: running on from a restored snapshot equals never stopping
@@ -56,9 +56,9 @@ assert.ok(h.eventsSince(h.state.ev.seq - 5).length === 5);
 assert.equal(h.state.trend.length, 3600 / 5);
 
 // a new random consumer does not shift another consumer's numbers: the vitals stream is named and independent
-const i1 = createSim({ seed: 5 }).step(500).state.vit;
+const i1 = createSim({ seed: 5 }).step(500).state.gas;
 const sysPlus = (await import('../js/model/systems.js')).SYSTEMS.concat([{ name: 'extra', init: () => ({ x: 0 }), step: (p, ctx) => ({ x: ctx.rand('extra') }) }]);
-const i2 = createSim({ seed: 5, systems: sysPlus }).step(500).state.vit;
+const i2 = createSim({ seed: 5, systems: sysPlus }).step(500).state.gas;
 assert.deepEqual(i2, i1, 'adding a consumer leaves the vitals draws unchanged');
 
 console.log('ot-sim determinism: ok');

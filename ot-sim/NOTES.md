@@ -69,6 +69,14 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Decisions log
 
+- 15 Oct 2026 (M2.6): `temp.js` (two compartments, core and periphery, energy balance in kcal). Anaesthesia opens the
+  core-peripheral conductance (K 23 awake, 37 asleep), which redistributes heat and gives the early fall (about -0.8 C
+  in hour 1, then slower); heat production falls 30% asleep; the periphery loses to a 21 C theatre; cold fluids cool
+  the core (1 L about -0.28 C mean, by specific heat); the forced-air warmer adds 55 W. The system is named `temp`
+  because `t` is the reserved clock field; `vitals.js` is gone (temperature was its last job). The monitor temperature
+  reads the core through the usual averaging. UI: a forced-air warmer on the Patient tab. No vasoconstriction-threshold
+  plateau yet, so a very long unwarmed case keeps drifting down slowly (recorded).
+
 - 15 Oct 2026 (M2.5): `volatile.js` (the circle circuit, three Gas Man tissue groups, agent effect sites, age-adjusted
   MAC, the N2O concentration effect) owns `vol.fi/ce/pv/mac`. `pd.js` now reads the whole volatile MAC fraction as one
   sevoflurane-equivalent, so every agent counts and the sevoflurane-written formulas hold (sevoflurane alone is

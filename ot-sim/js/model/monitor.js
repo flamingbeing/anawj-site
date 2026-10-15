@@ -23,10 +23,9 @@ const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
 export const monitor = {
   name: 'mon',
   init(state) {
-    const v = state.vit;
     return {
       hr: state.cv ? state.cv.hr : 72, spo2: state.gas ? state.gas.sao2 : 98, etco2: state.gas ? state.gas.etco2 : 38,
-      rr: state.resp ? state.resp.rr : 14, temp: v.temp,
+      rr: state.resp ? state.resp.rr : 14, temp: state.temp ? state.temp.core : 36.8,
       rrs: [], cycles: [], seenBeat: state.rh ? state.rh.next : 0, seenBreath: state.resp ? state.resp.breathT : 0,
       // SpO2 history, one sample a second, for the oximeter's transport delay
       sat: new Array(SAT_HIST).fill(state.gas ? state.gas.sao2 : 98), satT: 0,
@@ -37,7 +36,7 @@ export const monitor = {
     };
   },
   step(prev, ctx) {
-    const v = prev.vit, m = prev.mon, dt = ctx.dt, t = ctx.t;
+    const m = prev.mon, dt = ctx.dt, t = ctx.t;
     const out = { ...m };
     // a beat or breath happened when the model's next event time moved on
     const rh = prev.rh;
@@ -61,7 +60,7 @@ export const monitor = {
     const seen = sat[SAT_HIST - 1 - delay];
     out.sat = sat; out.satT = satT;
     out.spo2 = m.spo2 + (seen - m.spo2) * (dt / SPO2_TAU);
-    out.temp = m.temp + (v.temp - m.temp) * (dt / TEMP_TAU);
+    out.temp = m.temp + ((prev.temp ? prev.temp.core : 36.8) - m.temp) * (dt / TEMP_TAU);
 
     // NIBP: actions first, then the cycle, then a running measurement finishing
     let n = m.nibp;

@@ -133,6 +133,11 @@ try {
     await page.selectOption('#bleed', '100');
     await page.evaluate(() => otsim.step(600));
     assert.ok(await page.evaluate(v => otsim.state.cv.bloodVol < v - 50, bv1), `${name}: bleeding lowers blood volume`);
+    // the forced-air warmer toggles (on the Patient tab, beside bleeding)
+    await page.click('#warmer');
+    assert.equal(await page.getAttribute('#warmer', 'aria-pressed'), 'true');
+    assert.ok(await page.evaluate(() => otsim.state.temp.warming), 'warmer on');
+    await page.click('#warmer');
     await page.selectOption('#bleed', '0');
     await page.click('#tab-circ');
 
