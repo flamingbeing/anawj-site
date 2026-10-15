@@ -2,7 +2,7 @@
 // and the tab bar's arrangement. Split from ui-settings.js so the Case tab (ui-log.js, ui-notepad.js) and app.js can
 // start without loading the settings pages (they load on first use).
 
-import { S, h, toast, modal, hooks, profile, facultyRole, shows } from './ui-core.js';
+import { S, h, toast, modal, hooks, profile, facultyRole, facultyMode, shows } from './ui-core.js';
 import { DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
 import { checkCss } from './custom-css.js';
 import { applyFonts } from './fonts.js';
@@ -200,7 +200,8 @@ export const roundLevel = d => (Number.isInteger(d.round) && d.round >= 0 && d.r
 // are listed first on the More page. Every page in the More list can go on the bar too (Admin portal: admins only).
 export const BAR_TABS = [['caselogs', 'Case logs'], ['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics'], ['notes', 'Notes'],
   ['account', 'Account'], ['settings', 'Settings'], ['recovery', 'Recover drafts'], ['data', 'Export / Import'], ['admin', 'Admin portal'], ['more', 'More']];
-export const barTabs = () => BAR_TABS.filter(([id]) => (id !== 'admin' || S.admin) && (id !== 'caselogs' || facultyRole()));
+// Faculty / PCs has no Analytics tab: Programme totals are on Case logs
+export const barTabs = () => BAR_TABS.filter(([id]) => (id !== 'admin' || S.admin) && (id !== 'caselogs' || facultyRole()) && (id !== 'progress' || !facultyMode()));
 // tabs off the bar until someone puts them there (they live in More by default), and the ones each profile moves:
 // profiles.js (OFF_BAR, PROFILE_OFF, PROFILE_ON)
 export const MAX_BAR = 7;
