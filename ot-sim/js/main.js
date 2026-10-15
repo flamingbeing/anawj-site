@@ -10,6 +10,7 @@ import { ecg, pleth, co2, modelSource, FastSource } from './ui/synth.js';
 import { Numerics, clockText } from './ui/numerics.js';
 import { DrugsPanel, CIRC_ROWS } from './ui/drugs.js';
 import { behindHtml } from './ui/behind.js';
+import { CASES, SIGN_IN, patientSummary, clinicalSummary } from './ui/preop.js';
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -240,10 +241,29 @@ $('nibp-go').addEventListener('click', () => {
   acted();
 });
 
+// Pre-op screen (DESIGN.md "Screens" #preop): the synthetic patient's summary and the sign-in checklist for the guided
+// case. Reads ?case=<key>; an unknown case falls back to the library. Demographics come from the model patient so the
+// briefing matches the monitor. Built once (the checklist keeps the trainee's ticks if they go back and forth).
+const dl = pairs => pairs.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+function renderPreop() {
+  const key = params.get('case'), c = CASES[key];
+  if (!c) return false;
+  $('preop-title').textContent = c.title;
+  $('preop-sum').innerHTML = dl(patientSummary(sim.state.patient));
+  $('preop-clin').innerHTML = dl(clinicalSummary(c));
+  if (!$('preop-list').children.length)
+    $('preop-list').innerHTML = SIGN_IN.map((t, i) => `<li><label><input type="checkbox" id="si-${i}"> <span>${t}</span></label></li>`).join('');
+  // keep the whole query (case, and any seed/test) and change only the hash, so the theatre uses the same patient the
+  // briefing described — and so it is a hashchange, not a reload
+  $('preop-begin').href = location.search + '#theatre';
+  return true;
+}
+
 // screens by hash
 function route() {
   const id = location.hash.slice(1);
-  const screen = id === 'theatre' ? 'theatre' : 'library';
+  let screen = id === 'theatre' ? 'theatre' : id === 'preop' ? 'preop' : 'library';
+  if (screen === 'preop' && !renderPreop()) screen = 'library';
   for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== screen;
   if (screen === 'theatre') { loop.start(); requestAnimationFrame(() => { refill(); nums.update(sim.state, performance.now(), true); panels(true); }); }
   else loop.stop();
