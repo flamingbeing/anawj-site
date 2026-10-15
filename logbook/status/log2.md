@@ -25,7 +25,11 @@ Agreed queue (one PR each, in order, once he says go):
    (no cards) at the very bottom, after Install and Sign out, before the app version. Privacy text (owner agreed):
    "Privacy · Only you can read your cases (and the app owner, for the old Google Form import). Log initials only,
    never names or NRIC. Programme residents share counts per tag, never details. Sign out on shared devices."
-7. **More page Edit mode:** pin a row to put it on the bar or take it off (a full bar asks which it replaces); drag to
+7. **Default bottom bars** (owner, 15 Oct; with the Edit mode below): logbook only Case · Logbook · Totals · More;
+   Basic + Reflections; Advanced + Reflections · Analytics; Personal Case · Logbook · Notes · Reflections · Analytics ·
+   More (Notes in Totals' place, the owner uses Personal); Faculty / PCs Totals · Admin · More. Notes (beta) in More
+   elsewhere. No Totals off the programme list. Devices arranged by hand keep their arrangement.
+   **More page Edit mode:** pin a row to put it on the bar or take it off (a full bar asks which it replaces); drag to
    reorder the More list and the bar strip; Done. Per device. Arrange tabs in Settings stays and links here.
 8. **Profile page:** Profile card; "Show or hide" as a section heading, not a card; groups in tab order: Case tab,
    Logbook (Grid moves here), Reflections (Reflect buttons / ☆, figures and references move here), Analytics (the
