@@ -1116,12 +1116,13 @@ function paintBulk(out) {
   // the confident suggestions of every row, ticked in one tap (the bold chips)
   const strong = r => (on && r.details.trim() ? suggest(r.details).filter(s => s.score >= STRONG && !r.cats.includes(s.code)).map(s => s.code) : []);
   const anyStrong = bulkRows.some(r => strong(r).length);
+  // the count and Tick all on one line, so the rows start high on a phone
   fill(out, 
-    h('h3', {}, `${bulkRows.length} case${bulkRows.length === 1 ? '' : 's'}`),
-    anyStrong ? h('div', { class: 'bar', style: 'margin:0 0 8px' }, h('button', { class: 'small', onclick: () => {
-      for (const r of bulkRows) { const add = strong(r); if (add.length) r.cats = sortCodes(withParents([...r.cats, ...add])); }
-      paintBulk(out);
-    } }, 'Tick all suggestions'), h('span', { class: 'hint', style: 'margin:0 0 0 8px' }, 'The confident ones, in bold.')) : null,
+    h('div', { class: 'bar', style: 'margin:0 0 6px;align-items:center' }, h('h3', { style: 'margin:0' }, `${bulkRows.length} case${bulkRows.length === 1 ? '' : 's'}`), h('span', { style: 'flex:1' }),
+      anyStrong ? h('button', { class: 'small', title: 'The confident suggestions (in bold) on every case', onclick: () => {
+        for (const r of bulkRows) { const add = strong(r); if (add.length) r.cats = sortCodes(withParents([...r.cats, ...add])); }
+        paintBulk(out);
+      } }, 'Tick all suggestions') : null),
     missing ? h('p', { class: 'tip' }, `${missing} case${missing === 1 ? ' has' : 's have'} no tag yet.`) : null,
     h('div', { class: 'scroll' }, h('table', { class: 'bulk' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Details'), h('th', {}, 'Tags'), h('th', {}))), tbody)),
     h('div', { class: 'actions' }, h('button', { class: 'primary big', onclick: saveBulk }, `Save all ${bulkRows.length}`),
