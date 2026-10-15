@@ -1,12 +1,12 @@
 // Faculty / PCs profile (faculty, PDs and admins; ui-core.js PROFILES): Case logs (#caselogs) lists the programme's
 // residents by residency year with their counts at a glance, and one resident's compiled case log (#caselog: counts
 // per tag against the targets, reflection headings met; Excel download). Built from the counts summaries only
-// (summaries/, the same data as Programme totals), never case details. Programme analytics (the Analytics tab in
-// this profile) is renderProgramme: who's behind, then Programme totals.
+// (summaries/, the same data as Programme totals), never case details. Programme totals sit below the list (this
+// profile has no Analytics tab; owner, 15 Oct 2026).
 
 import { REFLECTION_HEADINGS } from './categories.js';
 import { progress, todayISO, fmtDate } from './engine.js';
-import { h, hooks, resetters, catName } from './ui-core.js';
+import { h, hooks, resetters } from './ui-core.js';
 import { programme, groupYearName, totalsTable, downloadTotals, legend, renderTotals, countSwitch } from './ui-progress.js';
 
 // q: the name search; rid: the resident open in #caselog
@@ -56,7 +56,8 @@ export function renderCaseLogs() {
       h('p', { class: 'hint help' }, 'Each resident’s compiled case log: counts per tag against the targets, and reflection headings met. Counts only, never case details. Tap a resident to see theirs.'),
       h('input', { type: 'search', placeholder: 'Find a resident', 'aria-label': 'Find a resident', value: cv.q, style: 'width:100%;margin:6px 0',
         oninput: e => { cv.q = e.target.value; const at = e.target.selectionStart; hooks.render(); const box = document.querySelector('input[aria-label="Find a resident"]'); if (box) { box.focus(); box.setSelectionRange(at, at); } } }),
-      people.length ? list : h('p', { class: 'empty' }, q ? 'No resident matches.' : 'No residents in this year.')));
+      people.length ? list : h('p', { class: 'empty' }, q ? 'No resident matches.' : 'No residents in this year.')),
+    renderTotals());
 }
 
 export function renderCaseLog() {
@@ -82,33 +83,4 @@ export function renderCaseLog() {
       h('p', { class: 'hint help' }, `${p.reflectionsTotal || 0} of the 96 needed, counted towards each heading’s minimum. The reflections themselves stay private to the resident.`),
       h('ul', { class: 'cl-heads' }, REFLECTION_HEADINGS.map(x => h('li', { class: met.has(x.id) ? 'met' : '' },
         h('span', { 'aria-hidden': 'true' }, met.has(x.id) ? '✓ ' : '○ '), x.label, h('small', { class: 'muted' }, met.has(x.id) ? ` · ${x.min} of ${x.min}` : ` · needs ${x.min}`))))));
-}
-
-// the Analytics tab in Faculty / PCs: who's behind in the year picked, then Programme totals for it
-export function renderProgramme() {
-  const t = programme();
-  const all = t.summaries || [];
-  if (!all.length) return loadingCard(t, 'Programme analytics');
-  const ypick = yearPick(t, all);
-  const people = all.filter(p => (p.rYear || 0) === t.year);
-  // residents with tags behind (most first), and the tags most residents are behind on
-  const behind = people.map(p => ({ p, late: progress(p.counts || {}, p.rYear || 1).filter(x => x.status === 'late') })).filter(x => x.late.length)
-    .sort((a, b) => b.late.length - a.late.length);
-  const byTag = new Map();
-  for (const { late } of behind) for (const x of late) byTag.set(x.code, (byTag.get(x.code) || 0) + 1);
-  const tags = [...byTag].sort((a, b) => b[1] - a[1]).slice(0, 8);
-  const open = rid => () => { cv.rid = String(rid); location.hash = '#caselog'; };
-  return h('div', {},
-    h('section', { class: 'card' },
-      h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Programme analytics'), ypick),
-      h('p', { class: 'hint help' }, `${people.length} residents · ${behind.length} behind on at least one tag (a target from an earlier year not met).`),
-      behind.length ? [
-        h('h3', {}, 'Who’s behind'),
-        h('ul', { class: 'cl-behind' }, behind.slice(0, 15).map(({ p, late }) => h('li', {},
-          h('a', { class: 'an-link', href: '#caselog', onclick: e => { e.preventDefault(); open(p.rid)(); } }, p.name || 'No name'),
-          ` · ${late.length} behind: `, h('span', { class: 'muted' }, late.slice(0, 4).map(x => catName(x.code)).join(', ') + (late.length > 4 ? '…' : ''))))),
-        h('h3', {}, 'Tags most residents are behind on'),
-        h('ul', { class: 'cl-behind' }, tags.map(([code, k]) => h('li', {}, catName(code), h('span', { class: 'muted' }, ` · ${k} of ${people.length}`)))),
-      ] : h('p', { class: 'empty' }, 'Nobody in this year is behind.')),
-    renderTotals());
 }

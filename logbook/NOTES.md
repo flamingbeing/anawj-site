@@ -435,9 +435,9 @@ portfolio content.
     default when nothing is saved, outside the demo; owner, 12 Oct 2026: PCs are added as admins, no PC role; no
     Generic profile): tab bar **Case logs** (`#caselogs`, `ui-caselogs.js`: residents by year with total cases, tags
     behind / due, reflections; tap → `#caselog`, that resident's counts per tag against the targets (`totalsTable`
-    with one column), reflection headings met, Excel download), then **Analytics** as programme analytics
-    (`renderProgramme`: who's behind, the tags most residents are behind on, then Programme totals), then the Admin
-    portal for admins (left of More; owner), then More (their own
+    with one column), reflection headings met, Excel download), with **Programme totals** below the list; no
+    Analytics tab (owner, 15 Oct 2026: the old programme analytics, who's behind, was dropped; each row shows its tags
+    behind), then the Admin portal for admins (left of More; owner), then More (their own
     Case, Logbook, Reflections first). All from the counts summaries, never case details. The rules let active
     faculty read `summaries/` (counts are no secret, owner); they still can't read the residents list, cases,
     reflections or notes. Case logs is listed in More for them in other profiles.
