@@ -4,19 +4,22 @@ import { recoverableCaseDrafts, recoverCaseDraft, editCaseDialog } from './ui-lo
 import { hasContent } from './ui-reflect.js';
 import { listDrafts } from './drafts.js';
 const summary = r => r?._deleted ? 'Deleted record' : [r?.initials, r?.title || r?.details || r?.summary || r?.diagnosis || r?.points?.find(p => p.heading || p.text)?.text || r?.points?.find(p => p.heading)?.heading || Object.values(r?.sections || {}).find(Boolean) || r?.references?.find(Boolean) || (r?.figures?.length ? 'Reflection with images' : '')].filter(Boolean).join(' ').slice(0, 160);
+// 'Restore my version': this device's newest version (saves made after the conflict waited behind it), not the oldest
+const mine = job => writes.entries().find(x => x.kind === job.kind && x.record.id === job.record.id && (x.state === 'pending' || x.state === 'conflict') && !x.record._deleted)?.record || job.record;
 async function restore(job, record) {
   const owner = S.user?.email;
   if (job.owner !== owner) return;
   if (!record || !await confirmBox('Restore this version?', 'Your current version is retained in this device’s Recent changes. Restore the selected version?', 'Restore')) return;
   if (S.user?.email !== owner) return;
   try {
-    const list = job.kind === 'case' ? S.cases : S.reflections;
-    const base = list.find(x => x.id === job.record.id) || null;
-    // Resolve the stopped chain deliberately; keep all versions in the history.
-    await writes.archive(job.key);
-    if (S.user?.email !== owner) return;
+    const list = (job.kind === 'case' ? S.cases : job.kind === 'note' ? S.notes : S.reflections) || [];
+    // after a conflict: saved over the other copy, the stopped chain set aside only once the new save is stored
+    const chain = writes.entries().filter(x => x.kind === job.kind && x.record.id === job.record.id && x.state !== 'synced' && x.state !== 'archived');
+    const conflict = chain.find(x => x.state === 'conflict');
+    const base = conflict ? conflict.remote || null : list.find(x => x.id === job.record.id) || null;
     const saved = await writes.save(job.kind, owner, record, base);
     if (S.user?.email !== owner) return;
+    if (conflict) await writes.archive(chain[0].key);   // (the queue did, unless it was the other copy unchanged)
     if (job.kind === 'case') setCases([saved, ...S.cases.filter(x => x.id !== saved.id)]);
     toast('Version restored'); hooks.render();
   } catch (err) { toast(err.message); hooks.render(); }
@@ -49,7 +52,7 @@ export function renderRecovery() {
         h('p', {}, h('b', {}, job.kind === 'case' ? 'Case' : 'Reflection'), ' · ', new Date(job.at).toLocaleString(), ' · ', job.state === 'pending' ? 'Saved locally · pending sync' : job.state),
         h('p', {}, summary(job.record)), job.error ? h('p', { role: 'status' }, job.error) : null,
         job.state === 'failed' || job.state === 'pending' ? h('button', { onclick: () => run(() => writes.retry(job.key)) }, 'Retry sync') : null,
-        job.record._deleted ? h('button', { onclick: () => restore(job, job.base) }, 'Restore deleted version') : h('button', { onclick: () => restore(job, job.record) }, job.state === 'conflict' ? 'Restore my version' : 'Restore this version'),
+        job.record._deleted ? h('button', { onclick: () => restore(job, job.base) }, 'Restore deleted version') : h('button', { onclick: () => restore(job, job.state === 'conflict' ? mine(job) : job.record) }, job.state === 'conflict' ? 'Restore my version' : 'Restore this version'),
         job.state === 'conflict' ? [h('p', {}, 'Version from elsewhere: ', summary(job.remote) || 'Deleted'),
           h('button', { onclick: () => run(() => writes.archive(job.key)) }, 'Keep version from elsewhere')] : null,
         job.base && !job.record._deleted ? h('button', { onclick: () => restore(job, job.base) }, 'Restore previous version') : null))));

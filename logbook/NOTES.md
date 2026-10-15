@@ -800,6 +800,19 @@ portfolio content.
 
 Case creation, individual edits/Undo and reflection editor saves first commit immutable recovery records on the device (IndexedDB, with localStorage fallback). Server transactions compare the editor’s base version before replacing a record. Offline saves stay usable; rejected saves keep the editor/input. More → Recent changes / Recover drafts shows pending/failed sync, explicit retries, both sides of a concurrent edit, and the last 100 saved versions. Pending/failed/conflicting changes never expire automatically. History is private to the browser/account and is cleared on sign-out; it is not a backup. Existing batch imports and reflection metadata operations keep their existing cloud APIs.
 
+After a conflict (14 Oct 2026 audit) nothing more for that record is sent until the resident chooses in Recent changes;
+a later save used to wait behind it for good, say "Saved locally", and be set aside by either conflict button. Now
+(`writes.js`): a save made on the version shown (the other copy) replaces the stopped chain (this device's earlier
+versions are set aside, kept in the history); saving it unchanged changes nothing; one made on this device's own
+version is kept as one more conflict and fails, so the editor keeps its input (each next one replaces that held copy).
+"Keep version from elsewhere" sets aside that save and older ones, never a newer one. "Restore my version" saves this
+device's newest version over the other copy, and the chain is set aside only once that save is stored. While a
+conflict is open the list shows the server's copy (from the sync engine), so an edit or delete made elsewhere since
+shows and is counted (it showed the copy found at the conflict: parked seed 285932884); the copy found at the conflict
+shows only while the list still holds this device's own version, or its delete took the record off. Windows that share
+the store (two tabs, the home-screen app and a browser tab) read a save's stored state again just before sending it,
+on Retry and when a failed save is reused, so one another window already sent or set aside is not sent again.
+
 Case and reflection drafts use separate document slots, including when session storage is cloned into a duplicated tab. Case input writes synchronously and flushes on pagehide/hidden; draft status reports storage failures. Recovering a draft preserves the currently open draft in its previous slot.
 
 Run `logbook/test/e2e/recovery.mjs` beside the full E2E suite for rejected writes, immediate reload, two-tab drafts, offline reconnect, conflicts, failed reflection Close and denied storage. It accepts `PLAYWRIGHT_PATH`/`CHROMIUM_PATH` for cloud-runtime paths and uses fake demo records only.

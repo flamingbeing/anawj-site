@@ -33,6 +33,15 @@ for (const width of [390, 1280]) {
   await p.evaluate(async()=>{const {cloud,S,updateCase}=await import('./js/ui-core.js');const base=S.cases.find(x=>x.id==='offline-proof');await cloud.saveCase(S.user.email,{...base,details:'Other writer'});try{await updateCase({...base,details:'My edit'},{base});}catch{};});
   const conflict=await p.evaluate(async()=>{const {writes,cloud,S}=await import('./js/ui-core.js');return {job:writes.entries()[0],remote:(await cloud.listCases(S.user.email)).find(x=>x.id==='offline-proof')};});
   assert.equal(conflict.job.state,'conflict');assert.equal(conflict.job.record.details,'My edit');assert.equal(conflict.remote.details,'Other writer');
+  // A later save on this device's own version fails and is kept as a conflict too (it waited behind it for good,
+  // saying 'Saved locally'); Restore my version on the first card then saves the newest copy over the other one.
+  const later=await p.evaluate(async()=>{const {updateCase,writes}=await import('./js/ui-core.js');const mine=writes.entries()[0].record;try{await updateCase({...mine,details:'My later edit'},{base:mine});return 'saved';}catch(e){return e.message;}});
+  assert.match(later,/changed elsewhere/);
+  await p.evaluate(()=>location.hash='#recovery');await p.getByRole('heading',{name:'Saved versions and sync'}).waitFor();
+  await p.getByRole('button',{name:'Restore my version',exact:true}).nth(1).click();await p.getByRole('button',{name:'Restore',exact:true}).click();
+  await p.waitForFunction(async()=>{const {cloud,S,writes}=await import('./js/ui-core.js');return (await cloud.listCases(S.user.email)).find(x=>x.id==='offline-proof')?.details==='My later edit'&&writes.status('case','offline-proof')==='synced'&&S.cases.find(x=>x.id==='offline-proof')?.details==='My later edit';});
+  assert.equal(await p.evaluate(async()=>(await import('./js/ui-core.js')).writes.entries().filter(x=>x.state==='conflict').length),0);
+  await p.evaluate(()=>location.hash='#log');await p.waitForSelector('textarea.details');
   await p.evaluate(async()=>{const {writes,S}=await import('./js/ui-core.js');writes.configure({backend:async()=>{throw Error('Reflection rejection');},getOwner:()=>S.user?.email});const m=await import('./js/ui-reflect.js');m.reflectOnCase({id:'fake-refl-case',date:'2026-10-10',initials:'ZZ',details:'Fake hernia',cats:['13']},{headingId:'thyroid'});});
   await p.waitForSelector('input[placeholder="Title"]');await p.locator('input[placeholder="Title"]').fill('Fake recoverable reflection');
   await p.getByRole('button',{name:'← Reflections',exact:true}).click();assert.equal(await p.locator('.refl-editor').count(),1);

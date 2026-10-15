@@ -8,7 +8,7 @@ const clone = x => structuredClone(x);
 function fixture() {
   const records = new Map(), remote = new Map();
   let owner = 'a', online = true, reject = false, deny = false;
-  const store = { async put(x) { if (deny) throw Error('quota'); records.set(x.key, clone(x)); }, async list(o) { return [...records.values()].filter(x => x.owner === o).map(clone); }, async remove(k) { records.delete(k); }, async forget(o) { for (const [k,x] of records) if(x.owner===o) records.delete(k); } };
+  const store = { async put(x) { if (deny) throw Error('quota'); records.set(x.key, clone(x)); }, async list(o) { return [...records.values()].filter(x => x.owner === o).map(clone); }, async get(k) { return records.has(k) ? clone(records.get(k)) : null; }, async remove(k) { records.delete(k); }, async forget(o) { for (const [k,x] of records) if(x.owner===o) records.delete(k); } };
   const config = { store, getOwner: () => owner, online: () => online, delay: ms => new Promise(r => setTimeout(r, ms === 180 ? 5 : 100)), backend: async (_, kind, record, base) => {
     if (reject) throw Error('rejected'); const current = remote.get(record.id) || null;
     checkWrite(current, record._deleted ? null : record, base);
@@ -93,4 +93,115 @@ test('a save cut off by the network stays pending and lands on its own', async (
   assert.equal(q.status('case','1'),'pending');
   for(let i=0;i<40&&q.status('case','1')!=='synced';i++)await new Promise(r=>setTimeout(r,20));
   assert.equal(q.status('case','1'),'synced');assert.equal(f.remote.get('1').details,'flaky wifi');assert.equal(q.entries()[0].error,'');
+});
+
+// ---- after a conflict (14 Oct 2026 audit): later saves, the conflict buttons, and what the list shows ----
+const wait = async (ok, n = 40) => { for (let i = 0; i < n && !ok(); i++) await new Promise(r => setTimeout(r, 20)); };
+const states = (q, id) => q.entries().filter(x => x.record.id === id).map(x => x.state + ':' + (x.record.details ?? x.record.text));
+// this device edits offline from v1, another device edits meanwhile: the offline edit meets a conflict
+async function conflicted(f, v1, mine, theirs, kind = 'case') {
+  f.remote.set(v1.id, clone(v1)); f.online(false);
+  await f.queue.save(kind, 'a', mine, v1);
+  f.remote.set(v1.id, theirs); f.online(true); await f.queue.flush(50);
+  assert.equal(f.queue.status(kind, v1.id), 'conflict');
+}
+test('a save after a conflict made on the version shown syncs, and sets the conflict aside', async () => {
+  const f = fixture(), v1 = { id: 'Y', details: 'Fake v1' };
+  await conflicted(f, v1, { ...v1, details: 'Fake offline edit' }, { ...v1, details: 'Fake edit on device B' });
+  const shown = f.queue.overlay('case', 'a', [clone(f.remote.get('Y'))])[0];
+  assert.equal(shown.details, 'Fake edit on device B');
+  // opening it and saving it unchanged is no choice: the conflict stays
+  await f.queue.save('case', 'a', { ...shown }, shown);
+  assert.deepEqual(states(f.queue, 'Y'), ['conflict:Fake offline edit']);
+  await f.queue.save('case', 'a', { ...shown, details: 'Fake edit after the conflict' }, shown);
+  assert.equal(await f.queue.flush(), true, 'nothing left waiting');
+  assert.equal(f.remote.get('Y').details, 'Fake edit after the conflict');
+  assert.deepEqual(states(f.queue, 'Y'), ['synced:Fake edit after the conflict', 'archived:Fake offline edit']);
+});
+test('a save after a conflict made on this device’s own version fails and is kept (never sent, never piling up)', async () => {
+  const f = fixture(), r0 = { id: 'R', text: 'Fake start' };
+  f.remote.set('R', { ...r0, text: 'Fake start (laptop)' });
+  // the reflection editor: the first autosave meets the conflict; its base stays, so each next autosave fails too
+  await assert.rejects(f.queue.save('reflection', 'a', { ...r0, text: 'Fake start + para 1' }, r0), /changed elsewhere/);
+  await assert.rejects(f.queue.save('reflection', 'a', { ...r0, text: 'Fake start + para 1 + 2' }, r0), /Recent changes/);
+  await assert.rejects(f.queue.save('reflection', 'a', { ...r0, text: 'Fake start + para 1 + 2 + 3' }, r0), /Recent changes/);
+  assert.equal(await f.queue.flush(50), false);
+  assert.equal(f.remote.get('R').text, 'Fake start (laptop)');
+  assert.deepEqual(states(f.queue, 'R'), ['conflict:Fake start + para 1 + 2 + 3', 'archived:Fake start + para 1 + 2', 'conflict:Fake start + para 1']);
+  assert.equal(f.queue.entries()[0].remote.text, 'Fake start (laptop)');
+  // Restore my version (ui-recovery.js): the newest copy, saved over the other copy, replaces the stopped chain
+  const [newest] = f.queue.entries();
+  await f.queue.save('reflection', 'a', newest.record, newest.remote);
+  assert.equal(await f.queue.flush(), true);
+  assert.equal(f.remote.get('R').text, 'Fake start + para 1 + 2 + 3');
+});
+test('Keep version from elsewhere sets aside that save and older ones, never a newer one', async () => {
+  const f = fixture(), v1 = { id: 'K', details: 'Fake v1' }, one = { ...v1, details: 'Fake offline one' };
+  f.remote.set('K', clone(v1)); f.online(false);
+  // two saves accepted before the first met the conflict (a slow or absent connection)
+  await f.queue.save('case', 'a', one, v1); await f.queue.save('case', 'a', { ...v1, details: 'Fake offline two' }, one);
+  f.remote.set('K', { ...v1, details: 'Fake device B' }); f.online(true); await f.queue.flush(50);
+  assert.deepEqual(states(f.queue, 'K'), ['pending:Fake offline two', 'conflict:Fake offline one']);
+  // Retry on the save behind the conflict says why it can't go yet
+  await assert.rejects(f.queue.retry(f.queue.entries()[0].key), /choose a version/);
+  await f.queue.archive(f.queue.entries()[1].key);
+  await wait(() => f.queue.status('case', 'K') !== 'pending');
+  // the newer save goes next; it continued from this device's own version, so it meets the conflict too, and stays
+  assert.deepEqual(states(f.queue, 'K'), ['conflict:Fake offline two', 'archived:Fake offline one']);
+  assert.equal(f.remote.get('K').details, 'Fake device B');
+});
+test('Restore my version saves the newest of this device’s versions, not the conflict’s own', async () => {
+  const f = fixture(), v1 = { id: 'M', details: 'Fake v1' }, one = { ...v1, details: 'Fake offline one' };
+  f.remote.set('M', clone(v1)); f.online(false);
+  await f.queue.save('case', 'a', one, v1); await f.queue.save('case', 'a', { ...v1, details: 'Fake offline two' }, one);
+  f.remote.set('M', { ...v1, details: 'Fake device B' }); f.online(true); await f.queue.flush(50);
+  const [newest, conflict] = f.queue.entries();
+  await f.queue.save('case', 'a', newest.record, conflict.remote);
+  assert.equal(await f.queue.flush(), true); assert.equal(f.remote.get('M').details, 'Fake offline two');
+});
+test('a conflict shows the list’s copy once the case was edited or deleted elsewhere', async () => {
+  const f = fixture(), v1 = { id: 'X', details: 'Fake v1', cats: ['1'] }, mine = { ...v1, details: 'Fake mine' };
+  await conflicted(f, v1, mine, { ...v1, details: 'Fake v2 device B' });
+  const show = list => f.queue.overlay('case', 'a', list.map(clone)).map(c => c.details);
+  // the list still has this device's own version (put there on saving) or the copy it started from: the other copy
+  assert.deepEqual(show([mine]), ['Fake v2 device B']); assert.deepEqual(show([v1]), ['Fake v2 device B']);
+  // edited again elsewhere (parked seed 285932884): the newer copy shows and is counted; Recent changes shows it too
+  assert.deepEqual(show([{ ...v1, details: 'Fake v3 device B', cats: ['2'] }]), ['Fake v3 device B']);
+  assert.equal(f.queue.entries()[0].remote.details, 'Fake v3 device B');
+  // deleted elsewhere: it stays gone
+  assert.deepEqual(show([]), []);
+  // this device's own delete met the conflict: the case is still on the server, so it shows
+  const g = fixture(), w = { id: 'W', details: 'Fake w1' };
+  await conflicted(g, w, { id: 'W', _deleted: true }, { ...w, details: 'Fake w2 elsewhere' });
+  assert.deepEqual(g.queue.overlay('case', 'a', []).map(c => c.details), ['Fake w2 elsewhere']);
+});
+test('a job another window has sent is not sent again from this window’s stale copy (one store, two windows)', async () => {
+  // A: the installed app, signal drops mid-save; its retry waits (a frozen background page waits longer still)
+  const f = fixture(); let flaky = true; const send = f.config.backend;
+  const A = createWriteQueue({ ...f.config, delay: ms => new Promise(r => setTimeout(r, ms === 180 ? 5 : 200)),
+    backend: async (...a) => { if (flaky) throw Object.assign(Error('Fake: the client is offline'), { code: 'unavailable' }); return send(...a); } });
+  await A.save('case', 'a', { id: 'Z', details: 'Fake new case' });
+  assert.equal(A.status('case', 'Z'), 'pending');
+  // B: a browser tab sends it, then the resident deletes the case there
+  const B = createWriteQueue(f.config); await B.activate('a'); assert.equal(await B.flush(), true);
+  await B.save('case', 'a', { id: 'Z', _deleted: true }, clone(f.remote.get('Z'))); assert.equal(f.remote.has('Z'), false);
+  flaky = false; await wait(() => A.status('case', 'Z') !== 'pending');
+  assert.equal(A.status('case', 'Z'), 'synced'); assert.equal(f.remote.has('Z'), false, 'the deleted case stays deleted');
+  // a delete pending in A, sent by B, then restored in B: A must not delete it again
+  const v = { id: 'W', details: 'Fake case' }; f.remote.set('W', clone(v)); flaky = true;
+  await A.save('case', 'a', { id: 'W', _deleted: true }, v);
+  const B2 = createWriteQueue(f.config); await B2.activate('a'); assert.equal(await B2.flush(), true); assert.equal(f.remote.has('W'), false);
+  await B2.save('case', 'a', clone(v), null); assert.equal(f.remote.has('W'), true);
+  flaky = false; await wait(() => A.status('case', 'W') !== 'pending');
+  assert.equal(f.remote.has('W'), true, 'the restored case stays');
+});
+test('Retry in one window does not resend a save another window has already synced', async () => {
+  const f = fixture(); f.reject(true); const A = createWriteQueue(f.config);
+  await assert.rejects(A.save('case', 'a', { id: '1', details: 'Fake keep' }), /rejected/);
+  const { key } = A.entries()[0]; f.reject(false);
+  const B = createWriteQueue(f.config); await B.activate('a'); await B.retry(key); assert.equal(B.status('case', '1'), 'synced');
+  await B.save('case', 'a', { id: '1', _deleted: true }, clone(f.remote.get('1'))); assert.equal(f.remote.has('1'), false);
+  await A.retry(key); assert.equal(A.status('case', '1'), 'synced'); assert.equal(f.remote.has('1'), false);
+  // and saving the same content again in A starts a new save instead of reviving the old one
+  await A.save('case', 'a', { id: '1', details: 'Fake keep' }, null); assert.equal(f.remote.get('1').details, 'Fake keep');
 });

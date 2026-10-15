@@ -345,7 +345,7 @@ try {
       results.push([name, false, `${e.message.split('\n')[0]} (device A shows: ${screen})\n    console: ${A.log.slice(-6).join('\n    ')}`]);
     }
     // a scenario that failed half-way leaves conflicts: clear them so the next starts clean
-    await Promise.all([A, B].map(async d => { await d.ctx.setOffline(false); await d.p.evaluate(async () => { const { writes } = await import('./js/writes.js'); for (const j of writes.entries()) if (j.state === 'conflict' || j.state === 'failed') await writes.archive(j.key); }).catch(() => {}); }));
+    await Promise.all([A, B].map(async d => { await d.ctx.setOffline(false); await d.p.evaluate(async () => { const { writes } = await import('./js/writes.js'); const left = writes.entries().filter(j => j.state !== 'synced' && j.state !== 'archived'); for (const j of left) if (left.some(x => x.record.id === j.record.id && (x.state === 'conflict' || x.state === 'failed'))) await writes.archive(j.key); }).catch(() => {}); }));
     const [name2, ok, note] = results.at(-1);
     console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${name2}: ${note}`);
   }
