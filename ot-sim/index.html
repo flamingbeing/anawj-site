@@ -257,13 +257,19 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
         <div class="act"><button type="button" id="talk">Talk to the patient</button></div>
         <p class="state" id="talk-reply" aria-live="polite"></p>
         <h3 class="sub">Stimulate</h3>
-        <p class="hint">Until the airway and the operation arrive, try a stimulus here and watch for movement.</p>
+        <p class="hint">Try a one-off stimulus and watch for movement and the autonomic response (heart rate and blood pressure), or run the operation below.</p>
         <div class="act">
           <button type="button" data-stim="tetanus">Tetanic stimulus</button>
           <button type="button" data-stim="laryngoscopy">Laryngoscopy</button>
           <button type="button" data-stim="incision">Skin incision</button>
-          <button type="button" id="surgery" aria-pressed="false">Surgery running</button>
         </div>
+        <h3 class="sub">Operation</h3>
+        <p class="hint">A standard operation's surgical stimulus over time: incision, steady surgery, a strongly-stimulating phase, then closing. Start it, then let it run or skip step by step — keep the patient asleep and still as the stimulus rises and falls.</p>
+        <div class="act">
+          <button type="button" id="surg-start">Start operation</button>
+          <button type="button" id="surg-skip" disabled>Skip to next step</button>
+        </div>
+        <p class="state" id="surg-state" aria-live="polite">Not started.</p>
         <div class="act"><button type="button" id="warmer" aria-pressed="false">Forced-air warmer</button></div>
         <div class="act"><label>Surgical bleeding <select id="bleed"><option value="0">None</option><option value="20">20 mL/min</option><option value="50">50 mL/min</option><option value="100">100 mL/min</option><option value="300">300 mL/min</option></select></label></div>
         <h3 class="sub">Rhythm</h3>
