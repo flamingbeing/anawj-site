@@ -12,6 +12,8 @@ import { DrugsPanel, CIRC_ROWS } from './ui/drugs.js';
 import { behindHtml } from './ui/behind.js';
 import { CASES, SIGN_IN, patientSummary, clinicalSummary } from './ui/preop.js';
 import { OPERATION, phaseAt } from './ui/timeline.js';
+import { examine } from './ui/examine.js';
+import { HELP, HELP_EVENT } from './ui/help.js';
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -90,6 +92,7 @@ function panels(force = false) {
     const st = surgText(); if ($('surg-state').textContent !== st) $('surg-state').textContent = st;
   }
   if (!$('panel-aw').hidden) { const t = airwayText(sim.state); if ($('aw-state').textContent !== t) $('aw-state').textContent = t; }
+  if (!$('panel-exam').hidden) { const h = dl(examine(sim.state)); if ($('exam-list').innerHTML !== h) $('exam-list').innerHTML = h; }
   if ($('behind-box').open) { const h = behindHtml(sim.state); if ($('behind').innerHTML !== h) $('behind').innerHTML = h; }
 }
 
@@ -136,7 +139,7 @@ $('v-apply').addEventListener('click', () => {
   sim.act(a); acted();
 });
 
-// Patient tab: talk, stimuli, events (the full Examine tab comes with the case flow, M3.2)
+// Patient tab: talk, stimuli, the operation timeline, events (Examine and Help are their own tabs)
 $('talk').addEventListener('click', () => {
   const pd = sim.state.pd;
   $('talk-reply').textContent = !pd.asleep ? 'Opens their eyes and answers.' : pd.pAsleep < 0.95 ? 'No answer. Stirs a little to a louder voice.' : 'No response.';
@@ -209,10 +212,23 @@ const EVENT_TEXT = {
   stimulus: e => (e.stimulus === 'surgery' ? 'Surgery under way' : `${e.stimulus[0].toUpperCase()}${e.stimulus.slice(1)}`),
   nibp: e => `NIBP ${e.sys}/${e.dia}`, ptc: e => (e.ptc == null ? 'PTC: TOF present' : `PTC ${e.ptc}`),
 };
+// help actions (logged as { kind: 'action', action: { type: 'help', do } }) also appear in the feed
+const eventText = e => e.kind === 'action' ? HELP_EVENT[e.action.do] : EVENT_TEXT[e.kind](e);
+const feedable = e => (EVENT_TEXT[e.kind] && e.kind !== 'nibp') || (e.kind === 'action' && e.action.type === 'help' && HELP_EVENT[e.action.do]);
 function eventsHtml(state) {
-  const ev = state.log.filter(e => EVENT_TEXT[e.kind] && e.kind !== 'nibp').slice(-8).reverse();
-  return ev.length ? ev.map(e => `<li><span class="when">${clockText(e.t)}</span> ${EVENT_TEXT[e.kind](e)}</li>`).join('') : '<li class="none">Nothing yet</li>';
+  const ev = state.log.filter(feedable).slice(-8).reverse();
+  return ev.length ? ev.map(e => `<li><span class="when">${clockText(e.t)}</span> ${eventText(e)}</li>`).join('') : '<li class="none">Nothing yet</li>';
 }
+
+// Help tab: get help and tell the team (DESIGN.md "Screens"). Each is a logged action (shows in events, there for the
+// debrief); no physiological effect in M3.2.
+$('help-acts').innerHTML = HELP.map(h => `<button type="button" data-help="${h.do}">${h.label}</button>`).join('');
+for (const b of $('help-acts').querySelectorAll('[data-help]')) b.addEventListener('click', () => {
+  sim.act({ type: 'help', do: b.dataset.help });
+  const h = HELP.find(x => x.do === b.dataset.help);
+  $('help-ack').textContent = h ? h.ack : '';
+  acted();
+});
 
 // tabs (ARIA tabs pattern: arrow keys move between tabs)
 const tabs = [...document.querySelectorAll('[role=tab]')];
