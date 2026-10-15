@@ -129,31 +129,76 @@ export function defaultState() {
   });
 }
 
-// Fill missing fields (old saves, imports, cloud loads). Mutates and returns the state.
+// Fill missing fields (old saves, imports, cloud loads). Mutates and returns the state. Anything a damaged or
+// hand-made file could hold is made safe here: lists hold objects with a string id (or code), duty kinds and colours
+// are from a fixed set (they end up in class names and styles), and maps are plain objects.
+export const DUTY_KINDS = ['shift', 'leave', 'request', 'other', 'derived'];
+const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+const str = (v, dflt = '') => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : dflt);
+const COLOUR = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/;
+const strList = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string' && x) : []);
+// a list a hand-edited file may hold as "a,b" (who lists, weekdays)
+const looseList = v => (typeof v === 'string' && v ? v.split(',').map(x => x.trim()).filter(Boolean) : Array.isArray(v) ? v : []);
+// One duty code made safe (kind from the fixed set, colours as #rgb / #rrggbb). Expects a string `code`.
+export function cleanDuty(d) {
+  const out = { name: d.code, kind: 'other', color: '#e0e0e0', ink: '#333', overnight: false, auto: false, hours: 0, ...d };
+  out.code = str(d.code);
+  if (!DUTY_KINDS.includes(out.kind)) out.kind = 'other';
+  out.name = str(out.name, out.code);
+  if (!COLOUR.test(str(out.color))) out.color = '#e0e0e0';
+  if (!COLOUR.test(str(out.ink))) out.ink = '#333333';
+  out.overnight = !!out.overnight; out.auto = !!out.auto;
+  out.hours = Number(out.hours) || 0;
+  return out;
+}
+// One rule made safe: who lists are lists of strings, days are 0..6, params an object. Expects a string `type`.
+export function cleanRule(r) {
+  const who = isObj(r.who) ? r.who : {}, when = isObj(r.when) ? r.when : {};
+  const lists = Object.fromEntries(['groups', 'tags', 'staff', 'exclude'].map(k => [k, strList(looseList(who[k]))]));
+  return {
+    name: '', enabled: true, hard: true, weight: 10, note: '', ...r,
+    id: str(r.id) || uid('r'), name: str(r.name), note: str(r.note),
+    params: isObj(r.params) ? r.params : {},
+    who: { ...who, ...lists },
+    when: { from: '', to: '', holidays: 'any', ...when, days: looseList(when.days).map(Number).filter(x => Number.isInteger(x) && x >= 0 && x <= 6) },
+  };
+}
 export function migrate(s) {
-  if (!s || typeof s !== 'object') return defaultState();
+  if (!isObj(s)) return defaultState();
   s.v = 1;
-  s.settings = { dept: 'NTFGH Department of Anaesthesia', holidays: {}, ...(s.settings || {}) };
-  if (!s.settings.holidays || typeof s.settings.holidays !== 'object') s.settings.holidays = {};
-  if (!Array.isArray(s.groups) || !s.groups.length) s.groups = clone(DEFAULT_GROUPS);
-  if (!Array.isArray(s.tags)) s.tags = clone(DEFAULT_TAGS);
-  if (!Array.isArray(s.duties) || !s.duties.length) s.duties = clone(DEFAULT_DUTIES);
-  s.duties = s.duties.map(d => ({ name: d.code, kind: 'other', color: '#e0e0e0', ink: '#333', overnight: false, auto: false, hours: 0, ...d }));
+  s.settings = { dept: 'NTFGH Department of Anaesthesia', holidays: {}, ...(isObj(s.settings) ? s.settings : {}) };
+  s.settings.dept = str(s.settings.dept, 'NTFGH Department of Anaesthesia');
+  if (!isObj(s.settings.holidays)) s.settings.holidays = {};
+  for (const [k, v] of Object.entries(s.settings.holidays)) if (!/^\d{4}-\d{2}-\d{2}$/.test(k) || typeof v !== 'string') delete s.settings.holidays[k];
+  const byId = (list, idKey = 'id') => (Array.isArray(list) ? list : []).filter(x => isObj(x) && str(x[idKey])).map(x => ({ ...x, [idKey]: str(x[idKey]) }));
+  s.groups = byId(s.groups).map(g => ({ ...g, name: str(g.name, g.id), kind: g.kind === 'senior' || g.kind === 'junior' ? g.kind : (g.kind ? 'other' : g.kind) }));
+  if (!s.groups.length) s.groups = clone(DEFAULT_GROUPS);
+  s.tags = Array.isArray(s.tags) ? byId(s.tags).map(t => ({ ...t, name: str(t.name, t.id), help: str(t.help) })) : clone(DEFAULT_TAGS);
+  s.duties = byId(s.duties, 'code');
+  if (!s.duties.length) s.duties = clone(DEFAULT_DUTIES);
+  s.duties = s.duties.map(cleanDuty);
   if (!s.duties.some(d => d.code === 'x')) s.duties.push(clone(DEFAULT_DUTIES.find(d => d.code === 'x')));
-  s.staff = (Array.isArray(s.staff) ? s.staff : []).map(p => ({
+  s.staff = byId(s.staff).map(p => ({
     short: '', group: 'mo', tags: [], fte: 1, start: '', end: '', note: '', active: true, ...p,
-    tags: Array.isArray(p.tags) ? p.tags : [],
+    name: str(p.name, p.id), short: str(p.short), group: str(p.group, 'mo'), note: str(p.note),
+    start: str(p.start), end: str(p.end), tags: strList(p.tags),
   }));
   if (!Array.isArray(s.rules)) s.rules = clone(DEFAULT_RULES);
-  s.rules = s.rules.filter(r => r && r.type).map(r => ({
-    name: '', enabled: true, hard: true, weight: 10, params: {}, note: '', ...r,
-    who: { groups: [], tags: [], staff: [], exclude: [], ...(r.who || {}) },
-    when: { from: '', to: '', days: [], holidays: 'any', ...(r.when || {}) },
-  }));
+  s.rules = s.rules.filter(r => isObj(r) && typeof r.type === 'string').map(cleanRule);
   if (!Array.isArray(s.rulesLog)) s.rulesLog = [];
+  s.rulesLog = s.rulesLog.filter(isObj);
   if (s.rulesLog.length > 200) s.rulesLog = s.rulesLog.slice(-200);
-  if (!s.months || typeof s.months !== 'object') s.months = {};
-  if (!s.cells || typeof s.cells !== 'object') s.cells = {};
+  if (!isObj(s.months)) s.months = {};
+  if (!isObj(s.cells)) s.cells = {};
+  // cells: { date: { staffId: { a: [], r: [], auto: [], note, lock } } }; drop anything else
+  for (const [d, day] of Object.entries(s.cells)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !isObj(day)) { delete s.cells[d]; continue; }
+    for (const [id, c] of Object.entries(day)) {
+      if (!isObj(c)) { delete day[id]; continue; }
+      for (const k of ['a', 'r', 'auto']) if (c[k] !== undefined) c[k] = strList(c[k]);
+      if (c.note !== undefined && typeof c.note !== 'string') c.note = str(c.note);
+    }
+  }
   return s;
 }
 
@@ -246,9 +291,9 @@ export function setCell(draft, s, staffId, patch) {
 // Assigned codes plus 'x' when the day before had an overnight shift.
 export function effectiveCodes(state, s, staffId) {
   const cell = getCell(state, s, staffId);
-  const out = cell ? [...cell.a] : [];
+  const out = cell && Array.isArray(cell.a) ? [...cell.a] : [];
   const prev = getCell(state, addDays(s, -1), staffId);
-  if (prev && prev.a.length) {
+  if (prev && Array.isArray(prev.a) && prev.a.length) {
     const dm = dutyMap(state);
     if (prev.a.some(c => dm.get(c) && dm.get(c).overnight) && !out.includes('x')) out.push('x');
   }
@@ -279,7 +324,7 @@ export function matchesCodes(state, s, staffId, codes, eff) {
   codes = codes || EMPTY;
   const cell = getCell(state, s, staffId);
   const effc = eff || effectiveCodes(state, s, staffId);
-  const all = cell ? [...effc, ...cell.r] : [...effc];
+  const all = cell && Array.isArray(cell.r) ? [...effc, ...cell.r] : [...effc];
   if (codes.includes('@any') && all.length) return true;
   const set = expandTokens(state, codes);
   if (all.some(c => set.has(c))) return true;

@@ -5,7 +5,8 @@ import * as M from './model.js';
 
 const WD = ['Su', 'M', 'Tu', 'W', 'Th', 'F', 'Sa'];
 const KIND_ORDER = [['shift', 'Shifts'], ['leave', 'Leave'], ['request', 'Requests'], ['other', 'Other']];
-const UI_KEY = 'ntf-roster-ui-roster';
+// remembered filters, one set per roster (practice and your own roster don't share them)
+let UI_KEY = 'ntf-roster-ui-roster';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const key = (d, s) => d + '|' + s;
@@ -114,6 +115,7 @@ function cellHas(state, d, sid, code) {
 // ---------- view ----------
 export function mount(el, app) {
   const { h, icon } = app;
+  UI_KEY = `${(app.store && app.store.key) || 'ntf-roster'}-ui-roster`;
   const ui = loadUi();
   let sel = app.selectedCell ? { ...app.selectedCell } : null;
   let editor = null;          // { d, s, close, refresh, el }
@@ -128,7 +130,7 @@ export function mount(el, app) {
 
   // Toolbar
   const tb = h('div', { class: 'r-toolbar', role: 'toolbar', 'aria-label': 'Roster tools' });
-  const search = h('input', { type: 'search', class: 'input r-search', placeholder: 'Find a person', 'aria-label': 'Find a person', value: ui.q });
+  const search = h('input', { type: 'search', class: 'input r-search', placeholder: 'Find', 'aria-label': 'Find a person', value: ui.q });
   const searchWrap = h('label', { class: 'r-searchwrap' }, h('span', { class: 'r-search-ic', html: icon('search') }), search);
   const groupSel = h('select', { class: 'input r-sel', 'aria-label': 'Show group' });
   const tagSel = h('select', { class: 'input r-sel', 'aria-label': 'Show tag' });
@@ -137,7 +139,26 @@ export function mount(el, app) {
   const paintBtn = h('button', { type: 'button', class: 'tbtn', 'aria-pressed': 'false', title: 'Paint mode: pick a code, then tap or drag across cells' });
   reqBtn.innerHTML = `${icon('eye')}<span>Requests</span>`;
   paintBtn.innerHTML = `${icon('brush')}<span>Paint</span>`;
-  tb.append(searchWrap, groupSel, tagSel, hiSel, reqBtn, paintBtn);
+  // the grid's marks explained (they are small and otherwise unexplained)
+  const keyBtn = h('button', { type: 'button', class: 'tbtn', title: 'What the marks in the grid mean', onclick: showKey }, 'Key');
+  tb.append(paintBtn, searchWrap, groupSel, tagSel, hiSel, reqBtn, keyBtn);
+  function showKey() {
+    const row = (mark, text) => h('li', { class: 'gk-row' }, h('span', { class: 'gk-mark', html: mark }), h('span', null, text));
+    app.sheet({
+      title: 'Key', actions: [{ label: 'Close', primary: true }],
+      body: h('ul', { class: 'gk' },
+        row('<span class="chip" style="--c:#c62828;--i:#fff">C</span>', 'A duty, leave or other code (filled chip)'),
+        row('<span class="chip au" style="--c:#c62828;--i:#fff">C</span>', 'Placed by Auto-fill (light line under the chip); re-running Auto-fill may change it'),
+        row('<span class="chip rq" style="--c:#0b5394">Nc</span>', 'A request (outlined chip): what someone asked for, not what they are doing'),
+        row('<span class="chip dx">x</span>', 'Post call: the day after an overnight duty (worked out, never typed)'),
+        row('<span class="gk-cell"><span class="vx vh"></span></span>', 'Red corner: a must-fix problem in that cell (tap the cell to see it)'),
+        row('<span class="gk-cell"><span class="vx vs"></span></span>', 'Amber corner: something to improve (a preference)'),
+        row('<span class="vx-nm vh"></span>', 'Dot after a name: a problem about their whole month (fair share, a monthly minimum)'),
+        row('<span class="gk-cell"><span class="nd"></span></span>', 'Blue dot: a note on that cell'),
+        row('<span class="gk-txt">Wk</span>', 'Weekend and public holiday calls this month (the totals at the end of each row)'),
+        row('<span class="gk-txt">2/2</span>', 'Bottom rows: how many are on each cover rule that day, against what it needs')),
+    });
+  }
   const typedPill = h('span', { class: 'typed', 'aria-live': 'polite', hidden: true });
   tb.append(typedPill);
 
@@ -155,8 +176,11 @@ export function mount(el, app) {
   function fillSelects(state) {
     const groups = (state.groups || []);
     const opts = [['', 'All groups'], ['@senior', 'Seniors'], ['@junior', 'Juniors'], ...groups.map(g => [g.id, g.name])];
-    groupSel.innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}"${v === ui.group ? ' selected' : ''}>${esc(l)}</option>`).join('');
+    // a remembered group or tag that no longer exists would hide everyone with no way to clear it: forget it
     const tags = state.tags || [];
+    if (ui.group && !opts.some(([v]) => v === ui.group)) { ui.group = ''; saveUi(ui); }
+    if (ui.tag && !tags.some(t => t.id === ui.tag)) { ui.tag = ''; saveUi(ui); }
+    groupSel.innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}"${v === ui.group ? ' selected' : ''}>${esc(l)}</option>`).join('');
     tagSel.innerHTML = [['', 'All tags'], ...tags.map(t => [t.id, t.name])].map(([v, l]) => `<option value="${esc(v)}"${v === ui.tag ? ' selected' : ''}>${esc(l)}</option>`).join('');
     tagSel.hidden = !tags.length;
     const duties = (state.duties || []).filter(d => d.kind !== 'derived');
@@ -181,7 +205,7 @@ export function mount(el, app) {
       for (const d of list) {
         grp.append(h('button', {
           type: 'button', class: `pchip k-${d.kind}`, 'data-code': d.code, 'aria-pressed': String(ui.paintCode === d.code),
-          title: d.name, style: { '--c': d.color || '#ccc', '--i': d.ink || '#222' },
+          title: d.name, 'aria-label': `${d.code}, ${d.name}`, style: chipVars(d),
           onclick: () => { ui.paintCode = d.code; saveUi(ui); renderPaintBar(app.store.get()); },
         }, d.code));
       }
@@ -191,7 +215,12 @@ export function mount(el, app) {
       type: 'button', class: 'pchip pchip-clear', 'aria-pressed': String(ui.paintCode === '__clear'), title: 'Clear cells',
       html: `${icon('eraser')}<span>Clear</span>`, onclick: () => { ui.paintCode = '__clear'; renderPaintBar(app.store.get()); },
     }));
-    paintBar.append(h('span', { class: 'pb-hint' }, ui.paintCode === '__clear' ? 'Tap or drag to clear cells' : `Tap or drag across cells to add ${ui.paintCode}; start on a cell that has it to remove`));
+    paintBar.append(h('span', { class: 'pb-hint' }, ui.paintCode === '__clear' ? 'Tap (or drag with a mouse) to clear cells' : `Tap cells to add ${ui.paintCode} (drag with a mouse); tap a cell that has it to remove`));
+    paintBar.append(h('button', { type: 'button', class: 'btn btn-primary btn-sm pb-done', onclick: () => setPaint(false) }, `Done painting`));
+  }
+  function setPaint(on) {
+    ui.paint = on; closeEditor(); renderPaintBar(app.store.get()); root.classList.toggle('painting', ui.paint);
+    if (!on) paintBtn.focus({ preventScroll: true });
   }
 
   search.addEventListener('input', () => { ui.q = search.value; renderGrid(); });
@@ -201,11 +230,13 @@ export function mount(el, app) {
   reqBtn.addEventListener('click', () => {
     ui.showReq = !ui.showReq; saveUi(ui); reqBtn.setAttribute('aria-pressed', String(ui.showReq));
     scroll.querySelector('table')?.classList.toggle('no-req', !ui.showReq);
+    prevRender = null;
   });
-  paintBtn.addEventListener('click', () => { ui.paint = !ui.paint; closeEditor(); renderPaintBar(app.store.get()); root.classList.toggle('painting', ui.paint); });
+  paintBtn.addEventListener('click', () => setPaint(!ui.paint));
 
   // ---------- grid ----------
   let ctx = null;   // lookups for the current render
+  let prevRender = null;   // { shape, head, rows, foot } of the last grid render
 
   function filteredStaff(state) {
     let list = M.staffInMonth(state, app.month);
@@ -229,14 +260,21 @@ export function mount(el, app) {
     const today = M.iso(new Date());
     const dayMeta = days.map(d => {
       const hol = M.isHoliday(state, d) ? (M.holidayName(state, d) || 'Public holiday') : '';
-      return { d, wd: M.weekday(d), we: M.isWeekend(d), hol, num: +d.slice(8), today: d === today };
+      return { d, wd: M.weekday(d), we: M.isWeekend(d), hol, num: +d.slice(8), today: d === today, label: M.fmtDay(d), prev: M.addDays(d, -1) };
     });
     const autoCodes = (state.duties || []).filter(d => d.auto && d.kind === 'shift').map(d => d.code);
-    return { state, days, dmap, dutyIdx, overnight, ev, today, dayMeta, autoCodes, hasCodes: makeHasCodes(state), gmap: M.groupMap(state) };
+    // problems about a person's whole month (fair share, a monthly minimum): a mark on the name, not on day 1
+    const personV = new Map();
+    for (const v of ev.violations || []) {
+      if (v.date || (v.dates || []).length || !v.staffId) continue;
+      if (!personV.has(v.staffId)) personV.set(v.staffId, []);
+      personV.get(v.staffId).push(v);
+    }
+    return { state, days, dmap, dutyIdx, overnight, ev, today, dayMeta, autoCodes, personV, hasCodes: makeHasCodes(state), gmap: M.groupMap(state) };
   }
 
   function dutyStyles(state) {
-    let css = (state.duties || []).map((d, i) => `.dc-${i}{--c:${safeColor(d.color, '#ddd')};--i:${safeColor(d.ink, '#222')}}`).join('');
+    let css = (state.duties || []).map((d, i) => { const v = chipVars(d); return `.dc-${i}{--c:${v['--c']};--i:${v['--i']}}`; }).join('');
     if (ui.hi && ctx) {
       const i = ctx.dutyIdx.get(ui.hi);
       css += i == null ? '' : `.grid.hi .chip:not(.dc-${i}){opacity:.14}.grid.hi .chip.dc-${i}{box-shadow:0 0 0 2px #002f6c}`;
@@ -247,6 +285,7 @@ export function mount(el, app) {
   function applyHighlight() {
     dutyStyles(app.store.get());
     scroll.querySelector('table')?.classList.toggle('hi', !!ui.hi);
+    prevRender = null;
   }
 
   function prevHasOvernight(state, d, sid, overnight) {
@@ -259,7 +298,8 @@ export function mount(el, app) {
     const d = dm.d, sid = person.id;
     const cell = state.cells?.[d]?.[sid];
     const vs = ev.byCell?.get(key(d, sid)) || [];
-    const post = prevHasOvernight(state, d, sid, overnight);
+    const prevCell = state.cells?.[dm.prev]?.[sid];
+    const post = !!prevCell && (prevCell.a || []).some(x => overnight.has(x));
     let chips = '';
     const names = [];
     if (cell) {
@@ -267,12 +307,12 @@ export function mount(el, app) {
         const i = dutyIdx.get(code);
         const du = dmap.get(code);
         const isAuto = (cell.auto || []).includes(code);
-        chips += `<span class="chip${i == null ? ' unk' : ' dc-' + i}${du ? ' k-' + du.kind : ''}${isAuto ? ' au' : ''}">${esc(code)}</span>`;
+        chips += `<span class="chip${i == null ? ' unk' : ' dc-' + i}${du ? ' k-' + esc(du.kind) : ''}${isAuto ? ' au' : ''}${code.length > 3 ? ' sm' : ''}">${esc(code)}</span>`;
         names.push((du ? du.name : code) + (isAuto ? ' (auto)' : ''));
       }
       for (const code of cell.r || []) {
         const i = dutyIdx.get(code);
-        chips += `<span class="chip rq${i == null ? '' : ' dc-' + i}">${esc(code)}</span>`;
+        chips += `<span class="chip rq${i == null ? '' : ' dc-' + i}${code.length > 3 ? ' sm' : ''}">${esc(code)}</span>`;
         names.push('request ' + (dmap.get(code)?.name || code));
       }
     }
@@ -287,9 +327,9 @@ export function mount(el, app) {
     if (cell?.note) { marks += '<span class="nd"></span>'; names.push('note: ' + cell.note); }
     if (cell?.lock) { marks += '<span class="lk"></span>'; names.push('locked'); }
     if (vs.length) names.push(`${vs.length} problem${vs.length > 1 ? 's' : ''}: ` + vs.map(v => v.msg).join('; '));
-    const label = `${person.name}, ${M.fmtDay(d)}: ${names.length ? names.join(', ') : 'empty'}`;
+    const label = `${person.name}, ${dm.label}: ${names.length ? names.join(', ') : 'empty'}`;
     const title = vs.length || cell?.note ? ` title="${esc([cell?.note ? 'Note: ' + cell.note : '', ...vs.map(v => (v.hard ? '⛔ ' : '⚠ ') + v.msg)].filter(Boolean).join('\n'))}"` : '';
-    return `<td class="${cls}"><button type="button" class="cell" data-d="${d}" data-s="${esc(sid)}" tabindex="${focusable ? 0 : -1}" aria-label="${esc(label)}"${title}>${marks}${chips}</button></td>`;
+    return `<td class="${cls}"><button class="cell" data-d="${d}" data-s="${esc(sid)}" tabindex="${focusable ? 0 : -1}" aria-label="${esc(label)}"${title}>${marks}${chips}</button></td>`;
   }
 
   function renderGrid() {
@@ -317,10 +357,11 @@ export function mount(el, app) {
       sel = staff.length ? { date: sel && c.days.includes(sel.date) ? sel.date : d0, staffId: staff[0].id } : null;
     }
 
-    let html = `<table class="grid${ui.showReq ? '' : ' no-req'}${ui.hi ? ' hi' : ''}" style="--days:${c.days.length};--sums:${nSum}">`;
-    html += `<caption class="sr-only">Roster for ${esc(M.fmtMonth(app.month))}. Rows are people, columns are days. Use the arrow keys to move, Enter to edit.</caption>`;
-    html += '<colgroup><col class="col-nm">' + c.days.map(() => '<col class="col-d">').join('') + sumCodes.map(() => '<col class="col-s">').join('') + (hasC ? '<col class="col-s">' : '') + '</colgroup>';
-    html += '<thead><tr><th scope="col" class="nh"><span class="nh-in">' + staff.length + (staff.length === all.length ? '' : ' of ' + all.length) + ' people</span></th>';
+    const tableClass = `grid${ui.showReq ? '' : ' no-req'}${ui.hi ? ' hi' : ''}`;
+    let open = `<table class="${tableClass}" style="--days:${c.days.length};--sums:${nSum}">`;
+    open += `<caption class="sr-only">Roster for ${esc(M.fmtMonth(app.month))}. Rows are people, columns are days. Use the arrow keys to move, Enter to edit.</caption>`;
+    open += '<colgroup><col class="col-nm">' + c.days.map(() => '<col class="col-d">').join('') + sumCodes.map(() => '<col class="col-s">').join('') + (hasC ? '<col class="col-s">' : '') + '</colgroup>';
+    let html = '<thead><tr><th scope="col" class="nh"><span class="nh-in">' + staff.length + (staff.length === all.length ? '' : ' of ' + all.length) + ' people</span></th>';
     for (const dm of c.dayMeta) {
       let cls = 'dh';
       if (dm.we) cls += ' we';
@@ -329,9 +370,11 @@ export function mount(el, app) {
       const t = dm.hol ? ` title="${esc(dm.hol)}"` : '';
       html += `<th scope="col" class="${cls}"${t} data-d="${dm.d}"><abbr class="dh-in" title="${esc(M.fmtDay(dm.d) + (dm.hol ? ', ' + dm.hol : ''))}"><span class="wd">${WD[dm.wd]}</span><span class="dn">${dm.num}</span></abbr></th>`;
     }
-    for (const code of sumCodes) html += `<th scope="col" class="sh" title="${esc(c.dmap.get(code)?.name || code)} this month">${esc(code)}</th>`;
-    if (hasC) html += '<th scope="col" class="sh" title="Weekend and public holiday calls this month">Wk</th>';
-    html += '</tr></thead><tbody>';
+    sumCodes.forEach((code, i) => { html += `<th scope="col" class="sh${i ? '' : ' s1'}" title="${esc(c.dmap.get(code)?.name || code)} this month"><abbr title="${esc(c.dmap.get(code)?.name || code)} this month">${esc(code)}</abbr></th>`; });
+    if (hasC) html += `<th scope="col" class="sh${sumCodes.length ? '' : ' s1'}"><abbr title="Weekend and public holiday calls this month">Wk</abbr></th>`;
+    html += '</tr></thead>';
+    const head = html;
+    const rows = [];   // one string per body row, so a re-render can replace only the rows that changed
 
     const groups = state.groups || [];
     const byGroup = new Map();
@@ -342,11 +385,14 @@ export function mount(el, app) {
       const people = byGroup.get(gid);
       if (!people || !people.length) continue;
       const g = c.gmap.get(gid);
-      html += `<tr class="grp-row"><th colspan="${nCols}" scope="colgroup" class="grp"><span class="grp-label">${esc(g ? g.name : 'No group')}<span class="grp-n">${people.length}</span></span></th></tr>`;
+      rows.push(`<tr class="grp-row"><th colspan="${nCols}" scope="colgroup" class="grp"><span class="grp-label">${esc(g ? g.name : 'No group')}<span class="grp-n">${people.length}</span></span></th></tr>`);
       for (const p of people) {
         const tagTxt = (p.tags || []).map(t => tagMap.get(t)?.name || t);
         const tagBadge = (p.tags || []).includes('babymo') ? '<span class="tagb" title="Baby MO">B</span>' : (p.tags || []).includes('parttime') ? '<span class="tagb tagb-pt" title="Part time">PT</span>' : '';
-        html += `<tr><th scope="row" class="nm"><button type="button" class="nm-btn" data-p="${esc(p.id)}" title="${esc(p.name + (tagTxt.length ? ' · ' + tagTxt.join(', ') : '') + (p.note ? ' · ' + p.note : '') + '. Open their month')}"><span class="nm-txt">${esc(p.short || p.name)}</span>${tagBadge}</button></th>`;
+        const pv = c.personV.get(p.id) || [];
+        const pvTxt = pv.length ? ' · ' + pv.map(v => (v.hard ? '⛔ ' : '⚠ ') + v.msg).join(' · ') : '';
+        const pvMark = pv.length ? `<span class="vx-nm ${pv.some(v => v.hard) ? 'vh' : 'vs'}" aria-hidden="true"></span>` : '';
+        html = `<tr><th scope="row" class="nm"><button type="button" class="nm-btn" data-p="${esc(p.id)}" title="${esc(p.name + (tagTxt.length ? ' · ' + tagTxt.join(', ') : '') + (p.note ? ' · ' + p.note : '') + pvTxt + '. Open their month')}"${pv.length ? ` aria-label="${esc(`${p.short || p.name}, ${pv.length} problem${pv.length > 1 ? 's' : ''} this month. Open their month`)}"` : ''}><span class="nm-txt">${esc(p.short || p.name)}</span>${tagBadge}${pvMark}</button></th>`;
         for (const dm of c.dayMeta) {
           const focusable = sel && sel.staffId === p.id && sel.date === dm.d;
           html += M.staffActiveOn(p, dm.d) ? cellHtml(c, p, dm, focusable) : `<td class="c off${dm.we ? ' we' : ''}"><span class="sr-only">not in post</span></td>`;
@@ -360,19 +406,22 @@ export function mount(el, app) {
           for (const code of a) counts[code] = (counts[code] || 0) + 1;
           if (a.includes('C') && (M.isWeekend(d) || M.isHoliday(state, d))) wk++;
         }
-        for (const code of sumCodes) html += `<td class="sc${counts[code] ? '' : ' zero'}">${counts[code] || 0}</td>`;
-        if (hasC) html += `<td class="sc${wk ? '' : ' zero'}">${wk}</td>`;
+        sumCodes.forEach((code, i) => { html += `<td class="sc${i ? '' : ' s1'}${counts[code] ? '' : ' zero'}">${counts[code] || 0}</td>`; });
+        if (hasC) html += `<td class="sc${sumCodes.length ? '' : ' s1'}${wk ? '' : ' zero'}">${wk}</td>`;
         html += '</tr>';
+        rows.push(html);
       }
     }
-    if (!staff.length) html += `<tr><td colspan="${nCols}" class="nobody">Nobody matches these filters.</td></tr>`;
-    html += '</tbody>';
+    if (!staff.length) rows.push(`<tr><td colspan="${nCols}" class="nobody">Nobody matches these filters.</td></tr>`);
+    html = '';
 
     // cover rows: per day, each cover rule's count vs min/max
-    const covRules = (state.rules || []).filter(r => r.type === 'cover' && r.enabled !== false);
+    let covRules = (state.rules || []).filter(r => r.type === 'cover' && r.enabled !== false);
+    const covByDay = covRules.length && staff.length ? c.days.map(d => coverOn(state, d, all, c.hasCodes)) : [];
+    // a rule with no day this month (public holidays only, in a month without one) gets no empty row
+    covRules = covRules.filter(rule => covByDay.some(day => day.some(x => x.rule === rule)));
     if (covRules.length && staff.length) {
       html += '<tfoot>';
-      const covByDay = c.days.map(d => coverOn(state, d, all, c.hasCodes));
       covRules.forEach((rule, ri) => {
         const desc = safeDescribe(rule, state);
         html += `<tr style="--b:${(covRules.length - 1 - ri) * 24}px"><th scope="row" class="nm cov-nm" title="${esc(desc)}">${esc(coverLabel(rule, state))}</th>`;
@@ -383,17 +432,28 @@ export function mount(el, app) {
           const txt = need != null ? `${cv.n}/${need}` : String(cv.n);
           html += `<td class="cov ${cv.status}" title="${esc(`${M.fmtDay(d)}: ${cv.n} on ${(rule.params?.codes || []).join('/')}${cv.min != null ? `, needs ${cv.min}` : ''}${cv.max != null ? `, at most ${cv.max}` : ''}`)}">${txt}</td>`;
         });
-        html += `<td colspan="${nSum}" class="cov-sum"></td></tr>`;
+        html += nSum ? `<td colspan="${nSum}" class="cov-sum s1"></td></tr>` : '</tr>';
       });
       html += '</tfoot>';
     }
-    html += '</table>';
+    const foot = html;
 
     const hadFocus = scroll.contains(document.activeElement) && document.activeElement.classList.contains('cell');
     const st = scroll.scrollTop, sl = scroll.scrollLeft;
-    scroll.innerHTML = html;
-    scroll.scrollTop = st; scroll.scrollLeft = sl;
-    if (hadFocus) focusSel(false);
+    const shape = [app.month, open, rows.length, foot ? 1 : 0].join('|');
+    const table = scroll.querySelector('table.grid');
+    if (prevRender && prevRender.shape === shape && table && table.tBodies[0] && table.tBodies[0].rows.length === rows.length) {
+      // Same layout as last time: swap only what changed (a typical edit touches a handful of rows).
+      if (head !== prevRender.head) table.tHead.outerHTML = head;
+      const trs = table.tBodies[0].rows;
+      for (let i = rows.length - 1; i >= 0; i--) if (rows[i] !== prevRender.rows[i]) trs[i].outerHTML = rows[i];
+      if (foot !== prevRender.foot && table.tFoot) table.tFoot.outerHTML = foot;
+    } else {
+      scroll.innerHTML = open + head + '<tbody>' + rows.join('') + '</tbody>' + foot + '</table>';
+      scroll.scrollTop = st; scroll.scrollLeft = sl;
+    }
+    prevRender = { shape, head, rows, foot };
+    if (hadFocus) { const b = selBtn(); if (b) { b.tabIndex = 0; if (document.activeElement !== b) b.focus({ preventScroll: true }); } }
     renderBanner(state, c);
     ctx.renderMs = performance.now() - t0;
     root.dataset.renderMs = ctx.renderMs.toFixed(1);
@@ -421,11 +481,17 @@ export function mount(el, app) {
       h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => openAutofill(app) }, 'Auto-fill this month'));
   }
 
+  // Bring a day's column into view (only scrolls when it is hidden behind the name column or off the right edge).
+  function revealDay(th) {
+    const nmW = scroll.querySelector('th.nh')?.offsetWidth || 150;
+    const left = th.offsetLeft, right = left + th.offsetWidth;
+    if (left - nmW >= scroll.scrollLeft && right <= scroll.scrollLeft + scroll.clientWidth) return;
+    scroll.scrollLeft = Math.max(0, left - nmW - th.offsetWidth * 2);
+  }
   function scrollToToday() {
     const th = scroll.querySelector('th.dh.td');
     if (!th) { scroll.scrollLeft = 0; return; }
-    const nmW = scroll.querySelector('th.nh')?.offsetWidth || 150;
-    scroll.scrollLeft = Math.max(0, th.offsetLeft - nmW - th.offsetWidth * 2);
+    revealDay(th);
   }
 
   function selBtn() {
@@ -566,6 +632,23 @@ export function mount(el, app) {
     if (!ui.paint || e.button > 0) return;
     const b = e.target.closest('.cell');
     if (!b || !ui.paintCode) return;
+    // Touch: a swipe scrolls the grid as usual (the browser cancels the pointer); only a tap paints one cell.
+    if (e.pointerType === 'touch') {
+      const x0 = e.clientX, y0 = e.clientY;
+      const end = (ev) => {
+        window.removeEventListener('pointerup', end);
+        window.removeEventListener('pointercancel', end);
+        if (ev.type !== 'pointerup' || Math.hypot(ev.clientX - x0, ev.clientY - y0) > 10) return;
+        const state = app.store.get();
+        const code = ui.paintCode;
+        paintDrag = { code, mode: code === '__clear' ? 'del' : cellHas(state, b.dataset.d, b.dataset.s, code) ? 'del' : 'add', cells: new Map(), last: null };
+        addPaintCell(b);
+        finishPaint();
+      };
+      window.addEventListener('pointerup', end);
+      window.addEventListener('pointercancel', end);
+      return;
+    }
     e.preventDefault();
     try { if (b.hasPointerCapture?.(e.pointerId)) b.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     const state = app.store.get();
@@ -616,6 +699,7 @@ export function mount(el, app) {
   function finishPaint() {
     const p = paintDrag;
     paintDrag = null;
+    scroll.querySelectorAll('.p-add, .p-del').forEach(b => { b.classList.remove('p-add', 'p-del'); b.removeAttribute('data-paint'); });
     if (!p || !p.cells.size) return;
     const n = p.cells.size;
     const label = p.code === '__clear' ? `Clear ${n} cell${n > 1 ? 's' : ''}` : `${p.mode === 'add' ? 'Paint' : 'Remove'} ${p.code} on ${n} cell${n > 1 ? 's' : ''}`;
@@ -674,7 +758,7 @@ export function mount(el, app) {
           const on = (cell[field] || []).includes(du.code);
           chips.append(h('button', {
             type: 'button', class: `tchip k-${kind}${on ? ' on' : ''}${(cell.auto || []).includes(du.code) ? ' au' : ''}`, 'aria-pressed': String(on),
-            'data-code': du.code, title: du.name, 'aria-label': `${du.code}, ${du.name}`, style: { '--c': safeColor(du.color, '#ccc'), '--i': safeColor(du.ink, '#222') },
+            'data-code': du.code, title: du.name, 'aria-label': `${du.code}, ${du.name}`, style: chipVars(du),
             onclick: () => app.store.commit(`${on ? 'Remove' : 'Add'} ${du.code} · ${personName(state, sid)} ${M.fmtDay(d)}`, draft => toggleCode(draft, d, sid, du.code, !on, M.dutyMap(draft))),
           }, h('span', { class: 'tc-code' }, du.code), h('span', { class: 'tc-name' }, du.name)));
         }
@@ -790,6 +874,8 @@ export function mount(el, app) {
       }
       probs = probs.concat(ev.byCell?.get(key(d, sid)) || []);
     }
+    // problems about the whole month (fair share, a monthly minimum) have no day: list them first
+    probs = (ev.violations || []).filter(v => v.staffId === sid && !v.date && !(v.dates || []).length).concat([...new Set(probs)]);
     personHost.innerHTML = '';
     const head = h('div', { class: 'ps-head' },
       h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => app.go('roster', { m: app.month }), html: `${app.icon('back')}<span>Roster</span>` }),
@@ -881,8 +967,7 @@ export function mount(el, app) {
         } else if (sc && sc.date && sc.date.startsWith(app.month)) {
           const th = scroll.querySelector(`th.dh[data-d="${sc.date}"]`);
           if (th) {
-            const nmW = scroll.querySelector('th.nh')?.offsetWidth || 150;
-            scroll.scrollLeft = Math.max(0, th.offsetLeft - nmW - th.offsetWidth * 2);
+            revealDay(th);
             th.classList.add('flash'); setTimeout(() => th.classList.remove('flash'), 1600);
           }
         } else scrollToToday();
@@ -906,6 +991,44 @@ export function mount(el, app) {
 
 function safeColor(c, fallback) {
   return typeof c === 'string' && /^#[0-9a-fA-F]{3,8}$|^[a-z]+$|^rgba?\([\d\s.,%]+\)$/.test(c) ? c : fallback;
+}
+
+// Duty colours are the owner's data, so make sure chip text stays readable (WCAG AA 4.5:1 for small text):
+// if the ink on the background is too faint, darken (light ink) or lighten (dark ink) the background step by step.
+function hexRgb(c) {
+  if (typeof c !== 'string' || !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(c)) return null;
+  let x = c.slice(1);
+  if (x.length === 3) x = x.split('').map(ch => ch + ch).join('');
+  return [0, 2, 4].map(i => parseInt(x.slice(i, i + 2), 16));
+}
+function lum([r, g, b]) {
+  const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+function contrast(a, b) { const la = lum(a), lb = lum(b); return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); }
+const toHex = (rgb) => '#' + rgb.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+const contrastCache = new Map();
+export function readable(bg, ink) {
+  const k = bg + '/' + ink;
+  if (contrastCache.has(k)) return contrastCache.get(k);
+  let out = { c: safeColor(bg, '#e0e0e0'), i: safeColor(ink, '#222') };
+  const B = hexRgb(bg), I = hexRgb(ink);
+  if (B && I && contrast(B, I) < 4.6) {
+    const inkLight = lum(I) > lum(B);
+    let cur = B;
+    for (let n = 0; n < 40 && contrast(cur, I) < 4.6; n++) cur = cur.map(v => inkLight ? v * 0.94 : v + (255 - v) * 0.12);
+    if (contrast(cur, I) < 4.6) out.i = inkLight ? '#000000' : '#ffffff';
+    else out.c = toHex(cur);
+  }
+  contrastCache.set(k, out);
+  return out;
+}
+// CSS custom properties for a chip of this duty: { '--c', '--i' } (requests are outlined: their colour is the text)
+export function chipVars(du) {
+  if (!du) return { '--c': '#e0e0e0', '--i': '#333' };
+  if (du.kind === 'request') { const r = readable('#ffffff', du.color || '#0b5394'); return { '--c': r.i, '--i': r.i }; }
+  const r = readable(du.color || '#e0e0e0', du.ink || '#222');
+  return { '--c': r.c, '--i': r.i };
 }
 
 // ---------- Auto-fill dialog ----------
@@ -1011,7 +1134,7 @@ export function openAutofill(app) {
     const hEl = wrap.querySelector('.af-hard'), sEl = wrap.querySelector('.af-soft'), st = wrap.querySelector('.af-status');
     if (m.best && hEl) { hEl.textContent = m.best.hard; sEl.textContent = m.best.soft; hEl.classList.toggle('zero', !m.best.hard); }
     if (st) st.textContent = m.best && m.best.hard === 0 ? 'All must-fix rules met. Improving fairness and requests…' : 'Searching for a better roster…';
-    if (typeof m.pct === 'number') setPct(Math.max(m.pct > 1 ? m.pct : m.pct * 100, 0));
+    if (typeof m.pct === 'number') setPct(Math.max(0, Math.min(100, m.pct)));
   }
 
   function run() {
@@ -1091,7 +1214,13 @@ export function openAutofill(app) {
     if (unf.length) {
       wrap.append(h('div', { class: 'af-unf' },
         h('h3', null, `Still short on ${unf.length} day${unf.length === 1 ? '' : 's'}`),
-        h('ul', null, unf.slice(0, 12).map(u => h('li', null, `${M.fmtDay(u.date)}: ${u.code} needs ${u.need} more`))),
+        // name the cover rule (juniors or seniors on Call, say), not just the code
+        h('ul', null, unf.slice(0, 12).map(u => {
+          const st = app.store.get(), rule = (st.rules || []).find(r => r.id === u.ruleId);
+          let what = u.code;
+          try { if (rule) what = rule.name || app.rules.describeRule(rule, st); } catch (e) { /* keep the code */ }
+          return h('li', null, `${M.fmtDay(u.date)}: ${u.need} more needed for "${what}"`);
+        })),
         unf.length > 12 ? h('p', { class: 'muted' }, `and ${unf.length - 12} more`) : null,
         h('p', { class: 'muted' }, 'Usually too much leave that day, or a rule that is too strict. Check them after applying.')));
     } else if (after.hard === 0) {

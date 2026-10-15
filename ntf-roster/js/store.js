@@ -5,23 +5,62 @@ import * as M from './model.js';
 
 const MAX_UNDO = 40;
 
+//
+// Two tabs (or the installed app and a browser tab) share one saved copy. Each save bumps a revision number kept
+// beside it (`<key>-rev`); a tab never saves over a newer revision, and when another tab saves, this one reloads the
+// saved copy (the `storage` event) instead of overwriting it later with its own older copy.
+// A saved copy that can't be read is kept aside (`<key>-damaged-<date>`) and nothing is saved over it until the
+// person chooses to start again (store.damaged; the app shows a bar with "Download damaged copy").
 export function createStore({ demo = false, fallback } = {}) {
   const key = demo ? M.DEMO_KEY : M.STORE_KEY;
+  const revKey = key + '-rev';
+  let rev = 0;           // the revision this tab's copy came from
+  let damaged = null;    // { raw, key } when the saved copy couldn't be read
   let state = load();
   let undo = [];   // [{ label, state }] newest last
   let redo = [];
   const subs = new Set();
 
+  function readRev() { try { return Number(localStorage.getItem(revKey)) || 0; } catch (e) { return 0; } }
+
   function load() {
-    let saved = null;
-    try { const raw = localStorage.getItem(key); if (raw) saved = JSON.parse(raw); } catch (e) { saved = null; }
-    if (saved && typeof saved === 'object') return safeMigrate(saved);
+    let raw = null, saved = null;
+    try { raw = localStorage.getItem(key); } catch (e) { raw = null; }
+    rev = readRev();
+    if (raw) {
+      try { saved = JSON.parse(raw); } catch (e) { saved = null; }
+      const s = saved && typeof saved === 'object' && !Array.isArray(saved) ? safeMigrate(saved) : null;
+      if (s) return s;
+      keepDamaged(raw);
+    }
     const fresh = typeof fallback === 'function' ? fallback() : (fallback || M.defaultState());
-    return safeMigrate(fresh);
+    return safeMigrate(fresh) || M.defaultState();
+  }
+
+  function keepDamaged(raw) {
+    const dkey = `${key}-damaged-${M.iso(new Date())}`;
+    try { if (!localStorage.getItem(dkey)) localStorage.setItem(dkey, raw); } catch (e) { /* full: the copy stays in memory for download */ }
+    damaged = { raw, key: dkey };
+    console.warn('saved roster could not be read; kept as', dkey);
   }
 
   function safeMigrate(s) {
-    try { return M.migrate ? M.migrate(s) : s; } catch (e) { console.warn('migrate failed', e); return s; }
+    try { return M.migrate ? M.migrate(s) : s; } catch (e) { console.warn('migrate failed', e); return null; }
+  }
+
+  // another tab saved: take its copy (undo steps from before would bring back our older copy, so they go)
+  function reloadFromStorage(label) {
+    const next = load();
+    if (damaged) return;
+    state = next; undo = []; redo = [];
+    notify(label, 'external');
+  }
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('storage', e => {
+      if (e.key !== key && e.key !== revKey && e.key !== null) return;
+      if (readRev() === rev && e.key !== null) return;
+      reloadFromStorage('Updated with changes from another tab or window');
+    });
   }
 
   function notify(label, source) {
@@ -34,6 +73,7 @@ export function createStore({ demo = false, fallback } = {}) {
     isDemo: !!demo,
     key,
     onSaveError: null,   // set by the app: shows a bar with "Download backup"
+    onConflict: null,    // set by the app: another tab saved first, this change was not saved
 
     get() { return state; },
 
@@ -51,10 +91,12 @@ export function createStore({ demo = false, fallback } = {}) {
     },
 
     replace(next, label = 'Replace') {
+      const migrated = safeMigrate(structuredClone(next));
+      if (!migrated) throw new Error('This roster is damaged: it could not be read.');
       undo.push({ label, state });
       if (undo.length > MAX_UNDO) undo.shift();
       redo = [];
-      state = safeMigrate(structuredClone(next));
+      state = migrated;
       store.save();
       notify(label, 'replace');
     },
@@ -86,9 +128,21 @@ export function createStore({ demo = false, fallback } = {}) {
 
     subscribe(fn) { subs.add(fn); return () => subs.delete(fn); },
 
+    get damaged() { return damaged; },
+    // the person chose to start again (or downloaded the damaged copy): saving may go ahead
+    clearDamaged() { damaged = null; store.save(); },
+
     save() {
+      if (damaged) return false;   // never save over a damaged copy until the person says so
       try {
+        if (readRev() > rev) {
+          // another tab saved after this copy was loaded: keep theirs, show it, and say this change wasn't saved
+          reloadFromStorage('Not saved: this roster was changed in another tab or window. This is the latest copy; make your change again.');
+          return false;
+        }
         localStorage.setItem(key, JSON.stringify(state));
+        rev += 1;
+        localStorage.setItem(revKey, String(rev));
         return true;
       } catch (e) {
         console.warn('save failed', e);

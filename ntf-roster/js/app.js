@@ -65,7 +65,13 @@ function h(tag, attrs, ...kids) {
     for (const [k, v] of Object.entries(attrs)) {
       if (v == null || v === false) continue;
       if (k === 'class' || k === 'className') el.className = v;
-      else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+      else if (k === 'style' && typeof v === 'object') {
+        for (const [prop, val] of Object.entries(v)) {
+          if (val == null) continue;
+          if (prop.startsWith('--') || prop.includes('-')) el.style.setProperty(prop, String(val));   // custom properties need setProperty
+          else el.style[prop] = val;
+        }
+      }
       else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
       else if (k === 'html') el.innerHTML = v;
       else if (k === 'value' || k === 'checked' || k === 'selected' || k === 'indeterminate') el[k] = v;
@@ -102,13 +108,26 @@ const app = {
 function isPhone() { return window.matchMedia(PHONE_MQ).matches; }
 
 function thisMonth() { return M.monthOf(M.iso(new Date())); }
-function validMonth(m) { return typeof m === 'string' && /^\d{4}-\d{2}$/.test(m); }
+function validMonth(m) { return typeof m === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(m); }
+function validDay(d) { return typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && M.iso(M.parseISO(d)) === d; }
+// the month a link asks for: ?m=, else the month of ?d= (a Day link), else none
+function monthFromParams(p) { return validMonth(p.m) ? p.m : validDay(p.d) ? p.d.slice(0, 7) : ''; }
 
 function setMonth(m) {
   if (!validMonth(m) || m === app.month) return;
   app.month = m;
   evalCache = null;
   try { localStorage.setItem('ntf-roster-ui-month', JSON.stringify({ m, at: M.iso(new Date()) })); } catch (e) { /* ignore */ }
+  // keep the month in the link, so a reload or a relaunch of the installed app comes back to it
+  try {
+    const { tab, params } = parseHash();
+    const next = { ...params, m };
+    if (next.d && !String(next.d).startsWith(m + '-')) delete next.d;
+    const q = new URLSearchParams(Object.entries(next).filter(([, v]) => v != null && v !== '')).toString();
+    history.replaceState(history.state, '', '#' + tab + (q ? '?' + q : ''));
+    app.params = next;
+    current.key = tab + (q ? '?' + q : '');
+  } catch (e) { /* ignore */ }
   renderHeader();
   if (current.view && typeof current.view.update === 'function') {
     try { current.view.update(app.store.get(), { month: true }); } catch (e) { console.error(e); }
@@ -117,22 +136,26 @@ function setMonth(m) {
 
 // ---------- rule check cache ----------
 let evalCache = null;
-const EMPTY_EVAL = () => ({ violations: [], hard: 0, soft: 0, score: 0, byCell: new Map(), byDay: new Map(), byRule: new Map() });
+const EMPTY_EVAL = () => ({ violations: [], hard: 0, soft: 0, score: 0, failed: [], byCell: new Map(), byDay: new Map(), byRule: new Map() });
 function evaluation() {
   const state = app.store.get();
   if (evalCache && evalCache.state === state && evalCache.month === app.month) return evalCache.res;
   let res = EMPTY_EVAL();
   if (R && typeof R.evaluate === 'function') {
     const days = M.monthDays(app.month);
-    try { res = R.evaluate(state, { from: days[0], to: days[days.length - 1] }) || res; } catch (e) { console.error('evaluate failed', e); }
+    // a failed check must never look like "No problems": the header and Check say so (error / failed)
+    try { res = R.evaluate(state, { from: days[0], to: days[days.length - 1] }) || res; } catch (e) { console.error('evaluate failed', e); res = { ...EMPTY_EVAL(), error: true }; }
   }
   evalCache = { state, month: app.month, res };
   return res;
 }
 
 // ---------- toasts ----------
+// an error toast ("Not saved: …") goes as soon as something else happens: it must not linger over the fix
+function clearErrorToasts() { document.querySelectorAll('#toasts .toast-error').forEach(el => el.remove()); }
 function toast(msg, { action, kind = 'ok', ms } = {}) {
   const box = $('#toasts');
+  clearErrorToasts();
   const el = h('div', { class: `toast toast-${kind}`, role: kind === 'error' ? 'alert' : 'status' },
     h('span', { class: 'toast-msg' }, msg));
   let timer;
@@ -143,28 +166,67 @@ function toast(msg, { action, kind = 'ok', ms } = {}) {
   el.append(h('button', { type: 'button', class: 'toast-x', 'aria-label': 'Dismiss', html: icon('close'), onclick: close }));
   box.append(el);
   while (box.children.length > 3) box.firstChild.remove();
-  timer = setTimeout(close, ms || (action ? 6000 : 3500));
+  if (ms !== 0) timer = setTimeout(close, ms || (action ? 6000 : 3500));   // ms: 0 stays until dismissed
   return close;
 }
 
 // ---------- sheets (modal on desktop, bottom sheet on phone) ----------
+// Each open sheet adds a history entry, so the phone's Back button closes the sheet instead of leaving the screen
+// underneath. beforeClose(reason) can ask first ("Discard changes?") when a sheet is closed by Back, Esc, the X or
+// a tap outside; buttons in the sheet's footer close it without asking.
 let sheetCount = 0;
-function sheet({ title = '', body, actions = [], wide = false, onClose, className = '' } = {}) {
+let sheetSeq = 0;
+const sheetStack = [];       // [{ seq, pushed, push, onBack }] open sheets, oldest first
+let backPending = null;      // a history.back() from closing a sheet that hasn't landed yet
+let backDone = null;
+window.addEventListener('popstate', (e) => {
+  if (backDone) { const r = backDone; backDone = null; backPending = null; r(); }
+  const seq = (e.state && e.state.ntfSheet) || 0;
+  for (const s of [...sheetStack].reverse()) if (s.pushed && s.seq > seq) s.onBack();
+  // sheets opened while that back was on its way get their history entry now
+  for (const s of sheetStack) if (!s.pushed) s.push();
+});
+function sheet({ title = '', body, actions = [], wide = false, onClose, beforeClose, className = '' } = {}) {
   const prevFocus = document.activeElement;
   const id = 'sheet-title-' + (++sheetCount);
+  const seq = ++sheetSeq;
+  let popped = false;
+  const entry = { seq, pushed: false, onBack: () => { popped = true; requestClose('back'); } };
+  const pushEntry = () => { try { history.pushState({ ...(history.state || {}), ntfSheet: seq }, ''); } catch (e) { /* ignore */ } popped = false; entry.pushed = true; };
+  entry.push = pushEntry;
+  if (!backPending) pushEntry();   // else once the pending back has landed (popstate)
+  sheetStack.push(entry);
   const back = h('div', { class: 'sheet-back' });
   const footer = actions.length ? h('div', { class: 'sheet-foot' }) : null;
   const dlg = h('div', { class: `sheet${wide ? ' wide' : ''} ${className}`, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': id },
     h('div', { class: 'sheet-grip', 'aria-hidden': 'true' }),
     h('div', { class: 'sheet-head' },
       h('h2', { id, class: 'sheet-title' }, title),
-      h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close', html: icon('close'), onclick: () => close() })),
+      h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close', html: icon('close'), onclick: () => requestClose('x') })),
     h('div', { class: 'sheet-body' }, body || null),
     footer);
-  let closed = false;
+  let closed = false, asking = false;
+  async function requestClose(reason) {
+    if (closed || asking) return;
+    if (typeof beforeClose === 'function') {
+      asking = true;
+      let ok = true;
+      try { ok = await beforeClose(reason); } catch (e) { ok = true; }
+      asking = false;
+      if (!ok) { if (reason === 'back') pushEntry(); return; }
+    }
+    close(reason);
+  }
   function close(reason) {
     if (closed) return;
     closed = true;
+    const at = sheetStack.indexOf(entry);
+    if (at >= 0) sheetStack.splice(at, 1);
+    if (entry.pushed && !popped && history.state && history.state.ntfSheet === seq) {
+      popped = true;
+      backPending = new Promise(res => { backDone = res; });
+      history.back();
+    }
     document.removeEventListener('keydown', onKey, true);
     back.classList.add('out');
     setTimeout(() => back.remove(), 160);
@@ -184,7 +246,7 @@ function sheet({ title = '', body, actions = [], wide = false, onClose, classNam
     if (!document.contains(dlg)) return;
     const top = [...document.querySelectorAll('.sheet-back')].pop();
     if (top !== back) return;   // only the top sheet reacts
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close('escape'); }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); requestClose('escape'); }
     if (e.key === 'Tab') {   // keep focus inside the dialog
       const f = [...dlg.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter(x => !x.disabled && x.offsetParent !== null);
       if (!f.length) return;
@@ -192,7 +254,7 @@ function sheet({ title = '', body, actions = [], wide = false, onClose, classNam
       else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
     }
   }
-  back.addEventListener('mousedown', (e) => { if (e.target === back) close('backdrop'); });
+  back.addEventListener('mousedown', (e) => { if (e.target === back) requestClose('backdrop'); });
   back.append(dlg);
   document.body.append(back);
   document.addEventListener('keydown', onKey, true);
@@ -222,7 +284,7 @@ function confirmBox(msg, { ok = 'OK', danger = false } = {}) {
 // ---------- header ----------
 function renderNav() {
   const tabs = $('#tabs');
-  tabs.innerHTML = DESKTOP_TABS.map(t => `<a href="#${t}" class="tab" data-tab="${t}">${icon(TABS[t].icon)}<span>${TABS[t].label}</span></a>`).join('');
+  tabs.innerHTML = DESKTOP_TABS.map(t => `<a href="#${t}" class="tab" data-tab="${t}" title="${TABS[t].label}">${icon(TABS[t].icon)}<span>${TABS[t].label}</span></a>`).join('');
   const bb = $('#bottombar');
   bb.innerHTML = PHONE_TABS.map(t => `<a href="#${t}" class="bb-tab" data-tab="${t}">${icon(TABS[t].icon)}<span class="bb-label">${TABS[t].label}</span>${t === 'check' ? '<span class="bb-badge" hidden></span>' : ''}</a>`).join('');
   $('#undo').innerHTML = icon('undo');
@@ -244,9 +306,9 @@ function markTabs() {
 function renderHeader() {
   const state = app.store.get();
   $('#dept').textContent = state.settings?.dept || '';
-  $('#month').textContent = M.fmtMonth(app.month);
-  const isNow = app.month === thisMonth();
-  $('#today').disabled = isNow;
+  const longM = M.fmtMonth(app.month);   // 'October 2026'; phones show 'Oct 2026'
+  $('#month').innerHTML = `<span class="m-long">${esc(longM)}</span><span class="m-short" aria-hidden="true">${esc(longM.slice(0, 3) + ' ' + app.month.slice(0, 4))}</span>`;
+  $('#today').title = 'Go to today (' + M.fmtDay(M.iso(new Date())) + ')';
   const u = $('#undo'), r = $('#redo');
   u.disabled = !app.store.canUndo();
   r.disabled = !app.store.canRedo();
@@ -254,12 +316,20 @@ function renderHeader() {
   r.title = app.store.canRedo() ? `Redo ${app.store.redoLabel()} (Ctrl+Shift+Z)` : 'Nothing to redo';
   u.setAttribute('aria-label', app.store.canUndo() ? `Undo ${app.store.undoLabel()}` : 'Undo');
   r.setAttribute('aria-label', app.store.canRedo() ? `Redo ${app.store.redoLabel()}` : 'Redo');
-  const ev = (state.staff || []).length ? evaluation() : EMPTY_EVAL();
+  const hasStaff = !!(state.staff || []).length;
+  const ev = hasStaff ? evaluation() : EMPTY_EVAL();
   const p = $('#problems');
-  p.className = 'problems ' + (ev.hard ? 'has-hard' : 'is-ok');
-  const hardTxt = ev.hard ? `${ev.hard} problem${ev.hard === 1 ? '' : 's'}` : 'No problems';
-  p.innerHTML = `${icon(ev.hard ? 'alert' : 'ok')}<span class="p-hard">${hardTxt}</span>${ev.soft ? `<span class="p-soft">${ev.soft} to improve</span>` : ''}`;
-  p.setAttribute('aria-label', `${hardTxt}${ev.soft ? `, ${ev.soft} to improve` : ''}. Open Check`);
+  // nothing to check or fill before there are staff (a fresh install): no green "No problems", no Auto-fill
+  p.hidden = !hasStaff;
+  $('#autofill').disabled = !hasStaff;
+  $('#autofill').title = hasStaff ? 'Auto-fill this month from the rules' : 'Add staff first (People)';
+  const nFailed = (ev.failed || []).length;
+  const bad = ev.hard || ev.error;
+  p.className = 'problems ' + (bad ? 'has-hard' : 'is-ok');
+  const hardTxt = ev.error ? 'Rule check failed' : ev.hard ? `${ev.hard} problem${ev.hard === 1 ? '' : 's'}` : 'No problems';
+  const extra = nFailed ? `${nFailed} rule${nFailed === 1 ? '' : 's'} can't be checked` : ev.soft ? `${ev.soft} to improve` : '';
+  p.innerHTML = `${icon(bad ? 'alert' : 'ok')}<span class="p-hard">${hardTxt}</span>${extra ? `<span class="p-soft">${extra}</span>` : ''}`;
+  p.setAttribute('aria-label', `${hardTxt}${extra ? `, ${extra}` : ''}. Open Check`);
   p.title = 'Rule check for ' + M.fmtMonth(app.month) + ': must-fix problems (hard rules) and things to improve (soft rules)';
   const bb = document.querySelector('.bb-badge');
   if (bb) { bb.hidden = !ev.hard; bb.textContent = ev.hard > 99 ? '99+' : String(ev.hard); }
@@ -273,7 +343,9 @@ const current = { tab: '', key: '', view: null, el: null };
 let routing = Promise.resolve();
 
 function parseHash() {
-  const raw = decodeURIComponent(location.hash.replace(/^#/, ''));
+  const h = location.hash.replace(/^#/, '');
+  let raw;
+  try { raw = decodeURIComponent(h); } catch (e) { raw = h; }   // a stray % in a link must not stop the app
   const [t, q] = raw.split('?');
   const params = Object.fromEntries(new URLSearchParams(q || ''));
   const tab = TABS[t] ? t : (isPhone() ? 'day' : 'roster');
@@ -281,6 +353,8 @@ function parseHash() {
 }
 
 function go(tab, params = {}) {
+  // a sheet just closed and its history entry is still being taken back: navigate once that has landed
+  if (backPending) { const p = backPending; backPending = null; p.then(() => go(tab, params)); setTimeout(() => { if (backDone) { const r = backDone; backDone = null; r(); } }, 400); return; }
   const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null && v !== '')).toString();
   const hash = '#' + tab + (q ? '?' + q : '');
   if (location.hash === hash) route();
@@ -295,7 +369,8 @@ function route() {
 async function doRoute() {
   const { tab, params, key } = parseHash();
   app.params = params;
-  if (validMonth(params.m) && params.m !== app.month) { app.month = params.m; evalCache = null; }
+  const pm = monthFromParams(params);
+  if (pm && pm !== app.month) { app.month = pm; evalCache = null; }
   const sameTab = tab === current.tab && current.view;
   app.tab = tab;
   renderHeader();
@@ -375,6 +450,12 @@ function welcomeCard() {
       h('h2', null, 'Welcome to NTF Roster'),
       h('p', null, 'Plan the monthly calls, PM shifts and clinics together with leave and requests, check them against your rules, and fill the gaps automatically.'),
       h('p', { class: 'muted' }, 'Start by bringing in the department list. Everything stays in this browser until team sync is set up.'),
+      // the next steps, in order; the default rules are already on, with numbers that are guesses
+      h('ol', { class: 'welcome-steps' },
+        h('li', null, 'Add your staff (import the Excel sheet, or add them under People).'),
+        h('li', null, 'Enter leave and requests on the roster (the Excel import brings them in too).'),
+        h('li', null, `Check the rules: ${(app.store.get().rules || []).filter(r => r.enabled !== false).length} default rules are already on, and their numbers (calls a month, people on call each night) are guesses.`),
+        h('li', null, 'Press Auto-fill, look at the preview, then Apply.')),
       h('div', { class: 'welcome-actions' },
         h('button', { type: 'button', class: 'btn btn-primary', onclick: () => go('more'), html: `${icon('upload')}<span>Import Excel sheet</span>` }),
         h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => go('people'), html: `${icon('plus')}<span>Add staff</span>` }),
@@ -389,9 +470,9 @@ function renderDemoBar() {
   bar.innerHTML = '';
   bar.append(
     h('span', { class: 'demo-pill' }, 'Practice'),
-    h('span', { class: 'demo-text' }, 'Practice (made-up department). Changes stay in this browser.'),
+    h('span', { class: 'demo-text' }, '(made-up department)', h('span', { class: 'demo-long' }, '. Changes stay in this browser.')),
     h('button', { type: 'button', class: 'linkish', onclick: resetDemo }, 'Reset'),
-    h('a', { class: 'linkish', href: './' }, 'Leave practice'));
+    h('a', { class: 'linkish', href: './', 'aria-label': 'Leave practice' }, h('span', { class: 'demo-leave' }, 'Leave practice'), h('span', { class: 'demo-leave-s', 'aria-hidden': 'true' }, 'Leave')));
 }
 
 async function resetDemo() {
@@ -410,6 +491,31 @@ function showSaveError() {
     h('span', null, 'This browser is out of storage space, so the last change was not saved.'),
     h('button', { type: 'button', class: 'btn btn-sm btn-danger', onclick: downloadBackup }, 'Download backup'),
     h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Dismiss', html: icon('close'), onclick: () => { bar.hidden = true; } }));
+}
+
+// The saved roster couldn't be read: it is kept aside, and nothing is saved over it until the person chooses.
+function showDamaged() {
+  const bar = $('#savebar');
+  const dmg = app.store.damaged;
+  bar.hidden = false;
+  bar.innerHTML = '';
+  const download = () => {
+    const blob = new Blob([dmg.raw], { type: 'application/json' });
+    const a = h('a', { href: URL.createObjectURL(blob), download: `ntf-roster-damaged-${M.iso(new Date())}.json` });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  bar.append(
+    h('span', null, 'The roster saved in this browser is damaged and could not be opened. Nothing will be saved over it until you choose.'),
+    h('button', { type: 'button', class: 'btn btn-sm', onclick: download }, 'Download damaged copy'),
+    h('button', {
+      type: 'button', class: 'btn btn-sm btn-danger', onclick: async () => {
+        const ok = await confirmBox('Start again here? The damaged copy is replaced by what you see now. Download it first if you may need it.', { ok: 'Start again' });
+        if (!ok) return;
+        app.store.clearDamaged();
+        bar.hidden = true;
+      },
+    }, 'Start again'));
 }
 
 function downloadBackup() {
@@ -448,6 +554,16 @@ function onKeydown(e) {
   if (e.key === '[') { e.preventDefault(); setMonth(M.addMonths(app.month, -1)); }
   else if (e.key === ']') { e.preventDefault(); setMonth(M.addMonths(app.month, 1)); }
   else if (e.key === '?') { e.preventDefault(); shortcutsSheet(); }
+}
+
+// Today: this month, with today's column (roster) or today (day view) in view.
+function goToday() {
+  const today = M.iso(new Date());
+  app.selectedCell = { date: today, staffId: null };
+  if (app.month !== thisMonth()) { setMonth(thisMonth()); return; }
+  if (current.view && typeof current.view.update === 'function') {
+    try { current.view.update(app.store.get(), { month: true }); } catch (e) { console.error(e); }
+  }
 }
 
 function doUndo() {
@@ -498,11 +614,12 @@ async function start() {
     fallback: () => (demo && typeof demoState === 'function' ? demoState(M.iso(new Date())) : M.defaultState()),
   });
   app.store.onSaveError = showSaveError;
+  if (app.store.damaged) showDamaged();
   if (demo) document.title = 'NTF Roster (practice)';
 
   // Month on screen: the hash (?m=), else this month.
   const hp = parseHash().params;
-  app.month = validMonth(hp.m) ? hp.m : thisMonth();
+  app.month = monthFromParams(hp) || thisMonth();
 
   renderNav();
   renderDemoBar();
@@ -513,7 +630,7 @@ async function start() {
   $('#help').addEventListener('click', shortcutsSheet);
   $('#prevm').addEventListener('click', () => setMonth(M.addMonths(app.month, -1)));
   $('#nextm').addEventListener('click', () => setMonth(M.addMonths(app.month, 1)));
-  $('#today').addEventListener('click', () => setMonth(thisMonth()));
+  $('#today').addEventListener('click', goToday);
   $('#autofill').addEventListener('click', openAutofill);
   document.addEventListener('keydown', onKeydown);
   window.addEventListener('hashchange', route);
@@ -529,6 +646,8 @@ async function start() {
 
   app.store.subscribe((state, info) => {
     evalCache = null;
+    clearErrorToasts();
+    if (info && info.source === 'external') toast(info.label, { kind: /^Not saved/.test(info.label) ? 'error' : 'ok' });
     renderHeader();
     if (current.view?.welcome && (state.staff || []).length) { route(); return; }
     if (current.view && typeof current.view.update === 'function') {
@@ -539,6 +658,11 @@ async function start() {
   await route();
   document.body.classList.add('ready');
   window.ntfApp = app;   // handy in the console and for browser tests
+
+  // Offline app shell (sw.js): offer the new version when one has downloaded.
+  import('./version.js')
+    .then(m => m.registerSW({ onUpdate: apply => toast('Update available', { action: { label: 'Reload', fn: apply }, ms: 0 }) }))
+    .catch(e => console.warn('version.js not loaded', e));
 }
 
 start();

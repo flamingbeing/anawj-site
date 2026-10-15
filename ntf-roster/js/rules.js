@@ -38,12 +38,28 @@ export const F = { SHIFT: 1, LEAVE: 2, OTHER: 4, REQ: 8, X: 16, ANY: 32, PRESENT
 const KIND_BIT = { shift: F.SHIFT, leave: F.LEAVE, other: F.OTHER, request: F.REQ };
 const NONE = Object.freeze([]);
 
-// Days from..to plus at least 7 days either side, widened to whole months (so month limits count every day).
-export function buildContext(state, { from, to }) {
+// How many days either side of the range the rules look at: at least 7, more for long rolling windows, far
+// day-after offsets and long runs (so a rule never misses last month's cells it needs).
+export function ruleReach(rules) {
+  let reach = 7;
+  for (const r of rules || []) {
+    if (!r || r.enabled === false || !r.params) continue;
+    const p = r.params;
+    if (r.type === 'sequence') reach = Math.max(reach, Math.abs(num(p.from, 1)), Math.abs(num(p.to, 1)));
+    else if (r.type === 'limit' && p.period === 'rolling') reach = Math.max(reach, num(p.window, 7) - 1);
+    else if (r.type === 'maxRun') reach = Math.max(reach, num(p.max, 5) + 1);
+  }
+  return Math.min(400, Math.max(7, Math.ceil(reach) || 7));
+}
+
+// Days from..to plus at least 7 days either side (more when a rule reaches further: ruleReach), widened to whole
+// months (so month limits count every day). `rules` defaults to the state's rules.
+export function buildContext(state, { from, to, rules }) {
   const dm = dutyMap(state);
-  const start = minS(addDays(from, -7), monthOf(from) + '-01');
+  const reach = ruleReach(rules || state.rules);
+  const start = minS(addDays(from, -reach), monthOf(from) + '-01');
   const endM = monthDays(monthOf(to));
-  const end = maxS(addDays(to, 7), endM[endM.length - 1]);
+  const end = maxS(addDays(to, reach), endM[endM.length - 1]);
   const days = [];
   for (let s = start; s <= end; s = addDays(s, 1)) days.push(s);
   const n = days.length;
@@ -75,13 +91,13 @@ export function buildContext(state, { from, to }) {
   for (let p = 0; p < P; p++) {
     const per = people[p];
     const prev = getCell(state, before, per.id);
-    ctx.prePost[p] = prev && prev.a.some(c => ctx.overnight.has(c)) ? 1 : 0;
+    ctx.prePost[p] = prev && Array.isArray(prev.a) && prev.a.some(c => ctx.overnight.has(c)) ? 1 : 0;
     for (let d = 0; d < n; d++) {
       const i = p * n + d, s = days[d];
       ctx.act[i] = (!per.start || s >= per.start) && (!per.end || s <= per.end) ? 1 : 0;
       const cell = state.cells && state.cells[s] && state.cells[s][per.id];
-      ctx.codes[i] = cell && cell.a ? cell.a : NONE;
-      ctx.req[i] = cell && cell.r ? cell.r : NONE;
+      ctx.codes[i] = cell && Array.isArray(cell.a) ? cell.a : NONE;
+      ctx.req[i] = cell && Array.isArray(cell.r) ? cell.r : NONE;
     }
     for (let d = 0; d < n; d++) refresh(ctx, p * n + d);
   }
@@ -205,14 +221,37 @@ export function compileWhen(ctx, when) {
 const unset = v => v === '' || v == null || Number.isNaN(Number(v));
 const num = (v, dflt = null) => (unset(v) ? dflt : Number(v));
 
-// Rule with every field present (params merged over the type's defaults).
+// A list from anything an imported file might hold: arrays stay, "0,6" splits, anything else is empty.
+const asList = v => (Array.isArray(v) ? v.filter(x => x != null && x !== '') : typeof v === 'string' && v ? v.split(',').map(x => x.trim()).filter(Boolean) : []);
+const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+export function normalizeWho(who) {
+  const w = obj(who);
+  return { ...w, groups: asList(w.groups).map(String), tags: asList(w.tags).map(String), staff: asList(w.staff).map(String), exclude: asList(w.exclude).map(String) };
+}
+export function normalizeWhen(when) {
+  const w = { from: '', to: '', days: [], holidays: 'any', ...obj(when) };
+  w.days = asList(w.days).map(Number).filter(x => Number.isInteger(x) && x >= 0 && x <= 6);
+  if (typeof w.from !== 'string') w.from = '';
+  if (typeof w.to !== 'string') w.to = '';
+  if (!['any', 'only', 'exclude'].includes(w.holidays)) w.holidays = 'any';
+  return w;
+}
+
+// Rule with every field present (params merged over the type's defaults), and lists that are really lists (an
+// imported or hand-edited rule with `groups: null` or `days: "0,6"` must not break every check).
 export function normalizeRule(rule) {
   const t = RULE_TYPES[rule && rule.type];
+  const params = { ...(t ? t.defaults() : {}), ...obj(rule && rule.params) };
+  if (t) for (const spec of t.params) {
+    if (spec.kind === 'codes') params[spec.key] = asList(params[spec.key]).map(String);
+    else if (spec.kind === 'who') params[spec.key] = normalizeWho(params[spec.key]);
+    else if (spec.kind === 'code' && params[spec.key] != null && typeof params[spec.key] !== 'string') params[spec.key] = String(params[spec.key]);
+  }
   return {
-    id: '', name: '', enabled: true, hard: true, weight: 10, note: '', ...rule,
-    who: { ...blankWho(), ...((rule && rule.who) || {}) },
-    when: { from: '', to: '', days: [], holidays: 'any', ...((rule && rule.when) || {}) },
-    params: { ...(t ? t.defaults() : {}), ...((rule && rule.params) || {}) },
+    id: '', name: '', enabled: true, hard: true, weight: 10, note: '', ...obj(rule),
+    who: normalizeWho(rule && rule.who),
+    when: normalizeWhen(rule && rule.when),
+    params,
   };
 }
 
@@ -223,22 +262,24 @@ export function compileRule(ctx, raw) {
   const rule = normalizeRule(raw);
   const hard = !!rule.hard && !t.soft_only;
   const u = hard ? 1000 : Math.min(100, Math.max(1, num(rule.weight, 10)));
-  const T = textKit(ctx.state);
-  const X = {
-    ctx, rule, hard, u, T,
-    codes: list => compileCodes(ctx, list),
-    who: w => compileWho(ctx, w),
-    when: compileWhen(ctx, rule.when),
-    name: p => { const per = ctx.people[p]; return (per && (per.short || per.name)) || '?'; },
-    day: d => fmtDay(ctx.days[d]),
-    inRange: d => d >= ctx.lo && d <= ctx.hi,
-    V: (penalty, msg, o = {}) => ({ ruleId: rule.id, type: rule.type, hard, penalty, msg, ...o }),
-    iso: d => ctx.days[d],
-    num,
-  };
-  X.W = X.who(rule.who);
   let ev = null;
-  try { ev = t.compile(rule, X); } catch (e) { ev = null; }
+  try {
+    const T = textKit(ctx.state);
+    const X = {
+      ctx, rule, hard, u, T,
+      codes: list => compileCodes(ctx, list),
+      who: w => compileWho(ctx, normalizeWho(w)),
+      when: compileWhen(ctx, rule.when),
+      name: p => { const per = ctx.people[p]; return (per && (per.short || per.name)) || '?'; },
+      day: d => fmtDay(ctx.days[d]),
+      inRange: d => d >= ctx.lo && d <= ctx.hi,
+      V: (penalty, msg, o = {}) => ({ ruleId: rule.id, type: rule.type, hard, penalty, msg, ...o }),
+      iso: d => ctx.days[d],
+      num,
+    };
+    X.W = X.who(rule.who);
+    ev = t.compile(rule, X);
+  } catch (e) { ev = null; }
   if (!ev) return null;
   return { rule, type: t, hard, u, ...ev };
 }
@@ -262,7 +303,9 @@ function textKit(state) {
   const codeName = c => TOKEN_WORDS[c] || (dm.get(c) && dm.get(c).name) || c;
   const T = {
     code: codeName,
-    codes: list => listOr((list || []).map(codeName)) || 'nothing',
+    codes: list => listOr((list || []).map(codeName)) || '…',   // '…' until codes are chosen ("Never … and … on the same day")
+    // "on Call", but "at work", "away", "on leave" for tokens that read better without "on"
+    on: list => (list && list.length === 1 && ['@present', '@away', '@any'].includes(list[0]) ? codeName(list[0]) : `on ${T.codes(list)}`),
     // "juniors", "seniors", "everyone", or names
     who(who) {
       who = { ...blankWho(), ...(who || {}) };
@@ -283,7 +326,7 @@ function textKit(state) {
       who = { ...blankWho(), ...(who || {}) };
       const one = count === 1;
       const g = who.groups;
-      if (g.length && !who.tags.length && !who.staff.length) {
+      if (g.length > 1 && !who.tags.length && !who.staff.length) {
         const kinds = new Set(g.map(id => (groups.find(x => x.id === id) || {}).kind));
         if (kinds.size === 1 && kinds.has('junior')) return one ? 'junior' : 'juniors';
         if (kinds.size === 1 && kinds.has('senior')) return one ? 'senior' : 'seniors';
@@ -349,7 +392,7 @@ export const RULE_TYPES = {
       const n = num(p.max, num(p.min, 2));
       let noun = T.noun(r.who, n);
       if (!isEveryone(r.who) && (noun === 'person' || noun === 'people')) noun += ` from ${T.who(r.who)}`;
-      return `${w ? cap(w) : 'Each day'}: ${amt} ${noun} on ${T.codes(p.codes)}`;
+      return `${w ? cap(w) : 'Each day'}: ${amt} ${noun} ${T.on(p.codes)}`;
     },
     validate(r) { return unset(r.params.min) && unset(r.params.max) ? ['Set at least or at most'] : []; },
     compile(r, X) {
@@ -366,13 +409,13 @@ export const RULE_TYPES = {
           let pen = 0;
           if (min != null && cnt < min) {
             pen += u * (min - cnt); ctx.n2++;
-            if (out) out.push(X.V(u * (min - cnt), `${X.day(d)}: ${cnt} ${X.T.noun(r.who, cnt)} on ${X.T.codes(r.params.codes)}, needs ${min}`, { date: X.iso(d) }));
+            if (out) out.push(X.V(u * (min - cnt), `${X.day(d)}: ${cnt} ${X.T.noun(r.who, cnt)} ${X.T.on(r.params.codes)}, needs ${min}`, { date: X.iso(d) }));
           }
           if (max != null && cnt > max) {
             pen += u * (cnt - max); ctx.n2++;
             if (out) {
               const ids = list.filter(p => act[p * n + d] && m(p * n + d)).map(p => ctx.people[p].id);
-              out.push(X.V(u * (cnt - max), `${X.day(d)}: ${cnt} ${X.T.noun(r.who, cnt)} on ${X.T.codes(r.params.codes)}, at most ${max}`, { date: X.iso(d), staffIds: ids }));
+              out.push(X.V(u * (cnt - max), `${X.day(d)}: ${cnt} ${X.T.noun(r.who, cnt)} ${X.T.on(r.params.codes)}, at most ${max}`, { date: X.iso(d), staffIds: ids }));
             }
           }
           return pen;
@@ -418,50 +461,77 @@ export const RULE_TYPES = {
       const { ctx, u } = X, n = ctx.n, ok = X.when, act = ctx.act, inWho = X.W.inWho;
       const codesTxt = X.T.codes(p.codes);
       const factorOf = (pi, act_, tot) => (p.fte ? (Number(ctx.people[pi].fte) > 0 ? Number(ctx.people[pi].fte) : 1) : 1) * (p.prorate ? (tot ? act_ / tot : 0) : 1);
-      const check = (pi, cnt, f, hits, label, a, out) => {
-        let pen = 0;
-        if (max != null) {
-          const capN = Math.floor(max * f + 1e-9);
-          if (cnt > capN) {
-            pen += u * (cnt - capN); ctx.n2++;
-            if (out) {
-              const dates = hits.filter(X.inRange).map(X.iso);
-              out.push(X.V(u * (cnt - capN), `${X.name(pi)}: ${cnt} ${codesTxt} ${label}, at most ${capN}`, { staffId: ctx.people[pi].id, date: dates[0] || X.iso(Math.max(a, ctx.lo)), dates }));
-            }
-          }
-        }
-        if (min != null) {
-          const need = Math.ceil(min * f - 1e-9);
-          if (cnt < need) {
-            pen += u * (need - cnt); ctx.n2++;
-            if (out) out.push(X.V(u * (need - cnt), `${X.name(pi)}: ${cnt} ${codesTxt} ${label}, needs ${need}`, { staffId: ctx.people[pi].id, date: X.iso(Math.min(Math.max(a, ctx.lo), ctx.hi)) }));
-          }
-        }
-        return pen;
-      };
+      const capOf = f => Math.floor(max * f + 1e-9);
+      // the minimum for a period: scaled down (and rounded down) when the period runs past the last day checked,
+      // because those days aren't planned yet (an empty next month must not force a duty onto the 30th)
+      const needOf = (f, planned, tot) => (planned >= tot ? Math.ceil(min * f - 1e-9) : Math.floor(min * f * (tot ? planned / tot : 0) + 1e-9));
       if (p.period === 'rolling') {
-        const W = Math.max(1, num(p.window, 7));
+        const W = Math.min(ctx.n, Math.max(1, Math.round(num(p.window, 7))));
+        const kept = new Uint8Array(n);
         return {
           person(pi, out) {
             if (!inWho[pi]) return 0;
-            const base = pi * n;
+            const base = pi * n, lo = ctx.lo, hi = ctx.hi;
+            const s0 = Math.max(0, lo - W + 1), s1 = Math.min(hi, n - W);
+            if (s1 < s0) return 0;
+            const e1 = s1 + W - 1;
             let pen = 0;
-            const s0 = Math.max(0, ctx.lo - W + 1), s1 = Math.min(ctx.hi, n - W);
-            let prevBad = false;
+            // the days of one window (only built for messages)
+            const hitsIn = s => { const h = []; for (let d = s; d < s + W; d++) if (ok[d] && act[base + d] && m(base + d)) h.push(d); return h; };
+            // sliding counts over the window [s, s+W): ok days, ok days in post, ok days up to hi, hits
+            let tot = 0, a_ = 0, planned = 0, cnt = 0;
+            for (let d = s0; d <= e1; d++) {
+              const hit = ok[d] && act[base + d] && m(base + d) ? 1 : 0;
+              kept[d] = hit;
+              if (d < s0 + W) { if (ok[d]) { tot++; if (d <= hi) planned++; if (act[base + d]) { a_++; cnt += hit; } } }
+            }
+            // At most: the fewest duties that must go so no window is over (drop the latest duty of an over-full
+            // window first), counting only duties inside the dates checked. One extra duty costs one unit however
+            // many windows it sits in; one message per run of over-full windows.
+            let kc = cnt, vMax = null, vMin = null;
             for (let s = s0; s <= s1; s++) {
-              let cnt = 0, a_ = 0, tot = 0;
-              const hits = out ? [] : null;
-              for (let d = s; d < s + W; d++) {
-                if (!ok[d]) continue; tot++;
-                if (!act[base + d]) continue; a_++;
-                if (m(base + d)) { cnt++; if (hits) hits.push(d); }
+              if (s > s0) {
+                const dOut = s - 1, dIn = s + W - 1;
+                if (ok[dOut]) { tot--; if (dOut <= hi) planned--; if (act[base + dOut]) { a_--; cnt -= (ok[dOut] && m(base + dOut)) ? 1 : 0; kc -= kept[dOut]; } }
+                if (ok[dIn]) { tot++; if (dIn <= hi) planned++; if (act[base + dIn]) { a_++; const h = m(base + dIn) ? 1 : 0; cnt += h; kc += kept[dIn]; } }
               }
-              const before = ctx.n2;
-              const pp = check(pi, cnt, factorOf(pi, a_, tot), hits || [], `in ${W} days from ${X.day(s)}`, s, prevBad ? null : out);
-              // report one violation per run of overlapping bad windows (penalty still counts each window)
-              if (prevBad && pp) ctx.n2 = before;
-              prevBad = pp > 0;
-              pen += pp;
+              const f = factorOf(pi, a_, tot);
+              if (max != null) {
+                const capN = capOf(f);
+                let removed = 0;
+                for (let d = s + W - 1; kc > capN && d >= s; d--) {
+                  if (!kept[d]) continue;
+                  kept[d] = 0; kc--;
+                  if (d >= lo && d <= hi) removed++;
+                }
+                if (removed) {
+                  pen += u * removed;
+                  if (vMax) vMax.penalty += u * removed;
+                  else {
+                    ctx.n2++;
+                    if (out) {
+                      const hits = hitsIn(s), dates = hits.filter(X.inRange).map(X.iso);
+                      vMax = X.V(u * removed, `${X.name(pi)}: ${hits.length} ${codesTxt} in ${W} days from ${X.day(s)}, at most ${capN}`, { staffId: ctx.people[pi].id, date: dates[0] || X.iso(Math.max(s, lo)), dates });
+                      out.push(vMax);
+                    } else vMax = { penalty: 0 };
+                  }
+                } else vMax = null;
+              }
+              if (min != null) {
+                const need = needOf(f, planned, tot);
+                if (cnt < need) {
+                  // at least: each short window counts (a long empty stretch is worse than a short one)
+                  pen += u * (need - cnt);
+                  if (vMin) vMin.penalty += u * (need - cnt);
+                  else {
+                    ctx.n2++;
+                    if (out) {
+                      vMin = X.V(u * (need - cnt), `${X.name(pi)}: ${cnt} ${codesTxt} in ${W} days from ${X.day(s)}, needs ${need}`, { staffId: ctx.people[pi].id, date: X.iso(Math.min(Math.max(s, lo), hi)) });
+                      out.push(vMin);
+                    } else vMin = { penalty: 0 };
+                  }
+                } else vMin = null;
+              }
             }
             return pen;
           },
@@ -471,19 +541,38 @@ export const RULE_TYPES = {
       return {
         person(pi, out) {
           if (!inWho[pi]) return 0;
-          const base = pi * n;
+          const base = pi * n, lo = ctx.lo, hi = ctx.hi;
           let pen = 0;
           for (const per of periods) {
-            let cnt = 0, a_ = 0, tot = 0;
-            const hits = out ? [] : null;
+            let cnt = 0, inCnt = 0, a_ = 0, tot = 0, planned = 0;
             for (let d = per.a; d <= per.b; d++) {
               if (!ok[d]) continue; tot++;
+              if (d <= hi) planned++;
               if (!act[base + d]) continue; a_++;
-              if (m(base + d)) { cnt++; if (hits) hits.push(d); }
+              if (m(base + d)) { cnt++; if (d >= lo && d <= hi) inCnt++; }
             }
             if (!a_) continue;
-            const label = p.period === 'week' ? `in the week of ${fmtDay(addDays(ctx.days[0], per.key))}` : `in ${fmtMonth(per.key)}`;
-            pen += check(pi, cnt, factorOf(pi, a_, tot), hits || [], label, per.a, out);
+            const f = factorOf(pi, a_, tot);
+            const label = () => (p.period === 'week' ? `in the week of ${fmtDay(addDays(ctx.days[0], per.key))}` : `in ${fmtMonth(per.key)}`);
+            if (max != null) {
+              // only the duties inside the dates checked can be taken away (last month's excess is last month's problem)
+              const capN = capOf(f), over = Math.min(cnt - capN, inCnt);
+              if (over > 0) {
+                pen += u * over; ctx.n2++;
+                if (out) {
+                  const dates = []; for (let d = Math.max(per.a, lo); d <= Math.min(per.b, hi); d++) if (ok[d] && act[base + d] && m(base + d)) dates.push(X.iso(d));
+                  out.push(X.V(u * over, `${X.name(pi)}: ${cnt} ${codesTxt} ${label()}, at most ${capN}`, { staffId: ctx.people[pi].id, date: dates[0], dates }));
+                }
+              }
+            }
+            if (min != null) {
+              const need = needOf(f, planned, tot);
+              if (cnt < need) {
+                pen += u * (need - cnt); ctx.n2++;
+                // a month's minimum is about the whole month (no date); a week's is pinned to the week
+                if (out) out.push(X.V(u * (need - cnt), `${X.name(pi)}: ${cnt} ${codesTxt} ${label()}, needs ${need}`, p.period === 'week' ? { staffId: ctx.people[pi].id, date: X.iso(Math.min(Math.max(per.a, lo), hi)) } : { staffId: ctx.people[pi].id, month: per.key }));
+              }
+            }
           }
           return pen;
         },
@@ -524,6 +613,14 @@ export const RULE_TYPES = {
       const a = num(p.from, 1), b = num(p.to, a), forbid = p.mode !== 'require';
       const { ctx, u } = X, n = ctx.n, ok = X.when, act = ctx.act, inWho = X.W.inWho;
       const d0 = Math.max(0, ctx.lo - Math.max(b, 0)), d1 = Math.min(n - 1, ctx.hi - Math.min(a, 0));
+      const samePair = i => {
+        const els = ctx.post[i] ? [...ctx.codes[i], ...ctx.req[i], 'x'] : [...ctx.codes[i], ...ctx.req[i]];
+        for (let x = 0; x < els.length; x++) {
+          if (!mi.elem(els[x])) continue;
+          for (let y = 0; y < els.length; y++) if (y !== x && mt.elem(els[y])) return true;
+        }
+        return false;
+      };
       return {
         person(pi, out) {
           if (!inWho[pi]) return 0;
@@ -532,12 +629,12 @@ export const RULE_TYPES = {
           for (let d = d0; d <= d1; d++) {
             if (!ok[d] || !act[base + d] || !mi(base + d)) continue;
             for (let k = a; k <= b; k++) {
-              if (k === 0 && forbid) continue;
               const e = d + k;
               if (e < 0 || e >= n || !act[base + e]) continue;
               const dIn = d >= ctx.lo && d <= ctx.hi, eIn = e >= ctx.lo && e <= ctx.hi;
               if (!dIn && !eIn) continue;
-              const hit = mt(base + e);
+              // the same day (offset 0, must not): two different codes, one from each list (a code never clashes with itself)
+              const hit = k === 0 && forbid ? samePair(base + e) : mt(base + e);
               if (forbid ? hit : !hit) {
                 pen += u; ctx.n2++;
                 if (out) {
@@ -592,6 +689,14 @@ export const RULE_TYPES = {
         }
         return null;
       };
+      // a pair where one side is post call (x)
+      const pairX = i => {
+        const els = [...ctx.codes[i], ...ctx.req[i]];
+        const pres = (ctx.flags[i] & F.PRESENT) !== 0;
+        if (mA.elem('x')) { if (mB.present && pres) return ['x', 'at work']; const c = els.find(mB.elem); if (c) return ['x', c]; }
+        if (mB.elem('x')) { if (mA.present && pres) return ['at work', 'x']; const c = els.find(mA.elem); if (c) return [c, 'x']; }
+        return null;
+      };
       return {
         info: { mA, mB, forbid, ok, inWho },
         person(pi, out) {
@@ -612,6 +717,16 @@ export const RULE_TYPES = {
               if (out) out.push(X.V(u, `${X.day(d)}: ${X.name(pi)} has ${X.T.codes(p.codesA)} without ${X.T.codes(p.codesB)}`, { staffId: ctx.people[pi].id, date: X.iso(d) }));
             }
           }
+          // The day after the last day checked: post call there comes from a duty inside the range (a call on the
+          // 30th before a clinic already planned on the 1st), so it is this range's problem too.
+          const e = ctx.hi + 1, ie = base + e;
+          if (forbid && e < n && ok[e] && act[ie] && ctx.post[ie]) {
+            const pr = pairX(ie);
+            if (pr) {
+              pen += u; ctx.n2++;
+              if (out) out.push(X.V(u, `${X.day(e)}: ${X.name(pi)} has ${X.T.code(pr[0])} and ${X.T.code(pr[1])}`, { staffId: ctx.people[pi].id, date: X.iso(ctx.hi), dates: [X.iso(ctx.hi)] }));
+            }
+          }
           return pen;
         },
       };
@@ -624,7 +739,7 @@ export const RULE_TYPES = {
     help: 'Who can\'t be on together (two Baby MOs), or who needs someone else on with them.',
     example: 'Baby MO on Call: at least 1 of senior residents or ACs on Call too',
     params: [
-      P.codes('codes', 'When someone in "Who" has'),
+      P.codes('codes', 'If someone in Who has'),
       P.sel('mode', 'Then', [['needs', 'they need someone else'], ['never', 'nobody else may be']]),
       { key: 'other', label: 'Other people', kind: 'who' },
       P.codes('otherCodes', 'On'),
@@ -634,10 +749,16 @@ export const RULE_TYPES = {
     describe(r, T) {
       const p = r.params;
       const same = JSON.stringify({ ...blankWho(), ...(p.other || {}) }) === JSON.stringify({ ...blankWho(), ...(r.who || {}) });
-      const other = same ? `another ${T.who(p.other)}` : T.who(p.other);
-      const s = p.mode === 'never'
-        ? `${cap(T.who(r.who))} on ${T.codes(p.codes)}: never with ${other} on ${T.codes(p.otherCodes)}`
-        : `${cap(T.who(r.who))} on ${T.codes(p.codes)}: at least ${num(p.min, 1)} of ${other} on ${T.codes(p.otherCodes)} too`;
+      const min = Math.max(1, num(p.min, 1));
+      const lead = `${cap(T.who(r.who))} on ${T.codes(p.codes)}`;
+      let s;
+      if (p.mode === 'never') s = `${lead}: never with ${same ? `another ${T.noun(p.other, 1)}` : T.who(p.other)} on ${T.codes(p.otherCodes)}`;
+      else {
+        const others = same
+          ? (min === 1 ? `another ${T.noun(p.other, 1)}` : `${min} other ${T.noun(p.other, min)}`)
+          : (min === 1 ? `someone from ${T.who(p.other)}` : `${min} from ${T.who(p.other)}`);
+        s = `${lead}: needs ${others} on ${T.codes(p.otherCodes)} too`;
+      }
       return withWhen(s, r, T);
     },
     validate(r) { return r.params.mode === 'needs' && !(num(r.params.min, 1) >= 1) ? ['How many others must be 1 or more'] : []; },
@@ -646,7 +767,7 @@ export const RULE_TYPES = {
       if (m.empty || mo.empty) return null;
       const O = X.who(p.other);
       const min = num(p.min, 1), never = p.mode === 'never';
-      const { ctx, u } = X, n = ctx.n, ok = X.when, act = ctx.act, list = X.W.list, inS = X.W.inWho;
+      const { ctx, u } = X, n = ctx.n, ok = X.when, act = ctx.act, list = X.W.list;
       const S = [], Os = [];
       return {
         day(d, out) {
@@ -660,7 +781,10 @@ export const RULE_TYPES = {
           for (const s of S) {
             if (never) {
               // count each unordered pair once
-              const bad = Os.filter(o => o !== s && !(inS[o] && O.inWho[s] && S.includes(o) && o < s));
+              // count each unordered pair once: skip o when the pair is already counted from o's side
+              // (o is in S with the first codes and s is one of the others with the other codes)
+              const sIsOther = Os.includes(s);
+              const bad = Os.filter(o => o !== s && !(sIsOther && o < s && S.includes(o)));
               if (!bad.length) continue;
               pen += u * bad.length; ctx.n2++;
               if (out) out.push(X.V(u * bad.length, `${X.day(d)}: ${X.name(s)} (${X.T.codes(p.codes)}) with ${bad.map(X.name).join(', ')} (${X.T.codes(p.otherCodes)})`, { date: X.iso(d), staffId: ctx.people[s].id, staffIds: [s, ...bad].map(i => ctx.people[i].id) }));
@@ -753,7 +877,10 @@ export const RULE_TYPES = {
           if (!inWho[pi]) return 0;
           const base = pi * n;
           let pen = 0, lastSat = -99;
-          for (let d = ctx.lo; d <= ctx.hi; d++) {
+          // a weekend request can sit up to 6 days before its weekend (Mon..Sun), and a weekend can straddle the
+          // range (Sat 31 Oct, Sun 1 Nov): scan those request days too, keep weekends with a day in the range
+          const dA = weekend ? Math.max(0, ctx.lo - 6) : ctx.lo, dB = weekend ? Math.min(n - 1, ctx.hi + 1) : ctx.hi;
+          for (let d = dA; d <= dB; d++) {
             const i = base + d;
             if (!ok[d] || !act[i] || !has(i)) continue;
             if (!weekend) {
@@ -765,18 +892,21 @@ export const RULE_TYPES = {
             }
             const wd = ctx.wd[d];
             const sat = wd === 6 ? d : wd === 0 ? d - 1 : d + (6 - wd);
+            if (sat + 1 < ctx.lo || sat > ctx.hi) continue;   // that weekend has no day in the range
             if (sat === lastSat) continue;
             lastSat = sat;
-            let hits = 0;
+            let hits = 0, inHits = 0;
             const wk = [];
-            for (const e of [sat, sat + 1]) if (e >= 0 && e < n && act[base + e]) { wk.push(e); if (m(base + e)) hits++; }
-            if (!wk.length) continue;
+            for (const e of [sat, sat + 1]) if (e >= 0 && e < n && act[base + e]) { wk.push(e); if (m(base + e)) { hits++; if (X.inRange(e)) inHits++; } }
+            const wkIn = wk.filter(X.inRange);
+            if (!wkIn.length) continue;
             if (want && hits === 0) {
               pen += u; ctx.n2++;
-              if (out) out.push(X.V(u, `Weekend of ${X.day(Math.max(sat, 0))}: ${X.name(pi)} asked for ${X.T.codes(p.codes)} (${code})`, { staffId: ctx.people[pi].id, date: X.iso(d), dates: wk.filter(X.inRange).map(X.iso) }));
-            } else if (!want && hits > 0) {
-              pen += u * hits; ctx.n2++;
-              if (out) out.push(X.V(u * hits, `Weekend of ${X.day(Math.max(sat, 0))}: ${X.name(pi)} has ${X.T.codes(p.codes)} despite ${reqTxt}`, { staffId: ctx.people[pi].id, date: X.iso(d), dates: wk.filter(e => X.inRange(e) && m(base + e)).map(X.iso) }));
+              if (out) out.push(X.V(u, `Weekend of ${X.day(Math.max(sat, 0))}: ${X.name(pi)} asked for ${X.T.codes(p.codes)} (${code})`, { staffId: ctx.people[pi].id, date: X.iso(wkIn[0]), dates: wkIn.map(X.iso) }));
+            } else if (!want && inHits > 0) {
+              // only the duties inside the range count (the other day of the weekend is the other month's problem)
+              pen += u * inHits; ctx.n2++;
+              if (out) { const dates = wkIn.filter(e => m(base + e)).map(X.iso); out.push(X.V(u * inHits, `Weekend of ${X.day(Math.max(sat, 0))}: ${X.name(pi)} has ${X.T.codes(p.codes)} despite ${reqTxt}`, { staffId: ctx.people[pi].id, date: dates[0], dates })); }
             }
           }
           return pen;
@@ -811,7 +941,8 @@ export const RULE_TYPES = {
       const K = periods.length;
       const val = new Float64Array(ctx.P * K).fill(NaN);   // weighted count per FTE, NaN = not in this period
       const raw = new Float64Array(ctx.P * K);
-      const wOf = d => (ctx.hol[d] ? hw : (ctx.wd[d] === 0 || ctx.wd[d] === 6) ? ww : 1);
+      // a public holiday on a weekend counts as the larger of the two weights
+      const wOf = d => { const wk = ctx.wd[d] === 0 || ctx.wd[d] === 6; return ctx.hol[d] ? (wk ? Math.max(hw, ww) : hw) : wk ? ww : 1; };
       const touch = pi => {
         if (!inWho[pi]) return;
         const base = pi * n, fte = Number(ctx.people[pi].fte) > 0 ? Number(ctx.people[pi].fte) : 1;
@@ -847,7 +978,9 @@ export const RULE_TYPES = {
               pen += pp; ctx.n2++;
               if (out) {
                 const lab = p.period === 'range' ? 'in these dates' : `in ${fmtMonth(periods[k].key)}`;
-                out.push(X.V(pp, `${X.name(pi)}: ${X.T.codes(p.codes)} share ${round1(v)} ${lab} (weighted), group average ${round1(mean)}`, { staffId: ctx.people[pi].id, date: X.iso(Math.max(periods[k].a, ctx.lo)) }));
+                // about the whole period, so no date: the grid marks the name, Check's Show opens their month
+                const wtxt = ww !== 1 || hw !== 1 ? ' (weekends and holidays count extra)' : '';
+                out.push(X.V(pp, `${X.name(pi)}: ${X.T.codes(p.codes)} ${round1(v)} ${lab}${wtxt}; group average ${round1(mean)}`, { staffId: ctx.people[pi].id, month: periods[k].key }));
               }
             }
           }
@@ -952,7 +1085,7 @@ export function validateRule(rule, state) {
     const v = r.params[spec.key];
     if (spec.kind === 'codes') {
       const list = Array.isArray(v) ? v : [];
-      if (!list.length && !spec.optional) out.push(t.params.filter(s => s.kind === 'codes').length > 1 ? `No codes chosen for "${spec.label}"` : 'No codes chosen');
+      if (!list.length && !spec.optional) out.push(t.params.filter(s => s.kind === 'codes').length > 1 ? `No codes chosen for ${spec.label}` : 'No codes chosen');
       for (const c of list) if (!known(c)) out.push(`Unknown code "${c}"`);
     } else if (spec.kind === 'code') {
       if (v && !known(v)) out.push(`Unknown code "${v}"`);
@@ -963,6 +1096,8 @@ export function validateRule(rule, state) {
       if (spec.max != null && x > spec.max) out.push(`"${spec.label}" must be at most ${spec.max}`);
     } else if (spec.kind === 'select') {
       if (spec.options && !spec.options.some(([val]) => val === v)) out.push(`Choose "${spec.label}"`);
+    } else if (spec.kind === 'who') {
+      whoProblems({ ...blankWho(), ...(v || {}) }, state, out);
     }
   }
   if (!unset(r.params.min) && !unset(r.params.max) && Number(r.params.min) > Number(r.params.max)) out.push('At least is more than at most');
@@ -971,11 +1106,15 @@ export function validateRule(rule, state) {
     const w = Number(r.weight);
     if (!(w >= 1 && w <= 100)) out.push('Weight must be 1 to 100');
   }
-  const gids = new Set((state.groups || []).map(g => g.id)), tids = new Set((state.tags || []).map(g => g.id));
-  for (const g of r.who.groups) if (!gids.has(g)) out.push(`Unknown group "${g}"`);
-  for (const g of r.who.tags) if (!tids.has(g)) out.push(`Unknown tag "${g}"`);
+  whoProblems(r.who, state, out);
   if (t.validate) out.push(...t.validate(r, state));
   return [...new Set(out)];
+}
+
+function whoProblems(who, state, out) {
+  const gids = new Set((state.groups || []).map(g => g.id)), tids = new Set((state.tags || []).map(g => g.id));
+  for (const g of who.groups || []) if (!gids.has(g)) out.push(`Unknown group "${g}"`);
+  for (const g of who.tags || []) if (!tids.has(g)) out.push(`Unknown tag "${g}"`);
 }
 
 function rangeOf(opts) {
@@ -1017,26 +1156,41 @@ function indexViolations(violations) {
   return { byCell, byDay, byRule };
 }
 
+// failed: ids of enabled rules that couldn't be checked (broken data); the screens say so instead of "No problems".
 export function evaluate(state, opts = {}) {
   const range = rangeOf(opts);
-  const ctx = buildContext(state, range);
   const rules = (opts.rules || state.rules || []).filter(r => r && r.enabled !== false);
-  const compiled = compileRules(ctx, rules);
+  const ctx = buildContext(state, { ...range, rules });
+  const failed = [];
   const violations = [];
   let score = 0;
-  for (const cr of compiled) score += runRule(ctx, cr, violations).pen;
+  for (const r of rules) {
+    const cr = compileRule(ctx, r);
+    if (!cr) { if (!RULE_TYPES[r.type] || validateRuleSafe(r, state)) failed.push(r.id); continue; }
+    const mark = violations.length;
+    try { score += runRule(ctx, cr, violations).pen; } catch (e) { violations.length = mark; failed.push(r.id); }
+  }
   let hard = 0, soft = 0;
   for (const v of violations) if (v.hard) hard++; else soft++;
-  return { violations, hard, soft, score: Math.round(score * 10) / 10, from: range.from, to: range.to, ...indexViolations(violations) };
+  return { violations, hard, soft, score: Math.round(score * 10) / 10, from: range.from, to: range.to, failed, ...indexViolations(violations) };
+}
+
+// A rule that compiles to nothing is fine when it is just unfinished (no codes chosen yet); it is broken when it has
+// codes and still can't be checked.
+function validateRuleSafe(rule, state) {
+  try {
+    const t = RULE_TYPES[rule.type], r = normalizeRule(rule);
+    return t.params.some(spec => spec.kind === 'codes' && r.params[spec.key].length) && !validateRule(rule, state).length;
+  } catch (e) { return true; }
 }
 
 // One rule, even when disabled (the builder's live "check now").
 export function evaluateRule(state, rule, opts = {}) {
   const range = rangeOf(opts);
-  const ctx = buildContext(state, range);
+  const ctx = buildContext(state, { ...range, rules: [rule] });
   const cr = compileRule(ctx, rule);
   if (!cr) return [];
   const out = [];
-  runRule(ctx, cr, out);
+  try { runRule(ctx, cr, out); } catch (e) { return []; }
   return out;
 }

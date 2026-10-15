@@ -4,17 +4,19 @@
 //   1. Clear the solver's own earlier codes in the range (codes listed in a cell's `auto`), keep everything else:
 //      locked cells, manual codes, leave, requests. Only duties with `auto: true` are ever placed, at most one per
 //      person per day, and never in a cell that already holds a manual auto-kind duty.
-//   2. Demand comes from the enabled `cover` rules on auto codes (their minimum).
+//   2. Demand comes from the enabled `cover` rules on auto codes (their minimum). `standing` rules and `limit` rules
+//      with a minimum on an auto code add their people to the candidates, and the search may add that duty for them.
 //   3. Greedy construction: hardest slots first (fewest candidates for the need), each filled by the candidate whose
 //      placement lowers the total penalty most.
 //   4. Local search with simulated annealing: move a duty to someone else, swap two people's days, swap two duties
 //      on one day, move one person's duty to another day, add or drop one. Scoring is incremental: a change re-checks
 //      only the touched person (person rules), the touched days (day rules) and the fairness sums (global rules).
+//   5. Back to the best roster found, then drop any duty that no rule needs (no stray shifts).
 //   Deterministic for a seed: own PRNG, and the search length is an iteration budget (the time limit only cuts it
-//   short on a slow device).
+//   short on a slow device). Extra exports for the UI: applyAssignments, withAssignments, diffAssignments.
 
 import { getCell, setCell } from './model.js';
-import { buildContext, compileRules, refresh, evaluate } from './rules.js';
+import { buildContext, compileRules, compileWho, refresh, evaluate } from './rules.js';
 
 const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 
@@ -39,7 +41,7 @@ export function solve(state, opts = {}) {
   const beforeEv = evaluate(state, { from, to, rules });
 
   // ----- grid: fixed codes per cell, the auto code (index into autoCodes, 0 = none) -----
-  const ctx = buildContext(state, { from, to });
+  const ctx = buildContext(state, { from, to, rules });
   const { n, P, lo, hi, act } = ctx;
   const dm = ctx.dm;
   const autoCodes = (state.duties || []).filter(d => d.auto && d.kind === 'shift').map(d => d.code);
@@ -55,8 +57,8 @@ export function solve(state, opts = {}) {
       const cell = getCell(state, ctx.days[d], id);
       const locked = !!(cell && cell.lock);
       if (cell && !locked) {
-        const au = cell.auto || [];
-        fixed[i] = au.length ? cell.a.filter(c => !au.includes(c)) : cell.a;
+        const au = cell.auto || [], a = Array.isArray(cell.a) ? cell.a : [];
+        fixed[i] = au.length ? a.filter(c => !au.includes(c)) : a;
         ctx.codes[i] = fixed[i];
       }
       free[i] = !locked && act[i] && !fixed[i].some(c => autoSet.has(c)) ? 1 : 0;
@@ -77,6 +79,10 @@ export function solve(state, opts = {}) {
   perR.forEach((cr, c) => { for (let p = 0; p < P; p++) { ctx.n2 = 0; const v = cr.person(p, null); perPen[c][p] = v; perCnt[c][p] = ctx.n2; addTotals(cr.hard, v, ctx.n2); } });
   gloR.forEach((cr, c) => { if (cr.init) cr.init(); ctx.n2 = 0; const v = cr.global(null); gloPen[c] = v; gloCnt[c] = ctx.n2; addTotals(cr.hard, v, ctx.n2); });
   const total = () => hardPen + softPen;
+  // Hard problems always come first: a move's cost is its hard change scaled far above any soft change, so no
+  // amount of soft penalty (a soft rule can add up past one hard unit) ever buys a hard problem. The two parts are
+  // kept apart and only combined as a difference, so the scaling never swamps the soft detail.
+  const HARD_SCALE = 1e6;
 
   // ----- incremental changes -----
   const assigned = [];                       // cell indices holding an auto code
@@ -95,7 +101,7 @@ export function solve(state, opts = {}) {
   let moveLog = [], undoLog = [], dDays = [], dPeople = [];
   function apply(changes) {
     moveLog = []; undoLog = []; dDays = []; dPeople = [];
-    const before = total();
+    const h0 = hardPen, s0 = softPen;
     for (const [i, k] of changes) {
       moveLog.push(i, setGrid(i, k));
       const p = (i / n) | 0, d = i % n;
@@ -133,7 +139,7 @@ export function solve(state, opts = {}) {
       undoLog.push(2, c, 0, oldV, oldC);
       gloPen[c] = v; gloCnt[c] = ctx.n2; addTotals(cr.hard, v - oldV, ctx.n2 - oldC);
     }
-    return total() - before;
+    return (hardPen - h0) * HARD_SCALE + (softPen - s0);
   }
   function revert() {
     for (let x = moveLog.length - 2; x >= 0; x -= 2) setGrid(moveLog[x], moveLog[x + 1]);
@@ -169,6 +175,15 @@ export function solve(state, opts = {}) {
       const { m, code: rc, ok, inWho } = cr.info;
       if (ok[d] && inWho[p] && m.elem(code) && els.includes(rc)) { b = true; break; }
     }
+    // an overnight duty makes the next day post call: blocked when that day's fixed codes can't go with post call
+    if (!b && d + 1 < n && dm.get(code) && dm.get(code).overnight) {
+      const next = [...fixed[i + 1], ...ctx.req[i + 1]];
+      if (next.length) for (const cr of hardSame) {
+        const { mA, mB, ok, inWho } = cr.info;
+        if (!ok[d + 1] || !inWho[p] || !act[i + 1]) continue;
+        if ((mA.elem('x') && next.some(mB.elem)) || (mB.elem('x') && next.some(mA.elem))) { b = true; break; }
+      }
+    }
     blockCache[key] = b ? 1 : 0;
     return b;
   }
@@ -180,6 +195,19 @@ export function solve(state, opts = {}) {
   const inPool = Array.from({ length: K + 1 }, () => new Uint8Array(P));
   const pool = Array.from({ length: K + 1 }, () => []);
   for (const { cr, k } of covers) for (const p of cr.info.list) if (!inPool[k][p]) { inPool[k][p] = 1; pool[k].push(p); }
+  // Other rules that want an auto duty placed (standing duty, a limit with a minimum) add their people to the pool,
+  // and the search may add that duty anywhere for them; the score decides whether it stays.
+  const wants = [];
+  for (const cr of compiled) {
+    const t = cr.rule.type, pr = cr.rule.params || {};
+    if (!(t === 'standing' || (t === 'limit' && pr.min != null && pr.min !== ''))) continue;
+    const c = (pr.codes || []).find(x => autoSet.has(x));
+    if (!c) continue;
+    const k = autoCodes.indexOf(c) + 1;
+    const W = compileWho(ctx, cr.rule.who).list;
+    for (const p of W) if (!inPool[k][p]) { inPool[k][p] = 1; pool[k].push(p); }
+    if (W.length) wants.push({ k, list: W });
+  }
   const coverCount = (cr, d) => { let c = 0; const { list, m } = cr.info; for (const p of list) { const i = p * n + d; if (act[i] && m(i)) c++; } return c; };
   const canTake = (p, d, k) => { const i = p * n + d; return free[i] && !grid[i] && !blocked(p, d, k); };
 
@@ -215,14 +243,21 @@ export function solve(state, opts = {}) {
   const iterMax = Math.max(0, opts.iterations ?? Math.min(300000, Math.max(30000, slots.length * 1500)));
   const T0 = opts.t0 ?? 25, T1 = opts.t1 ?? 0.2;
   const best = grid.slice();
-  let bestTotal = total(), bestHard = hardCnt, bestSoft = softCnt;
+  let bestHardPen = hardPen, bestSoftPen = softPen, bestHard = hardCnt, bestSoft = softCnt;
+  // better = fewer hard penalty points, then fewer soft
+  const better = () => hardPen < bestHardPen - 1e-9 || (Math.abs(hardPen - bestHardPen) <= 1e-9 && softPen < bestSoftPen - 1e-9);
   let it = 0, lastProg = now();
   const pick = a => a[(rng() * a.length) | 0];
   function propose() {
+    if (wants.length && rng() < 0.05) {
+      // add a duty another rule wants (standing duty, limit minimum)
+      const { k, list } = pick(wants), q = pick(list), d = lo + ((rng() * rangeDays) | 0);
+      return canTake(q, d, k) ? [[q * n + d, k]] : null;
+    }
     const r = rng();
     if (!assigned.length || r < 0.08) {
       // add one where a cover is short
-      if (!covers.length) return null;
+      if (!covers.length) return null;   // (with no cover rules, only the wants above add duties)
       const { cr, k } = pick(covers);
       const d = lo + ((rng() * rangeDays) | 0);
       if (!cr.info.ok[d]) return null;
@@ -279,10 +314,17 @@ export function solve(state, opts = {}) {
     if (!changes) continue;
     const delta = apply(changes);
     if (delta <= 1e-9 || rng() < Math.exp(-delta / T)) {
-      if (total() < bestTotal - 1e-9) { bestTotal = total(); bestHard = hardCnt; bestSoft = softCnt; best.set(grid); }
+      if (better()) { bestHardPen = hardPen; bestSoftPen = softPen; bestHard = hardCnt; bestSoft = softCnt; best.set(grid); }
     } else revert();
   }
-  for (let i = 0; i < grid.length; i++) if (grid[i] !== best[i]) setGrid(i, best[i]);
+  // back to the best roster found (through apply, so the score caches stay right)
+  const back = [];
+  for (let i = 0; i < grid.length; i++) if (grid[i] !== best[i]) back.push([i, best[i]]);
+  if (back.length) apply(back);
+  // clean up: drop any duty no rule needs (removing it doesn't make the score worse), so no stray shifts are left
+  for (const i of assigned.slice().sort((a, b) => a - b)) {
+    if (apply([[i, 0]]) > 1e-9) revert();
+  }
 
   // ----- result -----
   const assignments = {};
@@ -322,8 +364,8 @@ export function applyAssignments(draft, assignments) {
     for (const id of Object.keys(row)) {
       const cell = getCell(draft, date, id);
       if (cell && cell.lock) continue;
-      const oldAuto = cell ? cell.auto : [];
-      const keep = cell ? cell.a.filter(c => !oldAuto.includes(c)) : [];
+      const oldAuto = (cell && cell.auto) || [];
+      const keep = cell ? (cell.a || []).filter(c => !oldAuto.includes(c)) : [];
       const add = row[id].filter(c => !keep.includes(c));
       if (oldAuto.length === add.length && add.every(c => oldAuto.includes(c))) continue;
       changed++;
@@ -349,7 +391,7 @@ export function diffAssignments(state, assignments) {
     for (const [id, codes] of Object.entries(assignments[date])) {
       const cell = getCell(state, date, id);
       if (cell && cell.lock) continue;
-      const old = cell ? cell.auto : [];
+      const old = (cell && cell.auto) || [];
       const a = codes.filter(c => !old.includes(c)).length, r = old.filter(c => !codes.includes(c)).length;
       added += a; removed += r;
       if (a || r) cells++;

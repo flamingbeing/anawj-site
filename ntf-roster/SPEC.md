@@ -42,8 +42,9 @@ Public repo: never commit real names, rosters or leave. Demo and tests use made-
 | `sw.js`, `manifest.webmanifest`, `icons/*`, `js/version.js` | installable/offline app, app version helper | E |
 | `test/e2e.mjs`, `NOTES.md`, `README.md`, `STATUS.md` | browser test, docs | integration |
 
-Each agent edits only its own files. If you need something from another module that isn't in this spec, write a
-small local fallback and leave a `// INTEGRATE:` comment rather than editing someone else's file.
+The first version was built by five builders (A to E) in parallel against this spec, then integrated (15 Oct 2026).
+The owners column now just says which part a file came from; anyone may change any file, and this spec is kept in
+step with the code ("As built" at the end lists what the code adds to it).
 
 ## State (`ntf-roster-v1`)
 
@@ -305,3 +306,50 @@ updatedBy }, `months/{YYYY-MM}` { cells (that month's days), status, updatedAt, 
 immutable; admins manage members and can't demote themselves. Emulator test with fake accounts and project
 `demo-ntf-roster`. `ui-team.js` exports `mountTeam(el, app)`: sign in/out, status, Save to team / Load from team with
 conflict check (`updatedAt` seen at load), members list for admins. Demo mode never signs in.
+
+## As built (integration, 15 Oct 2026)
+
+What the code adds to the contract above. Keep this list in step with the code.
+
+- **App** (`app.js`): also `app.icon(name)` (line icons as SVG strings), `app.esc`, `app.model` (model.js),
+  `app.rules` (rules.js), `app.isDemo`, `app.tab`; `window.ntfApp` points at it (for the browser test and console).
+  `sheet()` also takes `className` and `onClose(reason)`; an action's `fn(close)` returning `false` keeps the sheet
+  open. `confirm(msg, { ok, danger })`. `toast(..., { ms: 0 })` stays until dismissed. The shell registers `sw.js`
+  through `version.js`'s `registerSW()` and offers "Update available: Reload" as a toast.
+- **Views**: mounted with `mount(host, app)` inside `.view-<tab> > .view-host`; `update(state, info)` gets
+  `info.label`/`info.source` after a store change, `info.month` after a month switch, `info.resize` when the phone
+  layout flips; an optional `route(params)` takes new hash params without remounting. With no staff, Roster, Day and
+  Check show a welcome card instead.
+- **Hash params**: `#roster?m=&p=<staffId>` (person view), `#day?d=`, `#people?s=staff|groups|tags|codes`,
+  `#rules?edit=<ruleId>|new`, `#check?rule=<ruleId>&v=fairness|coverage`.
+- **Store**: `createStore({ demo, fallback })` (fallback builds the first state); also `store.key`,
+  `store.onSaveError` (the shell shows a bar with "Download backup") and `store.reset(fresh, label)`. A fresh or
+  practice state is written to localStorage on its first change.
+- **Rules**: violations may also carry `dates[]` (a run of days). `evaluate` skips disabled or broken rules;
+  `evaluateRule` checks a rule even when it is off. Lower-level exports (`buildContext`, `compileRules`, `refresh`,
+  `runRule`, …) are for the solver. `spread` is always soft. The default rules are stored in `model.js` and
+  re-exported by `rules.js` (no circular import); there are 21 (item 8 is two rules, item 9 six).
+- **Solver**: `unfilled[]` entries also carry `ruleId`; `before`/`after` also carry `score`. Extra exports
+  `applyAssignments(draft, assignments)`, `withAssignments(state, assignments)`, `diffAssignments(state, assignments)`
+  (the roster's Auto-fill dialog uses its own `applyAssignments(draft, result, days)` in `ui-roster.js`). After the
+  search it drops any duty no rule needs.
+- **Rule builder**: `limit.window` shows only for `period: 'rolling'`, `together.min` only for `mode: 'needs'`
+  (`SHOW_IF` in `ui-rules.js`).
+- **io.js**: `exportDeptWorkbook()` is async (a Promise of a Blob). Parsed workbooks also carry `meetings[]`, people
+  a `key`, cells `u` (unknown codes). Extra helpers: `buildDeptWorkbook`, `parseCellText`, `parseNameCell`,
+  `normName`, `fileStamp`, …
+- **Team sync**: `team/main/versions/*` also keeps an immutable copy of each team save; the last team version each
+  browser has seen is in localStorage `ntf-roster-team-seen` (not part of the state). `cloud.js` accepts an
+  `emulator: { firestore, auth }` config field only for `demo-` projects (tests).
+- **Offline app**: `sw.js` (`VERSION = 'ntf-roster-v1'`, stamped at deploy) caches the shell; ExcelJS and the
+  Firebase SDK are cached on first use. `version.js`: `registerSW({ onUpdate })`, `renderVersion(el)`, `getLatest()`,
+  `appVersion()`, `versionLabel()`; More ends with the two version lines.
+- **Tests**: `test/e2e.mjs` (browser, desktop and phone, axe) is in the Checks workflow with the unit tests.
+- **Review fixes (15 Oct 2026)**: `sheet()` also takes `beforeClose(reason)` (may return a Promise of false to keep the
+  sheet open when closed by Back, Esc, the X or the backdrop) and adds a history entry so Back closes it.
+  `evaluate()` also returns `failed[]` (ids of enabled rules it couldn't check); the shell's evaluation carries
+  `error: true` when the whole check threw. `buildContext(state, { from, to, rules })` widens by `ruleReach(rules)`.
+  `rules.js` also exports `normalizeWho`, `normalizeWhen`; `model.js` exports `cleanRule`, `cleanDuty`, `DUTY_KINDS`
+  (used by `migrate`, rules import and `parseRulesJSON`). Whole-month violations (spread, a monthly minimum) carry
+  `month` and no `date`. Store: `store.damaged` (`{ raw, key }` when the saved copy couldn't be read; saving waits),
+  `store.clearDamaged()`, a revision counter in `<key>-rev`, and `info.source === 'external'` when another tab saved.

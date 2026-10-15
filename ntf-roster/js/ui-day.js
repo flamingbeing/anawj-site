@@ -2,7 +2,7 @@
 // cover rules' counts), who is away, requests, notes and the day's problems with a Show button to jump to the grid.
 // Swipe left/right (or the arrows, or the date strip) to change day.
 import * as M from './model.js';
-import { coverOn, makeHasCodes } from './ui-roster.js';
+import { coverOn, makeHasCodes, chipVars } from './ui-roster.js';
 
 const WD = ['Su', 'M', 'Tu', 'W', 'Th', 'F', 'Sa'];
 const LONG_WD = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -38,7 +38,7 @@ export function mount(el, app) {
   }, { passive: true });
 
   function pickDay(d) {
-    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d) && M.iso(M.parseISO(d)) === d) return d;   // a real date only (not 2026-13-45)
     const sc = app.selectedCell;
     if (sc && sc.date && sc.date.startsWith(app.month)) return sc.date;
     const today = M.iso(new Date());
@@ -68,7 +68,7 @@ export function mount(el, app) {
     const hol = M.isHoliday(state, day) ? (M.holidayName(state, day) || 'Public holiday') : '';
     const overnight = new Set((state.duties || []).filter(d => d.overnight).map(d => d.code));
     const dayViol = ev.byDay?.get(day) || [];
-    const styleVars = (du) => ({ '--c': du?.color || '#ddd', '--i': du?.ink || '#222' });
+    const styleVars = (du) => chipVars(du);
     const nm = (p) => p.short || p.name;
 
     // title
