@@ -59,11 +59,20 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Stubs in place (replaced by their PR, DESIGN.md "PR order")
 
-- `js/model/vitals.js` (M0.1): steady awake vitals with seeded noise, beats and breaths. Replaced by `rhythm.js` and
-  `cardio.js` (M2.1), `gas.js` and `resp.js` (M2.4), `temp.js` (M2.6). `synth.js` and `monitor.js` read `state.vit`
-  for now; they move to the real slices with those PRs.
+- `js/model/vitals.js` (M0.1): steady awake SpO2, breathing, EtCO2 and temperature with seeded noise, and breaths.
+  Heart rate and blood pressure moved to `rhythm.js` and `cardio.js` (M2.1); the rest moves to `gas.js` and `resp.js`
+  (M2.4) and `temp.js` (M2.6). `synth.js` and `monitor.js` read `state.vit` for those until then.
+- The Patient tab's stimuli and "Talk" (M1.4): replaced by the airway (M3.1) and the case flow with Examine (M3.2).
+- Pleural pressure reads `resp.pplMmHg` (0 until M2.4); MAC fraction reads `vol.mac` (0 until M2.5).
 
 ## Decisions log
+
+- 15 Oct 2026 (M2.1): `cardio.js` as in MODEL.md section 5 (as-built notes there): the prototype's structure and
+  numbers reproduce (steady state exact, propofol 2 mg/kg SBP −17.9 at 2 min, steady Ce 1 −10.5%). `pd.auto` became a
+  graded response, because a probability could not give the laryngoscopy rise; brief stimuli now last 60 s. Beat
+  events now come from `cardio.js` (with stroke volume and pressures); `rhythm.js` keeps exact beat times with 1.5%
+  beat-to-beat variation. `createSim` takes `dt` for tests. Cost about 13 µs a step with two pumps running (2.6 ms of
+  CPU a second at 20x).
 
 - 15 Oct 2026 (M1.4): `pd.js` holds hypnosis (asleep when P(no response to voice) > the patient's q), the stimulus
   surface (movement at stimulus onset when P(no response) < q and the thumb twitch is over 10%), the BIS-like index

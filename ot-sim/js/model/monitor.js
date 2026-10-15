@@ -22,8 +22,8 @@ export const monitor = {
   init(state) {
     const v = state.vit;
     return {
-      hr: v.hr, spo2: v.spo2, etco2: v.etco2, rr: v.rr, temp: v.temp,
-      rrs: [], cycles: [], seenBeat: v.nextBeat, seenBreath: v.nextBreath,
+      hr: state.cv ? state.cv.hr : 72, spo2: v.spo2, etco2: v.etco2, rr: v.rr, temp: v.temp,
+      rrs: [], cycles: [], seenBeat: state.rh ? state.rh.next : 0, seenBreath: v.nextBreath,
       // NIBP: cycle in minutes (0 = manual); start = when the running measurement began (null when idle)
       nibp: { cycle: 5, start: null, next: 0, last: null },
       // TOF at the adductor pollicis: count, ratio (count 4 only), when; a PTC on request when the count is 0
@@ -34,10 +34,11 @@ export const monitor = {
     const v = prev.vit, m = prev.mon, dt = ctx.dt, t = ctx.t;
     const out = { ...m };
     // a beat or breath happened when the model's next event time moved on
-    if (v.nextBeat !== m.seenBeat) {
-      out.rrs = push(m.rrs, v.nextBeat - m.seenBeat, HR_BEATS);
+    const rh = prev.rh;
+    if (rh && rh.next !== m.seenBeat) {
+      out.rrs = push(m.rrs, rh.next - m.seenBeat, HR_BEATS);
       out.hr = 60 / mean(out.rrs);
-      out.seenBeat = v.nextBeat;
+      out.seenBeat = rh.next;
     }
     if (v.nextBreath !== m.seenBreath) {
       out.cycles = push(m.cycles, v.nextBreath - m.seenBreath, RR_BREATHS);
@@ -59,8 +60,9 @@ export const monitor = {
     }
     if (n.cycle && n.start == null && t >= n.next) n = { ...n, start: t, next: t + n.cycle * 60 };
     if (n.start != null && t - n.start >= NIBP_TAKES) {
-      n = { ...n, start: null, last: { sys: v.sbp, dia: v.dbp, map: v.map, t } };
-      ctx.log({ kind: 'nibp', sys: Math.round(v.sbp), dia: Math.round(v.dbp), map: Math.round(v.map) });
+      const cv = prev.cv;
+      n = { ...n, start: null, last: { sys: cv.sbp, dia: cv.dbp, map: cv.map, t } };
+      ctx.log({ kind: 'nibp', sys: Math.round(cv.sbp), dia: Math.round(cv.dbp), map: Math.round(cv.map) });
     }
     if (n !== m.nibp) out.nibp = n;
 

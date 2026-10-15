@@ -30,9 +30,24 @@ function hypnosisHtml(state) {
 <p class="hint">This patient: ${p.asleep ? 'asleep' : 'awake'}. BIS-like index ${Math.round(p.bisLike)} (a real monitor needs a processed-EEG module). Autonomic response to stimulation ${pct(p.auto)}.</p>`;
 }
 
+function circHtml(state) {
+  const c = state.cv;
+  if (!c) return '';
+  const r = x => Math.round(x);
+  return `<table class="behind"><caption class="sr">Circulation</caption>
+<thead><tr><th scope="col">Circulation</th><th scope="col">Now</th></tr></thead>
+<tbody><tr><th scope="row">Cardiac output (L/min)</th><td>${c.co.toFixed(1)}</td></tr>
+<tr><th scope="row">Stroke volume (mL)</th><td>${r(c.svL)}</td></tr>
+<tr><th scope="row">Arterial pressure (mmHg)</th><td>${r(c.sbp)}/${r(c.dbp)} (${r(c.map)})</td></tr>
+<tr><th scope="row">CVP / LAP (mmHg)</th><td>${c.cvp.toFixed(1)} / ${c.lap.toFixed(1)}</td></tr>
+<tr><th scope="row">SVR (Wood units)</th><td>${c.svr.toFixed(1)}</td></tr>
+<tr><th scope="row">Baroreflex sympathetic drive</th><td>${pct(c.s)}</td></tr></tbody></table>
+<p class="hint">The monitor shows only heart rate and the cuff pressure. Underneath, pressure is output times resistance, and the baroreflex pushes heart rate, vessel tone and venous capacity to hold it.</p>`;
+}
+
 export function behindHtml(state) {
   const ids = Object.keys(state.pk.d);
-  if (!ids.length) return state.pk.nm ? nmbHtml(state) : '<p class="hint">No drugs given yet.</p>';
+  if (!ids.length) return circHtml(state) + (state.pk.nm ? nmbHtml(state) : '<p class="hint">No drugs given yet.</p>');
   const rows = ids.map(id => {
     const v = pumpView(state, id);
     return `<tr><th scope="row">${esc(DRUGS[id].name)}</th><td>${f(v && v.predCp)}</td><td>${f(v && v.predCe)}</td><td>${f(cp(state, id))}</td><td>${f(ce(state, id))}</td><td>${esc(DRUGS[id].conc)}</td></tr>`;
@@ -40,5 +55,5 @@ export function behindHtml(state) {
   return `<table class="behind"><caption class="sr">Predicted and true drug levels</caption>
 <thead><tr><th scope="col">Drug</th><th scope="col">Pump Cp</th><th scope="col">Pump Ce</th><th scope="col">True Cp</th><th scope="col">True Ce</th><th scope="col">Unit</th></tr></thead>
 <tbody>${rows}</tbody></table>
-<p class="hint">Cp is the plasma level, Ce the effect site (the brain). The pump knows only its published model; this patient differs, as real patients do.</p>${hypnosisHtml(state)}${nmbHtml(state)}`;
+<p class="hint">Cp is the plasma level, Ce the effect site (the brain). The pump knows only its published model; this patient differs, as real patients do.</p>${hypnosisHtml(state)}${nmbHtml(state)}${circHtml(state)}`;
 }

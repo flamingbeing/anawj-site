@@ -69,8 +69,8 @@ export function co2(src, t) {
 export function modelSource(state) {
   const beats = [], breaths = [];
   for (const e of state.ev.ring) (e.kind === 'beat' ? beats : e.kind === 'breath' ? breaths : []).push(e);
-  const v = state.vit;
-  beats.push({ t: v.nextBeat, rr: 60 / v.hr, sbp: v.sbp, dbp: v.dbp });
+  const v = state.vit, c = state.cv;
+  beats.push({ t: state.rh.next, rr: c.hp, sbp: c.sbp, dbp: c.dbp });
   breaths.push({ t: v.nextBreath, cycle: 60 / v.rr, ti: 20 / v.rr, etco2: v.etco2 });
   return { beats, breaths };
 }
@@ -92,10 +92,10 @@ export class FastSource {
   }
   // make events up to display time t + lookahead, from the model's current values
   advance(state, t) {
-    const v = state.vit, until = t + 0.4;
+    const v = state.vit, c = state.cv, until = t + 0.4;
     while (this.nextBeat <= until) {
-      const rr = (60 / v.hr) * (1 + 0.02 * (this.rand() - 0.5));
-      this.beats.push({ t: this.nextBeat, rr, sbp: v.sbp, dbp: v.dbp });
+      const rr = c.hp * (1 + 0.02 * (this.rand() - 0.5));
+      this.beats.push({ t: this.nextBeat, rr, sbp: c.sbp, dbp: c.dbp });
       this.nextBeat += rr;
     }
     while (this.nextBreath <= until) {
