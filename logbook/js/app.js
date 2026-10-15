@@ -848,7 +848,7 @@ function paintWho() {
     : flags ? h('span', { class: 'who-flag' }, flags) : null;
   // sync: cases saved on this phone but not yet on the server (no signal), or all synced
   const sync = !S.user ? null : writes.pending()
-    ? h('a', { href: '#recovery', class: 'sync wait' }, writes.entries().some(x => x.state === 'failed' || x.state === 'conflict') ? 'Save needs attention' : 'Saved locally · pending sync')
+    ? h('a', { href: '#recovery', class: 'sync wait' }, writes.attention() ? 'Save needs attention' : 'Saved locally · pending sync')
     : cloud.demo ? null : S.pending
     ? h('span', { class: 'sync wait', title: navigator.onLine ? 'Saving to the server…' : 'Saved on this phone; will sync when there is signal' }, navigator.onLine ? '⟳ Saving' : '⏳ Will sync')
     : S.casesSynced ? h('span', { class: 'sync ok', title: 'All your cases are saved to the server' }, '✓ Synced') : null;
@@ -926,6 +926,15 @@ const whoKey = email => WHO_KEY + (cloud.demo ? 'demo:' : '') + String(email || 
 function readWho(email) { try { return JSON.parse(localStorage.getItem(whoKey(email)) || 'null'); } catch { return null; } }
 function saveWho(email, w) { try { localStorage.setItem(whoKey(email), JSON.stringify(w)); } catch { /* storage blocked */ } }
 function forgetWho() { try { for (const k of Object.keys(localStorage)) if (k.startsWith(WHO_KEY)) localStorage.removeItem(k); } catch { /* ignore */ } }
+// A programme resident's logbook remembers their rid (admins and the rules use it, and new cases reach the response sheet
+// only once it is there: ui-core.js toSheet). Set here at once, in place (refreshWho checks S.logbook is still the copy it
+// started from), and saved: also when someone is put on the programme list after this device last asked.
+function keepRid(user) {
+  const r = S.resident;
+  if (!r || !r.rid || !S.logbook || S.logbook.rid === r.rid) return;
+  S.logbook.rid = r.rid;
+  cloud.saveLogbook(user.email, { rid: r.rid }).catch(() => {});
+}
 // the server's answers after a fast start: update what changed without disturbing someone typing
 function refreshWho(user, who, firstLogbook) {
   who().then(async w => {
@@ -943,6 +952,7 @@ function refreshWho(user, who, firstLogbook) {
       applyDisplay(adoptDisplay(lb.settings, { fresh: true }));   // a first look made from a stale offline copy is corrected
     }
     if (lb && adoptShared()) lbChanged = true;   // never from a cached copy alone
+    keepRid(user);   // after the server's copy (which may not have it yet) is taken in
     if (!lbChanged && before === JSON.stringify([S.admin, S.owner, S.pd, S.faculty, S.resident, S.sharedTemplates, categoryNamesNow()])) return;
     const typing = document.activeElement && /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName);
     if (!typing && !document.querySelector('dialog[open]')) render(); else paintTabs();
@@ -1012,8 +1022,7 @@ async function onUser(user) {
     applyDisplay(adoptDisplay(logbook.settings));   // this device's display settings (from the account the first time)
     const resident = S.resident;
     if (!logbook.name && (resident?.name || user.name)) S.logbook.name = resident?.name || user.name;
-    // a programme resident's logbook remembers their rid (used by admins and the rules)
-    if (resident && logbook.rid !== resident.rid) cloud.saveLogbook(user.email, { rid: resident.rid }).catch(() => {});
+    keepRid(user);
   } catch (err) {
     // a Firestore client closed by an earlier sign-out can't be reused: start the page afresh (once)
     if (/terminated/i.test(err.message) && !reloadFlag()) { reloadFlag('1'); location.reload(); return; }
@@ -1083,14 +1092,10 @@ async function pickUpForm(user) {
   try {
     const entries = await cloud.listFormEntries(user.email);
     if (!entries.length || S.user !== user) return;
-    const [{ mergeFormEntries, pickupMessage, formCaseId }, bin] = await Promise.all([import('./form-inbox.js'), cloud.listBin(user.email).catch(() => [])]);
-    const binned = bin.filter(b => b.kind === 'case' && b.data && b.data.id).map(b => String(b.data.id));
-    const r = mergeFormEntries(entries, new Map((S.cases || []).map(c => [c.id, c])), Date.now(), { binned });
-    const byCase = new Map(r.save.map(c => [c.id, c]));
-    const items = r.done.map(id => ({ id, case: byCase.get(formCaseId(id)) || null }));
-    const done = new Set(await cloud.commitFormPickup(user.email, items));
-    const saved = items.filter(it => it.case && done.has(it.id)).map(it => it.case);
-    const msg = pickupMessage({ ...r, save: saved });
+    const { pickUp, pickupMessage } = await import('./form-inbox.js');
+    // (reads the bin and the deleted Form cases from the server; if it can't, nothing is written and the entries wait)
+    const r = await pickUp(cloud, user.email, entries, { cases: () => S.cases, still: () => S.user === user });
+    const msg = r && pickupMessage(r);
     if (msg && S.user === user) toast(msg);
   } finally { formBusy = false; }
 }

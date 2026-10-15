@@ -140,6 +140,15 @@ service cloud.firestore {
         allow read, delete: if isOwner(email);
         allow create, update: if isOwner(email) && validBinEntry(id, request.resource.data);
       }
+
+      // Google Form cases the resident deleted (js/form-inbox.js): just the case id and when, kept after the bin entry
+      // goes, so an edited or re-sent Form response doesn't bring the case back; owner only
+      match /formGone/{id} {
+        allow read, delete: if isOwner(email);
+        allow create, update: if isOwner(email) && id.matches('^imp_form~003a[A-Za-z0-9_-]{1,120}$')
+          && request.resource.data.keys().hasOnly(['id', 'deletedAt']) && request.resource.data.id == id
+          && request.resource.data.deletedAt is number;
+      }
     }
     function validLogbook(email, d) {
       return d.keys().hasOnly(['email', 'name', 'rid', 'settings', 'templates', 'profile', 'plan', 'updatedAt'])
@@ -344,7 +353,10 @@ service cloud.firestore {
         && request.resource.data.email == me()
         && request.resource.data.rid == get(/databases/$(database)/documents/logbooks/$(me())).data.rid;
       allow read: if isFormBot();
-      allow delete: if isFormBot() || (signedIn() && resource.data.email == me());
+      // a resident takes back their own entry when the case is deleted; one that is already gone (the sheet script took it,
+      // or the case never had one) is nothing to delete, so that is allowed too (refused, it showed a false "could not be
+      // synced" when the delete was sent late, offline)
+      allow delete: if isFormBot() || (signedIn() && (resource == null || resource.data.email == me()));
     }
 
     // private feedback (logbook More → Send feedback): never a public GitHub issue, as a report can mention a case or

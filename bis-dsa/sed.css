@@ -1,16 +1,17 @@
 /* Masimo SedLine screen (the 'sedline' skin). Every size is in design pixels of the real 800 x 1280 Root screen times --u, so the screen
    scales as a unit. Built from Masimo's manuals and screen figures; see NOTES.md, "Masimo SedLine". */
-@font-face{font-family:"Source Sans 3";font-style:normal;font-weight:300 700;font-display:swap;src:url(fonts/SourceSans3-latin-var.woff2) format("woff2")}
-@font-face{font-family:"Source Sans 3";font-style:italic;font-weight:300 700;font-display:swap;src:url(fonts/SourceSans3-Italic-latin-var.woff2) format("woff2")}
+@font-face{font-family:"Hind";font-style:normal;font-weight:300 400;font-display:swap;src:url(fonts/Hind-400.woff2) format("woff2")}
+@font-face{font-family:"Hind";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/Hind-500.woff2) format("woff2")}
+@font-face{font-family:"Hind";font-style:normal;font-weight:600 700;font-display:swap;src:url(fonts/Hind-600.woff2) format("woff2")}
 .sedwrap{display:block;min-width:0}
 .sedwrap[hidden]{display:none}
 .sedcase{max-width:min(100%,540px);margin:0 auto}
-.sedbezel{container-type:inline-size;position:relative;background:linear-gradient(#17171a,#08080a);border-radius:14px;padding:26px 14px 30px;box-shadow:inset 0 0 0 1px #2c2c30,0 10px 30px -18px rgba(0,0,0,.8)}
+.sedbezel{container-type:inline-size;position:relative;background:linear-gradient(#17171a,#08080a);border-radius:14px;padding:26px 14px 30px;border:3px solid #d4d4d1;box-shadow:inset 0 0 0 1px #2c2c30,0 0 0 1px #9c9c98,0 10px 30px -18px rgba(0,0,0,.8)}
 .sedlogo{position:absolute;right:16px;top:8px;color:#ececec;display:flex;align-items:center;gap:4px}
-.sedlogo b{font:600 12px/1 "Archivo Narrow","Source Sans 3",system-ui,sans-serif;letter-spacing:.01em;font-style:normal}
+.sedlogo b{font:600 12px/1 "Archivo Narrow",Hind,system-ui,sans-serif;letter-spacing:.01em;font-style:normal}
 .sedlogo svg{display:block;width:16px;height:10px}
-.sedroot{position:absolute;right:18px;bottom:8px;font:400 14px/1 "Source Sans 3",system-ui,sans-serif;color:#8a8a90}
-.seds{--u:calc(100cqw / 800);position:relative;aspect-ratio:5/8;background:#100f0d;overflow:hidden;border-radius:calc(4*var(--u));color:#fff;font-family:"Source Sans 3","Source Sans Pro","Segoe UI",system-ui,sans-serif;user-select:none;-webkit-user-select:none}
+.sedroot{position:absolute;right:18px;bottom:8px;font:400 14px/1 Hind,system-ui,sans-serif;color:#8a8a90}
+.seds{--u:calc(100cqw / 800);position:relative;aspect-ratio:5/8;background:#100f0d;overflow:hidden;border-radius:calc(4*var(--u));color:#fff;font-family:Hind,"Frutiger","Segoe UI",system-ui,sans-serif;user-select:none;-webkit-user-select:none}
 @media (max-width:640px){.sedbezel{padding:14px 6px 18px;border-radius:10px}.sedlogo{top:4px}.sedlogo b{font-size:10px}.sedroot{font-size:11px;bottom:3px}}
 .seds *{box-sizing:border-box}
 .seds button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:inherit}
@@ -38,7 +39,7 @@
 .seds .sdp{position:absolute;inset:0;display:flex;flex-direction:column}
 .seds .sdback{position:absolute;left:calc(20*var(--u));top:calc(12*var(--u));width:calc(48*var(--u));height:calc(48*var(--u));z-index:2}
 .seds .sdback svg{display:block;width:100%;height:100%}
-.seds .sdp h2{margin:0;text-align:center;font:300 calc(46*var(--u))/calc(60*var(--u)) "Source Sans 3","Segoe UI",system-ui,sans-serif;padding-top:calc(62*var(--u));height:calc(150*var(--u));color:#fff;letter-spacing:.01em}
+.seds .sdp h2{margin:0;text-align:center;font:300 calc(46*var(--u))/calc(60*var(--u)) Hind,"Segoe UI",system-ui,sans-serif;padding-top:calc(62*var(--u));height:calc(150*var(--u));color:#fff;letter-spacing:.01em}
 .seds .sdbody{flex:1;overflow:auto;padding:0 calc(22*var(--u)) calc(20*var(--u));position:relative}
 .seds .sdrow{position:relative;display:flex;align-items:center;min-height:calc(98*var(--u))}
 .seds .sdrow label{flex:none;width:calc(298*var(--u));padding-right:0;text-align:right;font-size:calc(27*var(--u));line-height:1.15;color:#e8e8e8;font-weight:300}

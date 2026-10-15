@@ -25,9 +25,16 @@ try {
     await page.click('#sedCtl summary'); assert.equal(await page.$eval('#sedCtl', e => e.open), true);
     // nothing on the glass gives the simulator away
     { const t = await page.evaluate(() => { const o = []; for (const id of ['main', 'about', 'layout', 'd_wifi', 'd_eth', 'd_bt', 'd_out', 'add']) { sedDlgOpen(id); o.push(document.querySelector('#sedDlg').textContent); sedDlgClose(); } return o.join(' '); }); assert.ok(!/simulat|teaching|stand-in|Not used/i.test(t), 'no simulator wording on the glass'); }
-    // the screen is portrait 5:8 and scales as a unit; the bundled Source Sans 3 font loads
+    // the screen is portrait 5:8 and scales as a unit; the bundled Hind font loads
     { const r = await page.$eval('#sedS', e => { const q = e.getBoundingClientRect(); return [q.width / q.height, q.width]; }); assert.ok(Math.abs(r[0] - 0.625) < 0.01, `5:8 screen (${r[0]})`); if (phone) assert.ok(r[1] <= 390, 'fits the phone width'); }
-    assert.ok(await page.evaluate(() => document.fonts.check('16px "Source Sans 3"')), 'bundled Source Sans 3 font loads');
+    assert.ok(await page.evaluate(() => document.fonts.check('16px Hind')), 'bundled Hind font loads');
+    // the older, dimmed sweep does not shimmer at 15 mm/s: right of the cursor the trace stays the same from frame to frame
+    { const d = await page.evaluate(async () => { const sp = SED.set.eegSpeed; SED.set.eegSpeed = 15; const cv = SED.cvE, N = 1474, raf = () => new Promise(r => requestAnimationFrame(r));
+        const grab = () => { sedDrawEeg(); return { pos: SED.eg.n % N, d: cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data }; };
+        let a, b; for (let tries = 0; tries < 5; tries++) { await raf(); a = grab(); await raf(); await raf(); b = grab(); if (b.pos > a.pos && b.pos < N - 200) break; }
+        SED.set.eegSpeed = sp; const k = cv.width / 800, x0 = Math.round((50 + b.pos * 737 / N + 70) * k), x1 = Math.round(780 * k);
+        if (b.pos === a.pos || x1 - x0 < 20) return -1; let n = 0, t = 0; for (let y = 0; y < cv.height; y++) for (let x = x0; x < x1; x++) { const j = (y * cv.width + x) * 4; t++; if (Math.abs(a.d[j] - b.d[j]) > 30) n++; } return n / t; });
+      assert.ok(d >= 0 && d < 0.002, `dim EEG sweep is steady between frames (${(d * 100).toFixed(2)}% changed)`); }
     // defaults are the manual's factory defaults
     const d = await page.evaluate(() => ({ s: SED.set, range: SED.range, view: SED.view, exp: Object.keys(SED.exp) }));
     assert.deepEqual([d.s.psiHi, d.s.psiLo, d.s.eegAmp, d.s.eegSpeed, d.s.dsaHi, d.s.dsaLo, d.s.maxHz, d.s.placement, d.s.silence, d.s.monImp, d.s.dispImp, d.range, d.view], [50, 25, 5, 30, 15, -40, 30, 'EEG/PSi/DSA', 120, true, true, 30, 'trend']);

@@ -219,7 +219,7 @@ Every element on all three screens is drawn each frame from the live simulation,
 |---|---|---|---|
 | Medtronic BIS (`vista`, the owner's monitor) | Layout, colours (sampled from the owner's photos), key row, message wording and codes, three-page menu names, sensor-check screens, review keys, defaults from the manual (1 hour scale, Target Range inactive) | EEG gain, AMPL dB scale, DSA colour scale (tuned by eye), alarm tone, Monitor Mode texts | Display menu of the 2-channel monitor (no photo), real passkey, exact fonts (look-alikes), EMG tube hatching, 4-channel views |
 | BIS Advance (`advance`) | Screen geometry (1246 x 779), left bar, alarm and message bars, tile menu tree, dialogs, colour values from the manual figures and 2021 marketing screens, DSA legend ramp | EEG sweep versus scroll, DSA cell size, Settings / Maintenance / INFO / Case Log pages (styled like seen dialogs), alarm bar flash rate, second-line wording of some alarms | Native screenshots of several pages, exact fonts and icons (redrawn; Selawik stands in for Segoe UI), ground check, trend lock, wireless, camera, the proprietary BIS and ASYM algorithms |
-| Masimo SedLine (`sedline`) | Root 800 x 1280 layout, status bar, four-channel EEG, trend rows, well, DSA with ASYM, colour bar, menu tree and its defaults, About texts, alarm and message names | Alarm priorities and delay, impedance colour limits, DSA Placement variants, Pediatric look, dialog artwork, sedated DSA colour profile, EEG character (own 178 Hz generator) | Typeface (Source Sans 3 stands in), start-up splash, animation timing, Masimo's PSi algorithm (a straight-line stand-in from BIS), real EMG, Brightness slider, 2 h of earlier history |
+| Masimo SedLine (`sedline`) | Root 800 x 1280 layout, status bar, four-channel EEG, trend rows, well, DSA with ASYM, colour bar, menu tree and its defaults, About texts, alarm and message names | Alarm priorities and delay, impedance colour limits, DSA Placement variants, Pediatric look, dialog artwork, sedated DSA colour profile, EEG character (own 178 Hz generator) | Typeface (Hind, a Frutiger-style open font, stands in), start-up splash, animation timing, Masimo's PSi algorithm (a straight-line stand-in from BIS), real EMG, Brightness slider, 2 h of earlier history |
 
 None of the three has been compared side by side with a live unit of that model by the owner except the Medtronic one (photos of his own monitor).
 
@@ -495,7 +495,7 @@ checked against a photo of a Root. Look chosen: the 2017/2018 builds (ADULT pill
   (data series, DSA images, every drawing), `sed-menu.js` (the menu tree), `sed.css` (design pixels of 800 x 1280 times `--u`, so the screen scales as a
   unit; the phone shows the same screen smaller), `test/sed.e2e.mjs` (also run by `e2e.mjs`), numeric checks in `engine.check.mjs`. `app.js` only calls
   `sedApply()` / `sedTick(dirty)`. The screen is two canvases (static: redrawn each second, EEG: every frame) with transparent labelled buttons over them
-  (`.hit`) for keyboard and screen readers. Font: Source Sans 3 (OFL, bundled; closest of seven open fonts to the real digits; the real typeface is not published).
+  (`.hit`) for keyboard and screen readers. Font: Hind (OFL, bundled; Frutiger-style, with the real screen's footless "1"; replaced Source Sans 3 on 15 Oct 2026 after the owner said the font did not match; the real typeface is not published).
 - Screen: status bar (alarm bell, Audio Pause, [power key if Standby is enabled], profile pill, network, Iris, battery, sounds, clock), SedLine window with the
   action tab (TREND / ANALOG), four-channel EEG (L1 R1 L2 R2, sweep with a white cursor and a gap, older sweep dimmed, `30 mm/sec`, `5 µV/mm`), trend rows
   EMG / PSI / SR (PSi 3 times the height, green 25-50 band, orange above and blue below, end dots, limits `50 25`), the well (ARTF, SEFL, SEFR), the DSA (L on
@@ -581,3 +581,25 @@ checked against a photo of a Root. Look chosen: the 2017/2018 builds (ADULT pill
 - `node bis-dsa/test/e2e.mjs` runs the teaching-layout and Medtronic checks, then `adv.e2e.mjs` and `sed.e2e.mjs`; the whole run takes over 10 minutes, so give a shell command a background run.
 - An earlier note said `adv.e2e.mjs` was flaky. The cause was the battery-low check: it read `#aBatT` straight after switching the Simulate button off, before the next frame had redrawn it
   (`'10%' !== '100%'`, about one run in two). The test now waits for the text; the assertion is unchanged. Six runs in a row passed after the fix.
+
+## Owner feedback, 15 Oct 2026 (phone, real use)
+
+- The Medtronic and Advance DSAs went solid red: they used the Display panel's saved DSA colour range (a lowered ceiling saved
+  on the device). The real monitors have no colour range, so both now always use their own fixed scale; the range sliders
+  only affect the Teaching layout and SedLine.
+- BIS Advance opens straight on the main screen (no start-up or sensor check); "Replay start-up" under the screen shows the
+  boot messages and sensor check again. Default layouts show the DSA and the raw EEG together on all three monitors
+  (Advance: DSA, ASYM, EEG; 2-channel: DSA, EEG).
+- A monitor switch (Medtronic BIS, BIS Advance, SedLine, Teaching) sits at the top of the page, in step with the Display
+  panel's screen-layout buttons.
+- SedLine EEG flicker: at 15 mm/s the trace drew every other sample, and which half was skipped in the dimmed older sweep
+  swapped every frame, so it shimmered. Every sample is now drawn (a test compares two frames).
+- SedLine font is now Hind (Frutiger-style, footless "1"), not Source Sans 3.
+- Each monitor sits in a case like the real one: warm light-grey plastic for the Medtronic BIS, the white case around the
+  blue band for BIS Advance (kept on phones, thinner), glossy black glass with a light rim for the Masimo Root.
+- SedLine raw EEG now follows the simulation's own EEG (the left engine for L1/L2, the right for R1/R2, resampled to 178 Hz,
+  scaled by 0.42, plus a small own part per electrode), so it shows the same drug and depth as the DSA; the old separate
+  generator was about three times too big and too busy beside Masimo's figures. Trace 1.7 px.
+- Medtronic BIS opens with about 35 minutes of earlier trend (an awake patient, made by adv-seed.js, kept in `MT.pre`, never in
+  HIST), so its DSA is full like the owner's photos; time labels then fall on whole clock steps. Clear Trend empties it.
+- BIS Advance DSA keeps 25 % (was 45 %) of the column before, for the finer minute-to-minute grain of the real screen.

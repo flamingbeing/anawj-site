@@ -361,6 +361,28 @@ await t('template part admin delete', assertSucceeds(deleteDoc(doc(adm, 'config'
   await t('form: anyone reads bots', assertFails(getDoc(doc(own, 'formBots', 'formbot-uid'))));
   await t('form: resident deletes own', assertSucceeds(deleteDoc(doc(a, 'formInbox', 'r1'))));
   await t('form: case from the Form', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'cases', 'imp_form~003ar3'), { ...c('imp_form~003ar3'), source: 'form', importKey: 'form:r3@1700000000000' })));
+  await t('form: key with the newest submit', assertSucceeds(updateDoc(doc(a, 'logbooks', A, 'cases', 'imp_form~003ar3'), { importKey: 'form:r3~1700000000000@1700000001000', updatedAt: 3 })));
+  // deleted Form cases (formGone): the case id and when, owner only, kept after the bin entry goes
+  const g = (id, extra = {}) => ({ id, deletedAt: 5, ...extra });
+  const G = 'imp_form~003ar3';
+  await t('formGone: owner lists one', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'formGone', G), g(G))));
+  await t('formGone: owner writes it again', assertSucceeds(setDoc(doc(a, 'logbooks', A, 'formGone', G), g(G, { deletedAt: 6 }))));
+  await t('formGone: owner reads the list', assertSucceeds(getDocs(collection(a, 'logbooks', A, 'formGone'))));
+  await t('formGone: other reads', assertFails(getDocs(collection(b, 'logbooks', A, 'formGone'))));
+  await t('formGone: app owner reads', assertFails(getDoc(doc(own, 'logbooks', A, 'formGone', G))));
+  await t('formGone: admin reads', assertFails(getDoc(doc(adm, 'logbooks', A, 'formGone', G))));
+  await t('formGone: bot reads', assertFails(getDoc(doc(bot, 'logbooks', A, 'formGone', G))));
+  await t('formGone: unverified reads', assertFails(getDoc(doc(unv, 'logbooks', A, 'formGone', G))));
+  await t('formGone: other writes', assertFails(setDoc(doc(b, 'logbooks', A, 'formGone', 'imp_form~003ar4'), g('imp_form~003ar4'))));
+  await t('formGone: app owner writes', assertFails(setDoc(doc(own, 'logbooks', A, 'formGone', 'imp_form~003ar4'), g('imp_form~003ar4'))));
+  await t('formGone: bot writes', assertFails(setDoc(doc(bot, 'logbooks', A, 'formGone', 'imp_form~003ar4'), g('imp_form~003ar4'))));
+  await t('formGone: not a Form case id', assertFails(setDoc(doc(a, 'logbooks', A, 'formGone', 'c1'), g('c1'))));
+  await t('formGone: imported case id', assertFails(setDoc(doc(a, 'logbooks', A, 'formGone', 'imp_x'), g('imp_x'))));
+  await t('formGone: id mismatch', assertFails(setDoc(doc(a, 'logbooks', A, 'formGone', 'imp_form~003ar4'), g(G))));
+  await t('formGone: extra field (case text)', assertFails(setDoc(doc(a, 'logbooks', A, 'formGone', G), g(G, { details: 'AB 34F' }))));
+  await t('formGone: deletedAt not a number', assertFails(setDoc(doc(a, 'logbooks', A, 'formGone', G), g(G, { deletedAt: 'now' }))));
+  await t('formGone: other deletes', assertFails(deleteDoc(doc(b, 'logbooks', A, 'formGone', G))));
+  await t('formGone: owner deletes', assertSucceeds(deleteDoc(doc(a, 'logbooks', A, 'formGone', G))));
 }
 // new app cases for the response sheet: a programme resident adds an entry for their own case; the bot (same account as
 // the Form inbox) lists and deletes entries; nobody else reads
@@ -397,6 +419,13 @@ await t('template part admin delete', assertSucceeds(deleteDoc(doc(adm, 'config'
   await t('outbox: bot still cannot read the Form inbox', assertFails(getDocs(collection(bot, 'formInbox'))));
   await t('outbox: bot still cannot read a logbook', assertFails(getDoc(doc(bot, 'logbooks', A))));
   await t('outbox: resident deletes own', assertSucceeds(deleteDoc(doc(a, 'sheetOutbox', 'k2'))));
+  // a case deleted after the script took its entry (or one that never had one): deleting nothing is allowed, so an
+  // offline delete sent late shows no false sync error; someone else's entry and signed-out or unverified accounts stay refused
+  await t('outbox: resident deletes an entry already gone', assertSucceeds(deleteDoc(doc(a, 'sheetOutbox', 'k2'))));
+  await t('outbox: resident deletes one that never was', assertSucceeds(deleteDoc(doc(a, 'sheetOutbox', 'never1'))));
+  await t('outbox: unverified deletes one already gone', assertFails(deleteDoc(doc(unv, 'sheetOutbox', 'k2'))));
+  await t('outbox: signed out deletes one already gone', assertFails(deleteDoc(doc(anon, 'sheetOutbox', 'k2'))));
+  await t('outbox: other resident still cannot delete an entry that is there', assertFails(deleteDoc(doc(b, 'sheetOutbox', 'k5'))));
   await t('outbox: bot deletes', assertSucceeds(deleteDoc(doc(bot, 'sheetOutbox', 'k1'))));
   await t('outbox: unlisted account lists', assertFails(getDocs(collection(unv, 'sheetOutbox'))));
 }

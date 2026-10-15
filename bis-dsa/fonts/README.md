@@ -20,6 +20,8 @@ Licences: <https://github.com/google/fonts/tree/main/apache/arimo>, <https://git
 
 ## Masimo SedLine screen
 
-- `SourceSans3-latin-var.woff2`, `SourceSans3-Italic-latin-var.woff2`: Source Sans 3 (SIL Open Font License 1.1, Adobe), Latin subset, variable weight 300-700, from Google Fonts
-  (<https://fonts.google.com/specimen/Source+Sans+3>, licence <https://github.com/adobe-fonts/source-sans/blob/main/LICENSE.md>). Masimo does not publish the
-  on-screen typeface of Root; of seven open fonts compared with the real digits it was the closest (narrow, humanist, flat-bottomed 1).
+- `Hind-400.woff2`, `Hind-500.woff2`, `Hind-600.woff2`: Hind (SIL Open Font License 1.1, Indian Type Foundry), Latin subset, from Google Fonts
+  (<https://fonts.google.com/specimen/Hind>, licence <https://github.com/google/fonts/blob/main/ofl/hind/OFL.txt>). Masimo does not publish the
+  on-screen typeface of Root; it looks like Frutiger (a "1" with a flag and no foot, narrow proportional digits). Hind is a Frutiger-style open font and
+  matches the real digits much better than Source Sans 3, used before (owner, 15 Oct 2026: "the font doesn't really match"). No italic: the
+  "SedLine" title's italic is drawn as an oblique.
