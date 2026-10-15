@@ -61,6 +61,13 @@
   fires in a non-perfusing rhythm (VF/torsades/asystole/PEA) and replaces the numeric SpO₂ alarm (no pulse to read).
   Logged with `tech:true`. MODEL.md §14 table updated. `test/alarms.test.mjs` + e2e cover both. Green under
   `tools/test-ot-sim.sh`, check, proofread.
-- M3.3 still to come: trainee-set limits (slice 3) and a ventilator-disconnection technical alarm (needs a
-  circuit-disconnect state — likely with the scenario engine); then the Log tab. Then M4.x (`conditions.js`/`events.js`
-  scenario engine + the crisis scenarios — the "diverse use cases" goal).
+- M3.3 slice 3 built on this branch (from main after #645 merged): the Log tab (`ui/log.js`). A readable, timestamped,
+  newest-first record of everything in `sim.log` — drugs (bolus/infusion/TCI), the airway and ventilator, fluids and
+  bleeding, the rhythm and resuscitation, the operation and stimuli, NIBP readings, alarms (with ⚠ and on/off
+  transitions) and the patient's responses (asleep/awake/movement). `actionText()` maps each action; unknown actions
+  are left out; capped to the most recent 300. It reads the same log the M5 debrief will replay. A Log tab;
+  `test/log.test.mjs`; e2e opens it and checks the record + axe (the scrollable list is keyboard-focusable).
+  `tools/test-ot-sim.sh`, check, proofread green.
+- M3.3 still to come (optional polish): trainee-set limits and a ventilator-disconnection technical alarm (needs a
+  circuit-disconnect state — likely with the scenario engine). **The core of M3.3 (alarms + Log) is done.** Next:
+  M4.x (`conditions.js`/`events.js` scenario engine + the crisis scenarios — the "diverse use cases" goal).

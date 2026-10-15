@@ -231,6 +231,13 @@ try {
     await page.click('#tab-pt');
     await page.evaluate(() => otsim.step(2));
     assert.match(await page.textContent('#events'), /Called for help|major haemorrhage/i, `${name}: help actions show in the events feed`);
+    // Log tab: a timestamped record of what happened (the help actions just taken, newest first)
+    await page.click('#tab-log');
+    await page.evaluate(() => otsim.step(1));
+    assert.ok((await page.$$('#log-feed li')).length >= 1, `${name}: log has entries`);
+    assert.match(await page.textContent('#log-feed'), /help|haemorrhage/i, `${name}: log records the help actions`);
+    await axe(page, `${name} theatre, Log tab`);
+    await page.click('#tab-pt');
     // Rhythms: impose each from the Patient tab. The ECG keeps drawing and the circulation responds.
     await page.selectOption('#rhythm', 'vt');
     await page.evaluate(() => otsim.step(400));

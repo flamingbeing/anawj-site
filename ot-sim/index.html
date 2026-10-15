@@ -108,6 +108,10 @@ h1{font-size:1.6rem;line-height:1.2;margin:.75rem 0 .25rem}
 .state{font-size:.85rem;color:#c9d3e0;margin:2px 0 0;min-height:1em}
 .sub{font-size:1rem;margin:12px 0 4px}
 .given{list-style:none;padding:0;margin:0;font-size:.9rem}.given li{padding:2px 0}.given .when{font-variant-numeric:tabular-nums;color:var(--mut);margin-right:6px}.given .none{color:var(--mut)}
+.logfeed{list-style:none;padding:0;margin:0;font-size:.9rem;max-height:60vh;overflow-y:auto}
+.logfeed li{display:flex;gap:8px;padding:4px 2px;border-bottom:1px solid var(--line)}
+.logfeed .when{font-variant-numeric:tabular-nums;color:var(--mut);flex:none;min-width:3.2em}
+.logfeed .none{color:var(--mut);border:0}
 details{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin:12px 0}
 summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:700}
 .behind{width:100%;border-collapse:collapse;font-size:.85rem;font-variant-numeric:tabular-nums}
@@ -201,6 +205,7 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
         <button type="button" role="tab" id="tab-pt" aria-controls="panel-pt" aria-selected="false" tabindex="-1">Patient</button>
         <button type="button" role="tab" id="tab-exam" aria-controls="panel-exam" aria-selected="false" tabindex="-1">Examine</button>
         <button type="button" role="tab" id="tab-help" aria-controls="panel-help" aria-selected="false" tabindex="-1">Help</button>
+        <button type="button" role="tab" id="tab-log" aria-controls="panel-log" aria-selected="false" tabindex="-1">Log</button>
       </div>
       <div class="panel" role="tabpanel" id="panel-drugs" aria-labelledby="tab-drugs"></div>
       <div class="panel" role="tabpanel" id="panel-circ" aria-labelledby="tab-circ" hidden>
@@ -325,6 +330,10 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
         <p class="hint">Get help and tell the team. These are recorded in the events list (and the debrief); in a crisis they are the first things to do.</p>
         <div class="act" id="help-acts"></div>
         <p class="state" id="help-ack" aria-live="polite"></p>
+      </div>
+      <div class="panel" role="tabpanel" id="panel-log" aria-labelledby="tab-log" hidden>
+        <p class="hint">Everything that has happened, newest first: drugs, airway and ventilator, fluids, rhythm and resuscitation, the operation, NIBP readings, alarms and the patient's responses.</p>
+        <ol class="logfeed" id="log-feed" tabindex="0" aria-label="Event log, newest first"><li class="none">Nothing yet</li></ol>
       </div>
       <details id="behind-box"><summary>Behind the monitor</summary><div id="behind"></div></details>
       <p class="foot">Free run: a healthy synthetic adult. A full model: drugs, the airway gases, breathing and the ventilator, heart rate and blood pressure, oxygen and CO2, temperature, the heart rhythm, resuscitation (compressions, defibrillation, pacing) and the airway (obstruction, mask, LMA, tube, front-of-neck) all respond. A guided case runs from pre-op through the operation (Examine and call for Help as you go); the crises come next. Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>

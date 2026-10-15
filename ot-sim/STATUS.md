@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-15 by Claude Code (build session: M2.7-M3.2 merged; M3.3 slice 1 alarm engine+bar merged; slice 2 technical alarms).
+Last updated: 2026-10-15 by Claude Code (build session: M2.7-M3.2 + M3.3 slices 1-2 merged; M3.3 slice 3 Log tab — alarms+Log core done).
 
 ## Now
 
@@ -19,13 +19,17 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next
 
-1. M3.3 slice 3: trainee-set alarm limits (an Alarms settings area/menu, per device). Then the Log tab. (A
-   ventilator-disconnection technical alarm likely rides with the scenario engine's circuit state.) Then M4.x:
-   `conditions.js`/`events.js` scenario engine + crisis scenarios (the "diverse use cases" goal).
+1. **M3.3 core (alarms + Log) is done.** Optional M3.3 polish left: trainee-set alarm limits (a per-device Alarms
+   settings area) and a ventilator-disconnection technical alarm (needs a circuit-disconnect state, likely with the
+   scenario engine). **Recommended next: M4.1** — the crisis engine (`conditions.js`, `events.js`, scenario format,
+   expected-action matching) + scenario 1 (hypotension after induction). This is the owner's "diverse use cases" goal.
 
 ## Recently done
 
-- M3.3 slice 2 (15 Oct 2026, #628→next): technical alarms (`monitor.js`) — "No CO₂ — check the tube and circuit"
+- M3.3 slice 3 (15 Oct 2026, #645→next): the Log tab (`ui/log.js`) — a readable, timestamped, newest-first record of
+  everything in `sim.log` (drugs, airway/vent, fluids, rhythm/resus, operation, NIBP, alarms, responses); the same
+  record the M5 debrief will replay. `test/log.test.mjs` + e2e.
+- M3.3 slice 2 (15 Oct 2026, #645): technical alarms (`monitor.js`) — "No CO₂ — check the tube and circuit"
   (high; ventilating but EtCO₂≈0: oesophageal tube/disconnection/arrest) and "SpO₂ — no pulse detected" (medium;
   non-perfusing rhythm, replaces the numeric SpO₂ alarm). Same engine/bar; logged `tech:true`. MODEL.md §14 +
   `test/alarms.test.mjs` + e2e.
