@@ -1668,7 +1668,10 @@ ul.cases li.refl-under button { min-height: 32px; text-align: left; }
 .lb-wrap.selecting ul.cases li:not(.monthhead):not(.refl-under) { padding-left: 42px; }
 .lb-wrap.selecting ul.cases li:not(.monthhead)::after, .lb-wrap.selecting ul.cases .acts { display: none; }
 .lb-wrap.selecting ul.cases .note-flag { pointer-events: none; }
-.lb-wrap ul.cases li .sel-box { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; min-height: 0; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.notes-page.selecting ul.notes-rows li { position: relative; padding-left: 42px; }
+.notes-page.selecting .note-case { pointer-events: none; }
+.notes-page ul.notes-rows li.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.notes-page ul.notes-rows li .sel-box, .lb-wrap ul.cases li .sel-box { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; min-height: 0; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .lb-wrap ul.cases li.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .sel-bar { position: sticky; bottom: calc((var(--tabbar-h) + var(--safe-b)) / var(--ui-zoom, 1)); z-index: 10; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--edge, var(--line)); border-radius: var(--radius, calc(14px * var(--round, 1))); box-shadow: 0 -6px 12px -10px rgba(0,0,0,.35); }
 .sel-bar[hidden] { display: none; }
@@ -1690,4 +1693,4 @@ ul.cases li.refl-under button { min-height: 32px; text-align: left; }
 .bulk-btns { margin-top: 14px; }
 @media (max-width: 560px) { .bulk-row { grid-template-columns: 1fr; } .bulk-l { padding-top: 0; } }
 /* a press and hold selects: no text selection or iOS callout under the finger (Copy is in the row menu) */
-@media (pointer: coarse) { .lb-wrap ul.cases li:not(.monthhead) { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }
+@media (pointer: coarse) { .notes-page ul.notes-rows li, .lb-wrap ul.cases li:not(.monthhead) { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }
