@@ -3,14 +3,11 @@
 Short and current, like `logbook/STATUS.md` (same layout and rules). The rules themselves are in `README.md` (the
 NUHS-style guide) and `tokens.css`. Update with `/save-state` (Claude Code) or `$save-state` (Codex).
 
-Last updated: 2026-10-13 by Claude Code, design session (branch `claude/inspiring-dijkstra-pctmrf`).
+Last updated: 2026-10-15 by Claude Code, design session (branch `claude/inspiring-dijkstra-pctmrf`).
 
 ## Now
 
-- Design session (branch `claude/inspiring-dijkstra-pctmrf`): the app kit is PR #592 (phone, tablet and computer
-  layouts). It waits only for `main`'s red **browser** check (`bis-dsa/test/e2e.mjs` "awake beta is cyan or green", red
-  on main since #591, not this PR's). Then one PR per app, each already built and tested locally on this session's
-  helper branches (not pushed): hand log + hand assessment, NUH roster, evals + People.
+- Design session: the app kit rollout is done (#592, #611, #613, #625). Nothing half-done.
 
 ## Waiting on the owner
 
@@ -21,17 +18,19 @@ Last updated: 2026-10-13 by Claude Code, design session (branch `claude/inspirin
 
 ## Next (agreed queue)
 
-Owner, 15 Oct 2026: a web-app design indistinguishable from a native app (from the logbook, the most polished), then
-every app using the NUHS style moves onto it, except the logbook. One PR per app, each with screenshots and preview links:
-
-1. App kit (`app.css`, `app.js`, `app.html`, README "App kit").
-2. Hand log + hand assessment, NUH roster, Evals + People (built; ship after #592).
-3. NTF roster: suggest the kit to its own session (it was just built by another session).
+1. NTF roster: suggest the kit to its own session (built by another session; don't restyle it from here).
+2. Possible, not asked for: list and detail side by side (`.a-split`) on computers for evals and the hand log; dark
+   mode for the other kit apps once each is checked in dark.
 - **Not prewarm** (owner, 15 Oct, via the prewarm session): "highly important app must stay up, skip breaking
   changes". Prewarm keeps its look unless the owner says otherwise in the design session's own chat.
+- The logbook keeps its own styles.
 
 ## Recently done
 
+- #625 Evals and People on the app kit (dark theme kept, on the kit's dark colours).
+- #613 NUH roster on the app kit (and a phone overflow fix with wide fonts).
+- #611 Hand log and hand assessment on the app kit.
+- #592 The app kit: `nuhsdesign/app.css`, `app.js`, demo `app.html`, README "App kit" (phone, tablet, computer).
 - #392 (log1) The old `design/` folder and `/design/` path are retired; every subdomain serves only `/nuhsdesign/`.
 - #363 `design/` moved to `nuhsdesign/` (every subdomain serves it); evals, prewarm and prewarm-update link it. Checked live: tokens load on
   `prewarmstudy.`, `apmes.` and `anawj.com`; the prewarm and evals service workers install and cache them.
