@@ -65,6 +65,13 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Decisions log
 
+- 14 Oct 2026 (M1.1): `pk.js` steps only drugs that have been given. Amounts are in mg (propofol, ketamine) or mcg
+  (opioids, midazolam), so concentrations read in the papers' units. The patient's PK multipliers act on V1 and the
+  metabolic clearance only (inter-compartment clearances stay). Context-sensitive half-times are tested as Hughes
+  1992 defines them (plasma held constant, then stopped); a constant-rate infusion gives a shorter 8 h value.
+  Alfentanil (Maitre PK, ke0 0.77) peaks at about 2.6 min, not Miller's 1.4 (Scott PK): recorded, not tuned, like
+  midazolam; on the clinical read-through list.
+
 - 14 Oct 2026 (M0.2): the default seed is 1 when the URL has no `?seed`, so first frames (and PR screenshots) repeat;
   free runs with a new patient each time can come with the library (M3.2). The warm start keeps its last events with
   negative times, so the lanes have a full sweep of history at t = 0. The lanes draw at device-pixel resolution and
