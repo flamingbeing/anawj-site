@@ -9,6 +9,7 @@
 
 import { DRUGS, doseAmount, rateAmount } from './drugs.js';
 import { pkLbm } from './patient.js';
+import { emptyNm, stepNm } from './nmb.js';
 
 const LN2 = 0.6931471805599453;
 
@@ -53,6 +54,27 @@ export const MODELS = {
   domino(p) { return fromK(0.063 * p.weightKg, { k10: 0.438, k12: 0.592, k13: 0.59, k21: 0.247, k31: 0.0146 }, 0.652); },
 };
 
+// vasoactive drugs (M2.3) [D unless marked]: volumes scale with weight, clearances with weight^0.75
+const w = p => p.weightKg / 70, w75 = p => w(p) / Math.sqrt(Math.sqrt(w(p)));
+const vc = (V1, V2, V3, CL1, CL2, CL3, ke0) => ({ V1, V2, V3, CL1, CL2, CL3, ke0 });
+Object.assign(MODELS, {
+  // phenylephrine: Anderson 2017 2-compartment (CL 160 L/h, V1 13.3 L, Q 25.3 L/h, V2 225 L) [V] with V1 split into a
+  // 5 L blood front end exchanging at 3 L/min with 8.3 L (prototype); ke0 1.5
+  anderson: p => vc(5 * w(p), 8.3 * w(p), 225 * w(p), 2.67 * w75(p), 3 * w75(p), 0.42 * w75(p), 1.0),
+  // noradrenaline: CL 3 L/min (Beloeil 2005) [V] from a 5 L blood volume (plasma t1/2 about 1.2 min: SmPC 1-2), so
+  // an infusion is gone 1-2 min after stopping
+  nora: p => vc(5 * w(p), 0, 0, 3 * w75(p), 0, 0, 2),
+  adre: p => vc(13 * w(p), 0, 0, 3.64 * w(p), 0, 0, 2),            // CL 52 mL/kg/min, t1/2 2.5 min (Clutter) [V]
+  vaso: p => vc(10 * w(p), 0, 0, 0.46 * w75(p), 0, 0, 1.5),        // t1/2 about 15 min; onset 1-2 min
+  meta: p => vc(40 * w(p), 0, 0, 0.7 * w75(p), 0, 0, 0.5),         // lasts 20-60 min
+  ephe: p => vc(210 * w(p), 0, 0, 0.6 * w75(p), 0, 0, 0.5),        // t1/2 about 4 h; onset 1-2 min
+  atro: p => vc(91 * w(p), 0, 0, 0.35 * w75(p), 0, 0, 1),          // Vd 1.3 L/kg, t1/2 3 h (Hinderling); HR peak 2-4 min
+  glyc: p => vc(42 * w(p), 0, 0, 0.39 * w75(p), 0, 0, 0.6),        // HR peak 2-5 min, lasts 2-3 h
+  esmo: p => vc(15 * w(p), 245 * w(p), 0, 20 * w75(p), 3 * w75(p), 0, 1),  // t1/2 9 min, distribution 2 min [V]
+  labe: p => vc(100 * w(p), 560 * w(p), 0, 1.9 * w75(p), 3 * w75(p), 0, 0.6), // maximum by 5 min
+  gtn: p => vc(15 * w(p), 180 * w(p), 0, 54 * w75(p), 10 * w75(p), 0, 0.6),   // CL up to 3270 L/h [V]; onset 1-3 min
+});
+
 // rate-constant models as volumes and clearances, so every model takes the patient multipliers the same way
 function fromK(V1, k, ke0) {
   return {
@@ -95,20 +117,35 @@ export const pk = {
   name: 'pk',
   init(state) {
     const p = {};
-    for (const id in DRUGS) p[id] = rates(MODELS[DRUGS[id].model](state.patient), state.patient);
-    return { p, d: {}, inf: {} };
+    for (const id in DRUGS) if (MODELS[DRUGS[id].model]) p[id] = rates(MODELS[DRUGS[id].model](state.patient), state.patient);
+    return { p, d: {}, inf: {}, nm: null, pend: [] };
   },
   step(prev, ctx) {
-    const s = prev.pk, w = prev.patient.weightKg, dtMin = ctx.dt / 60;
-    let inf = s.inf;
+    const s = prev.pk, wt = prev.patient.weightKg, dtMin = ctx.dt / 60;
+    let inf = s.inf, pend = s.pend || [];
     const add = {};
+    const nmAdd = {};
     for (const a of ctx.actions) {
+      if (a.type === 'bolus' && a.route === 'iv' && DRUGS[a.drug] && DRUGS[a.drug].model === 'nmb') {
+        nmAdd[a.drug] = (nmAdd[a.drug] || 0) + doseAmount(a.drug, a.dose, a.unit, wt);
+        continue;
+      }
       if (!(a.drug in s.p)) continue;
-      if (a.type === 'bolus' && a.route === 'iv') add[a.drug] = (add[a.drug] || 0) + doseAmount(a.drug, a.dose, a.unit, w);
+      if (a.type === 'bolus' && a.route === 'iv') {
+        const amt = doseAmount(a.drug, a.dose, a.unit, wt);
+        // a transit delay from the cannula to the central circulation (phenylephrine, prototype) [D]
+        if (DRUGS[a.drug].delayS) pend = [...pend, { drug: a.drug, amt, at: ctx.t + DRUGS[a.drug].delayS }];
+        else add[a.drug] = (add[a.drug] || 0) + amt;
+      }
       else if (a.type === 'infusion') {
         inf = { ...inf };
-        if (a.rate > 0) inf[a.drug] = rateAmount(a.drug, a.rate, a.unit, w); else delete inf[a.drug];
+        if (a.rate > 0) inf[a.drug] = rateAmount(a.drug, a.rate, a.unit, wt); else delete inf[a.drug];
       }
+    }
+    // delayed boluses that arrive this step
+    if (pend.length) {
+      for (const x of pend) if (x.at <= ctx.t + 1e-9) add[x.drug] = (add[x.drug] || 0) + x.amt;
+      pend = pend.filter(x => x.at > ctx.t + 1e-9);
     }
     const d = {}, pumps = prev.pump || {};
     for (const id in s.p) {
@@ -119,7 +156,9 @@ export const pk = {
       if (add[id]) nx.a1 += add[id];
       d[id] = nx;
     }
-    return { ...s, d, inf };
+    // neuromuscular drugs (nmb.js): stepped once any has been given
+    const nm = s.nm || Object.keys(nmAdd).length ? stepNm(s.nm || emptyNm(), nmAdd, prev.patient, dtMin) : null;
+    return { ...s, d, inf, nm, pend };
   },
   trend(s) {
     const out = {};

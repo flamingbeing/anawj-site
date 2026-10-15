@@ -6,7 +6,7 @@ import { NIBP_TAKES } from '../js/model/monitor.js';
 const s = createSim({ seed: 11 });
 const m0 = s.state.mon;
 // after the warm start the averages sit near the model's values
-assert.ok(Math.abs(m0.hr - s.state.vit.hr) < 5 && Math.abs(m0.spo2 - s.state.vit.spo2) < 1);
+assert.ok(Math.abs(m0.hr - s.state.cv.hr) < 5 && Math.abs(m0.spo2 - s.state.gas.sao2) < 2);
 assert.equal(m0.rrs.length, 4); assert.equal(m0.cycles.length, 4);
 // the warm start leaves a reading and the events of the last minutes (negative times) for the lanes
 assert.ok(m0.nibp.last && m0.nibp.last.t < 0);

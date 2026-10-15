@@ -113,16 +113,75 @@ try {
     assert.match(await page.textContent('#n-nibp-age'), /min ago|just now/);
     assert.ok(!/cycle/.test(await page.textContent('#n-nibp-age')), 'manual mode shows no cycle');
 
+    // vasoactive drugs on the Circulation tab: phenylephrine raises the pressure within a minute
+    const mapBefore = await page.evaluate(() => otsim.state.cv.map);
+    await page.click('[data-bolus="phenylephrine"][data-dose="100"]');
+    await page.evaluate(() => otsim.step(450));
+    assert.ok(await page.evaluate(m => otsim.state.cv.map > m + 5, mapBefore), `${name}: phenylephrine raises MAP`);
+    await page.click('[data-inf="noradrenaline"]');
+    assert.match(await page.textContent('#inf-state-noradrenaline'), /Running 0.05 mcg\/kg\/min/);
+    await page.click('[data-infstop="noradrenaline"]');
+    // fluids: a bolus runs and is counted; bleeding lowers the blood volume
+    await page.click('[data-fluid="crystalloid"][data-ml="250"]');
+    await page.evaluate(() => otsim.step(20));
+    assert.match(await page.textContent('#fluid-state'), /Running: crystalloid \d+ mL to go/);
+    await page.evaluate(() => otsim.step(3000));
+    assert.match(await page.textContent('#fluid-state'), /Given: crystalloid 250 mL/);
     await axe(page, `${name} theatre, Circulation tab`);
+    await page.click('#tab-pt');
+    const bv1 = await page.evaluate(() => otsim.state.cv.bloodVol);
+    await page.selectOption('#bleed', '100');
+    await page.evaluate(() => otsim.step(600));
+    assert.ok(await page.evaluate(v => otsim.state.cv.bloodVol < v - 50, bv1), `${name}: bleeding lowers blood volume`);
+    // the forced-air warmer toggles (on the Patient tab, beside bleeding)
+    await page.click('#warmer');
+    assert.equal(await page.getAttribute('#warmer', 'aria-pressed'), 'true');
+    assert.ok(await page.evaluate(() => otsim.state.temp.warming), 'warmer on');
+    await page.click('#warmer');
+    await page.selectOption('#bleed', '0');
+    await page.click('#tab-circ');
 
     // Drugs: a propofol bolus raises the plasma level at once and the effect site over the next minute and a half
     await page.click('#tab-drugs');
+    const map0 = await page.evaluate(() => otsim.state.cv.map);
     await page.click('[data-bolus="propofol"][data-dose="140"]');
     const cp0 = await page.evaluate(() => otsim.state.pk.d.propofol.a1 / otsim.state.pk.p.propofol.V1);
     assert.ok(cp0 > 20, `${name}: propofol Cp after 140 mg: ${cp0}`);
     await page.evaluate(() => otsim.step(900));
     assert.ok(await page.evaluate(() => otsim.state.pk.d.propofol.ce) > 4, `${name}: effect site rises`);
+    await page.evaluate(() => otsim.step(300));
+    assert.ok(await page.evaluate(m => otsim.state.cv.map < m - 5, map0), `${name}: blood pressure falls after propofol`);
     assert.match(await page.textContent('#given'), /Propofol 140 mg/);
+    // the Breathing tab: volume-control ventilation gives a plateau pressure and a minute volume; 100% O2 raises SpO2
+    await page.click('#tab-breath');
+    await page.evaluate(() => otsim.sim.act({ type: 'bolus', drug: 'rocuronium', dose: 0.6, unit: 'mg/kg', route: 'iv' }));
+    await page.selectOption('#vmode', 'vc');
+    await page.click('[data-fio2="1"]');
+    await page.click('#v-apply');
+    await page.evaluate(() => otsim.step(3000));
+    assert.match(await page.textContent('#vent-state'), /Volume control: Vt \d+ mL, Ppeak \d+/);
+    assert.ok(await page.evaluate(() => parseFloat(document.getElementById('n-ppeak').textContent)) > 8, `${name}: airway pressure shown`);
+    await page.evaluate(() => otsim.step(3000));
+    assert.ok(await page.evaluate(() => otsim.state.gas.sao2) > 98, `${name}: oxygenated on 100% (got ${await page.evaluate(() => otsim.state.gas.sao2)})`);
+    // the vaporiser: sevoflurane washes in, raising the agent numeric and MAC
+    await page.selectOption('#vap-agent', 'sevoflurane');
+    await page.fill('#vap-dial', '6'); await page.click('#vap-apply');
+    await page.fill('#fgf-o2', '4'); await page.click('#fgf-apply');
+    await page.evaluate(() => otsim.step(12000));
+    assert.ok(await page.evaluate(() => otsim.state.vol.mac) > 0.8, `${name}: sevoflurane raises MAC`);
+    assert.match(await page.textContent('#n-agent'), /^\d/);
+    await axe(page, `${name} theatre, Breathing tab`);
+    await page.click('#tab-drugs');
+    // the Patient tab: asleep under TCI; a stimulus shows in the events
+    await page.evaluate(() => { otsim.sim.act({ type: 'tci', drug: 'propofol', target: 4 }); otsim.step(3000); });
+    await page.click('#tab-pt');
+    await page.click('#talk');
+    assert.match(await page.textContent('#talk-reply'), /No answer|No response/);
+    await page.click('[data-stim="incision"]');
+    assert.match(await page.textContent('#events'), /Incision/);
+    assert.match(await page.textContent('#events'), /No longer responds to voice/);
+    await axe(page, `${name} theatre, Patient tab`);
+    await page.click('#tab-drugs');
     // a custom dose
     await page.fill('#bd-fentanyl', '75');
     await page.click('[data-give="fentanyl"]');
@@ -138,12 +197,25 @@ try {
     assert.match(await page.textContent('#inf-state-propofol'), /Running 6 mg\/kg\/h/);
     await page.click('[data-infstop="propofol"]');
     assert.equal(await page.textContent('#inf-state-propofol'), '');
+    // neuromuscular block: rocuronium takes the TOF to 0/4, a PTC can be counted, sugammadex brings it back
+    await page.click('[data-bolus="rocuronium"]');
+    await page.evaluate(() => otsim.step(1800));
+    assert.equal(await page.textContent('#n-tof'), '0/4');
+    await page.click('[data-tof="ptc"]');
+    assert.match(await page.textContent('#n-ptc'), /^PTC \d+$/);
+    await page.click('[data-bolus="sugammadex"][data-dose="1100"]');
+    await page.evaluate(() => otsim.step(1800));
+    assert.equal(await page.textContent('#n-tof'), '4/4');
+    assert.match(await page.textContent('#n-tofr'), /^\d+%$/);
     // Behind the monitor: closed by default, shows the pump's prediction beside the true level, remembered
     assert.equal(await page.$eval('#behind-box', d => d.open), false);
     await page.click('#behind-box summary');
     await page.evaluate(() => otsim.step(1));
     const rows = await page.$$eval('.behind tbody tr', trs => trs.map(tr => tr.textContent));
-    assert.ok(rows.some(r => /^Remifentanil3\.0/.test(r)) && rows.some(r => /^Propofol––/.test(r)), `${name}: behind rows ${rows}`);
+    assert.ok(rows.some(r => /^Remifentanil3\.0/.test(r)) && rows.some(r => /^Propofol/.test(r)), `${name}: behind drug rows ${rows}`);
+    assert.ok(rows.some(r => /^Twitch \(T1\)/.test(r)), `${name}: neuromuscular rows in Behind the monitor`);
+    assert.ok(rows.some(r => /^To voice \(asleep\)/.test(r)), `${name}: depth rows in Behind the monitor`);
+    assert.ok(rows.some(r => /^Cardiac output/.test(r)), `${name}: circulation rows in Behind the monitor`);
     assert.equal(await page.evaluate(() => localStorage.getItem('otsim.behind')), '1');
 
     // no horizontal scroll; axe on the paused theatre

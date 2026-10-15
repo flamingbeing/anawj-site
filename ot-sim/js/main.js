@@ -6,8 +6,8 @@ import { NIBP_CYCLES } from './model/monitor.js';
 import { Loop, SPEEDS } from './ui/loop.js';
 import { Lane } from './ui/lanes.js';
 import { ecg, pleth, co2, modelSource, FastSource } from './ui/synth.js';
-import { Numerics } from './ui/numerics.js';
-import { DrugsPanel } from './ui/drugs.js';
+import { Numerics, clockText } from './ui/numerics.js';
+import { DrugsPanel, CIRC_ROWS } from './ui/drugs.js';
 import { behindHtml } from './ui/behind.js';
 
 const $ = id => document.getElementById(id);
@@ -45,6 +45,15 @@ function panels(force = false) {
   if (!force && now - panelsAt < 500) return;
   panelsAt = now;
   drugs.update(sim.state);
+  if (!$('panel-circ').hidden) circDrugs.update(sim.state);
+  if (!$('panel-breath').hidden) {
+    const vol = sim.state.vol, fg = vol.fgf, parts = [];
+    for (const id in vol.dial) if (vol.dial[id] > 0) parts.push(`${id} ${vol.dial[id]}% (Et ${(vol.t[id].fa * 100).toFixed(1)}%)`);
+    const at = `Fresh gas O₂ ${fg.o2} / air ${fg.air} / N₂O ${fg.n2o} L/min.${parts.length ? ' ' + parts.join(', ') + '.' : ''} MAC ${vol.mac.toFixed(1)}.`;
+    if ($('agent-state').textContent !== at) $('agent-state').textContent = at;
+    const r = sim.state.resp; const t = r.mode === 'spont' ? (r.apnoea ? 'Apnoeic (no spontaneous breaths).' : `Spontaneous: Vt ${Math.round(r.vt)} mL, rate ${r.rr.toFixed(0)}, MV ${r.mv.toFixed(1)} L/min.`) : `${r.mode === 'vc' ? 'Volume' : 'Pressure'} control: Vt ${Math.round(r.vt)} mL, Ppeak ${Math.round(r.ppeak)}, Pplat ${Math.round(r.pplat)}, MV ${r.mv.toFixed(1)} L/min${r.autoPeep > 0.05 ? `, auto-PEEP ${r.autoPeep.toFixed(1)}` : ''}.`; if ($('vent-state').textContent !== t) $('vent-state').textContent = t; }
+  if (!$('panel-circ').hidden) { const t = fluidText(sim.state); if ($('fluid-state').textContent !== t) $('fluid-state').textContent = t; }
+  if (!$('panel-pt').hidden) { const h = eventsHtml(sim.state); if ($('events').innerHTML !== h) $('events').innerHTML = h; }
   if ($('behind-box').open) { const h = behindHtml(sim.state); if ($('behind').innerHTML !== h) $('behind').innerHTML = h; }
 }
 
@@ -64,6 +73,63 @@ function acted() {
   panels(true);
 }
 const drugs = new DrugsPanel($('panel-drugs'), sim, acted);
+const circDrugs = new DrugsPanel($('circ-drugs'), sim, acted, { rows: CIRC_ROWS, extras: false });
+
+// Breathing tab: oxygen and the ventilator
+function setFio2(v) {
+  v = Math.min(1, Math.max(0.21, v || 0.21));
+  $('fio2').value = v;
+  sim.act({ type: 'o2', fio2: v });                       // spontaneous breathing
+  if (sim.state.resp.mode !== 'spont') sim.act({ type: 'vent', fio2: v }); // the ventilator's own FiO2
+  acted();
+}
+for (const b of document.querySelectorAll('[data-fio2]')) b.addEventListener('click', () => setFio2(+b.dataset.fio2));
+$('fio2').addEventListener('change', () => setFio2(+$('fio2').value));
+$('vmode').addEventListener('change', () => {
+  const m = $('vmode').value;
+  $('vc-set').hidden = m !== 'vc'; $('pc-set').hidden = m !== 'pc';
+});
+$('fgf-apply').addEventListener('click', () => { sim.act({ type: 'fgf', o2: +$('fgf-o2').value, air: +$('fgf-air').value, n2o: +$('fgf-n2o').value }); acted(); });
+$('vap-apply').addEventListener('click', () => { sim.act({ type: 'vaporiser', agent: $('vap-agent').value, dial: +$('vap-dial').value }); acted(); });
+$('v-apply').addEventListener('click', () => {
+  const m = $('vmode').value;
+  const a = { type: 'vent', mode: m, peep: +$('v-peep').value, ie: 1 / (+$('v-ie').value || 2), fio2: Math.min(1, Math.max(0.21, +$('fio2').value || 0.21)) };
+  if (m === 'vc') { a.vt = +$('v-vt').value; a.rr = +$('v-rr').value; }
+  else if (m === 'pc') { a.pinsp = +$('v-pinsp').value; a.rr = +$('v-rr2').value; }
+  sim.act(a); acted();
+});
+
+// Patient tab: talk, stimuli, events (the full Examine tab comes with the case flow, M3.2)
+$('talk').addEventListener('click', () => {
+  const pd = sim.state.pd;
+  $('talk-reply').textContent = !pd.asleep ? 'Opens their eyes and answers.' : pd.pAsleep < 0.95 ? 'No answer. Stirs a little to a louder voice.' : 'No response.';
+});
+for (const b of document.querySelectorAll('[data-stim]')) b.addEventListener('click', () => { sim.act({ type: 'stimulus', kind: b.dataset.stim }); acted(); });
+$('surgery').addEventListener('click', () => {
+  const on = $('surgery').getAttribute('aria-pressed') !== 'true';
+  $('surgery').setAttribute('aria-pressed', String(on));
+  sim.act({ type: 'stimulus', kind: 'surgery', level: on ? 0.8 : 0 });
+  acted();
+});
+for (const b of document.querySelectorAll('[data-fluid]')) b.addEventListener('click', () => { sim.act({ type: 'fluid', product: b.dataset.fluid, ml: +b.dataset.ml }); acted(); });
+$('bleed').addEventListener('change', () => { sim.act({ type: 'bleed', mlPerMin: +$('bleed').value }); acted(); });
+$('warmer').addEventListener('click', () => { const on = $('warmer').getAttribute('aria-pressed') !== 'true'; $('warmer').setAttribute('aria-pressed', String(on)); sim.act({ type: 'warming', on }); acted(); });
+const PRODUCT_NAME = { crystalloid: 'crystalloid', colloid: 'colloid', rbc: 'red cells' };
+function fluidText(state) {
+  const fl = state.cv.fl, run = fl.running.map(r => `${PRODUCT_NAME[r.product]} ${Math.round(r.left)} mL to go`);
+  const given = Object.entries(fl.given).filter(([, v]) => v > 0.5).map(([k, v]) => `${PRODUCT_NAME[k]} ${Math.round(v)} mL`);
+  return [run.length ? `Running: ${run.join(', ')}.` : '', given.length ? `Given: ${given.join(', ')}.` : ''].filter(Boolean).join(' ');
+}
+const EVENT_TEXT = {
+  asleep: () => 'No longer responds to voice', awake: () => 'Responds to voice again',
+  movement: e => `Moved at ${e.stimulus === 'surgery' ? 'the start of surgery' : e.stimulus}`,
+  stimulus: e => (e.stimulus === 'surgery' ? 'Surgery under way' : `${e.stimulus[0].toUpperCase()}${e.stimulus.slice(1)}`),
+  nibp: e => `NIBP ${e.sys}/${e.dia}`, ptc: e => (e.ptc == null ? 'PTC: TOF present' : `PTC ${e.ptc}`),
+};
+function eventsHtml(state) {
+  const ev = state.log.filter(e => EVENT_TEXT[e.kind] && e.kind !== 'nibp').slice(-8).reverse();
+  return ev.length ? ev.map(e => `<li><span class="when">${clockText(e.t)}</span> ${EVENT_TEXT[e.kind](e)}</li>`).join('') : '<li class="none">Nothing yet</li>';
+}
 
 // tabs (ARIA tabs pattern: arrow keys move between tabs)
 const tabs = [...document.querySelectorAll('[role=tab]')];
@@ -77,7 +143,7 @@ function selectTab(tab, focus = false) {
   if (focus) tab.focus();
 }
 for (const t of tabs) {
-  t.addEventListener('click', () => selectTab(t));
+  t.addEventListener('click', () => { selectTab(t); panels(true); });
   t.addEventListener('keydown', e => {
     const i = tabs.indexOf(t), n = tabs.length;
     const j = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i + n - 1) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1;

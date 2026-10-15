@@ -32,7 +32,7 @@ only writer of its slice (`DESIGN.md`, the model loop):
 | `resp` | `resp.{mode, vt, rr, mv, va, ppeak, pplat, peep, autoPeep, compliance, resistance, spont, pplMmHg, breaths[]}` |
 | `gas` | `gas.{fa[species], fio2, pao2, sao2, paco2, etco2, pvo2, svo2, ph, hco3, be, lactate, k, ica, shunt, vdAlvFrac, uptake[agent]}` |
 | `airway` | `aw.{device, patent, obstruction, seal, leak, cuff, position, view}` (glottic closure is owned by `cond.laryngospasm.level`; `airway.js` reads it as obstruction) |
-| `temp` | `t.{core, periph, ambient, warming}` |
+| `temp` | `temp.{core, periph, ambient, warming}` |
 | `cond` | `cond[name].{level, ...}` (the disease processes, section 11), `cond.haemorrhage.coag.{fibrinogen, platelets}` |
 | `resus` | `rs.{cpr, quality, coFraction, lastShock, paced, capture}` |
 | `monitor` | `mon.{shown values, alarms[], nibp state, probe states}` |
@@ -84,10 +84,10 @@ Details and cross-checks: `research/pk.md`.
 | Alfentanil | Maitre 1987 (later, optional) | V1 0.111·W; CL 0.356 L/min (falls after 40 y); k12 0.104, k13 0.017, k21 0.0673, k31 0.0126; ke0 0.77 | [V] |
 | Midazolam | Albrecht 1999 | V1 7.9 L; CL1 0.399; k12 0.19, k13 0.065, k21 0.06, k31 0.0083; ke0 0.11 (time to peak about 6 min in this model vs about 2.8 min in Miller's table: record, don't tune) | [V] |
 | Ketamine | Domino 1982 | V1 0.063·W; k10 0.438, k12 0.592, k13 0.590, k21 0.247, k31 0.0146; ke0 0.652 (chosen by opentiva for a time to peak about 1 min) | PK [S]; ke0 [D] |
-| Rocuronium | **Kleijn** 2011 PK (2 compartments, holds the sugammadex binding) with **directional effect sites** | V1 4.73·(W/70), V2 6.76·(W/70) L; CL 0.269·(W/70)^0.75, Q2 0.279·(W/70)^0.75 L/min. Thumb (adductor pollicis): ke0 0.3/min while Ce rises, 1.2/min while it falls; Ce50 0.95 mcg/mL (bromide); Hill 3.5; under sevoflurane Ce50 × 0.605 (Kleijn). Diaphragm Ce50 × 1.9 (rocuronium ED50 0.26 vs 0.14 mg/kg, Cantineau 1994), recovers sooner. Upper-airway dilator muscles Ce50 × 0.7 (more sensitive than the thumb). Larynx (intubating conditions) Ce50 × 1.73 with faster equilibration (Plaud 1995: 1.42 vs 0.82 mcg/mL, t½ke0 2.7 vs 4.4 min) | PK [V]; one symmetric ke0 could not meet both onset and sugammadex reversal in the prototype, so the directional ke0, Ce50 and Hill are [D] tuned to the label; site ratios [V] (diaphragm, larynx) and [D] (upper airway) |
+| Rocuronium | **Kleijn** 2011 PK (2 compartments, holds the sugammadex binding) with **directional effect sites** | V1 4.73·(W/70), V2 6.76·(W/70) L; CL 0.269·(W/70)^0.75, Q2 0.279·(W/70)^0.75 L/min. Thumb (adductor pollicis): ke0 0.2/min while Ce rises, 0.9/min while it falls (M1.3 retune of the prototype's 0.3 / 1.2 against the acceleromyography TOF readout); Ce50 0.95 mcg/mL (bromide); Hill 3.5; under sevoflurane Ce50 × 0.605 (Kleijn). Diaphragm Ce50 × 1.9 (rocuronium ED50 0.26 vs 0.14 mg/kg, Cantineau 1994), recovers sooner. Upper-airway dilator muscles Ce50 × 0.7 (more sensitive than the thumb). Larynx (intubating conditions) Ce50 × 1.73 with faster equilibration (Plaud 1995: 1.42 vs 0.82 mcg/mL, t½ke0 2.7 vs 4.4 min) | PK [V]; one symmetric ke0 could not meet both onset and sugammadex reversal in the prototype, so the directional ke0, Ce50 and Hill are [D] tuned to the label; site ratios [V] (diaphragm, larynx) and [D] (upper airway) |
 | Suxamethonium | Roy 2002 1-compartment | V 0.038 L/kg; hydrolysis k 0.97/min; ke0 **0.29** (Roy's 0.058 gives T1 90% at about 22 min, twice the Lee 2009 time); Ce50 825 ng/mL; Hill 4; cholinesterase variants scale k: heterozygous × 0.5 (about 15 min), homozygous × 0.01 (about 8 h); phase II block (fade) after 3–5 mg/kg total; potassium +0.5 mmol/L | PK [V]; ke0, Ce50, Hill [D] tuned; K+ [S] (Thapa & Brull 2000); phase II [V] Lee 1975 |
 | Sugammadex | Kleijn 2011 | 1:1 complex with free rocuronium, KD 0.0559 µM, **solved as equilibrium each step** (quadratic for free rocuronium from totals and KD, written in its numerically stable form); complex cleared like free sugammadex (CL about 88 mL/min, t½ about 2 h); MW rocuronium bromide 609.7, sugammadex 2178 | [V]; equilibrium method [D] (an explicit reaction blew up at realistic on-rates) |
-| Neostigmine | Effect model | Peak antagonism 5–10 min (4.6 min warm, 5.6 min mildly cold in Heier 2002; 7–10 min in clinical reviews; ASA 2023 waits at least 10 min with qualitative monitoring), a ceiling (no effect on deep block); raises the effective rocuronium Ce50 by up to about × 3 [D]; usual 40–50 mcg/kg, never over 5 mg (label maximum 50 mcg/kg UK, 70 mcg/kg US); muscarinic slowing of HR and secretions unless glycopyrrolate about 10 mcg/kg (0.2 mg per 1 mg neostigmine) or atropine 15–20 mcg/kg | [V] timing, labels; size [D] calibrated to Kopman 2005 and Naguib 1993 (below) |
+| Neostigmine | Effect model (M1.3: one compartment 0.7 L/kg, t½ 80 min, ke0 0.65; raises rocuronium's Ce50 up to × 2, half at 20 ng/mL; fits Kopman 2005 and Blobner 2010 at T2, 18.6 min; Jones 2008 from a deep block 50 min, model 32: a known miss) | Peak antagonism 5–10 min (4.6 min warm, 5.6 min mildly cold in Heier 2002; 7–10 min in clinical reviews; ASA 2023 waits at least 10 min with qualitative monitoring), a ceiling (no effect on deep block); raises the effective rocuronium Ce50 by up to about × 3 [D]; usual 40–50 mcg/kg, never over 5 mg (label maximum 50 mcg/kg UK, 70 mcg/kg US); muscarinic slowing of HR and secretions unless glycopyrrolate about 10 mcg/kg (0.2 mg per 1 mg neostigmine) or atropine 15–20 mcg/kg | [V] timing, labels; size [D] calibrated to Kopman 2005 and Naguib 1993 (below) |
 | Local anaesthetics | 2-compartment plus an absorption compartment per block site; intravascular injection goes to the central compartment | lidocaine, bupivacaine, ropivacaine. **Gap: volumes, clearances, absorption rates and free fractions (bupivacaine about 0.05, ropivacaine about 0.06, lidocaine about 0.3 [U]) need a research step before the LAST scenario PR.** Thresholds must be compared on the same basis (free or total) | [U] |
 | Vasoactive drugs | Section 5 | — | — |
 
@@ -120,8 +120,13 @@ remifentanil 50 mcg/mL, maximum 1200 mL/h (confirm with NUH pumps). Different pu
 | Neostigmine | at T1 about 10%, ED50 17 and ED80 33 mcg/kg for recovery at 10 min (Naguib 1993); profound block with 50 mcg/kg: TOFR 0.55 / 0.71 / 0.81 at 10 / 15 / 20 min (Kopman 2005) | not prototyped |
 | Post-tetanic count | first PTC response to first TOF response about 16 min in adults (Baykara 2002) | not prototyped |
 
-**TOF readout** [V for the mapping, D for the fade factors]: T1 = 1/(1 + (Ce/EC50)^γ); later twitches more sensitive,
-Tn with EC50 × fn (f2 0.85, f3 0.7, f4 0.59); a twitch counts above 3–5% of control; TOFR = T4/T1; fade cannot be felt
+**TOF readout** [V for the anchors, D for the fit] (M1.3): T1 = 1/(1 + (Ce/EC50)^γ); later twitches more sensitive and
+steeper, Tn with EC50 × fn and γ × hn (f 0.917 / 0.835 / 0.752, h 1.17 / 1.34 / 1.51), fitted so T4 disappears at T1
+about 25% (Lee 1975) and TOFR 0.9 comes at T1 about 86% (acceleromyography, Kopman 2002), the way the trials measured
+(the planned single slope with f4 0.59 is mechanomyography: TOFR 0.9 at T1 99%); a twitch counts above 4% of control;
+PTC: post-tetanic twitch n acts as if EC50 were × (2.7 falling to 1 by the 11th), tuned to Baykara 2002's 16 min;
+spontaneous recovery from T2 to TOFR 0.9 is about 50 min in the model vs 21 min in Sorgenfrei 2006's small placebo
+arm (a known miss: fitting it shortens the label's 31-min duration to about 16); TOFR = T4/T1; fade cannot be felt
 above a TOFR of about 0.4 (Viby-Mogensen 1985) [V]; acceleromyography reads TOFR 0.9 at T1 about 86% (Kopman 2002) [V].
 Hypothermia (34.5 °C roughly doubles vecuronium duration, Heier 1991) and magnesium (40 mg/kg: about −25% ED50,
 Fuchs-Buder 1995) prolong the block [V]; volatiles potentiate it [S].
@@ -192,7 +197,9 @@ use the plain wash-in [V for the protocol].
   - **Movement:** the patient moves at stimulus onset if P(no response) < q, unless paralysed.
   - **Autonomic drive** `pd.auto` (0–1): a second surface needing about 1.6× the hypnotic Ce50 with the opioid
     relatively more potent (MAC-BAR is about 1.5–2 MAC; fentanyl 3 ng/mL cuts sevoflurane MAC-BAR by 83% but MAC by
-    61%) [V ratios, D form]. `cardio.js` turns it into sympathetic drive, calibrated in M2.1 so laryngoscopy at P_TOL
+    61%) [V ratios, D form]. Built in M2.1 as a graded response, auto = 1/(1 + U_a²) with the hypnotic terms × 1.6 and
+    the opioid C50 1.0 ng/mL (fentanyl 3 ng/mL: MAC-BAR −71% here), about 0.4 at every P_TOL 0.9 pair; a probability
+    (1 − P(no response)) was about 0.01 there and could not give the measured rise. Brief stimuli drive it for 60 s. `cardio.js` turns it into sympathetic drive, calibrated in M2.1 so laryngoscopy at P_TOL
     0.9 gives SBP +19 to +32 mmHg and HR +6 to +10 (van den Berg 2021) [V]; rise over 30–60 s, fade over 3–5 min for
     brief stimuli, held during surgery [D].
   - Light-anaesthesia signs in Examine: sweating and tears (two of Evans' PRST signs), pupils dilating with a noxious
@@ -235,6 +242,14 @@ Hybrid design (`research/cardio.md` section 1, prototyped in `research/prototype
   systemic (about 1590 with the pulmonary bed), systemic mean filling pressure 10.4, venous compartment 9.4 mmHg, Rvr =
   (Psv − CVP)/CO, systemic resistance 0.896 mmHg·s/mL; displayed SVR (MAP − CVP)/CO = 15.9 Wood units (1270
   dyn·s·cm⁻⁵; 1000–1200 dyn is 12.5–15 Wood units). Prototype: HR 72.0, SV 75.0, CO 5.40, 120/75, CVP 4.0, LAP 8.0.
+- **As built in M2.1:** `cardio.js` reads the beats `rhythm.js` placed in the previous step (0.1 s later) and does not
+  split the step at the beat: flows change at step boundaries, and volume is still conserved (flux transfer; drift under
+  1e-6 mL an hour, tested). The filling-time loss is (1 − exp(−(RR − 0.3 s)/0.08 s)), normalised to 1 at rest [D]. The
+  opioid adds vagal drive v + 1.0·E_R·(1 − v) with E_R = CeR_eq/(CeR_eq + 2) (HR 56–59 at remifentanil 4–8 with
+  propofol at P_TOL 0.9) and lowers SVR up to 7.5%; the stimulus adds 1.4 × `pd.auto` of sympathetic drive after the
+  reflex's blunting (laryngoscopy at P_TOL 0.9: SBP +19 to +31, HR +5 to +16, wider than van den Berg's +6 to +10 at
+  low opioid); propofol's haemodynamic C50 is 1.0/(1 + 0.02·(age − 40)) mcg/mL so the elderly fall further (75 y:
+  −18.8 vs −17.9 mmHg at 2 min) [D]. The critical closing pressure waits for VF (M2.7).
 - **Critical closing pressure** [D, not yet prototyped]: Q_sys = (Psa − max(Psv, Pcrit))/R with Pcrit about 20 mmHg
   engaging only at low flow, plus a small leak so pressures still equalise over minutes. A closing pressure changes
   where arterial pressure settles, not how fast: after VF starts it falls with τ ≈ R·C (about 1.4 s) towards Pcrit,
@@ -309,6 +324,11 @@ Hybrid design (`research/cardio.md` section 1, prototyped in `research/prototype
 | Labetalol | 10–20 mg, then 5–10 mg increments (hypotensive anaesthesia); severe hypertension 50 mg over 1 min, to 200 mg | maximum by 5 min; 20–25 mg lasts about 50 min under anaesthesia | SmPC [V] |
 | GTN | 50–100 mcg bolus (off-label); infusion 10–200 mcg/min | onset 1–3 min, offset 5–10 min, preload falls first | Stengert 1978; SmPC [V] |
 | Metaraminol | 0.5–1 mg (off by default: not on the HSA register) | onset 1–2 min, lasts 20–60 min | SmPC [V]; HSA listing checked 14 Oct 2026 |
+
+As built in M2.3 (`vaso.js`, `test/vaso.test.mjs`): phenylephrine 50/100/200 mcg under the MAC-1.6 test state gives
+MAP +9.7/+13/+18.7 with the 100 mcg peak at 46 s and CO −1.0; noradrenaline 10 mcg +12; adrenaline 10 mcg HR +21 with
+DBP −5, 1 mg MAP +23; atropine 0.6 mg HR +25 at 3 min; glycopyrrolate 0.2 mg +18; labetalol 20 mg and GTN 50 mcg/min
+lower MAP about 5–12 mmHg; ephedrine 6 mg +11 then less with each repeat [D].
 
 ## 6. Rhythms and the ECG
 

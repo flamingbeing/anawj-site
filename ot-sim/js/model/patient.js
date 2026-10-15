@@ -60,6 +60,10 @@ export function makePatient(profile = {}, draw) {
     bloodVol0: bloodVolume(sex, w, h),
     frc0: frc(sex, w, h),
     hb0: p.hb0 ?? (sex === 'F' ? 135 : 150),
+    // plasma cholinesterase activity as a fraction of normal: scales suxamethonium hydrolysis (heterozygous about 0.5,
+    // homozygous atypical about 0.01; MODEL.md section 2) [D]
+    che: p.che ?? 1,
+    macStub: p.macStub ?? 0,
     // variation (MODEL.md section 1); the order of draws is fixed so a seed always gives the same patient
     q: draw.uniform(),
     pkV1: exp(0.25 * draw.normal()),

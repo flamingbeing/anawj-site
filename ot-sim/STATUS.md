@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-14 by Claude Code (build session: M1.2 pumps and TCI).
+Last updated: 2026-10-15 by Claude Code (build session: M2.2-M2.6, one combined PR).
 
 ## Now
 
@@ -19,12 +19,20 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next
 
-1. M1.3 (neuromuscular block: rocuronium, suxamethonium, sugammadex, neostigmine, TOF on the monitor), then the PR
+1. M2.2 (fluids and bleeding), M2.3 (vasoactive drugs), M2.4 (gas exchange and breathing), then the rest of the PR
    order in `DESIGN.md`, one PR at a time, each merged before the next.
 
 ## Recently done
 
-- M1.2 (15 Oct 2026): syringe pumps with their own predicted model (Schnider, Marsh, Minto), plasma and effect-site
+- M2.1 (15 Oct 2026): circulation (`cardio.js`, `rhythm.js`): three compartments, beat-latched stroke volumes, the
+  baroreflex, empty-ventricle decompensation, propofol, opioid and stimulus drives. Heart rate, blood pressure and the
+  waveforms now follow the model; "Behind the monitor" shows output, SVR, CVP and the reflex.
+- M1.4 (15 Oct 2026, #577): hypnosis (asleep by one rule for everyone, the patient's own sensitivity), the stimulus response
+  (movement unless paralysed), the BIS-like index and the autonomic drive; a Patient tab (talk, stimuli, events).
+- M1.3 (15 Oct 2026, #576): neuromuscular block: rocuronium, suxamethonium, sugammadex, neostigmine; TOF on the monitor
+  every 15 s, PTC on request; the block by muscle in "Behind the monitor". Tuned to the trials' acceleromyography;
+  known misses in MODEL.md.
+- M1.2 (15 Oct 2026, #575): syringe pumps with their own predicted model (Schnider, Marsh, Minto), plasma and effect-site
   TCI; the Drugs tab (boluses for the patient's weight, custom doses, infusions, TCI), the Circulation tab (NIBP) and
   "Behind the monitor" (the pump's prediction beside the true level).
 - M1.1 (14 Oct 2026, #573): `pk.js` and `drugs.js`: propofol (Schnider, haemodynamic effect site), remifentanil (Minto),

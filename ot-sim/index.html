@@ -20,7 +20,7 @@ if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname))
 @font-face{font-family:"Arimo";font-style:normal;font-weight:400 700;font-display:swap;src:url(fonts/Arimo-latin-var.woff2) format("woff2")}
 @font-face{font-family:"Archivo Narrow";font-style:normal;font-weight:400 700;font-display:swap;src:url(fonts/ArchivoNarrow-latin-var.woff2) format("woff2")}
 :root{--bg:#0a0f18;--panel:#121a27;--fg:#e8edf5;--mut:#a9b8cc;--line:#2a3a52;--key:#1b2638;--keyon:#e8edf5;
-  --ecg:#4be36a;--spo2:#3fd6ff;--co2:#ffd23f;--nibp:#ff8a8a;--temp:#e2e2e2;
+  --ecg:#4be36a;--spo2:#3fd6ff;--co2:#ffd23f;--nibp:#ff8a8a;--temp:#e2e2e2;--tof:#c9a7ff;
   --f-mon:"Arimo","Liberation Sans",Arial,sans-serif;--f-narrow:"Archivo Narrow","Arimo",sans-serif}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
@@ -61,8 +61,9 @@ h1{font-size:1.6rem;line-height:1.2;margin:.75rem 0 .25rem}
 .num .nv{font-weight:700;font-size:40px;font-variant-numeric:tabular-nums}
 .num .nu{font-size:11px;color:#c9d3e0}
 .num .sub{font-size:15px;font-variant-numeric:tabular-nums;margin-top:2px}
-.ecg{color:var(--ecg)}.spo2{color:var(--spo2)}.co2{color:var(--co2)}.nibp{color:var(--nibp)}.temp{color:var(--temp)}
-.row{display:grid;grid-template-columns:1fr auto;gap:6px;padding-top:6px}
+.tof{color:var(--tof)}.ecg{color:var(--ecg)}.spo2{color:var(--spo2)}.co2{color:var(--co2)}.nibp{color:var(--nibp)}.temp{color:var(--temp)}
+.row{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 10px;padding-top:6px}
+.row .nv{font-size:22px}
 .box{display:flex;flex-direction:column;justify-content:center;padding:4px 6px;line-height:1.1}
 .box .nl{font:13px/1.1 var(--f-narrow)}
 .box .nv{font-weight:700;font-size:30px;font-variant-numeric:tabular-nums}
@@ -76,7 +77,7 @@ h1{font-size:1.6rem;line-height:1.2;margin:.75rem 0 .25rem}
 .tabs [role=tab]{border-radius:8px 8px 0 0;border-bottom:0;background:transparent;color:var(--mut)}
 .tabs [role=tab][aria-selected=true]{background:var(--panel);color:var(--fg);font-weight:700;border-color:var(--line)}
 .hint{color:var(--mut);font-size:.9rem;margin:.25rem 0 .75rem}
-.drug{border-left:6px solid var(--tag);background:var(--panel);border-radius:0 10px 10px 0;padding:8px 10px;margin:0 0 10px}
+.drug{border-left:6px solid var(--tag);border-image:var(--tagimg,none) 1;background:var(--panel);border-radius:0 10px 10px 0;padding:8px 10px;margin:0 0 10px}
 .drug h3{font-size:1rem;margin:0 0 6px}.drug .cls{font-weight:400;font-size:.8rem;color:var(--mut);margin-left:6px}
 .act{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0}
 .act label{display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--mut)}
@@ -143,6 +144,9 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
       </div>
       <div class="row">
         <div class="box nibp"><span class="nl">NIBP mmHg</span><span class="nv"><span id="n-nibp">--/--</span> <small id="n-map"></small></span><span class="age" id="n-nibp-age"></span></div>
+        <div class="box co2"><span class="nl">Agent Fi/Et/MAC</span><span class="nv" id="n-agent">--</span><span class="age" id="n-agent-name"></span></div>
+        <div class="box"><span class="nl">Paw cmH₂O</span><span class="nv"><span id="n-ppeak">--</span></span><span class="age">PEEP <span id="n-peep">--</span> · MV <span id="n-mv">--</span></span></div>
+        <div class="box tof"><span class="nl">TOF</span><span class="nv"><span id="n-tof">4/4</span> <small id="n-tofr"></small></span><span class="age" id="n-ptc"></span></div>
         <div class="box temp"><span class="nl">Temp</span><span class="nv"><span id="n-temp">--</span><small>°C</small></span></div>
       </div>
     </div>
@@ -150,6 +154,8 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
       <div class="tabs" role="tablist" aria-label="Controls">
         <button type="button" role="tab" id="tab-drugs" aria-controls="panel-drugs" aria-selected="true">Drugs</button>
         <button type="button" role="tab" id="tab-circ" aria-controls="panel-circ" aria-selected="false" tabindex="-1">Circulation</button>
+        <button type="button" role="tab" id="tab-breath" aria-controls="panel-breath" aria-selected="false" tabindex="-1">Breathing</button>
+        <button type="button" role="tab" id="tab-pt" aria-controls="panel-pt" aria-selected="false" tabindex="-1">Patient</button>
       </div>
       <div class="panel" role="tabpanel" id="panel-drugs" aria-labelledby="tab-drugs"></div>
       <div class="panel" role="tabpanel" id="panel-circ" aria-labelledby="tab-circ" hidden>
@@ -157,10 +163,69 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
           <button type="button" id="nibp-go">Start NIBP</button>
           <label>Cycle <select id="nibp-cycle"></select></label>
         </div>
-        <p class="hint">Fluids, blood and the circulation's controls come in the next updates.</p>
+        <div id="circ-drugs"></div>
+        <h3 class="sub">Fluids and blood</h3>
+        <div class="act">
+          <button type="button" data-fluid="crystalloid" data-ml="250">Crystalloid 250 mL</button>
+          <button type="button" data-fluid="crystalloid" data-ml="500">Crystalloid 500 mL</button>
+          <button type="button" data-fluid="colloid" data-ml="250">Colloid 250 mL</button>
+          <button type="button" data-fluid="rbc" data-ml="280">Red cells, 1 unit</button>
+        </div>
+        <p class="state" id="fluid-state"></p>
+      </div>
+      <div class="panel" role="tabpanel" id="panel-breath" aria-labelledby="tab-breath" hidden>
+        <h3 class="sub">Oxygen</h3>
+        <div class="act"><label>FiO<sub>2</sub> <input type="number" inputmode="decimal" min="0.21" max="1" step="0.05" id="fio2" value="0.21"></label>
+          <button type="button" data-fio2="0.21">Air</button><button type="button" data-fio2="1">100%</button></div>
+        <h3 class="sub">Ventilator</h3>
+        <div class="act"><label>Mode <select id="vmode"><option value="spont">Spontaneous</option><option value="vc">Volume control</option><option value="pc">Pressure control</option></select></label></div>
+        <div class="act" id="vc-set">
+          <label>V<sub>t</sub> <input type="number" inputmode="numeric" min="100" max="1000" step="10" id="v-vt" value="500"> mL</label>
+          <label>Rate <input type="number" inputmode="numeric" min="4" max="40" step="1" id="v-rr" value="12"></label>
+        </div>
+        <div class="act" id="pc-set" hidden>
+          <label>P<sub>insp</sub> <input type="number" inputmode="numeric" min="5" max="40" step="1" id="v-pinsp" value="15"> cmH<sub>2</sub>O</label>
+          <label>Rate <input type="number" inputmode="numeric" min="4" max="40" step="1" id="v-rr2" value="12"></label>
+        </div>
+        <div class="act">
+          <label>PEEP <input type="number" inputmode="numeric" min="0" max="20" step="1" id="v-peep" value="5"> cmH<sub>2</sub>O</label>
+          <label>I:E 1:<input type="number" inputmode="decimal" min="1" max="4" step="0.5" id="v-ie" value="2"></label>
+          <button type="button" id="v-apply">Set ventilator</button>
+        </div>
+        <p class="state" id="vent-state"></p>
+        <h3 class="sub">Fresh gas and vaporiser</h3>
+        <div class="act">
+          <label>O<sub>2</sub> <input type="number" inputmode="decimal" min="0" max="15" step="0.5" id="fgf-o2" value="2"></label>
+          <label>Air <input type="number" inputmode="decimal" min="0" max="15" step="0.5" id="fgf-air" value="0"></label>
+          <label>N<sub>2</sub>O <input type="number" inputmode="decimal" min="0" max="15" step="0.5" id="fgf-n2o" value="0"></label>
+          <span class="nl">L/min</span><button type="button" id="fgf-apply">Set flows</button>
+        </div>
+        <div class="act">
+          <label>Agent <select id="vap-agent"><option value="sevoflurane">Sevoflurane</option><option value="desflurane">Desflurane</option><option value="isoflurane">Isoflurane</option></select></label>
+          <label>Dial <input type="number" inputmode="decimal" min="0" max="18" step="0.5" id="vap-dial" value="0"> %</label>
+          <button type="button" id="vap-apply">Set vaporiser</button>
+        </div>
+        <p class="state" id="agent-state"></p>
+        <p class="hint">Airway control (mask, LMA, tube) and spontaneous-breathing support come with the airway update.</p>
+      </div>
+      <div class="panel" role="tabpanel" id="panel-pt" aria-labelledby="tab-pt" hidden>
+        <div class="act"><button type="button" id="talk">Talk to the patient</button></div>
+        <p class="state" id="talk-reply" aria-live="polite"></p>
+        <h3 class="sub">Stimulate</h3>
+        <p class="hint">Until the airway and the operation arrive, try a stimulus here and watch for movement.</p>
+        <div class="act">
+          <button type="button" data-stim="tetanus">Tetanic stimulus</button>
+          <button type="button" data-stim="laryngoscopy">Laryngoscopy</button>
+          <button type="button" data-stim="incision">Skin incision</button>
+          <button type="button" id="surgery" aria-pressed="false">Surgery running</button>
+        </div>
+        <div class="act"><button type="button" id="warmer" aria-pressed="false">Forced-air warmer</button></div>
+        <div class="act"><label>Surgical bleeding <select id="bleed"><option value="0">None</option><option value="20">20 mL/min</option><option value="50">50 mL/min</option><option value="100">100 mL/min</option><option value="300">300 mL/min</option></select></label></div>
+        <h3 class="sub">Events</h3>
+        <ol class="given" id="events"><li class="none">Nothing yet</li></ol>
       </div>
       <details id="behind-box"><summary>Behind the monitor</summary><div id="behind"></div></details>
-      <p class="foot">Free run: a healthy synthetic adult. The monitor does not respond to drugs yet (drug effects come next). Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
+      <p class="foot">Free run: a healthy synthetic adult. A full model: drugs, the airway gases, breathing and the ventilator, heart rate and blood pressure, oxygen and CO2 all respond. Temperature, the rhythms, the airway and the crises come next. Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
     </div>
   </div>
 </section>
