@@ -287,7 +287,8 @@ async function binReflections(list, extra = {}) {
   if (!m || !m.moveToBin) { toast('The recycle bin isn’t available yet, so nothing was deleted.'); return 0; }
   let n = 0;
   for (const r of list) {
-    try { await m.moveToBin('reflection', r, extra); n++; } catch (err) { toast('Could not delete: ' + err.message); break; }
+    // (changed elsewhere: the bin has already said it was kept, more clearly)
+    try { await m.moveToBin('reflection', r, extra); n++; } catch (err) { if (!/changed elsewhere/.test(err.message)) toast('Could not delete: ' + err.message); break; }
   }
   return n;
 }

@@ -105,9 +105,13 @@ async function healClosed(job, me) {
 export async function notesFromServer(ms = 30e3, again = 'Sync') {
   const me = mine();
   if (!me) return [];
-  await ensureNotes();
-  for (const t0 = Date.now(); !(synced && owner === me); await new Promise(r => setTimeout(r, 250)))
-    if (Date.now() - t0 > ms || mine() !== me) throw new Error(`your notes didn’t finish loading (no signal?). Tap ${again} again.`);
+  const t0 = Date.now(), fail = () => new Error(`your notes didn’t finish loading (no signal?). Tap ${again} again.`);
+  // the first answer counts in the time too (a new device with a stalled connection can wait long for it)
+  let timer;
+  try { await Promise.race([ensureNotes(), new Promise((_, no) => { timer = setTimeout(() => no(fail()), ms); })]); }
+  finally { clearTimeout(timer); }
+  for (; !(synced && owner === me); await new Promise(r => setTimeout(r, 250)))
+    if (Date.now() - t0 > ms || mine() !== me) throw fail();
   return S.notes || [];
 }
 

@@ -127,6 +127,9 @@ export function createWriteQueue({ store, backend, getOwner = () => null, normal
     },
     error: () => storageError,
     status(kind, id) { return [...ordered()].reverse().find(x => x.kind === kind && x.record.id === id)?.state || ''; },
+    // one job followed through (a later save of the same record is another job): the latest job's key, and a job's state
+    jobKey(kind, id) { return [...ordered()].reverse().find(x => x.kind === kind && x.record.id === id)?.key || ''; },
+    stateOf(key) { return jobs.find(x => x.key === key)?.state || ''; },
   };
 }
 export const writes = createWriteQueue({ store: recoveryStore, online: () => typeof navigator === 'undefined' || navigator.onLine !== false });

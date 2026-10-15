@@ -129,13 +129,17 @@ async function rollBack(owner, kind, entries) {
   }
 }
 
+// each delete's own job is followed (the latest for that record when it was queued), not the record's latest: a restore
+// from the bin queued behind a delete still waiting for signal is a later job, and while it waits the delete's refusal
+// would go unseen
 function watchDeletes(owner, kind, entries) {
   const left = new Map(entries.map(e => [e.data.id, e]));
   if (!left.size) return;
+  const keys = new Map([...left.keys()].map(id => [id, writes.jobKey(kind, id)]));
   let off = null;
   const check = () => {
     for (const [id, e] of [...left]) {
-      const st = writes.status(kind, id);
+      const st = writes.stateOf(keys.get(id));
       if (st === 'pending') continue;
       left.delete(id);
       if (st === 'failed' || st === 'conflict') rollBack(owner, kind, [e]).catch(err => console.warn('Bin entry left after a failed delete', err));
@@ -176,7 +180,10 @@ export async function restoreFromBin(id) {
   } else {
     out = { ...e.data };
     if ((S.reflections || []).some(r => r.id === out.id)) out.id = uid();
-    out = await cloud.saveReflection(mine(), out);
+    // through the write queue, as notes and cases (base null: never over a copy the server has): queued behind a delete
+    // still waiting for signal, so it shows at once and lands after it. A blind save went ahead of that delete, which
+    // then removed the restored copy (its content matches the version deleted), with the bin entry already gone
+    out = await writes.save('reflection', mine(), out, null);
   }
   await cloud.deleteBinEntry(mine(), e.id);
   binCache = binCache.filter(x => x.id !== e.id);

@@ -16,7 +16,7 @@ import { ensureNotes, notesFromServer } from './ui-notepad.js';
 
 const mine = () => S.user.email;
 const FORMAT = 'apmes-logbook-backup';
-const STILL_LOADING = 'Your logbook is still loading, try again';
+const STILL_LOADING = 'Your logbook is still loading (no signal?), try again';
 
 // the server's copy of the cases and reflections has arrived (not only this device's): true, or false after ms (no
 // signal) or a sign-out
@@ -47,7 +47,11 @@ export async function makeBackup({ fromServer = false, wait = 30e3 } = {}) {
   }
   const reflections = S.reflections || [];
   const lb = S.logbook || {};
-  const notes = (await ensureNotes().catch(() => null)) || [];   // personal notes load on first use
+  // personal notes load on first use; on a new device with a stalled connection their first answer can take long: then
+  // the notes this device has (the downloads say the file is this device's copy)
+  let timer;
+  const notes = (await Promise.race([ensureNotes().catch(() => null), new Promise(r => { timer = setTimeout(r, fromServer ? wait : 5e3); })])) || S.notes || [];
+  clearTimeout(timer);
   return {
     format: FORMAT, version: 1, exportedAt: new Date().toISOString(), email: mine(), name: displayName(),
     logbook: { name: lb.name || '', settings: noIndex(lb.settings), templates: lb.templates || [], profile: lb.profile || null },
@@ -152,6 +156,7 @@ async function restoreBackup(file) {
       h('button', { onclick: () => m.close() }, nothing ? 'Close' : 'Cancel'),
       nothing ? null : h('button', { class: 'primary', onclick: async () => {
         m.close();
+        toast('Restoring…');   // (first a look at what the server has: a moment for a big logbook)
         // again now: the lists may have changed while the dialog was open. Cases and reflections are written only
         // where the server has none with that id (cloud.addMissing), so even a list that missed one never overwrites it
         const p = restorePlan(data);

@@ -45,10 +45,11 @@ portfolio content.
   wait for the server's copy first (`S.casesSynced && S.reflectionsSynced`, then `notesFromServer`). A new phone, or
   one signed in again (sign-out wipes the device copy), shows an empty list until it comes, and a restore then counted
   every case and reflection as missing and wrote the backup's older copies over newer ones with blind sets. Restore
-  waits up to 30 s ("Your logbook is still loading, try again"), works out what's missing again when Restore is
-  tapped (`restorePlan`), and writes cases and reflections only where the server has no document with that id
-  (`cloud.addMissing`: ids looked up on the server 30 at a time with `documentId() in`, a read per one found, then
-  batches; it needs signal); notes go through the write queue with base null. Save to Google Drive / Dropbox takes
+  waits up to 30 s ("Your logbook is still loading (no signal?), try again"), works out what's missing again when
+  Restore is tapped (`restorePlan`; toast "Restoring…"), and writes cases and reflections only where the server has no
+  document with that id (`cloud.addMissing`: ids looked up on the server 30 at a time with `documentId() in`, four
+  lookups at once, a read per one found, then batches; it needs signal); notes go through the write queue with base
+  null. Save to Google Drive / Dropbox takes
   everything as the server has it (`makeBackup({ fromServer: true })`, "Not saved" after 30 s; the notes zip then
   reads the same notes). Download backup and the spreadsheet wait 10 s, then save this device's copy and say so in
   the toast (a backup made offline still helps), or stop if the device has nothing yet.
@@ -648,7 +649,10 @@ portfolio content.
   is still the version that was binned (the entry's `data.updatedAt`; restored or edited elsewhere since, it stays, so
   a bin entry whose delete was refused as a conflict removes nothing). Deletes on this device (`commitRecord`
   `_deleted`: every move to the bin, cases, reflections and notes alike, checked against the version being deleted;
-  `deleteCases`, `deleteReflection`) drop the record from the local copy and remember its id (`gone`,
+  a restore from the bin goes through the write queue too, base null, so it waits behind a delete still waiting for
+  signal and lands after it, and `watchDeletes` follows each delete's own job (`writes.jobKey` / `stateOf`), not the
+  record's latest, so a refused delete is still rolled back with a restore queued behind it; `deleteCases`,
+  `deleteReflection`) drop the record from the local copy and remember its id (`gone`,
   8 days), so a stale copy arriving later is ignored. A removal the server confirms goes at once; one seen only in the
   cache, or after this device's own pending write (a refused write), is checked with one read. Delete account stops
   the listeners first.

@@ -129,5 +129,51 @@ writes.configure({ backend: cloud.commitRecord });
 assert.equal(reflOf('r9')?.summary, 'edited on the laptop');
 assert.equal((await cloud.listBin(email)).filter(e => e.data.id === 'r9').length, 0);
 
+// binned with no signal (the delete waits in the write queue), then restored from the bin before signal returns: the
+// restore queues behind the delete, shows at once and is still there afterwards. A blind save went ahead of the
+// queued delete, which then deleted the restored copy, with its bin entry already gone (review, 15 Oct 2026)
+let signal = false;
+const flaky = async (...a) => { if (!signal) throw Object.assign(new Error('offline'), { code: 'unavailable' }); return cloud.commitRecord(...a); };
+const shown = id => writes.overlay('reflection', email, D.reflectionsOf(email.toLowerCase())).find(x => x.id === id);
+const settled = async id => { for (let i = 0; i < 100 && writes.entries().some(x => x.record.id === id && x.state === 'pending'); i++) await new Promise(res => setTimeout(res, 20)); };
+const back1 = async () => { signal = true; writes.kick(); await settled('r10'); };
+writes.configure({ backend: flaky });
+S.reflections = [await cloud.saveReflection(email, { id: 'r10', headingId: 'thyroid', initials: 'AB', title: 'Made-up', summary: 'kept after all', status: 'draft' })];
+const off1 = await B.moveToBin('reflection', S.reflections[0]);
+assert.equal(writes.status('reflection', 'r10'), 'pending', 'the delete waits for signal');
+assert.equal(shown('r10'), undefined, 'gone from the list at once');
+const res1 = await B.restoreFromBin(off1.id);
+assert.equal(res1.id, 'r10', 'same id: the delete has not landed');
+assert.equal(shown('r10')?.summary, 'kept after all', 'listed again at once');
+await back1();
+assert.equal(reflOf('r10')?.summary, 'kept after all', 'still on the server after the delete landed');
+assert.equal(shown('r10')?.summary, 'kept after all', 'and listed');
+assert.equal((await cloud.listBin(email)).filter(e => e.data.id === 'r10').length, 0);
+// ...the same, but changed on another device meanwhile: the delete is refused, the newer version stays and the
+// restore queued behind it (the binned, older copy) is set aside, not left waiting for ever
+signal = false;
+S.reflections = [reflOf('r10')];
+const off2 = await B.moveToBin('reflection', S.reflections[0]);
+await B.restoreFromBin(off2.id);
+await cloud.saveReflection(email, { ...reflOf('r10'), summary: 'finished on the laptop' });
+await back1();
+for (let i = 0; i < 50 && !/so it was kept/.test(toasts.at(-1)); i++) await new Promise(res => setTimeout(res, 20));
+assert.equal(reflOf('r10')?.summary, 'finished on the laptop', 'the newer version kept');
+assert.match(toasts.at(-1), /A reflection you deleted was changed on another device, so it was kept/);
+assert.ok(!writes.entries().some(x => x.record.id === 'r10' && ['pending', 'conflict', 'failed'].includes(x.state)), 'nothing left waiting');
+assert.equal(shown('r10')?.summary, 'finished on the laptop');
+// ...and a delete that fails outright with a restore queued behind it: the reflection is still there and listed
+signal = false;
+S.reflections = [reflOf('r10')];
+const off3 = await B.moveToBin('reflection', S.reflections[0]);
+await B.restoreFromBin(off3.id);
+writes.configure({ backend: async (em, kind, rec, bs) => { if (rec._deleted) throw Object.assign(new Error('Fake refusal'), { code: 'permission-denied' }); return cloud.commitRecord(em, kind, rec, bs); } });
+writes.kick(); await settled('r10');
+for (let i = 0; i < 50 && writes.entries().some(x => x.record.id === 'r10' && ['pending', 'failed'].includes(x.state)); i++) await new Promise(res => setTimeout(res, 20));
+assert.equal(reflOf('r10')?.summary, 'finished on the laptop');
+assert.equal(shown('r10')?.summary, 'finished on the laptop');
+assert.ok(!writes.entries().some(x => x.record.id === 'r10' && ['pending', 'conflict', 'failed'].includes(x.state)), 'nothing left waiting');
+writes.configure({ backend: cloud.commitRecord });
+
 resetCaches();
 console.log('bin tests passed');
