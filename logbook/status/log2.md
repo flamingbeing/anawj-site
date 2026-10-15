@@ -1,7 +1,7 @@
 # Now: Claude Code, Logbook 2 (log2)
 
-**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): **planning with the owner; build nothing until he says
-go** (15 Oct). Merged today: #599–#603 (Totals tab for everyone, Analytics in More; Faculty / PCs: Totals, Admin, More;
+**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): **building the agreed queue** (owner said go, 15 Oct;
+he's away ~6 h): Themes first (this PR), then bugs 0, 0b, 1 and the age cap, then the plan in order. Merged today: #599–#603 (Totals tab for everyone, Analytics in More; Faculty / PCs: Totals, Admin, More;
 frozen names row, Category column ≤ ⅓ width, all-years zip, no tooltips; app version at the bottom of More).
 
 Agreed queue (one PR each, in order, once he says go):
@@ -107,48 +107,10 @@ Agreed queue (one PR each, in order, once he says go):
    in a column at most a quarter of the screen; tighter cells. Target lines stay on by default, with a "Show targets"
    toggle at the bottom of the table (beside All tags / Towards minimums). Excel downloads keep full names and full
    category names. Compact off: the table as now.
-9i. **Suggested colours** (owner, 15 Oct; replaces the 13 Oct "no preset swatches" call in ui-settings.js): Settings →
-   Display → Colour shows swatches in two rows (owner, 15 Oct): NUH (navy, the default; orange; red; blue; as they are)
-   and muted (desaturated teal, sage, dusty purple, slate); then pastels (blush pink, lavender, mint, peach, powder blue,
-   butter yellow: used as the tint, with a deeper shade of the same hue for text and buttons so they stay readable) and a last "Custom…" swatch that opens the device's own picker as now; a tick on the one in use (a custom
-   colour shows in the Custom swatch). The same light / dark readability adjustment as today; each suggested colour
-   checked for contrast in light, dark and OLED.
-9j. **Themes page above Display** (owner; with 9i): Settings → Themes holds the look: ready-made themes as preview
-   cards (NUHS, the default as today; Flat; Soft; Paper; Dark navy; OLED; High contrast), each a bundle of light /
-   dark, colour, Colourful, corners, borders / shadows and font; picking one sets those, and changing any of them
-   after shows "Custom (based on …)" as profiles do. Below the cards, the parts themselves moved out of Display and
-   Advanced display: Light or dark, Colour (the swatches and Custom), Colourful, corners, borders, shadows, fonts and
-   line spacing. Display keeps the layout: compact, start tab, header and tab bar, Logbook rows, Case tab layout,
-   Plain calendar, icons on buttons. Per device, as now. Reset this page on each.
-   Plus themes in the style of other apps (owner, 15 Oct), named "Obsidian-style" etc., colours, corners and type only,
-   never their logos or paid fonts: Obsidian-style (dark grey, violet accent, compact), Bear-style (warm off-white, red
-   accent, roomy, soft serif headings), Evernote-style (white, green accent, clean sans), Notion-style (white, near-black
-   text, grey hairlines, small corners, no shadows), Telegram-style (blue accent, rounded cards, pale blue-grey ground),
-   Office-style (owner: white, a dark blue title band, light grey ground, square-ish corners, thin borders, outlined
-   cards, underline tab bar, a clean system sans), WhatsApp-style (owner: teal-green accent, beige ground, rounded
-   cards, the dark version in deep teal-grey), ACGME-style (owner: to feel like the ACGME Case Log System; build it
-   from the owner's screenshot of it, colours and layout only, no logo or wording).
-   Also Pixel-style (owner: Material You look: soft tinted surfaces, large rounded corners, pill buttons and pill tab
-   indicator, Roboto-like sans; the accent follows the chosen colour) and Apple-style (owner: iOS look: grouped
-   inset lists on light grey, hairline separators, system blue accent, the device's system font, translucent
-   header and tab bar), Instagram-style (owner: white or black ground, a pink-to-orange gradient accent on the
-   active tab, buttons and the header band, thin borders, rounded cards; text stays solid for contrast) and TikTok-style
-   (owner: black ground, cyan and pink-red accents, bold sans, high contrast, dark only).
-   Also Material-style in Inspired (owner: classic Material Design: a bold coloured top bar, raised cards with
-   shadows, a round floating Save-style button feel, Roboto-like sans; distinct from Pixel-style's Material You) and
-   Eye comfort in Classic (owner: warm sepia ground, soft dark-grey text instead of black, less blue, no pure white,
-   slightly roomier lines; its dark version is warm dark brown-grey, not blue-black).
-   Layout of the Themes page (owner, 15 Oct): "Classic" as preview cards (NUHS, Flat, Soft, Paper, Dark navy, OLED,
-   High contrast); "Inspired" (owner's name for it) as one searchable dropdown (type to filter; each row a small colour preview and
-   the name; picking one previews it at once, Undo in the toast); a "Suggest a theme" button under it opens Send
-   feedback with "Theme suggestion: " filled in (the private feedback queue, owner reads it in Feedback).
-   A theme sets the Advanced display settings too (owner, 15 Oct): fonts, line spacing and width, corners, borders,
-   shadows, compact, icons on buttons, icons-only tab bar, page titles in the header, plain calendar, shorter rows;
-   every one stays editable afterwards (the card then says "Custom (based on …)"), and a theme never touches layout
-   choices that aren't about looks (start tab, tab order, Case tab parts). New settings the themes need, each its own
-   editable switch in Themes → Advanced: heading font (separate from the body font; serif for Bear / Notion),
-   background tint (cream, blue-grey, pure white…), spacing scale (roomy / normal / tight), tab bar style (underline /
-   pill / plain), card style (raised / outlined / flat).
+9i/9j. **Themes and suggested colours: built** (Themes PR, 15 Oct): Settings → Themes (Classic cards, Inspired
+   searchable list, Suggest a theme), swatches, background tint, spacing, tab bar style, heading font, Top band.
+   Still to do: ACGME-style (needs the owner's screenshot); card style (raised / outlined / flat) not built (borders
+   and shadows cover it for now).
 10. **Grid as a spreadsheet:** thin lines, no boxed inputs; drag to resize columns (per device, double-tap resets);
     lines per row 1 / 2 / 3 / Fit to content.
 11. **Paging by default** (owner's call, 15 Oct): 100 per page, 25 / 50 / 100 / 300 / All (per device); "‹ Page 2 of

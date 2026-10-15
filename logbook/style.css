@@ -376,6 +376,8 @@ code, kbd { font-size: calc(13px * var(--fs, 1)); background: var(--chip); paddi
 .top { background: linear-gradient(90deg, var(--s1) 0 25%, var(--s2) 25% 50%, var(--s3) 50% 75%, var(--s4) 75% 100%) top / 100% 5px no-repeat, var(--panel); border-bottom: 1px solid var(--edge, var(--line)); }
 .top, .top[class] { padding-top: max(17px, calc(env(safe-area-inset-top, 0px) + 5px)); }
 .top h1, section.card h2, h2, h3 { color: var(--heading); }
+/* Themes → Heading font (themes.js lookCss sets --font-head) */
+.top h1, h1, h2, h3 { font-family: var(--font-head, var(--font-ui)); }
 a { color: var(--accent); }
 :focus-visible { outline: 3px solid var(--heading); outline-offset: 2px; }
 input:focus, select:focus, textarea:focus { border-color: var(--heading); box-shadow: none; outline: 3px solid var(--heading); outline-offset: 1px; }
@@ -1019,6 +1021,33 @@ details.refl-foot { margin: 4px 4px 12px; }
 .accent-pick .accent-input::-webkit-color-swatch { border: 0; border-radius: calc(7px * var(--round, 1)); }
 .accent-pick .accent-input::-moz-color-swatch { border: 0; border-radius: calc(7px * var(--round, 1)); }
 .accent-pick .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+/* suggested colours (Settings → Themes → Colour): round swatches in rows, the device's picker last */
+.swatches { display: grid; gap: 8px; margin: 6px 0 4px; }
+.swatch-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.swatch-group { width: 64px; flex: none; font-size: calc(13px * var(--fs, 1)); color: var(--muted); }
+.swatch { width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent); background: var(--sw, conic-gradient(#e4002b, #e57200, #f6e7a6, #7d9a78, #178fd7, #8a7a9e, #e4002b)); cursor: pointer; position: relative; flex: none; }
+.swatch[aria-pressed="true"], .swatch.custom.on { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--ink); }
+.swatch.custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.swatch.custom:focus-within { outline: 3px solid var(--heading); outline-offset: 3px; }
+/* Settings → Themes: Classic as cards, Inspired as a searchable list */
+.theme-now { margin: 0 0 6px; }
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin: 6px 0 10px; }
+.theme-card, .theme-row { display: flex; text-align: left; gap: 4px; padding: 8px; min-height: 0; border: 1px solid var(--edge, var(--line)); border-radius: calc(10px * var(--round, 1)); background: var(--panel); color: var(--ink); cursor: pointer; font: inherit; }
+.theme-card { flex-direction: column; align-items: stretch; }
+.theme-card small, .theme-row small { color: var(--muted); font-size: calc(12px * var(--fs, 1)); line-height: 1.3; }
+.theme-card[aria-pressed="true"], .theme-row[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.theme-sw { display: flex; flex-direction: column; height: 46px; border-radius: calc(6px * var(--round, 1)); overflow: hidden; background: var(--tb); border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); flex: none; }
+.theme-row .theme-sw { width: 64px; }
+.theme-band { display: flex; height: 6px; flex: none; }
+.theme-band i { flex: 1; }
+.theme-card-in { flex: 1; margin: 6px; border-radius: 4px; background: var(--tp); display: flex; align-items: center; gap: 4px; padding: 0 5px; }
+.theme-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ta); flex: none; }
+.theme-line { flex: 1; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--ta) 45%, transparent); }
+.theme-find { width: 100%; margin: 6px 0 8px; }
+.theme-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 360px; overflow-y: auto; }
+.theme-row { width: 100%; align-items: center; gap: 10px; }
+.theme-row .mt { display: flex; flex-direction: column; min-width: 0; }
+.theme-list .empty { color: var(--muted); padding: 6px 2px; }
 .install-steps { margin: 4px 0 8px; padding-left: 20px; line-height: calc(1.6 * var(--lh, 1)); }
 /* Analytics at a glance (folded Logbook / Reflections cards) */
 .glance { align-self: stretch; display: flex; flex-direction: column; gap: 8px; margin: 8px 0 2px; }
