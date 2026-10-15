@@ -33,11 +33,14 @@
       const t = [...document.querySelectorAll('.a-main .a-title')].find(el => el.getClientRects().length);
       // a screen change: snap the small title to its new state instead of fading (no flicker)
       bar.classList.add('no-fade');
-      requestAnimationFrame(() => requestAnimationFrame(() => bar.classList.remove('no-fade')));
-      if (!t || !('IntersectionObserver' in window)) { delete bar.dataset.large; return; }
+      const settle = () => requestAnimationFrame(() => requestAnimationFrame(() => bar.classList.remove('no-fade')));
+      if (!t || !('IntersectionObserver' in window)) { delete bar.dataset.large; settle(); return; }
       bar.dataset.large = '';
-      io = new IntersectionObserver(([e]) => bar.classList.toggle('is-scrolled', !e.isIntersecting || scrollY > 2),
-        { rootMargin: `-${bar.offsetHeight}px 0px 0px 0px` });
+      let first = true;
+      io = new IntersectionObserver(([e]) => {
+        bar.classList.toggle('is-scrolled', !e.isIntersecting || scrollY > 2);
+        if (first) { first = false; settle(); }   // fade only for scrolling, after the first check
+      }, { rootMargin: `-${bar.offsetHeight}px 0px 0px 0px` });
       io.observe(t);
     };
     large();
