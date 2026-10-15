@@ -156,6 +156,7 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
         <button type="button" role="tab" id="tab-drugs" aria-controls="panel-drugs" aria-selected="true">Drugs</button>
         <button type="button" role="tab" id="tab-circ" aria-controls="panel-circ" aria-selected="false" tabindex="-1">Circulation</button>
         <button type="button" role="tab" id="tab-breath" aria-controls="panel-breath" aria-selected="false" tabindex="-1">Breathing</button>
+        <button type="button" role="tab" id="tab-aw" aria-controls="panel-aw" aria-selected="false" tabindex="-1">Airway</button>
         <button type="button" role="tab" id="tab-pt" aria-controls="panel-pt" aria-selected="false" tabindex="-1">Patient</button>
       </div>
       <div class="panel" role="tabpanel" id="panel-drugs" aria-labelledby="tab-drugs"></div>
@@ -209,6 +210,21 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
         <p class="state" id="agent-state"></p>
         <p class="hint">Airway control (mask, LMA, tube) and spontaneous-breathing support come with the airway update.</p>
       </div>
+      <div class="panel" role="tabpanel" id="panel-aw" aria-labelledby="tab-aw" hidden>
+        <p class="hint">A natural airway obstructs as the patient deepens or is paralysed — relieve it with a manoeuvre or a device. Laryngoscopy shows this patient's view (hidden until you look). Capnography (EtCO<sub>2</sub> on the monitor) confirms a tracheal tube; an oesophageal tube shows no CO<sub>2</sub>.</p>
+        <h3 class="sub">Open the airway</h3>
+        <div class="act"><label>Manoeuvre <select id="aw-man"><option value="none">None</option><option value="jawThrust">Jaw thrust</option><option value="opa">Oropharyngeal airway</option><option value="npa">Nasopharyngeal airway</option></select></label></div>
+        <h3 class="sub">Device</h3>
+        <div class="act"><label>Airway <select id="aw-device"><option value="none">Natural (face)</option><option value="mask">Face mask</option><option value="sad">Supraglottic (LMA)</option><option value="fona">Front-of-neck</option></select></label></div>
+        <h3 class="sub">Laryngoscopy and intubation</h3>
+        <div class="act"><button type="button" id="aw-laryn">Laryngoscopy</button><button type="button" id="aw-video">Videolaryngoscopy</button></div>
+        <div class="act">
+          <label>Place tube <select id="aw-place"><option value="tracheal">Tracheal</option><option value="oesophageal">Oesophageal (misplaced)</option><option value="endobronchial">Endobronchial (too deep)</option></select></label>
+          <button type="button" id="aw-intubate">Intubate</button>
+          <button type="button" id="aw-extubate">Extubate</button>
+        </div>
+        <p class="state" id="aw-state" aria-live="polite"></p>
+      </div>
       <div class="panel" role="tabpanel" id="panel-pt" aria-labelledby="tab-pt" hidden>
         <div class="act"><button type="button" id="talk">Talk to the patient</button></div>
         <p class="state" id="talk-reply" aria-live="polite"></p>
@@ -253,7 +269,7 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
         <ol class="given" id="events"><li class="none">Nothing yet</li></ol>
       </div>
       <details id="behind-box"><summary>Behind the monitor</summary><div id="behind"></div></details>
-      <p class="foot">Free run: a healthy synthetic adult. A full model: drugs, the airway gases, breathing and the ventilator, heart rate and blood pressure, oxygen and CO2, temperature, the heart rhythm and resuscitation (compressions, defibrillation, pacing) all respond. The airway and the crises come next. Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
+      <p class="foot">Free run: a healthy synthetic adult. A full model: drugs, the airway gases, breathing and the ventilator, heart rate and blood pressure, oxygen and CO2, temperature, the heart rhythm, resuscitation (compressions, defibrillation, pacing) and the airway (obstruction, mask, LMA, tube, front-of-neck) all respond. The case flow and the crises come next. Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
     </div>
   </div>
 </section>
