@@ -3,6 +3,7 @@
 // generated from RULE_TYPES (rules.js). A new rule type added there shows up here with no change to this file.
 // Also: the rules log (who changed what, newest first) and rules-only JSON export / import with a review step.
 // A few small helpers at the bottom are exported for the People and Check screens (same author, same styles).
+// Looks: the NTF app kit (grouped rows, chips, segmented controls, switches, sheets); line icons, never emoji.
 
 import * as M from './model.js';
 import { RULE_TYPES, describeRule, validateRule, evaluateRule, newRule } from './rules.js';
@@ -20,6 +21,28 @@ const TOKEN_HELP = {
 const KIND_LABEL = { shift: 'Shifts', leave: 'Leave', request: 'Requests', other: 'Other', derived: 'Worked out' };
 const LOG_WORDS = { add: 'Added', edit: 'Changed', delete: 'Deleted', enable: 'Turned on', disable: 'Turned off' };
 
+// Line icons for the rule types and templates (the kit's 24 px line style). RULE_TYPES.icon (an emoji) isn't shown:
+// the design language has no emoji. A new rule type without an entry here gets the generic one.
+const ICON_PATHS = {
+  cover: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 010 6.8M18 14.8c2 .7 3.2 2.5 3.5 5.2"/>',
+  limit: '<path d="M5 9h14M5 15h14M10 4L8 20M16 4l-2 16"/>',
+  sequence: '<path d="M4 7l5 5-5 5M12 7l5 5-5 5"/>',
+  sameDay: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M9.5 12.5l5 5M14.5 12.5l-5 5"/>',
+  together: '<circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2.5 19c.5-3 2.6-4.5 5.5-4.5s5 1.5 5.5 4.5M13 14.6c.9-.1 2-.1 3 0 2.9.3 4.9 1.8 5.5 4.4"/>',
+  maxRun: '<rect x="2.5" y="9" width="5" height="6" rx="1"/><rect x="9.5" y="9" width="5" height="6" rx="1"/><rect x="16.5" y="9" width="5" height="6" rx="1"/>',
+  requests: '<path d="M4 5h16v11H10l-5 4v-4H4z"/><path d="M8 10h8"/>',
+  spread: '<path d="M12 4v16M7 20h10M5 7h14M5 7l-3 6.5a3 3 0 006 0zM19 7l-3 6.5a3 3 0 006 0z"/>',
+  eligible: '<circle cx="10" cy="8" r="4"/><path d="M3 21c.7-3.8 3.4-6 7-6"/><path d="M14.5 17.5l2 2 4.5-4.5"/>',
+  standing: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 013-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 01-3 3H3"/>',
+  leave: '<rect x="4" y="7" width="16" height="13" rx="2"/><path d="M9 7V4h6v3M4 12h16"/>',
+  person: '<circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4.2 4-6.5 8-6.5s7.2 2.3 8 6.5"/>',
+  day: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
+  rule: '<path d="M4 6h9M19 6h1M4 12h3M13 12h7M4 18h11M21 18h-1"/><circle cx="16" cy="6" r="2.2"/><circle cx="10" cy="12" r="2.2"/><circle cx="18" cy="18" r="2.2"/>',
+};
+export function ruleIcon(name) {
+  return `<svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICON_PATHS[name] || ICON_PATHS.rule}</svg>`;
+}
+
 // Params shown only when they matter (a ParamSpec.showIf in rules.js, if one is ever added, wins).
 const SHOW_IF = {
   'limit.window': p => p.period === 'rolling',
@@ -31,44 +54,44 @@ const W = (o = {}) => ({ groups: [], tags: [], staff: [], exclude: [], ...o });
 const WHEN = (o = {}) => ({ from: '', to: '', days: [], holidays: 'any', ...o });
 const kindIds = (state, k) => (state.groups || []).filter(g => g.kind === k).map(g => g.id);
 const TEMPLATES = [
-  { id: 'preleave', icon: '🧳', label: 'No call the night before leave', sub: 'After Call, no leave the next day (soft)',
+  { id: 'preleave', icon: 'leave', label: 'No call the night before leave', sub: 'After Call, no leave the next day (soft)',
     make: s => ({ type: 'sequence', name: 'No call the night before leave', hard: false, weight: 10, params: { ifCodes: ['C'], thenCodes: ['@leave'], mode: 'forbid', from: 1, to: 1 } }) },
-  { id: 'pair', icon: '🙅', label: 'Two people never on call together', sub: 'Pick the two people in Who and Other people',
+  { id: 'pair', icon: 'together', label: 'Two people never on call together', sub: 'Pick the two people in Who and Other people',
     pick: 'Choose one person under Who and the other under Other people.',
     make: s => ({ type: 'together', name: '', hard: true, params: { codes: ['C'], other: W(), otherCodes: ['C'], mode: 'never', min: 1 } }) },
-  { id: 'maxcalls', icon: '🔢', label: 'At most N calls a month', sub: 'Per person, scaled by FTE',
+  { id: 'maxcalls', icon: 'limit', label: 'At most N calls a month', sub: 'Per person, scaled by FTE',
     make: s => ({ type: 'limit', name: '', hard: true, params: { codes: ['C'], period: 'month', window: 7, min: null, max: 6, fte: true, prorate: false } }) },
-  { id: 'gap', icon: '↔️', label: 'At least N days between calls', sub: 'After Call, no Call for the next 2 days = 3 days apart',
+  { id: 'gap', icon: 'sequence', label: 'At least N days between calls', sub: 'After Call, no Call for the next 2 days = 3 days apart',
     make: s => ({ type: 'sequence', name: 'At least 3 days between calls', hard: false, weight: 20, params: { ifCodes: ['C'], thenCodes: ['C'], mode: 'forbid', from: 1, to: 2 } }) },
-  { id: 'wkpair', icon: '🗓️', label: 'Weekend calls together (Sat + Sun)', sub: 'Saturday call means Sunday call too',
+  { id: 'wkpair', icon: 'day', label: 'Weekend calls together (Sat + Sun)', sub: 'Saturday call means Sunday call too',
     make: s => ({ type: 'sequence', name: 'Saturday call means Sunday call too', hard: false, weight: 20, when: WHEN({ days: [6] }), params: { ifCodes: ['C'], thenCodes: ['C'], mode: 'require', from: 1, to: 1 } }) },
-  { id: 'noday', icon: '⛔', label: 'Someone can\'t work on a weekday', sub: 'No shifts on Fridays for one person',
+  { id: 'noday', icon: 'sameDay', label: 'Someone can\'t work on a weekday', sub: 'No shifts on Fridays for one person',
     pick: 'Choose the person under Who and the weekday under When.',
     make: s => ({ type: 'limit', name: '', hard: true, when: WHEN({ days: [5] }), params: { codes: ['@shift'], period: 'week', window: 7, min: null, max: 0, fte: false, prorate: false } }) },
-  { id: 'baby', icon: '🍼', label: 'Baby MO on call needs a senior', sub: 'A senior resident, RP or AC on call too',
+  { id: 'baby', icon: 'person', label: 'Baby MO on call needs a senior', sub: 'A senior resident, RP or AC on call too',
     make: s => ({ type: 'together', name: 'A Baby MO on call needs a senior on call', hard: true, who: W({ tags: (s.tags || []).some(t => t.id === 'babymo') ? ['babymo'] : [] }),
       params: { codes: ['C'], other: W({ groups: ['sr', 'srp', 'rp', 'ac'].filter(id => (s.groups || []).some(g => g.id === id)) }), otherCodes: ['C'], mode: 'needs', min: 1 } }) },
-  { id: 'seniors', icon: '🏥', label: 'Minimum seniors at work each weekday', sub: 'Counts seniors who are at work (@present)',
+  { id: 'seniors', icon: 'cover', label: 'Minimum seniors at work each weekday', sub: 'Counts seniors who are at work (@present)',
     make: s => ({ type: 'cover', name: '', hard: true, who: W({ groups: kindIds(s, 'senior') }), when: WHEN({ days: [1, 2, 3, 4, 5], holidays: 'exclude' }), params: { codes: ['@present'], min: 8, max: null } }) },
-  { id: 'request', icon: '🙋', label: 'Honour a new request code', sub: 'Add the code under People > Duty codes first',
+  { id: 'request', icon: 'requests', label: 'Honour a new request code', sub: 'Add the code under People > Duty codes first',
     make: s => ({ type: 'requests', name: '', hard: false, weight: 10, params: { request: ((s.duties || []).filter(d => d.kind === 'request').pop() || { code: '' }).code, codes: ['C'], mode: 'avoid', span: 'day' } }) },
-  { id: 'run', icon: '📅', label: 'At most N days in a row', sub: 'Of any shift',
+  { id: 'run', icon: 'maxRun', label: 'At most N days in a row', sub: 'Of any shift',
     make: s => ({ type: 'maxRun', name: '', hard: false, weight: 20, params: { codes: ['@shift'], max: 5 } }) },
 ];
 
 // "Combination restriction" (the owner's words): which kind, then common ones ready-made. First in Add a rule.
 const COMBO_KINDS = [
-  { type: 'sameDay', icon: '🚫', label: 'On the same day', sub: 'Two codes that can\'t go together on one day (Call and Clinic), or one that needs another' },
-  { type: 'sequence', icon: '⏭️', label: 'On following days', sub: 'What may not (or must) come the day after, or the day before (no call before leave)' },
-  { type: 'together', icon: '🤝', label: 'Between two people', sub: 'Two people never on together, or someone who needs another person on with them' },
+  { type: 'sameDay', icon: 'sameDay', label: 'On the same day', sub: 'Two codes that can\'t go together on one day (Call and Clinic), or one that needs another' },
+  { type: 'sequence', icon: 'sequence', label: 'On following days', sub: 'What may not (or must) come the day after, or the day before (no call before leave)' },
+  { type: 'together', icon: 'together', label: 'Between two people', sub: 'Two people never on together, or someone who needs another person on with them' },
 ];
 const has = (s, c) => (s.duties || []).some(d => d.code === c);
 const COMBO_TEMPLATES = [
-  { icon: '🚫', label: 'No clinic on a call day', sub: 'Call and Clinic never on the same day', ok: s => has(s, 'C') && has(s, 'Clinic'),
+  { icon: 'sameDay', label: 'No clinic on a call day', sub: 'Call and Clinic never on the same day', ok: s => has(s, 'C') && has(s, 'Clinic'),
     make: () => ({ type: 'sameDay', name: 'No clinic on a call day', hard: true, params: { codesA: ['C'], codesB: ['Clinic'], mode: 'forbid' } }) },
-  { icon: '🚫', label: 'No PM shift on a call day', sub: 'Call and PM shift never on the same day', ok: s => has(s, 'C') && has(s, 'P'),
+  { icon: 'sameDay', label: 'No PM shift on a call day', sub: 'Call and PM shift never on the same day', ok: s => has(s, 'C') && has(s, 'P'),
     make: () => ({ type: 'sameDay', name: 'No PM shift on a call day', hard: true, params: { codesA: ['C'], codesB: ['P'], mode: 'forbid' } }) },
-  { icon: '⏮️', label: 'No call the day before…', sub: 'Pick the code under Codes (a clinic, a course, leave)', ok: s => has(s, 'C'),
+  { icon: 'sequence', label: 'No call the day before…', sub: 'Pick the code under Codes (a clinic, a course, leave)', ok: s => has(s, 'C'),
     pick: 'Choose the code that must not follow a call under Codes.',
     make: () => ({ type: 'sequence', name: '', hard: true, params: { ifCodes: ['C'], thenCodes: [], mode: 'forbid', from: 1, to: 1 } }) },
 ];
@@ -83,22 +106,20 @@ export function mount(el, app) {
 
   const root = h('div', { class: 'rv' });
   const head = h('div', { class: 'bx-head' },
-    h('div', { class: 'bx-head-text' },
-      h('h2', { class: 'bx-h' }, 'Rules'),
-      h('p', { class: 'bx-sub' }, 'Hard rules must hold; preferences are weighed. Every change is checked straight away and can be undone.')),
-    h('div', { class: 'bx-head-acts' },
-      h('button', { type: 'button', class: 'btn btn-primary rv-add', onclick: () => openPicker(), html: `${app.icon('plus')}<span>Add rule</span>` })));
-  const search = h('input', { type: 'search', class: 'bx-search', placeholder: 'Search rules', 'aria-label': 'Search rules',
+    h('p', { class: 'bx-sub' }, 'Hard rules must hold; preferences are weighed. Every change is checked straight away and can be undone.'),
+    h('button', { type: 'button', class: 'app-btn app-btn--primary rv-add', onclick: () => openPicker(), html: `${app.icon('plus')}<span>Add rule</span>` }));
+  const search = h('input', { type: 'search', class: 'app-input bx-search', placeholder: 'Search rules', 'aria-label': 'Search rules',
     oninput: () => { q = search.value.trim().toLowerCase(); renderList(); } });
-  const filters = seg(h, {
-    name: fid('rvf'), label: 'Show', value: filter, compact: true,
+  // filters: the kit's chips (one row that scrolls sideways), one of them on
+  const filters = chipFilter(h, {
+    label: 'Show', value: filter,
     options: [['all', 'All'], ['hard', 'Must hold'], ['soft', 'Preferences'], ['bad', 'Problems'], ['off', 'Off']],
     onChange: v => { filter = v; renderList(); },
   });
   const tools = h('div', { class: 'rv-tools' },
-    h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => openLog(), html: `${app.icon('list')}<span>Rules log</span>` }),
-    h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => exportRules(), html: `${dlIcon()}<span>Export</span>` }),
-    h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => importRules(), html: `${app.icon('upload')}<span>Import</span>` }));
+    h('button', { type: 'button', class: 'app-btn app-btn--plain app-btn--compact', onclick: () => openLog(), html: `${app.icon('list')}<span>Rules log</span>` }),
+    h('button', { type: 'button', class: 'app-btn app-btn--plain app-btn--compact', onclick: () => exportRules(), html: `${dlIcon()}<span>Export</span>` }),
+    h('button', { type: 'button', class: 'app-btn app-btn--plain app-btn--compact', onclick: () => importRules(), html: `${app.icon('upload')}<span>Import</span>` }));
   const bar = h('div', { class: 'rv-bar' }, h('div', { class: 'rv-search' }, h('span', { class: 'bx-search-ic', html: app.icon('search') }), search), filters, tools);
   const list = h('div', { class: 'rv-list' });
   root.append(head, bar, list);
@@ -123,8 +144,9 @@ export function mount(el, app) {
       return hay.includes(q);
     });
     if (!rules.length) {
-      list.append(h('div', { class: 'card bx-empty' }, h('p', null, 'No rules yet. Add one, or start from a quick template.'),
-        h('button', { type: 'button', class: 'btn btn-primary', onclick: () => openPicker() }, 'Add a rule')));
+      list.append(h('div', { class: 'app-card app-empty' }, h('span', { class: 'app-empty-icon', html: ruleIcon('rule') }),
+        h('p', { class: 'app-empty-title' }, 'No rules yet'), h('p', { class: 'app-empty-text' }, 'Add one, or start from a quick template.'),
+        h('button', { type: 'button', class: 'app-btn app-btn--secondary', onclick: () => openPicker() }, 'Add a rule')));
       return;
     }
     if (!shown.length) {
@@ -138,12 +160,11 @@ export function mount(el, app) {
     ];
     for (const [title, sub, rs] of groups) {
       if (!rs.length) continue;
-      const sec = h('section', { class: 'rv-sec', 'aria-label': title },
-        h('h3', { class: 'rv-sec-h' }, title, h('span', { class: 'bx-count' }, String(rs.length))),
-        h('p', { class: 'rv-sec-sub' }, sub));
-      const ul = h('ul', { class: 'rv-cards' });
+      const sec = h('section', { class: 'app-section rv-sec', 'aria-label': title },
+        h('h3', { class: 'app-section-header' }, title, h('span', { class: 'bx-count' }, String(rs.length))));
+      const ul = h('ul', { class: 'app-list rv-cards' });
       for (const r of rs) ul.append(h('li', null, ruleCard(r, state, count(r))));
-      sec.append(ul);
+      sec.append(ul, h('p', { class: 'app-section-footer' }, sub));
       list.append(sec);
     }
   }
@@ -155,29 +176,27 @@ export function mount(el, app) {
     const sentence = describeRule(r, state);
     const title = r.name || sentence;
     const meta = [whoText(r.who, state), whenText(r.when)].filter(Boolean).join(' · ');
-    const sw = h('input', { type: 'checkbox', checked: !off, 'aria-label': `Rule on: ${title}`, onchange: () => toggleRule(r.id, sw.checked) });
+    // the rule on or off: the kit's switch at the end of the row
+    const sw = h('input', { type: 'checkbox', class: 'app-switch rv-sw', role: 'switch', checked: !off, 'aria-label': `Rule on: ${title}`, title: off ? 'Turn on' : 'Turn off', onchange: () => toggleRule(r.id, sw.checked) });
     let countEl;
-    if (off) countEl = h('span', { class: 'bx-tag off' }, 'Off');
-    else if (!t) countEl = h('span', { class: 'bx-tag bad' }, 'Unknown type');
-    else if (n) countEl = h('button', { type: 'button', class: `bx-tag ${hard ? 'bad' : 'warn'} rv-n`, title: 'See them in Check', onclick: () => app.go('check', { rule: r.id }) }, `${n} ${n === 1 ? 'problem' : 'problems'}`);
-    else countEl = h('span', { class: 'bx-tag ok' }, 'OK', h('span', { class: 'rv-long' }, '\u00a0this month'));
-    return h('article', { class: `card rv-card ${hard ? 'is-hard' : 'is-soft'}${off ? ' is-off' : ''}`, 'data-rule': r.id },
-      h('div', { class: 'rv-ic', 'aria-hidden': 'true' }, t ? t.icon : '?'),
+    if (off) countEl = h('span', { class: 'app-badge app-badge--ink' }, 'Off');
+    else if (!t) countEl = h('span', { class: 'app-badge app-badge--bad' }, 'Unknown type');
+    else if (n) countEl = h('button', { type: 'button', class: `app-badge app-badge--${hard ? 'bad' : 'warn'} rv-n`, title: 'See them in Check', onclick: () => app.go('check', { rule: r.id }) }, `${n} ${n === 1 ? 'problem' : 'problems'}`);
+    else countEl = h('span', { class: 'app-badge app-badge--ok' }, 'OK', h('span', { class: 'rv-long' }, '\u00a0this month'));
+    // a grouped row: the title button covers the whole row (tap anywhere to open it; Copy and Delete are in there);
+    // the switch (in a 44 px tap area) and the problems badge sit above it
+    return h('article', { class: `app-row rv-card ${hard ? 'is-hard' : 'is-soft'}${off ? ' is-off' : ''}`, 'data-rule': r.id },
+      h('span', { class: 'app-row-icon', html: ruleIcon(r.type) }),
       h('div', { class: 'rv-main' },
         h('h4', { class: 'rv-title' }, h('button', { type: 'button', class: 'rv-open', onclick: () => openBuilder(r) }, title)),
         r.name ? h('p', { class: 'rv-sent' }, sentence) : null,
         h('p', { class: 'rv-meta' },
-          h('span', { class: `bx-badge ${hard ? 'hard' : 'soft'}` }, hard ? 'Must hold' : `Preference · ${clampW(r.weight)}`),
+          h('span', { class: `rv-strength ${hard ? 'hard' : 'soft'}` }, hard ? 'Must hold' : `Preference · ${clampW(r.weight)}`),
           t ? h('span', { class: 'rv-type' }, t.label) : null,
           meta ? h('span', { class: 'rv-who' }, meta) : null),
-        r.note ? h('p', { class: 'rv-note' }, r.note) : null),
-      h('div', { class: 'rv-side' },
-        countEl,
-        h('div', { class: 'rv-acts' },
-          h('label', { class: 'switch rv-sw', title: off ? 'Turn on' : 'Turn off' }, sw, h('span', { class: 'sw-track' }), h('span', { class: 'sr-only' }, 'On')),
-          h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => openBuilder(r), 'aria-label': `Edit: ${title}` }, 'Edit'),
-          h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => duplicate(r), 'aria-label': `Duplicate (copy): ${title}` }, h('span', { class: 'rv-long' }, 'Duplicate'), h('span', { class: 'rv-short', 'aria-hidden': 'true' }, 'Copy')),
-          h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm', onclick: () => removeRule(r), 'aria-label': `Delete: ${title}` }, 'Delete'))));
+        r.note ? h('p', { class: 'rv-note' }, r.note) : null,
+        h('div', { class: 'rv-acts' }, countEl)),
+      h('label', { class: 'rv-swl' }, sw));
   }
 
   // ---------- changes ----------
@@ -241,40 +260,35 @@ export function mount(el, app) {
     const state = app.store.get();
     let close;
     const pick = rule => { close(); openBuilder(rule, { isNew: true }); };
-    const tpl = h('ul', { class: 'rp-tpls' }, TEMPLATES.map(tp => h('li', null,
-      h('button', { type: 'button', class: 'rp-tpl', onclick: () => {
-        const base = newRule(tp.make(state).type, state);
-        const made = tp.make(state);
-        const rule = { ...base, ...made, who: { ...base.who, ...(made.who || {}) }, when: { ...base.when, ...(made.when || {}) }, params: { ...base.params, ...made.params } };
-        close(); openBuilder(rule, { isNew: true, hint: tp.pick });
-      } },
-      h('span', { class: 'rp-ic', 'aria-hidden': 'true' }, tp.icon),
-      h('span', { class: 'rp-txt' }, h('strong', null, tp.label), h('span', null, tp.sub))))));
+    // each choice is one of the kit's rows: an icon tile, the label and a line of help
+    const choice = (cls, ic, label, sub, onclick, example) => h('li', null, h('button', { type: 'button', class: `app-row ${cls}`, onclick },
+      h('span', { class: 'app-row-icon', html: ruleIcon(ic) }),
+      h('span', { class: 'app-row-body' }, h('span', { class: 'app-row-title' }, label), h('span', { class: 'app-row-sub' }, sub),
+        example ? h('span', { class: 'app-row-sub rp-eg' }, `e.g. ${example}`) : null),
+      h('span', { class: 'app-row-chevron', 'aria-hidden': 'true' })));
+    const tpl = h('ul', { class: 'app-list rp-tpls' }, TEMPLATES.map(tp => choice('rp-tpl', tp.icon, tp.label, tp.sub, () => {
+      const base = newRule(tp.make(state).type, state);
+      const made = tp.make(state);
+      const rule = { ...base, ...made, who: { ...base.who, ...(made.who || {}) }, when: { ...base.when, ...(made.when || {}) }, params: { ...base.params, ...made.params } };
+      close(); openBuilder(rule, { isNew: true, hint: tp.pick });
+    })));
     const fromTemplate = (tp, made) => {
       const base = newRule(made.type, state);
       const rule = { ...base, ...made, who: { ...base.who, ...(made.who || {}) }, when: { ...base.when, ...(made.when || {}) }, params: { ...base.params, ...made.params } };
       close(); openBuilder(rule, { isNew: true, hint: tp.pick });
     };
-    const combo = h('ul', { class: 'rp-tpls rp-combo' },
-      COMBO_KINDS.filter(k => RULE_TYPES[k.type]).map(k => h('li', null,
-        h('button', { type: 'button', class: 'rp-tpl', onclick: () => pick(newRule(k.type, state)) },
-          h('span', { class: 'rp-ic', 'aria-hidden': 'true' }, k.icon),
-          h('span', { class: 'rp-txt' }, h('strong', null, k.label), h('span', null, k.sub))))),
-      COMBO_TEMPLATES.filter(tp => tp.ok(state)).map(tp => h('li', null,
-        h('button', { type: 'button', class: 'rp-tpl', onclick: () => fromTemplate(tp, tp.make(state)) },
-          h('span', { class: 'rp-ic', 'aria-hidden': 'true' }, tp.icon),
-          h('span', { class: 'rp-txt' }, h('strong', null, tp.label), h('span', null, tp.sub))))));
-    const types = h('ul', { class: 'rp-types' }, Object.entries(RULE_TYPES).map(([type, t]) => h('li', null,
-      h('button', { type: 'button', class: 'rp-type', onclick: () => pick(newRule(type, state)) },
-        h('span', { class: 'rp-ic', 'aria-hidden': 'true' }, t.icon),
-        h('span', { class: 'rp-txt' }, h('strong', null, t.label), h('span', null, t.help), t.example ? h('em', null, `e.g. ${t.example}`) : null)))));
+    const combo = h('ul', { class: 'app-list rp-tpls rp-combo' },
+      COMBO_KINDS.filter(k => RULE_TYPES[k.type]).map(k => choice('rp-tpl', k.icon, k.label, k.sub, () => pick(newRule(k.type, state)))),
+      COMBO_TEMPLATES.filter(tp => tp.ok(state)).map(tp => choice('rp-tpl', tp.icon, tp.label, tp.sub, () => fromTemplate(tp, tp.make(state)))));
+    const types = h('ul', { class: 'app-list rp-types' }, Object.entries(RULE_TYPES).map(([type, t]) =>
+      choice('rp-type', type, t.label, t.help, () => pick(newRule(type, state)), t.example)));
+    const part = (title, sub, ul) => h('section', { class: 'app-section' }, h('h3', { class: 'app-section-header' }, title), ul, sub ? h('p', { class: 'app-section-footer' }, sub) : null);
     close = app.sheet({
-      title: 'Add a rule', wide: true, className: 'rp-sheet',
+      title: 'Add a rule', wide: true, className: 'rp-sheet is-grouped',
       body: h('div', { class: 'rp' },
-        h('h3', { class: 'rp-h' }, 'Combination restriction'),
-        h('p', { class: 'bx-help' }, 'Codes or people that can\'t (or must) go together: which kind?'), combo,
-        h('h3', { class: 'rp-h' }, 'Quick templates'), tpl,
-        h('h3', { class: 'rp-h' }, 'Or start from a rule type'), types),
+        part('Combination restriction', 'Codes or people that can\'t (or must) go together.', combo),
+        part('Quick templates', null, tpl),
+        part('Or start from a rule type', null, types)),
       actions: [{ label: 'Cancel' }],
     });
   }
@@ -293,17 +307,51 @@ export function mount(el, app) {
     if (t.soft_only) draft.hard = false;
     if (!(Number(draft.weight) >= 1)) draft.weight = 10;
     const startJSON = JSON.stringify(draft);   // closing with changes asks first (Back, Esc, X, tap outside)
+    const sheetTitle = title || (isNew ? `New rule: ${t.label}` : 'Edit rule');
 
-    let timer = 0;
-    const changed = () => { clearTimeout(timer); timer = setTimeout(preview, 120); };
+    // the live check runs at most once a frame, straight after a change (it takes a few milliseconds), instead of
+    // waiting for a pause in typing (speed: it used to wait 120 ms)
+    let raf = 0;
+    // a new rule starts with a hint, not red errors: they show after the first change or on Add rule
+    let touched = !isNew;
+    const changed = () => { touched = true; if (!raf) raf = requestAnimationFrame(() => { raf = 0; preview(); }); };
 
-    // live preview: sentence, problems with the rule as written, and what it finds this month
+    // live preview: sentence, problems with the rule as written, and what it finds this month (the type's name only
+    // when the sheet's title doesn't already say it)
     const pvSentence = h('p', { class: 'rb-sentence' });
     const pvErrors = h('ul', { class: 'rb-errors' });
     const pvCheck = h('div', { class: 'rb-check' });
     const pv = h('div', { class: 'rb-preview', 'aria-live': 'polite' },
-      h('p', { class: 'rb-pv-label' }, h('span', { 'aria-hidden': 'true' }, t.icon), ` ${t.label}`),
+      sheetTitle.includes(t.label) ? null : h('p', { class: 'rb-pv-label' }, h('span', { class: 'rb-pv-ic', html: ruleIcon(src.type) }), t.label),
       pvSentence, pvErrors, pvCheck);
+
+    // an error about one field goes under that field (the kit's field error); the rest stay in the preview
+    function fieldFor(e) {
+      for (const [spec, f] of paramFields) {
+        if (f.hidden) continue;
+        if (e.includes(`"${spec.label}"`) || e === `No codes chosen for ${spec.label}` || (e === 'No codes chosen' && spec.kind === 'codes')
+          || (e === 'At least is more than at most' && spec.key === 'max')) return f;
+      }
+      return null;
+    }
+    function markFields(errs) {
+      const byField = new Map();
+      const rest = [];
+      for (const e of errs) { const f = fieldFor(e); if (f) byField.set(f, [...(byField.get(f) || []), e]); else rest.push(e); }
+      for (const [, f] of paramFields) {
+        const msgs = byField.get(f) || [];
+        let p = f.querySelector(':scope > .app-field-error');
+        // (under a code list's label: the list itself is long)
+        if (msgs.length && !p) { p = h('p', { class: 'app-field-error', id: fid('err') }); const lab = f.querySelector(':scope > .bx-label'); if (lab && f.querySelector('.bx-codes')) lab.after(p); else f.append(p); }
+        if (p) { if (msgs.length) p.textContent = msgs.join('. '); else { p.remove(); p = null; } }
+        for (const el of f.querySelectorAll('input.app-input, select.app-input, .bx-codes')) {
+          const inp = !el.classList.contains('bx-codes');
+          if (p) { if (inp) el.setAttribute('aria-invalid', 'true'); el.setAttribute('aria-describedby', p.id); }
+          else { el.removeAttribute('aria-invalid'); el.removeAttribute('aria-describedby'); }
+        }
+      }
+      return rest;
+    }
 
     function preview() {
       const st = app.store.get();
@@ -311,10 +359,15 @@ export function mount(el, app) {
       const errs = validateRule(draft, st);
       const warns = warnings(draft, st);
       pvErrors.innerHTML = '';
-      for (const e of errs) pvErrors.append(h('li', { class: 'err' }, e));
-      for (const w of warns) pvErrors.append(h('li', { class: 'warn' }, w));
       pvCheck.innerHTML = '';
-      if (errs.length) { pvCheck.append(h('p', { class: 'rb-ck-h muted' }, 'Fix the above to check this rule.')); return; }
+      if (!touched && errs.length) {
+        markFields([]);
+        pvCheck.append(h('p', { class: 'rb-ck-h rb-ck-hint muted' }, `Choose the codes and people below; this checks the rule against ${M.fmtMonth(app.month)} as you go.`));
+        return;
+      }
+      for (const e of markFields(errs)) pvErrors.append(h('li', { class: 'err' }, e));
+      for (const w of warns) pvErrors.append(h('li', { class: 'warn' }, w));
+      if (errs.length) { pvCheck.append(h('p', { class: 'rb-ck-h muted' }, 'Fix what is marked to check this rule.')); return; }
       const days = M.monthDays(app.month);
       let found = [];
       try { found = evaluateRule(st, draft, { from: days[0], to: days[days.length - 1] }); } catch (e) { console.error(e); }
@@ -348,7 +401,7 @@ export function mount(el, app) {
 
     // Strength: hard / soft + weight
     const wOut = h('output', { class: 'rb-wout' }, String(clampW(draft.weight)));
-    const wRange = h('input', { type: 'range', min: '1', max: '100', step: '1', value: String(clampW(draft.weight)), 'aria-label': 'Weight (1 to 100)',
+    const wRange = h('input', { type: 'range', class: 'rb-range', min: '1', max: '100', step: '1', value: String(clampW(draft.weight)), 'aria-label': 'Weight (1 to 100)',
       oninput: () => { draft.weight = Number(wRange.value); wOut.textContent = wRange.value; changed(); } });
     const wRow = h('div', { class: 'rb-weight' }, h('span', { class: 'muted' }, 'Weight'), wRange, wOut);
     const strength = seg(h, {
@@ -360,10 +413,10 @@ export function mount(el, app) {
 
     // Name, note, on/off
     const nameId = fid('rname'), noteId = fid('rnote');
-    const nameIn = h('input', { type: 'text', id: nameId, value: draft.name || '', placeholder: 'Leave blank to use the sentence', maxlength: '120',
+    const nameIn = h('input', { type: 'text', id: nameId, class: 'app-input', value: draft.name || '', placeholder: 'Leave blank to use the sentence', maxlength: '120',
       oninput: () => { draft.name = nameIn.value; } });
-    const noteIn = h('textarea', { id: noteId, rows: '2', placeholder: 'Why this rule exists, who asked for it', oninput: () => { draft.note = noteIn.value; } }, draft.note || '');
-    const onIn = h('input', { type: 'checkbox', checked: draft.enabled !== false, onchange: () => { draft.enabled = onIn.checked; } });
+    const noteIn = h('textarea', { id: noteId, class: 'app-input', rows: '2', placeholder: 'Why this rule exists, who asked for it', oninput: () => { draft.note = noteIn.value; } }, draft.note || '');
+    const onIn = h('input', { type: 'checkbox', class: 'app-switch', role: 'switch', checked: draft.enabled !== false, onchange: () => { draft.enabled = onIn.checked; } });
 
     const form = h('div', { class: 'rb-form' },
       hint ? h('p', { class: 'rb-hint' }, hint) : null,
@@ -375,11 +428,15 @@ export function mount(el, app) {
       section('Name and note', h('div', { class: 'rb-fields' },
         h('div', { class: 'bx-field' }, h('label', { for: nameId }, 'Name (optional)'), nameIn),
         h('div', { class: 'bx-field' }, h('label', { for: noteId }, 'Note (optional)'), noteIn),
-        h('label', { class: 'switch' }, onIn, h('span', { class: 'sw-track' }), h('span', null, 'Rule on')))));
+        h('label', { class: 'sw-line' }, h('span', null, 'Rule on'), onIn))));
 
     const body = h('div', { class: 'rb' }, pv, form);
-    const actions = [{ label: 'Cancel' }];
-    if (!isNew) actions.unshift({ label: 'Delete', danger: true, fn: () => removeRule(src) });
+    // a saved rule: Delete (red) and Copy here, not on the list's rows; Copy starts a new rule from what is on screen
+    // (the X closes without saving, asking first if anything changed)
+    const actions = isNew ? [{ label: 'Cancel' }] : [
+      { label: 'Delete', danger: true, fn: () => removeRule(src) },
+      { label: 'Copy', fn: () => { setTimeout(() => duplicate({ ...structuredClone(draft), name: (draft.name || '').trim() }), 0); } },
+    ];
     actions.push({
       label: isNew ? 'Add rule' : 'Save rule', primary: true,
       fn: () => {
@@ -387,19 +444,25 @@ export function mount(el, app) {
         draft.name = (draft.name || '').trim();
         draft.note = (draft.note || '').trim();
         const errs = validateRule(draft, st);
-        if (errs.length) { preview(); app.toast(`Not saved: ${errs[0]}`, { kind: 'error' }); return false; }
+        if (errs.length) {
+          touched = true; preview();
+          body.querySelector('.app-field-error')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          app.toast(`Not saved: ${errs[0]}`, { kind: 'error' });
+          return false;
+        }
         saveRule(structuredClone(draft), isNew, after);
       },
     });
     app.sheet({
-      title: title || (isNew ? `New rule: ${t.label}` : 'Edit rule'), body, actions, wide: true, className: 'rb-sheet', onClose: () => clearTimeout(timer),
+      title: sheetTitle, body, actions, wide: true, className: 'rb-sheet is-grouped', onClose: () => cancelAnimationFrame(raf),
       beforeClose: () => JSON.stringify(draft) === startJSON || app.confirm(isNew ? 'Close without adding this rule?' : 'Close without saving your changes to this rule?', { ok: 'Discard', danger: true }),
     });
     preview();
   }
 
+  // a builder section: the kit's caption header over a raised card
   function section(title, content) {
-    return h('section', { class: 'rb-sec' }, h('h3', { class: 'rb-sec-h' }, title), content);
+    return h('section', { class: 'app-section rb-sec' }, h('h3', { class: 'app-section-header' }, title), h('div', { class: 'rb-card' }, content));
   }
 
   // ---------- rules log ----------
@@ -408,14 +471,15 @@ export function mount(el, app) {
     const items = [...(state.rulesLog || [])].reverse();
     const ids = new Set((state.rules || []).map(r => r.id));
     const body = items.length
-      ? h('ol', { class: 'rl-log' }, items.map(e => h('li', null,
-        h('span', { class: `bx-tag ${e.action === 'delete' ? 'bad' : e.action === 'add' ? 'ok' : 'off'}` }, LOG_WORDS[e.action] || e.action),
-        h('span', { class: 'rl-name' }, ids.has(e.ruleId)
-          ? h('button', { type: 'button', class: 'linkish', onclick: () => { close(); const r = app.store.get().rules.find(x => x.id === e.ruleId); if (r) openBuilder(r); } }, e.name || e.ruleId)
-          : (e.name || e.ruleId)),
-        h('time', { class: 'muted', datetime: e.at }, fmtWhen(e.at) + (e.by ? ` · ${e.by}` : '')))))
+      ? h('ol', { class: 'app-list rl-log' }, items.map(e => h('li', null, h('div', { class: 'app-row' },
+        h('span', { class: 'app-row-body' },
+          h('span', { class: 'app-row-title rl-name' }, ids.has(e.ruleId)
+            ? h('button', { type: 'button', class: 'linkish', onclick: () => { close(); const r = app.store.get().rules.find(x => x.id === e.ruleId); if (r) openBuilder(r); } }, e.name || e.ruleId)
+            : (e.name || e.ruleId)),
+          h('time', { class: 'app-row-sub', datetime: e.at }, fmtWhen(e.at) + (e.by ? ` · ${e.by}` : ''))),
+        h('span', { class: `app-badge app-badge--${e.action === 'delete' ? 'bad' : e.action === 'add' ? 'ok' : 'ink'}` }, LOG_WORDS[e.action] || e.action)))))
       : h('p', { class: 'muted' }, 'No rule changes yet. Adding, changing, turning off or deleting a rule is listed here.');
-    const close = app.sheet({ title: 'Rules log', body, actions: [{ label: 'Close', primary: true }] });
+    const close = app.sheet({ title: 'Rules log', body, className: 'is-grouped' });   // read only: the X closes it
   }
 
   // ---------- export / import ----------
@@ -455,21 +519,22 @@ export function mount(el, app) {
     const missing = duties.filter(d => d && d.code && !dm.has(d.code));
     let addCodes = true;
     const row = it => {
-      const cb = h('input', { type: 'checkbox', checked: it.on, onchange: () => { it.on = cb.checked; } });
-      return h('li', null, h('label', { class: 'ri-row' }, cb,
-        h('span', { class: `bx-tag ${it.status === 'new' ? 'ok' : 'warn'}` }, it.status === 'new' ? 'New' : 'Changed'),
-        h('span', null, it.rule.name || describeRule(it.rule, state))));
+      const cb = h('input', { type: 'checkbox', class: 'app-switch', role: 'switch', checked: it.on, onchange: () => { it.on = cb.checked; } });
+      return h('li', null, h('label', { class: 'app-row ri-row' },
+        h('span', { class: 'app-row-body' }, h('span', { class: 'app-row-title' }, it.rule.name || describeRule(it.rule, state))),
+        h('span', { class: `app-badge app-badge--${it.status === 'new' ? 'ok' : 'warn'}` }, it.status === 'new' ? 'New' : 'Changed'), cb));
     };
     const fresh = items.filter(i => i.status === 'new'), changedItems = items.filter(i => i.status === 'changed'), same = items.filter(i => i.status === 'same');
     const body = h('div', { class: 'ri' },
       h('p', null, `${file.name}: ${items.length} rules. ${fresh.length} new, ${changedItems.length} changed, ${same.length} the same as here.`),
-      fresh.length || changedItems.length ? h('ul', { class: 'ri-list' }, [...fresh, ...changedItems].map(row)) : h('p', { class: 'ok-box' }, 'Nothing new: every rule in the file is already here.'),
-      missing.length ? h('label', { class: 'ri-row ri-codes' }, h('input', { type: 'checkbox', checked: true, onchange: e => { addCodes = e.target.checked; } }),
-        h('span', null, `Also add ${missing.length} duty ${missing.length === 1 ? 'code' : 'codes'} these rules use: ${missing.map(d => d.code).join(', ')}`)) : null,
+      fresh.length || changedItems.length ? h('ul', { class: 'app-list ri-list' }, [...fresh, ...changedItems].map(row)) : h('p', { class: 'ok-box' }, 'Nothing new: every rule in the file is already here.'),
+      missing.length ? h('ul', { class: 'app-list' }, h('li', null, h('label', { class: 'app-row ri-codes' },
+        h('span', { class: 'app-row-body' }, h('span', { class: 'app-row-title' }, `Also add ${missing.length} duty ${missing.length === 1 ? 'code' : 'codes'} these rules use`), h('span', { class: 'app-row-sub' }, missing.map(d => d.code).join(', '))),
+        h('input', { type: 'checkbox', class: 'app-switch', role: 'switch', checked: true, onchange: e => { addCodes = e.target.checked; } })))) : null,
       unknown ? h('p', { class: 'warn-box' }, `${unknown} ${unknown === 1 ? 'rule has a type' : 'rules have types'} this version doesn't know; skipped.`) : null,
       h('p', { class: 'bx-help' }, 'Rules you have here and the file doesn\'t are kept. Import is one step you can undo.'));
     app.sheet({
-      title: 'Import rules', body,
+      title: 'Import rules', body, className: 'is-grouped',
       actions: [{ label: 'Cancel' }, {
         label: 'Import', primary: true,
         fn: () => {
@@ -528,7 +593,7 @@ function paramField(app, state, spec, params, onChange, type) {
   }
   if (spec.kind === 'code') {
     const onlyReq = spec.key === 'request';
-    const sel = h('select', { id, onchange: () => { params[spec.key] = sel.value; onChange(); } });
+    const sel = h('select', { id, class: 'app-input', onchange: () => { params[spec.key] = sel.value; onChange(); } });
     const duties = (state.duties || []).filter(d => d.kind !== 'derived' && (!onlyReq || d.kind === 'request'));
     if (!duties.some(d => d.code === params[spec.key])) sel.append(h('option', { value: params[spec.key] || '' }, params[spec.key] ? `${params[spec.key]} (unknown)` : 'Choose…'));
     const kinds = [...new Set(duties.map(d => d.kind))];
@@ -539,7 +604,7 @@ function paramField(app, state, spec, params, onChange, type) {
   if (spec.kind === 'number') {
     const v = params[spec.key];
     const inp = h('input', {
-      type: 'number', id, inputmode: 'numeric', class: 'bx-num', value: v == null ? '' : String(v),
+      type: 'number', id, inputmode: 'numeric', class: 'app-input bx-num', value: v == null ? '' : String(v),
       min: spec.min != null ? String(spec.min) : null, max: spec.max != null ? String(spec.max) : null, step: 'any',
       placeholder: spec.optional ? 'No limit' : '',
       oninput: () => { params[spec.key] = inp.value === '' ? (spec.optional ? null : '') : Number(inp.value); onChange(); },
@@ -561,13 +626,13 @@ function paramField(app, state, spec, params, onChange, type) {
     if (opts.length <= 3) {
       return h('div', { class: 'bx-field' }, seg(h, { name: id, label: spec.label, value: params[spec.key], options: opts, onChange: v => { params[spec.key] = v; onChange(); } }), help);
     }
-    const sel = h('select', { id, onchange: () => { params[spec.key] = sel.value; onChange(); } }, opts.map(([v, l]) => h('option', { value: v }, l)));
+    const sel = h('select', { id, class: 'app-input', onchange: () => { params[spec.key] = sel.value; onChange(); } }, opts.map(([v, l]) => h('option', { value: v }, l)));
     sel.value = params[spec.key];
     return h('div', { class: 'bx-field' }, h('label', { for: id }, spec.label), sel, help);
   }
   if (spec.kind === 'bool') {
-    const cb = h('input', { type: 'checkbox', checked: !!params[spec.key], onchange: () => { params[spec.key] = cb.checked; onChange(); } });
-    return h('div', { class: 'bx-field' }, h('label', { class: 'switch' }, cb, h('span', { class: 'sw-track' }), h('span', null, spec.label)), help);
+    const cb = h('input', { type: 'checkbox', class: 'app-switch', role: 'switch', checked: !!params[spec.key], onchange: () => { params[spec.key] = cb.checked; onChange(); } });
+    return h('div', { class: 'bx-field' }, h('label', { class: 'sw-line' }, h('span', null, spec.label), cb), help);
   }
   if (spec.kind === 'who') {
     params[spec.key] = W(params[spec.key]);
@@ -583,7 +648,7 @@ export function codePicker(app, state, selected, onChange, { labelledby } = {}) 
   let cur = [...selected];
   const wrap = h('div', { class: 'bx-codes', role: 'group', 'aria-labelledby': labelledby || null });
   const btn = (code, label, du, title) => {
-    const b = h('button', { type: 'button', class: `bx-tok${du ? '' : ' is-token'}`, 'aria-pressed': cur.includes(code) ? 'true' : 'false', title: title || '', 'data-code': code,
+    const b = h('button', { type: 'button', class: `app-chip bx-tok${du ? '' : ' is-token'}`, 'aria-pressed': cur.includes(code) ? 'true' : 'false', title: title || '', 'data-code': code,
       onclick: () => {
         cur = cur.includes(code) ? cur.filter(c => c !== code) : [...cur, code];
         b.setAttribute('aria-pressed', cur.includes(code) ? 'true' : 'false');
@@ -627,12 +692,12 @@ export function whoPicker(app, state, who, onChange, { everyoneNote = '' } = {})
     const isAll = !who.groups.length && !who.tags.length && !who.staff.length;
     const same = (a, b) => a.length === b.length && a.every(x => b.includes(x));
     wrap.append(h('div', { class: 'bx-quick', role: 'group', 'aria-label': 'Quick choice' },
-      h('button', { type: 'button', class: 'bx-pill', 'aria-pressed': String(isAll), onclick: () => set([]) }, 'Everyone'),
-      jr.length ? h('button', { type: 'button', class: 'bx-pill', 'aria-pressed': String(!who.tags.length && !who.staff.length && same(who.groups, jr)), onclick: () => set([...jr]) }, 'Juniors') : null,
-      sr.length ? h('button', { type: 'button', class: 'bx-pill', 'aria-pressed': String(!who.tags.length && !who.staff.length && same(who.groups, sr)), onclick: () => set([...sr]) }, 'Seniors') : null));
+      h('button', { type: 'button', class: 'app-chip', 'aria-pressed': String(isAll), onclick: () => set([]) }, 'Everyone'),
+      jr.length ? h('button', { type: 'button', class: 'app-chip', 'aria-pressed': String(!who.tags.length && !who.staff.length && same(who.groups, jr)), onclick: () => set([...jr]) }, 'Juniors') : null,
+      sr.length ? h('button', { type: 'button', class: 'app-chip', 'aria-pressed': String(!who.tags.length && !who.staff.length && same(who.groups, sr)), onclick: () => set([...sr]) }, 'Seniors') : null));
     const toggles = (label, items, key) => h('div', { class: 'bx-who-row' }, h('span', { class: 'bx-codes-k' }, label),
       h('div', { class: 'bx-pills', role: 'group', 'aria-label': label }, items.map(([id, text, title]) => h('button', {
-        type: 'button', class: 'bx-pill', 'aria-pressed': String(who[key].includes(id)), title: title || null,
+        type: 'button', class: 'app-chip', 'aria-pressed': String(who[key].includes(id)), title: title || null,
         onclick: () => { who[key] = who[key].includes(id) ? who[key].filter(x => x !== id) : [...who[key], id]; render(); onChange(); },
       }, text))));
     wrap.append(toggles('Groups', (state.groups || []).map(g => [g.id, g.name, g.kind === 'senior' ? 'Senior group' : 'Junior group']), 'groups'));
@@ -646,13 +711,13 @@ export function whoPicker(app, state, who, onChange, { everyoneNote = '' } = {})
 
   function personRow(label, key, placeholder) {
     const id = fid('who');
-    const sel = h('select', { id, class: 'bx-who-sel', onchange: () => { if (sel.value) { who[key] = [...who[key], sel.value]; render(); onChange(); } } },
+    const sel = h('select', { id, class: 'app-input bx-who-sel', onchange: () => { if (sel.value) { who[key] = [...who[key], sel.value]; render(); onChange(); } } },
       h('option', { value: '' }, placeholder));
     for (const g of state.groups || []) {
       const ps = staff.filter(p => p.group === g.id && !who[key].includes(p.id));
       if (ps.length) sel.append(h('optgroup', { label: g.name }, ps.map(p => h('option', { value: p.id }, p.name + (p.short ? ` (${p.short})` : '')))));
     }
-    const chosen = who[key].map(pid => h('span', { class: 'bx-pill is-on' }, name(pid),
+    const chosen = who[key].map(pid => h('span', { class: 'bx-picked' }, name(pid),
       h('button', { type: 'button', class: 'bx-x', 'aria-label': `Remove ${name(pid)}`, onclick: () => { who[key] = who[key].filter(x => x !== pid); render(); onChange(); } }, '×')));
     return h('div', { class: 'bx-who-row' }, h('label', { class: 'bx-codes-k', for: id }, label), h('div', { class: 'bx-pills' }, chosen, sel));
   }
@@ -671,7 +736,7 @@ export function whenPicker(app, when, onChange) {
   const setDays = arr => { when.days = arr; paint(); onChange(); };
   const quick = [
     ['Every day', []], ['Weekdays', [1, 2, 3, 4, 5]], ['Weekends', [0, 6]],
-  ].map(([l, arr]) => h('button', { type: 'button', class: 'bx-pill', onclick: () => setDays(arr) }, l));
+  ].map(([l, arr]) => h('button', { type: 'button', class: 'app-chip', onclick: () => setDays(arr) }, l));
   function paint() {
     dayBtns.forEach((b, i) => b.setAttribute('aria-pressed', String((when.days || []).includes(i))));
     const d = when.days || [];
@@ -680,8 +745,8 @@ export function whenPicker(app, when, onChange) {
     quick[2].setAttribute('aria-pressed', String(d.length === 2 && d.includes(0) && d.includes(6)));
   }
   paint();
-  const fromIn = h('input', { type: 'date', id: fromId, value: when.from || '', onchange: () => { when.from = fromIn.value; onChange(); } });
-  const toIn = h('input', { type: 'date', id: toId, value: when.to || '', onchange: () => { when.to = toIn.value; onChange(); } });
+  const fromIn = h('input', { type: 'date', id: fromId, class: 'app-input', value: when.from || '', onchange: () => { when.from = fromIn.value; onChange(); } });
+  const toIn = h('input', { type: 'date', id: toId, class: 'app-input', value: when.to || '', onchange: () => { when.to = toIn.value; onChange(); } });
   wrap.append(
     h('div', { class: 'bx-who-row' }, h('span', { class: 'bx-codes-k', id: fromId + 'd' }, 'Days'),
       h('div', { class: 'bx-pills' }, h('div', { class: 'bx-days', role: 'group', 'aria-labelledby': fromId + 'd' }, dayBtns), quick)),
@@ -694,18 +759,32 @@ export function whenPicker(app, when, onChange) {
   return wrap;
 }
 
-// Segmented control built from radio buttons (keyboard and screen readers get a real radio group).
-export function seg(h, { name, label, value, options, onChange, compact = false }) {
-  const fs = h('fieldset', { class: `bx-seg${compact ? ' compact' : ''}` }, h('legend', null, label));
-  const box = h('div', { class: 'bx-seg-opts' });
+// One choice of a few, built from radio buttons (keyboard and screen readers get a real radio group): the kit's
+// segmented control when the labels fit one row on a phone (2 to 4 short ones), else a check list (iOS style).
+const SEG_FIT = { 2: 18, 3: 11, 4: 8 };   // longest label (characters) a segment holds at 390 px
+export function seg(h, { name, label, value, options, onChange }) {
+  const longest = Math.max(...options.map(([, l]) => String(l).length));
+  const asSeg = options.length >= 2 && options.length <= 4 && longest <= SEG_FIT[options.length];
+  const fs = h('fieldset', { class: asSeg ? 'app-segmented bx-seg' : 'bx-radios' }, h('legend', null, label));
   const inputs = options.map(([v, l]) => {
     const inp = h('input', { type: 'radio', name, value: v, checked: v === value, onchange: () => { if (inp.checked) onChange(v); } });
-    box.append(h('label', { class: 'bx-seg-opt' }, inp, h('span', null, l)));
+    fs.append(h('label', { class: asSeg ? 'app-seg' : 'bx-radio' }, inp, h('span', null, l)));
     return inp;
   });
-  fs.append(box);
-  fs.set = v => inputs.forEach(i => { i.checked = i.value === v; });
-  return fs;
+  // the legend is hidden in the kit's control; a visible label above stands in for it
+  const wrap = h('div', { class: 'bx-segwrap' }, h('p', { class: 'bx-label', 'aria-hidden': 'true' }, label), fs);
+  wrap.set = v => inputs.forEach(i => { i.checked = i.value === v; });
+  return wrap;
+}
+
+// One filter of several as the kit's chips (aria-pressed; exactly one is on). Returns the row, with set(value).
+export function chipFilter(h, { label, value, options, onChange }) {
+  const row = h('div', { class: 'app-chips bx-chipfilter', role: 'group', 'aria-label': label });
+  const btns = options.map(([v, l]) => h('button', { type: 'button', class: 'app-chip', 'aria-pressed': String(v === value), 'data-v': v,
+    onclick: () => { row.set(v); onChange(v); } }, l));
+  row.append(...btns);
+  row.set = v => btns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+  return row;
 }
 
 // ---------- small helpers (exported for People and Check) ----------
@@ -763,10 +842,10 @@ export function whenText(when) {
 
 // Chip colours for a duty, nudged for contrast (requests are outlined: their colour is the text).
 export function chipStyle(du) {
-  if (!du) return { '--c': '#e0e0e0', '--i': '#333' };
-  if (du.kind === 'request') { const c = darkenFor(du.color || '#0b5394', '#ffffff'); return { '--c': c, '--i': c }; }
-  const bg = safeHex(du.color, '#e0e0e0');
-  let ink = safeHex(du.ink, '#222222');
+  if (!du) return { '--c': '#e6e1d6', '--i': '#272722' };
+  if (du.kind === 'request') { const c = darkenFor(du.color || '#633d3c', '#ffffff'); return { '--c': c, '--i': c }; }
+  const bg = safeHex(du.color, '#e6e1d6');
+  let ink = safeHex(du.ink, '#272722');
   if (contrast(bg, ink) < 4.5) ink = contrast(bg, '#ffffff') >= contrast(bg, '#111111') ? '#ffffff' : '#111111';
   return { '--c': bg, '--i': ink };
 }

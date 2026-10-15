@@ -43,31 +43,36 @@ export async function getLatest() {
   return true;
 }
 
-// The two lines, appended to el. Returns the wrapper.
+// The two lines, appended to el, as the kit's grouped rows in small muted text (the kit ends settings with them as
+// rows). The version row shows only once there is a cache name. Returns the wrapper.
 export function renderVersion(el) {
-  const wrap = document.createElement('div');
-  wrap.className = 'appver muted';
-  wrap.style.cssText = 'font-size:12px;line-height:1.5';
-  const ver = document.createElement('div');
-  ver.className = 'appver-line';
-  const row = document.createElement('div');
-  const btn = document.createElement('button');
+  const make = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n; };
+  const wrap = make('div', 'app-section appver');
+  const list = make('ul', 'app-list');
+  const verItem = make('li');
+  verItem.hidden = true;
+  const ver = make('div', 'app-row appver-line');
+  verItem.append(ver);
+  const btn = make('button', 'app-row app-row--action appver-get');
   btn.type = 'button';
-  btn.className = 'linkish appver-get';
-  btn.style.cssText = 'font-size:inherit;font-weight:400;color:inherit;padding:6px 0;cursor:pointer';
-  btn.textContent = 'Not updating? Get the latest version';
-  const msg = document.createElement('span');
+  btn.append(make('span', 'app-row-title', 'Not updating? Get the latest version'));
+  const getItem = make('li');
+  getItem.append(btn);
+  list.append(verItem, getItem);
+  const msg = make('p', 'app-section-footer appver-msg');
   msg.setAttribute('role', 'status');
-  msg.className = 'appver-msg';
   btn.addEventListener('click', async () => {
     btn.disabled = true; msg.textContent = '';
     const ok = await getLatest();
-    if (!ok) { msg.textContent = ' No signal: nothing was changed. Try again when you have signal.'; btn.disabled = false; }
+    if (!ok) { msg.textContent = 'No signal: nothing was changed. Try again when you have signal.'; btn.disabled = false; }
   });
-  row.append(btn, msg);
-  wrap.append(ver, row);
+  wrap.append(list, msg);
   el.append(wrap);
-  appVersion().then(v => { if (v) ver.textContent = 'App version ' + v; });
+  appVersion().then(v => {
+    if (!v) return;
+    ver.replaceChildren(make('span', 'app-row-title', 'App version'), ' ', make('span', 'app-row-value app-mono', v));
+    verItem.hidden = false;
+  });
   return wrap;
 }
 
@@ -103,18 +108,18 @@ export function registerSW({ onUpdate } = {}) {
 function updateBar(apply) {
   const box = document.getElementById('toasts');
   const bar = document.createElement('div');
-  bar.className = 'toast';
+  bar.className = 'toast app-toast is-visible';
   bar.setAttribute('role', 'status');
   bar.id = 'update-bar';
   const text = document.createElement('span');
-  text.className = 'toast-msg';
+  text.className = 'app-toast-text';
   text.textContent = 'Update available';
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'toast-act';
+  btn.className = 'app-toast-action';
   btn.textContent = 'Reload';
   btn.addEventListener('click', () => { bar.remove(); apply(); });
   bar.append(text, btn);
   if (box) box.append(bar);
-  else { bar.style.cssText = 'position:fixed;left:16px;right:16px;bottom:16px;z-index:1000;background:#002f6c;color:#fff;padding:10px 14px;border-radius:8px;display:flex;gap:12px;align-items:center;justify-content:space-between'; document.body.append(bar); }
+  else { bar.style.cssText = 'position:fixed;left:16px;right:16px;bottom:16px;z-index:1000;background:#272722;color:#fffaf0;padding:10px 14px;border-radius:12px;display:flex;gap:12px;align-items:center;justify-content:space-between'; document.body.append(bar); }
 }

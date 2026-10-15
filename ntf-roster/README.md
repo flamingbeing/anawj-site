@@ -9,7 +9,7 @@ Background, department codes, the data model, the rules engine (and how to add a
 
 ## Flow
 
-1. **People** (on phones: More › People): import the department's "ALL STAFF LEAVE REQUEST" sheet (More › Import),
+1. **People** (More › People): import the department's "ALL STAFF LEAVE REQUEST" sheet (More › Import),
    or add staff by hand or by pasting a list. Groups, tags and duty codes are there too.
 2. **Roster**: enter leave and requests (tap a cell, or Paint to drag a code across days), then **Auto-fill** the
    calls and PM shifts. Preview, then Apply (one undo step). Locked cells and anything typed by hand are kept.
@@ -30,6 +30,7 @@ From the repo root:
 ```
 for f in ntf-roster/test/*.test.mjs; do node "$f"; done   # rules engine, solver, Excel parser (no browser)
 node ntf-roster/test/e2e.mjs                              # browser test: needs the server above on port 8080
+node ntf-roster/test/perf.e2e.mjs                         # speed budgets on a slowed phone (also in CI)
 tools/test-rules.sh                                       # firestore.rules in the local emulator (all apps)
 node tools/check.mjs                                      # repo check (sw.js SHELL lists files that exist)
 ```
@@ -39,8 +40,11 @@ node tools/check.mjs                                      # repo check (sw.js SH
 - `test/io.test.mjs`: Excel import and export on a generated sheet with invented names (~200 checks).
 - `test/e2e.mjs`: Practice in Chromium at 1300×900 and 390×844 plus a fresh start: every tab with axe (WCAG 2 A/AA),
   cell editor, paint and undo/redo, a new rule appearing in the grid and Check, Auto-fill next month to zero must-fix
-  problems, Excel export then import, backup and restore, the app version lines (~85 checks, ~45 s). `SHOTS=<dir>`
-  saves screenshots.
+  problems, Excel export then import, backup and restore, the app version lines, no sideways scroll at 360 and 320 px
+  (~100 checks, ~45 s). `SHOTS=<dir>` saves screenshots.
+- `test/perf.e2e.mjs`: tap a cell → editor, tap a code → grid, switch month, timed at 390×844 with the CPU 4x slower,
+  against budgets (~1 min). In the Checks workflow it fails only if a second run is over budget too (timings vary by
+  machine).
 - `test/rules.emulator.mjs`: the Firestore rules (run by `tools/test-rules.sh`).
 
 ## Code

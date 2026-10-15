@@ -29,23 +29,28 @@ export const DEFAULT_TAGS = [
 
 const duty = (code, name, kind, color, ink, extra = {}) =>
   ({ code, name, kind, color, ink, overnight: false, auto: false, hours: 0, ...extra });
-const shift = (code, name, color, extra) => duty(code, name, 'shift', color, '#fff', { hours: 8, ...extra });
-const leave = (code, name, color = '#fde2e4') => duty(code, name, 'leave', color, '#7a1c27');
-const request = (code, name) => duty(code, name, 'request', '#0b5394', '#fff');   // UI draws requests as outlined chips
-const other = (code, name) => duty(code, name, 'other', '#e0e0e0', '#333');
+// Default colours: warm, earthy codes in the NTF palette (anantf-site DESIGN-APP.md: no blue, teal or purple), told
+// apart by hue and lightness, every ink at least 4.5:1 on its fill. Call is the strongest; leave is rose, requests are
+// outlined in wine, other codes sit on the kit's fill grey.
+// Only new installs and the practice department use these: a saved roster keeps the colours it has.
+const IVORY = '#fffaf0';
+const shift = (code, name, color, extra) => duty(code, name, 'shift', color, IVORY, { hours: 8, ...extra });
+const leave = (code, name, color = '#f3dcd8') => duty(code, name, 'leave', color, '#6e2622');
+const request = (code, name) => duty(code, name, 'request', '#633d3c', IVORY);   // UI draws requests as outlined chips
+const other = (code, name) => duty(code, name, 'other', '#e6e1d6', '#3d3b35');
 
 export const DEFAULT_DUTIES = [
-  shift('C', 'Call', '#c62828', { overnight: true, auto: true, hours: 24 }),
-  shift('P', 'PM shift', '#ef6c00', { auto: true, hours: 5 }),
-  shift('SMO', 'Stepdown MO call', '#6a1b9a', { overnight: true, auto: true, hours: 24 }),
-  shift('OTC', 'OT consultant', '#1565c0', { auto: true, hours: 10 }),
-  shift('PHD', 'Public holiday day shift', '#00838f', { auto: true, hours: 12 }),
-  shift('W', 'Weekend duty', '#4527a0', { overnight: true, hours: 24 }),
-  shift('Creg', 'Call tag-on', '#ad1457', { hours: 4 }),
-  shift('APS', 'Acute pain service', '#2e7d32'),
-  shift('Clinic', 'Clinic', '#558b2f', { hours: 4 }),
-  shift('Inj', 'Injection list', '#827717', { hours: 4 }),
-  leave('AL', 'Annual leave', '#f8c9cf'),
+  shift('C', 'Call', '#9c2b1e', { overnight: true, auto: true, hours: 24 }),
+  shift('P', 'PM shift', '#b0571c', { auto: true, hours: 5 }),
+  shift('SMO', 'Stepdown MO call', '#6b3326', { overnight: true, auto: true, hours: 24 }),
+  shift('OTC', 'OT consultant', '#5c4a32', { auto: true, hours: 10 }),
+  shift('PHD', 'Public holiday day shift', '#5a5a2a', { auto: true, hours: 12 }),
+  shift('W', 'Weekend duty', '#3f3a30', { overnight: true, hours: 24 }),
+  shift('Creg', 'Call tag-on', '#a4493a', { hours: 4 }),
+  shift('APS', 'Acute pain service', '#3f6a33'),
+  shift('Clinic', 'Clinic', '#62702c', { hours: 4 }),
+  shift('Inj', 'Injection list', '#7c6320', { hours: 4 }),
+  leave('AL', 'Annual leave', '#ecc6c0'),
   leave('AAL', 'Advance annual leave'),
   leave('CL', 'Conference/training leave'),
   leave('TL', 'Training leave'),
@@ -70,7 +75,7 @@ export const DEFAULT_DUTIES = [
   other('LT', 'Liver transplant'),
   other('Mtg', 'Meeting'),
   other('Teach', 'Teaching'),
-  duty('x', 'Post call', 'derived', '#eeeeee', '#555'),
+  duty('x', 'Post call', 'derived', '#eee9df', '#55534d'),
 ];
 
 // Default rules live here (data only) so defaultState() needs no import from rules.js (no circular import);
@@ -141,12 +146,12 @@ const strList = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string' && 
 const looseList = v => (typeof v === 'string' && v ? v.split(',').map(x => x.trim()).filter(Boolean) : Array.isArray(v) ? v : []);
 // One duty code made safe (kind from the fixed set, colours as #rgb / #rrggbb). Expects a string `code`.
 export function cleanDuty(d) {
-  const out = { name: d.code, kind: 'other', color: '#e0e0e0', ink: '#333', overnight: false, auto: false, hours: 0, ...d };
+  const out = { name: d.code, kind: 'other', color: '#e6e1d6', ink: '#272722', overnight: false, auto: false, hours: 0, ...d };   // (the kit's fill and ink)
   out.code = str(d.code);
   if (!DUTY_KINDS.includes(out.kind)) out.kind = 'other';
   out.name = str(out.name, out.code);
-  if (!COLOUR.test(str(out.color))) out.color = '#e0e0e0';
-  if (!COLOUR.test(str(out.ink))) out.ink = '#333333';
+  if (!COLOUR.test(str(out.color))) out.color = '#e6e1d6';
+  if (!COLOUR.test(str(out.ink))) out.ink = '#272722';
   out.overnight = !!out.overnight; out.auto = !!out.auto;
   out.hours = Number(out.hours) || 0;
   return out;
@@ -235,7 +240,17 @@ export function addMonths(m, n) {
   const d = new Date(y, mo - 1 + n, 1);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 }
-export function weekday(s) { return parseISO(s).getDay(); }
+// Weekdays are asked for thousands of times per screen (grid, checks, demo): remember them per date string.
+const WEEKDAY = new Map();
+export function weekday(s) {
+  let w = WEEKDAY.get(s);
+  if (w === undefined) {
+    w = parseISO(s).getDay();
+    if (WEEKDAY.size > 5000) WEEKDAY.clear();
+    WEEKDAY.set(s, w);
+  }
+  return w;
+}
 export function isWeekend(s) { const w = weekday(s); return w === 0 || w === 6; }
 export function isHoliday(state, s) { return !!(state && state.settings && state.settings.holidays && state.settings.holidays[s]); }
 export function holidayName(state, s) { return (state && state.settings && state.settings.holidays && state.settings.holidays[s]) || ''; }
@@ -245,6 +260,18 @@ export function fmtMonth(m) { const [y, mo] = String(m).split('-').map(Number); 
 // ---------- lookups ----------
 
 export function dutyMap(state) { return new Map((state.duties || []).map(d => [d.code, d])); }
+// The same map, built once per duties list (read-only use: effectiveCodes and matchesCodes run per cell). It is
+// rebuilt when the list changes, even in place (a duty added, replaced or recoded inside a commit).
+const DUTY_MAPS = new WeakMap();
+function dutyMapCached(state) {
+  const list = state.duties;
+  if (!Array.isArray(list)) return dutyMap(state);
+  const hit = DUTY_MAPS.get(list);
+  if (hit && hit.items.length === list.length && hit.items.every((d, k) => d === list[k] && hit.codes[k] === (d && d.code))) return hit.m;
+  const m = dutyMap(state);
+  DUTY_MAPS.set(list, { m, items: list.slice(), codes: list.map(d => d && d.code) });
+  return m;
+}
 export function groupMap(state) { return new Map((state.groups || []).map(g => [g.id, g])); }
 export function staffMap(state) { return new Map((state.staff || []).map(p => [p.id, p])); }
 
@@ -294,7 +321,7 @@ export function effectiveCodes(state, s, staffId) {
   const out = cell && Array.isArray(cell.a) ? [...cell.a] : [];
   const prev = getCell(state, addDays(s, -1), staffId);
   if (prev && Array.isArray(prev.a) && prev.a.length) {
-    const dm = dutyMap(state);
+    const dm = dutyMapCached(state);
     if (prev.a.some(c => dm.get(c) && dm.get(c).overnight) && !out.includes('x')) out.push('x');
   }
   return out;
@@ -329,7 +356,7 @@ export function matchesCodes(state, s, staffId, codes, eff) {
   const set = expandTokens(state, codes);
   if (all.some(c => set.has(c))) return true;
   if (codes.includes('@present')) {
-    const dm = dutyMap(state);
+    const dm = dutyMapCached(state);
     const kindOf = c => (c === 'x' ? 'derived' : (dm.get(c) && dm.get(c).kind));
     if (effc.some(c => kindOf(c) === 'shift')) return true;
     const person = (state.staff || []).find(p => p.id === staffId);
