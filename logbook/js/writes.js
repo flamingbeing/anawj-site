@@ -6,7 +6,7 @@ const terminal = new Set(['synced', 'archived']);
 const KEEP = 100;   // finished saves kept in the device history (Recent changes)
 // the network dropped mid-save (Firestore: 'unavailable', 'deadline-exceeded'): the job stays pending and tries again
 const transient = error => error?.code === 'unavailable' || error?.code === 'deadline-exceeded';
-const failure = job => new Error(/Recent changes/.test(job.error) ? job.error : job.error + ' — a copy is kept in Recent changes');
+const failure = job => new Error(/in Recover\b/.test(job.error) ? job.error : job.error + ' — a copy is kept in Recover');
 export function createWriteQueue({ store, backend, getOwner = () => null, normalize = (_kind, value) => value, online = () => true, delay = ms => new Promise(r => setTimeout(r, ms)), notice = () => {} }) {
   let owner = null, generation = 0, jobs = [], loading = null, storageError = '';
   const running = new Map(), listeners = new Set(), waits = new Map();
@@ -134,7 +134,7 @@ export function createWriteQueue({ store, backend, getOwner = () => null, normal
     for (const x of over ? chain : stale && stale !== job ? [stale] : []) { x.state = 'archived'; if (over) x.kept = true; await persist(x); }
     if (!jobs.includes(job)) jobs.push(job);
     notify();
-    if (over && !same(previous.record, record)) notice('Your version from this device is kept in Recent changes');
+    if (over && !same(previous.record, record)) notice('Your version from this device is kept in Recover');
     if (held) throw failure(job);
     await Promise.race([drain(keyOf(job)), delay(180)]);
     if (!current(email, gen)) throw new Error('Account changed; the editor has not been saved');

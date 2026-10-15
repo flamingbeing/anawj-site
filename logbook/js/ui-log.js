@@ -637,7 +637,7 @@ function renderOne(card) {
   const draftNote = h('span', { class: 'draft-note', 'aria-live': 'polite' });
   // one quiet line under the box: the star on the left, the draft and sync state on the right, then a short
   // link to Recent changes / Recover drafts (its words say what needs doing when a save needs attention)
-  const syncNote = h('a', { href: '#recovery', class: 'draft-note sync-note', title: 'Recent changes / Recover drafts', 'aria-live': 'polite' });
+  const syncNote = h('a', { href: '#recovery', class: 'draft-note sync-note', title: 'Recover: drafts, deleted items and earlier versions', 'aria-live': 'polite' });
   const paintSync = () => { syncNote.textContent = writes.error() || (writes.attention() ? 'Save needs attention' : writes.pending() ? 'Pending sync' : writes.entries().length ? 'Synced' : 'Recover'); };
   const offSync = writes.onChange(() => { if (syncNote.isConnected) paintSync(); else offSync(); });
   paintSync();
@@ -1270,7 +1270,7 @@ export function editCaseDialog(c, opts = {}) {
   const saveEditDraft = () => {
     if ((cloud.demo ? 'demo:' : '') + (S.user?.email || '') !== ownerKey) return;
     if (JSON.stringify(e) === initial) return;
-    try { editDraft.save({ record: e, base, isNew, savedAt: Date.now() }); draftStatus.textContent = 'Edit draft saved on this device · Recover drafts'; }
+    try { editDraft.save({ record: e, base, isNew, savedAt: Date.now() }); draftStatus.textContent = 'Edit draft saved on this device · in Recover'; }
     catch { draftStatus.textContent = 'Edit draft not saved · storage unavailable'; }
   };
   const sel = h('div', { class: 'chips selected' });

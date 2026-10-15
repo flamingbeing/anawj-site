@@ -48,21 +48,21 @@ Agreed queue (one PR each, in order, once he says go):
    default: Patient ages, ASA mix, Elective vs emergency and GA vs regional (marked "estimated", with "from N of M
    cases"), Logging habits (how soon after the case, streak). Faculty / PCs: Year comparison (each year's median per
    target, residents well behind it highlighted), shown by default in their Analytics.
-6. **More page:** group 1 under the page's own "More" title, no extra heading (hidden tabs, Recover, Export / Import, Settings last); group 2 "Account and help" (Account,
+6. **Built (More page PR).** **More page:** group 1 under the page's own "More" title, no extra heading (hidden tabs, Recover, Export / Import, Settings last); group 2 "Account and help" (Account,
    Send feedback, Feedback, Admin portal; owner: Account moves here) with its own heading; privacy and credits as plain matching fine print
    (no cards) at the very bottom, after Install and Sign out, before the app version. Privacy text (owner agreed):
    "Privacy · Only you can read your cases (and the app owner, for the old Google Form import). Log initials only,
    never names or NRIC. Programme residents share counts per tag, never details. Sign out on shared devices."
-7. **Default bottom bars** (owner, 15 Oct; with the Edit mode below): logbook only Case · Logbook · Totals · More;
+7. **Built (Bars and More Edit PR).** **Default bottom bars** (owner, 15 Oct; with the Edit mode below): logbook only Case · Logbook · Totals · More;
    Basic + Reflections; Advanced + Reflections · Analytics; Personal Case · Logbook · Notes · Reflections · Analytics ·
    More (Notes in Totals' place, the owner uses Personal); Faculty / PCs Totals · Admin · More. Notes (beta) in More
    elsewhere. No Totals off the programme list. Devices arranged by hand keep their arrangement.
    **More page Edit mode:** pin a row to put it on the bar or take it off (a full bar asks which it replaces); drag to
    reorder the More list and the bar strip; Done. Per device. Arrange tabs in Settings stays and links here.
-8. **Profile page:** Profile card; "Show or hide" as a section heading, not a card; groups in tab order: Case tab,
+8. **Built (with the bars PR).** **Profile page:** Profile card; "Show or hide" as a section heading, not a card; groups in tab order: Case tab,
    Logbook (Grid moves here), Reflections (Reflect buttons / ☆, figures and references move here), Analytics (the
    analytics extras move here), Header and tabs, Tips and help, APMES last. The Extras card goes (owner).
-8b. **One "Recover" page** (in More; can go on the bar), replacing Recent changes / Recover drafts and the Settings →
+8b. **Built (Recover PR).** **One "Recover" page** (in More; can go on the bar), replacing Recent changes / Recover drafts and the Settings →
    Data Recycle bin (no link left there: alpha, no old habits; owner). Sections, each folded with a count and a line
    saying all devices or this device: Needs attention (only when any: unsynced / clashing changes, Retry, Keep mine /
    theirs), Recently deleted (the bin, all devices, 30 days), Unfinished drafts (this device), Earlier versions (this

@@ -4,17 +4,18 @@
 
 import { replaceShow, legacyShow, tabsAfter } from './profiles.js';
 import { appVersion, versionLabel, freshCopy } from './app-version.js';
-import { S, hooks, h, toast, basicHides, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow, watchMyReflections } from './ui-core.js';
+import { S, hooks, h, toast, basicHides, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow, watchMyReflections, resetters } from './ui-core.js';
 import { renderLog, focusLog, logCasesChanged, clearDrafts } from './ui-log.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, IPHONE_APP, setPageLabel, START_TABS, arrangeTabs } from './display.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, IPHONE_APP, setPageLabel, START_TABS, arrangeTabs, setTabOnBar, barTabs, MAX_BAR } from './display.js';
+import { gripDrag, moveIn } from './drag-list.js';
 import { createNavigation } from './navigation.js';
 import { renderNotes, leaveNotes, openDayNote, renderNoteSettings } from './ui-notepad.js';
 import { fromQuery, keepShared, readInbox } from './share-in.js';
-import { purgeExpired, openBin } from './bin.js';
+import { purgeExpired } from './bin.js';
 import { profile } from './ui-core.js';
 import { deviceOn, barAtBottom } from './device-presets.js';
 import { notesChanged } from './ui-notepad.js';
-import { privacyCard, creditsCard, signOutCard } from './more-cards.js';
+import { finePrint, signOutCard } from './more-cards.js';
 import { wipeSyncDevice } from './sync-forget.js';
 
 // ---------- pages that load on first use ----------
@@ -131,7 +132,7 @@ const TABS = [
   { id: 'points', label: 'Learning points', render: page(['parts'], m => m.parts.renderPoints()), hidden: true, under: 'logbook', unlisted: true },
   { id: 'account', bar: true, label: 'Account', render: page(['account', 'settings'], m => m.account.renderAccount()), hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
   { id: 'settings', bar: true, label: 'Settings', render: page(['settings', 'send', 'sync', 'settingsFile'], () => renderSettingsMenu()), hidden: true, under: 'more', desc: 'Profile, look, logging, reflections, notes and sharing, data' },
-  { id: 'recovery', bar: true, short: 'Recover', label: 'Recent changes / Recover drafts', render: page(['recovery'], m => m.recovery.renderRecovery()), hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },
+  { id: 'recovery', bar: true, short: 'Recover', label: 'Recover', render: page(['recovery'], m => m.recovery.renderRecovery()), hidden: true, under: 'more', desc: 'Changes waiting to sync, recently deleted, unfinished drafts and earlier versions' },
   { id: 'data', bar: true, short: 'Export', label: 'Export / Import', render: page(['logbook', 'notesExport', 'cloudSave', 'backup'], () => renderDataPage()), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
@@ -177,15 +178,66 @@ function renderMore() {
   const hidden = arrangeTabs(barCandidates(), display()).hidden.filter(id => !TABS.find(t => t.id === id).hidden)
     .sort((a, b) => rank(a) - rank(b));
   const descOf = t => (t.id === 'progress' && facultyMode() ? 'Who’s behind in each residency year' : t.desc || 'Hidden from the tab bar');
+  // two groups (owner, 15 Oct 2026): the pages under More's own title (hidden tabs first, Settings last), then
+  // "Account and help"; Install and Sign out; privacy and credits as fine print; the app version
+  const HELP = ['account', 'feedback', 'feedbackinbox', 'admin'];
+  const row = (t, desc) => menuItem(t.id, t.moreLabel || t.label, desc);
+  const firstTabs = byMoreOrder([...hidden.map(id => TABS.find(t => t.id === id)).filter(t => !HELP.includes(t.id)),
+    ...items.filter(t => !HELP.includes(t.id) && t.id !== 'settings'), ...items.filter(t => t.id === 'settings')]);
+  if (moreEdit) return h('div', {}, moreEditCard(firstTabs));
+  const first = firstTabs.map(t => row(t, hidden.includes(t.id) ? descOf(t) : t.desc));
+  const help = HELP.map(id => visibleTabs().find(t => t.id === id) || (hidden.includes(id) ? TABS.find(t => t.id === id) : null)).filter(Boolean);
   return h('div', {},
-    h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
-      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.moreLabel || t.label, descOf(t))), items.map(t => menuItem(t.id, t.moreLabel || t.label, t.desc)))),
-    privacyCard(),
-    creditsCard(),
+    h('section', { class: 'card more-list' }, h('div', { class: 'more-head' }, h('h2', {}, 'More'),
+      h('button', { type: 'button', class: 'small', onclick: () => { moreEdit = true; render(); } }, 'Edit')), h('ul', {}, first)),
+    help.length ? h('section', { class: 'card more-list more-help' }, h('h2', {}, 'Account and help'), h('ul', {}, help.map(t => row(t, t.desc)))) : null,
     installCard(),
     signOutCard(),
+    finePrint(),
     versionLine());
 }
+
+// More's Edit mode (owner, 15 Oct 2026; per device): the tab bar and the More list, each to drag or move with the
+// arrows; a row goes on the bar or comes off it (a full bar asks which tab it replaces: setTabOnBar). More's own order
+// is display().moreOrder (pages it doesn't name keep their default place).
+let moreEdit = false;
+resetters.push(() => { moreEdit = false; });
+const byMoreOrder = tabs => {
+  const order = Array.isArray(display().moreOrder) ? display().moreOrder : [];
+  const at = (t, i) => (order.includes(t.id) ? order.indexOf(t.id) : order.length + i);
+  return tabs.map((t, i) => [t, at(t, i)]).sort((a, b) => a[1] - b[1]).map(([t]) => t);
+};
+function moreEditCard(moreTabs) {
+  const label = id => (BAR_TABS_LABEL(id));
+  const all = barTabs().map(([k]) => k), { sorted, shown } = arrangeTabs(all, display());
+  const onBar = shown.filter(id => id !== 'more');
+  const barIds = new Set(all);
+  const setOrder = ids => { const rest = sorted.filter(x => !ids.includes(x)); applyDisplay(setDisplay({ tabOrder: [...ids, ...rest] })); hooks.paintTabs?.(); render(); };
+  const setMore = ids => { applyDisplay(setDisplay({ moreOrder: ids })); render(); };
+  const barList = h('ul', { class: 'an-edit-list', role: 'list' });
+  const moreList = h('ul', { class: 'an-edit-list', role: 'list' });
+  const arrows = (list, ids, i, set, name) => [
+    h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${name} up`, disabled: i === 0, onclick: () => set(moveIn(ids, i, i - 1)) }, '↑'),
+    h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${name} down`, disabled: i === ids.length - 1, onclick: () => set(moveIn(ids, i, i + 1)) }, '↓')];
+  const grip = (list, ids, set) => h('span', { class: 'an-grip', 'aria-hidden': 'true', title: 'Drag to move', onpointerdown: e => gripDrag(e, list, (from, to) => set(moveIn(ids, from, to))) }, '⠿');
+  barList.append(...onBar.map((id, i) => h('li', { 'data-tab': id }, grip(barList, onBar, setOrder), h('span', { class: 'an-edit-name' }, label(id)),
+    ...arrows(barList, onBar, i, setOrder, label(id)),
+    h('button', { type: 'button', class: 'small', 'aria-label': `Take ${label(id)} off the bar`, onclick: () => setTabOnBar(id, false, render) }, 'Take off'))));
+  const ids = moreTabs.map(t => t.id);
+  moreList.append(...moreTabs.map((t, i) => h('li', { 'data-tab': t.id }, grip(moreList, ids, setMore), h('span', { class: 'an-edit-name' }, t.moreLabel || t.label),
+    ...arrows(moreList, ids, i, setMore, t.moreLabel || t.label),
+    barIds.has(t.id) ? h('button', { type: 'button', class: 'small', 'aria-label': `Put ${t.moreLabel || t.label} on the bar`, onclick: () => setTabOnBar(t.id, true, render) }, 'Pin') : null)));
+  return h('section', { class: 'card an-edit more-edit' },
+    h('h2', {}, 'Arrange More and the tab bar'),
+    h('p', { class: 'hint help' }, `Drag by ⠿ or use the arrows. Pin puts a page on the tab bar (it holds ${MAX_BAR}); Take off puts it back in More. This device only.`),
+    h('h3', {}, 'On the tab bar'), barList, h('p', { class: 'hint', style: 'margin:0 0 8px' }, 'More stays last.'),
+    h('h3', {}, 'In More'), moreList,
+    h('div', { class: 'bar', style: 'margin:12px 0 0' },
+      h('button', { type: 'button', class: 'linkish', onclick: () => { applyDisplay(setDisplay({ moreOrder: null, tabOrder: null, tabHidden: null })); hooks.paintTabs?.(); render(); } }, 'Reset'),
+      h('span', { style: 'flex:1' }),
+      h('button', { type: 'button', class: 'primary', onclick: () => { moreEdit = false; render(); } }, 'Done')));
+}
+const BAR_TABS_LABEL = id => (t => (t ? t.short || t.label : id))(TABS.find(t => t.id === id));
 
 // "Install the app" (More): Android and desktop Chrome/Edge offer their own install prompt, which we
 // keep from beforeinstallprompt; iPhone/iPad Safari has none, so it gets the Share → Add to Home Screen
@@ -250,7 +302,7 @@ function buildSettingsIndex() {
     const text = card.querySelector('h2').textContent.trim();
     out.push({ id: 'settings', page: 'Settings', text, hint: [...card.querySelectorAll('button, a, label'), ...card.querySelectorAll('p')].map(x => x.textContent.trim()).join(' · ').slice(0, 160) });
   }
-  out.push({ id: 'bin', page: 'Settings', text: 'Recycle bin', hint: 'Deleted cases, reflections and notes, kept for 30 days', open: openBin });
+  out.push({ id: 'recovery', page: 'More', text: 'Recycle bin', hint: 'Recover → Recently deleted: cases, reflections and notes, kept for 30 days' });
   return out;
 }
 const searchSettings = (index, q) => {
@@ -309,7 +361,6 @@ const SETTINGS_GROUPS = [
   ['Logging', ['logging', 'tags']],
   ['Reflections', ['reflset']],
   ['Notes and sharing', ['notesset', 'sharefmt', 'sendto', 'sync']],
-  ['Data', ['bin']],
   ['Advanced', ['displayadv', 'loggingadv']],
 ];
 // the groups, then any Settings page none of them names (so a new page is never left out of the menu)
@@ -320,8 +371,7 @@ function settingsGroups() {
 }
 function renderSettingsMenu() {
   if (lastRendered !== 'settings') { settingsIndex = null; settingsQuery = ''; }   // drawn again on the first search of this visit
-  const item = id => (id === 'bin' ? menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin())
-    : (t => menuItem(t.id, t.label, t.desc))(TABS.find(t => t.id === id)));
+  const item = id => (t => menuItem(t.id, t.label, t.desc))(TABS.find(t => t.id === id));
   return h('div', {},
     settingsSearch(),
     h('section', { class: 'card more-list settings-menu' }, h('h2', {}, 'Settings'),

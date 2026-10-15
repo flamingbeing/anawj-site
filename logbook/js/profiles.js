@@ -188,8 +188,10 @@ export const OFF_BAR = ['caselogs', 'progress', 'notes', 'account', 'settings', 
 // own Case, Logbook and Reflections in More, with Case logs and Analytics (both also in OFF_BAR: listed here so a device
 // moving into the profile with its tabs arranged takes them off the bar), leaving Totals, the Admin portal and More
 export const PROFILE_OFF = { advanced: [], basic: ['progress'], logbook: ['progress', 'reflect'], personal: [], faculty: ['log', 'logbook', 'reflect', 'caselogs', 'progress'] };
-// OFF_BAR tabs a profile puts on the bar: the Admin portal (admins only) in Faculty / PCs, Notes in Personal
-export const PROFILE_ON = { faculty: ['admin'], personal: ['notes'] };
+// OFF_BAR tabs a profile puts on the bar: the Admin portal (admins only) in Faculty / PCs, Analytics in Advanced, and
+// Notes and Analytics in Personal (owner, 15 Oct 2026: logbook only Case · Logbook · Totals · More; Basic + Reflections;
+// Advanced + Reflections · Analytics; Personal Case · Logbook · Notes · Reflections · Analytics · More)
+export const PROFILE_ON = { faculty: ['admin'], advanced: ['progress'], personal: ['notes', 'progress'] };
 export const offBar = mode => [...OFF_BAR.filter(id => !(PROFILE_ON[mode] || []).includes(id)), ...(PROFILE_OFF[mode] || [])];
 // a profile's default for one tab: off the bar?
 export const presetHidesTab = (mode, id) => offBar(mode).includes(id);

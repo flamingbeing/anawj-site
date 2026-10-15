@@ -265,6 +265,7 @@ function tabArranger() {
     const hideSet = new Set(hidden);
     const toggle = (id, show) => setTabOnBar(id, show, paint);
     fill(wrap, h('span', {}, 'Tabs on the bar'),
+      h('p', { class: 'hint', style: 'margin:2px 0 6px' }, 'Also on the More page: Edit, to drag the bar and More’s own list. ', h('a', { href: '#more' }, 'Open More')),
       h('ul', { class: 'tab-order' }, order.map((id, i) => h('li', {},
         h('label', { class: 'check', style: 'flex:1;min-height:40px' }, h('input', { type: 'checkbox', checked: !hideSet.has(id), disabled: id === 'more', 'aria-label': 'Show ' + BAR_TABS.find(([k]) => k === id)[1], onchange: e => toggle(id, e.target.checked) }), BAR_TABS.find(([k]) => k === id)[1]),
         h('button', { class: 'small icon-btn', type: 'button', disabled: i === 0, 'aria-label': 'Move up', onclick: () => move(id, -1) }, '↑'),
@@ -618,65 +619,72 @@ const groupReset = (what, run, question = `Put ${what} back to the profile’s d
   if (!await confirmBox('Reset this group', question, 'Reset')) return;
   await run(); hooks.render(); toast('Back to the defaults');
 } }, 'Reset this group'));
-const sw = (label, on, set, hint) => [h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': label, checked: !!on, onchange: e => set(e.target.checked) }), label), hint ? h('p', { class: 'hint help' }, hint) : null];
+const sw = (label, on, set, hint, attrs = {}) => [h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': label, checked: !!on, onchange: e => set(e.target.checked), ...attrs }), label), hint ? h('p', { class: 'hint help' }, hint) : null];
 // a profile switch (profiles.js), saved for the account. These show only with the targets' counts: while that is off,
 // one switched on says so (rather than seeming to do nothing)
 const NEEDS_TARGETS = ['case:still', 'totals', 'year', 'saveToast'];
-const presetSwitch = ([k, label]) => sw(label, shows(k), v => setShown(k, v, partIds()).then(() => hooks.render()),
-  NEEDS_TARGETS.includes(k) && shows(k) && !shows('targets') ? 'Shows only with Counts against the APMES targets on.' : undefined);
+// (data-switch names it; the extras, which the Basic profiles leave out, also carry data-extra)
+const presetSwitch = ([k, label, g]) => sw(label, shows(k), v => setShown(k, v, partIds()).then(() => hooks.render()),
+  NEEDS_TARGETS.includes(k) && shows(k) && !shows('targets') ? 'Shows only with Counts against the APMES targets on.' : undefined,
+  { 'data-switch': k, ...(g === 'extras' ? { 'data-extra': '' } : {}) });
+const extra = k => presetSwitch(SWITCHES.find(x => x[0] === k));
 const switchGroup = g => SWITCHES.filter(x => x[2] === g);
 export function renderShowHide() {
   const st = settings(), d = display();
   const save = patch => patchLogbook({ settings: patch });
   const caseParts = CASE_PARTS.filter(([p]) => p !== 'still');   // (Still needed is with the APMES parts)
   const { hidden } = arrangeTabs(barTabs().map(([id]) => id), d);
+  const extrasReset = keys => resetPatch(settings(), keys);
+  // in the order of the tabs (owner, 15 Oct 2026): Case tab, Logbook, Reflections, Analytics, Header and tabs, Tips and
+  // help, APMES last; the extras sit with the area they belong to (no Extras card)
   return h('div', { class: 'showhide set-page' },
     profileCard(),
-    h('section', { class: 'card' },
-      h('h2', {}, 'Show or hide'),
-      h('p', { class: 'hint help', style: 'margin:0' }, 'Everything you can show or hide, by area. Each group has its own reset, so you can bring one area back without touching the rest. The same switches are on their own pages too.'),
-      ),
-    h('section', { class: 'card', 'data-group': 'extras' },
-      h('h3', { style: 'margin-top:0' }, 'Extras'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Off in the Basic profiles, on in Advanced and Personal.'),
-      switchGroup('extras').map(presetSwitch),
-      groupReset('the extras', () => save(resetPatch(settings(), switchGroup('extras').map(([k]) => k))))),
+    h('h2', { class: 'set-heading' }, 'Show or hide'),
+    h('p', { class: 'hint help', style: 'margin:0 6px 10px' }, 'Everything you can show or hide, by area, in the order of the tabs. Each group has its own reset. The same switches are on their own pages too. Off in the Basic profiles: the Logbook grid, figures and references, and (in Basic: logbook only) the reflections.'),
+    h('section', { class: 'card', 'data-group': 'case' },
+      h('h3', { style: 'margin-top:0' }, 'Case tab'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box, All tags and Save always stay. Still needed is under APMES.'),
+      caseParts.map(([part, label]) => sw(label, caseShown(part), v => setCaseShown(part, v, partIds()).then(() => hooks.render()))),
+      groupReset('every part of the Case tab', () => save(resetPatch(settings(), caseParts.map(([p]) => 'case:' + p))))),
+    h('section', { class: 'card', 'data-group': 'logbook' },
+      h('h3', { style: 'margin-top:0' }, 'Logbook'),
+      extra('grid'),
+      sw('Copy and Reflect buttons on each case (this device)', !d.rowMenu, v => applyDisplay(setDisplay({ rowMenu: v ? null : true })), 'Off: one ⋯ button on each row instead.'),
+      sw('Copy button on each case (this device)', !!d.rowCopy, v => applyDisplay(setDisplay({ rowCopy: v || null })), 'Off by default.'),
+      sw('Copy button for each day (this device)', !!d.dayCopy, v => applyDisplay(setDisplay({ dayCopy: v || null })), 'Off by default: Share sends the whole day.'),
+      groupReset('the grid view and the row and day buttons', () => { applyDisplay(setDisplay({ rowMenu: null, rowCopy: null, dayCopy: null })); return save(extrasReset(['grid'])); })),
+    h('section', { class: 'card', 'data-group': 'reflections' },
+      h('h3', { style: 'margin-top:0' }, 'Reflections'),
+      extra('reflect'),
+      extra('reflExtras'),
+      sw('Formatting buttons (this device)', !!d.reflToolbar, v => applyDisplay(setDisplay({ reflToolbar: v || null })), 'Bold, bullet and numbered lists above each box.'),
+      sw('Show notes under each heading', st.reflNotes !== false, v => save({ reflNotes: v })),
+      sw('Word counts in the list (this device)', !d.hideWords, v => applyDisplay(setDisplay({ hideWords: v ? null : true }))),
+      groupReset('the reflection parts and defaults (no formatting buttons, heading notes and word counts on)', () => { applyDisplay(setDisplay({ reflToolbar: null, hideWords: null })); return save({ ...extrasReset(['reflect', 'reflExtras']), reflNotes: null }); })),
+    h('section', { class: 'card', 'data-group': 'analytics' },
+      h('h3', { style: 'margin-top:0' }, 'Analytics'),
+      extra('analytics'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Arrange or hide its cards with Edit on the Analytics page.'),
+      groupReset('Analytics', () => save(extrasReset(['analytics'])))),
+    h('section', { class: 'card', 'data-group': 'bar' },
+      h('h3', { style: 'margin-top:0' }, 'Header and tabs (this device)'),
+      sw('Show the header (the app’s name and your name)', !d.hideHeader, v => applyDisplay(setDisplay({ hideHeader: !v }))),
+      sw('Swipe left or right to change tab', d.swipeTabs !== false, v => applyDisplay(setDisplay({ swipeTabs: v ? null : false }))),
+      barTabs().filter(([id]) => id !== 'more').map(([id, label]) => sw(`${label} on the tab bar`, !hidden.includes(id), v => setTabOnBar(id, v, () => hooks.render()))),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, `Up to ${MAX_BAR} tabs fit, More included. Hidden tabs are first in More. The order is in Display → Advanced, and Edit on More.`),
+      groupReset('the header, swiping and the profile’s tabs (Notes and the More pages go back into More, unless the profile puts them on the bar)', () => { applyDisplay(setDisplay({ hideHeader: null, swipeTabs: null, tabHidden: null, tabOrder: null })); hooks.paintTabs?.(); })),
+    h('section', { class: 'card', 'data-group': 'tips' },
+      h('h3', { style: 'margin-top:0' }, 'Tips and help'),
+      sw('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }).then(() => hooks.render()), 'Explanations around the app, the privacy and photo reminders, and the tips for the tags you pick.'),
+      sw('Show last week’s summary on the Case tab', !!st.weeklyDigest, v => save({ weeklyDigest: v })),
+      groupReset('the tips and the weekly summary', () => save({ hideTips: null, weeklyDigest: null }))),
     h('section', { class: 'card', 'data-group': 'apmes' },
       h('h3', { style: 'margin-top:0' }, 'APMES'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The programme’s parts. Off in the Personal profile, for logging outside APMES. Request an evaluation (in a case’s ⋯ menu and its edit page: a new evaluation request with the case’s date and initials, never its details) is off unless you switch it on.'),
       switchGroup('apmes').map(presetSwitch),
       // (Request an evaluation is opt-in: the reset turns it off, and says so)
       groupReset('the APMES parts', () => save(resetPatch(settings(), switchGroup('apmes').map(([k]) => k))),
-        'Put the APMES parts back to the profile’s defaults? This also turns off Request an evaluation.')),
-    h('section', { class: 'card', 'data-group': 'tips' },
-      h('h3', { style: 'margin-top:0' }, 'Tips and help'),
-      sw('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }).then(() => hooks.render()), 'Explanations around the app, the privacy and photo reminders, and the tips for the tags you pick.'),
-      sw('Show last week’s summary on the Case tab', !!st.weeklyDigest, v => save({ weeklyDigest: v })),
-      groupReset('the tips and the weekly summary', () => save({ hideTips: null, weeklyDigest: null }))),
-    h('section', { class: 'card', 'data-group': 'case' },
-      h('h3', { style: 'margin-top:0' }, 'Case tab'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box, All tags and Save always stay. Still needed is under APMES.'),
-      caseParts.map(([part, label]) => sw(label, caseShown(part), v => setCaseShown(part, v, partIds()).then(() => hooks.render()))),
-      groupReset('every part of the Case tab', () => save(resetPatch(settings(), caseParts.map(([p]) => 'case:' + p))))),
-    h('section', { class: 'card', 'data-group': 'reflections' },
-      h('h3', { style: 'margin-top:0' }, 'Reflections'),
-      sw('Formatting buttons (this device)', !!d.reflToolbar, v => applyDisplay(setDisplay({ reflToolbar: v || null })), 'Bold, bullet and numbered lists above each box.'),
-      sw('Show notes under each heading', st.reflNotes !== false, v => save({ reflNotes: v })),
-      sw('Word counts in the list (this device)', !d.hideWords, v => applyDisplay(setDisplay({ hideWords: v ? null : true }))),
-      groupReset('the reflection defaults (no formatting buttons, heading notes and word counts on)', () => { applyDisplay(setDisplay({ reflToolbar: null, hideWords: null })); return save({ reflNotes: null }); })),
-    h('section', { class: 'card', 'data-group': 'logbook' },
-      h('h3', { style: 'margin-top:0' }, 'Logbook (this device)'),
-      sw('Copy and Reflect buttons on each case', !d.rowMenu, v => applyDisplay(setDisplay({ rowMenu: v ? null : true })), 'Off: one ⋯ button on each row instead.'),
-      sw('Copy button on each case', !!d.rowCopy, v => applyDisplay(setDisplay({ rowCopy: v || null })), 'Off by default.'),
-      sw('Copy button for each day', !!d.dayCopy, v => applyDisplay(setDisplay({ dayCopy: v || null })), 'Off by default: Share sends the whole day.'),
-      groupReset('the row and day buttons', () => applyDisplay(setDisplay({ rowMenu: null, rowCopy: null, dayCopy: null })))),
-    h('section', { class: 'card', 'data-group': 'bar' },
-      h('h3', { style: 'margin-top:0' }, 'Header and tabs (this device)'),
-      sw('Show the header (the app’s name and your name)', !d.hideHeader, v => applyDisplay(setDisplay({ hideHeader: !v }))),
-      sw('Swipe left or right to change tab', d.swipeTabs !== false, v => applyDisplay(setDisplay({ swipeTabs: v ? null : false }))),
-      barTabs().filter(([id]) => id !== 'more').map(([id, label]) => sw(`${label} on the tab bar`, !hidden.includes(id), v => setTabOnBar(id, v, () => hooks.render()))),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, `Up to ${MAX_BAR} tabs fit, More included. Hidden tabs are first in More. The order is in Display → Advanced.`),
-      groupReset('the header, swiping and the profile’s tabs (Notes and the More pages go back into More, unless the profile puts them on the bar)', () => { applyDisplay(setDisplay({ hideHeader: null, swipeTabs: null, tabHidden: null, tabOrder: null })); hooks.paintTabs?.(); })));
+        'Put the APMES parts back to the profile’s defaults? This also turns off Request an evaluation.')));
 }
 
 export function renderReflectionSettings() {
