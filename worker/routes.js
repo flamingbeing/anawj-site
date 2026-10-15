@@ -15,6 +15,8 @@ export const SITES = {
   'nuhroster.anawj.com': { root: 'nuh-roster/' },
   // NTF anaesthesia monthly duty roster (its own data, so its own host)
   'ntfroster.anawj.com': { root: 'ntf-roster/' },
+  // NUH junior monthly roster helper (cardiac and ICU calls into the department's Google Sheet; its own data)
+  'nuhjuniormonthly.anawj.com': { root: 'nuh-junior-monthly/' },
   // /people/ is the shared people lists (residents, faculty, PDs) the logbook and evals both use.
   // /apmes/guidebook/ is the programme guidebook text the evals app reads (just that folder of apmes/).
   // /__/auth/ and /__/firebase/ are Firebase's sign-in helper pages (the auth domain of logbook and evals). The helper

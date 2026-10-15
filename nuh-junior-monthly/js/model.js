@@ -1,0 +1,444 @@
+// NUH Junior Monthly: the data model. State shape, defaults, local-date helpers, cell helpers and code tokens.
+// Plain functions over plain data (see SPEC.md "State"). No DOM, so node tests and the solver worker can use it.
+
+export const STORE_KEY = 'nuhjm-v1';
+export const DEMO_KEY = 'nuhjm-demo';
+
+// ---------- defaults ----------
+
+// Sheet order: the grade column of the department's monthly junior roster sheet ("1 - 30 Nov 26 Request"), top to
+// bottom. `grades` are the texts in the sheet's Grade column that belong to the group (import matches them).
+export const DEFAULT_GROUPS = [
+  { id: 'ac', name: 'Associate consultants (AC)', kind: 'senior', grades: ['AC'] },
+  { id: 'r', name: 'Senior residents (R)', kind: 'junior', grades: ['R', 'SR'] },
+  { id: 'res3', name: 'Residents year 3 (RES3)', kind: 'junior', grades: ['RES3'] },
+  { id: 'res2', name: 'Residents year 2 (RES2)', kind: 'junior', grades: ['RES2'] },
+  { id: 'res1', name: 'Residents year 1 (RES1)', kind: 'junior', grades: ['RES1'] },
+  { id: 'nhg', name: 'NHG cardiac residents (NHG)', kind: 'junior', grades: ['NHG'] },
+  { id: 'rp', name: 'Resident physicians (RP)', kind: 'junior', grades: ['RP', 'HC'] },
+  { id: 'loc', name: 'Locums (LOC)', kind: 'junior', grades: ['LOC', 'LOCUM'] },
+  { id: 'mopex', name: 'MOPEX', kind: 'junior', grades: ['MOPEX'] },
+  { id: 'rr', name: 'Rotating residents (RR)', kind: 'junior', grades: ['RR'] },
+  { id: 'fellow', name: 'Fellows', kind: 'junior', grades: ['FELLOW'] },
+];
+
+export const DEFAULT_TAGS = [
+  { id: 'babymo', name: 'Baby MO', help: 'New MO: first month, no leave, never alone' },
+  { id: 'mo1', name: 'MO1 call level', help: 'Does R1 (MO1) calls' },
+  { id: 'mo2', name: 'MO2 call level', help: 'Does R2 (MO2) calls' },
+  { id: 'mo3', name: 'MO3 call level', help: 'Does R3 (MO3) calls' },
+  { id: 'icunew', name: 'New to ICU', help: 'First time in ICU: ICU calls from day 4 of the posting' },
+  { id: 'rrlate', name: 'Ortho / HRM resident', help: 'Rotating resident from Ortho or HRM: ICU calls from day 8' },
+  { id: 'supernum', name: 'Supernumerary in ICU', help: 'In ICU without calls (MOPEX new to ICU, hospital clinicians, a fellow\'s first month)' },
+];
+
+const duty = (code, name, kind, color, ink, extra = {}) =>
+  ({ code, name, kind, color, ink, overnight: false, auto: false, hours: 0, ...extra });
+const shift = (code, name, color, extra) => duty(code, name, 'shift', color, '#fff', { hours: 8, ...extra });
+const call = (code, name, color, extra) => shift(code, name, color, { overnight: true, hours: 24, ...extra });
+const posting = (code, name, color, ink = '#1f2937') => duty(code, name, 'posting', color, ink, { hours: 8 });
+const leave = (code, name, color = '#fde2e4') => duty(code, name, 'leave', color, '#7a1c27');
+const request = (code, name) => duty(code, name, 'request', '#0b5394', '#fff');   // UI draws requests as outlined chips
+const other = (code, name) => duty(code, name, 'other', '#e0e0e0', '#333');
+
+// The codes on the department's sheet (its legend and two years of rosters). Postings are planned by the week
+// (Postings tab); calls are what the app fills; PC (post call) and PPC (the day off after an ICU post call) are worked
+// out, never typed.
+export const DEFAULT_DUTIES = [
+  call('C3', 'Cardiac call', '#b71c1c', { auto: true }),
+  call('R1B', 'ICU call (SICU)', '#0d47a1', { auto: true, rest2: true }),
+  call('R1', 'MO1 call', '#c62828'),
+  call('R2', 'MO2 call', '#ad1457'),
+  call('R3', 'MO3 call', '#6a1b9a'),
+  call('S1', 'Registrar call (S1)', '#4e342e'),
+  call('S1B', 'Stay-in S1 (S1B)', '#5d4037'),
+  call('OGC', 'Obstetric call', '#00695c'),
+  call('OGN', 'Obstetric night float', '#00796b'),
+  shift('OGD', 'Obstetric day float', '#26a69a'),
+  shift('WR', 'Saturday APS ward round', '#558b2f', { hours: 4 }),
+  shift('P1', 'Premed 1 (Sunday)', '#827717', { hours: 4 }),
+  shift('P2', 'Premed 2 (Sunday)', '#827717', { hours: 4 }),
+  shift('P3', 'Premed 3 (Sunday)', '#827717', { hours: 4 }),
+  shift('P4', 'Premed 4 (Sunday)', '#827717', { hours: 4 }),
+  shift('P5', 'Premed 5 (Sunday)', '#827717', { hours: 4 }),
+  shift('P6', 'Premed 6 (Sunday)', '#827717', { hours: 4 }),
+  shift('P', 'Premed duty', '#827717', { hours: 4 }),
+  shift('AHC', 'Alexandra Hospital call', '#4527a0'),
+  posting('C', 'Cardiac', '#ffcdd2'),
+  posting('C-e', 'Cardiac echo week', '#f8bbd0'),
+  posting('C-p', 'Cardiac perfusion week', '#f8bbd0'),
+  posting('ICU', 'Surgical ICU', '#bbdefb'),
+  posting('CP', 'Chronic pain', '#dcedc8'),
+  posting('AP', 'Acute pain (APS)', '#c5e1a5'),
+  posting('OG1', 'Obstetrics 1', '#b2dfdb'),
+  posting('OG2', 'Obstetrics 2', '#b2dfdb'),
+  posting('LI', 'Liver transplant', '#ffe0b2'),
+  posting('LivOT', 'Liver transplant OT', '#ffcc80'),
+  posting('AH', 'Alexandra Hospital', '#e1bee7'),
+  posting('AH1', 'Alexandra Hospital 1', '#e1bee7'),
+  posting('AH2', 'Alexandra Hospital 2', '#e1bee7'),
+  posting('AH3', 'Alexandra Hospital 3', '#e1bee7'),
+  posting('KKH', 'Out: KKH', '#d7ccc8'),
+  posting('TTSH', 'Out: TTSH', '#d7ccc8'),
+  posting('NTF', 'Out: NTFGH', '#d7ccc8'),
+  leave('AL', 'Annual leave', '#f8c9cf'),
+  leave('SL', 'Study leave'),
+  leave('TL', 'Training leave'),
+  leave('MC', 'Medical leave'),
+  leave('ML', 'Maternity leave'),
+  leave('PL', 'Paternity leave'),
+  leave('HL', 'Hospitalisation leave'),
+  leave('FCL', 'Family care leave'),
+  leave('CCL', 'Childcare leave'),
+  leave('NS', 'NS (reservist)'),
+  leave('0.5', 'Half day leave'),
+  request('X', 'No call'),
+  request('XX', 'Call blocked by the planner'),
+  request('NP', 'No premed'),
+  request('R', 'Call request'),
+  other('Z', 'Not on the roster'),
+  other('Adm', 'Admin day'),
+  other('Pain', 'Pain clinic'),
+  other('RD', 'Rest day'),
+  other('Exam', 'Exam'),
+  other('PC', 'Post call (carried over from last month)'),
+  other('PPC', 'Day off after ICU post call (carried over)'),
+  duty('x', 'Post call (PC)', 'derived', '#eeeeee', '#555'),
+];
+
+// Default rules live here (data only) so defaultState() needs no import from rules.js (no circular import);
+// rules.js re-exports them as DEFAULT_RULES. Cardiac and ICU are on; the rest are predictions from the department's
+// roster guide and past rosters, some off until the rosterer confirms them. The rosterer tunes them in the app.
+export const CALLS = ['R1', 'R2', 'R3', 'S1', 'S1B', 'R1B', 'C3', 'OGC', 'OGN'];
+const R = (id, type, name, params, o = {}) => ({
+  id, type, name, enabled: o.enabled !== false, hard: o.hard !== false, weight: o.weight ?? 10,
+  who: { groups: [], tags: [], staff: [], exclude: [], ...(o.who || {}) },
+  when: { from: '', to: '', days: [], holidays: 'any', ...(o.when || {}) },
+  params, note: o.note || '',
+});
+const soft = (weight, more = {}) => ({ hard: false, weight, ...more });
+const PREDICTED = 'Predicted from the roster guide: confirm or change.';
+export const DEFAULT_RULES = [
+  // cardiac (C3): seen on every night of 2025 and 2026
+  R('r-c3-cover', 'cover', 'One cardiac call every night', { codes: ['C3'], min: 1, max: 1 }),
+  R('r-c3-onc', 'sameDay', 'Cardiac call only on a cardiac day', { codesA: ['C3'], codesB: ['C', 'C-e', 'C-p'], mode: 'require' }),
+  R('r-c3-echo', 'sameDay', 'Avoid cardiac calls in echo or perfusion weeks', { codesA: ['C3'], codesB: ['C-e', 'C-p'], mode: 'forbid' }, soft(30, { note: 'Real rosters: now and then, when the cardiac team is short.' })),
+  R('r-c3-next', 'sequence', 'Post call falls inside the cardiac posting', { ifCodes: ['C3'], thenCodes: ['C', 'C-e', 'C-p'], mode: 'require', from: 1, to: 1 }, soft(40)),
+  R('r-c3-gap', 'sequence', 'At least 3 days between cardiac calls', { ifCodes: ['C3'], thenCodes: ['C3'], mode: 'forbid', from: 1, to: 2 }),
+  R('r-c3-d1', 'postingStart', 'No cardiac call on day 1 of the posting', { codes: ['C3'], posting: 'C', days: 1 }, soft(20)),
+  R('r-c3-fair', 'spread', 'Share cardiac calls fairly', { codes: ['C3'], period: 'month', weekendWeight: 2, holidayWeight: 1.5, tolerance: 1, among: ['C', 'C-e', 'C-p'] }, soft(10)),
+  R('r-c3-sat', 'limit', 'At most 1 Saturday cardiac call a month', { codes: ['C3'], period: 'month', window: 7, min: null, max: 1, fte: false, prorate: false }, soft(20, { when: { days: [6] } })),
+  // ICU (R1B): call, post call, a day off (PPC), back to ICU
+  R('r-r1b-cover', 'cover', 'One ICU call every night', { codes: ['R1B'], min: 1, max: 1 }),
+  R('r-r1b-on', 'sameDay', 'ICU call only on an ICU day', { codesA: ['R1B'], codesB: ['ICU'], mode: 'require' }),
+  R('r-r1b-next', 'sequence', 'Post call falls inside the ICU posting', { ifCodes: ['R1B'], thenCodes: ['ICU'], mode: 'require', from: 1, to: 1 }, soft(40)),
+  R('r-r1b-gap', 'sequence', 'No ICU call on post call or the day off', { ifCodes: ['R1B'], thenCodes: ['R1B'], mode: 'forbid', from: 1, to: 2 }),
+  R('r-r1b-gap4', 'sequence', 'An ICU day between the day off and the next call', { ifCodes: ['R1B'], thenCodes: ['R1B'], mode: 'forbid', from: 3, to: 3 }, soft(15)),
+  R('r-r1b-d1', 'postingStart', 'No ICU call on day 1 in ICU', { codes: ['R1B'], posting: 'ICU', days: 1 }),
+  R('r-r1b-new', 'postingStart', 'New to ICU: calls from day 4', { codes: ['R1B'], posting: 'ICU', days: 3 }, { who: { tags: ['icunew'] } }),
+  R('r-r1b-rr', 'postingStart', 'Ortho / HRM residents: ICU calls from day 8', { codes: ['R1B'], posting: 'ICU', days: 7 }, soft(40, { who: { tags: ['rrlate'] }, note: 'SICU rules: day 4 or 5 when manpower is short, never a weekend first call.' })),
+  R('r-r1b-super', 'limit', 'Supernumerary: no ICU calls', { codes: ['R1B'], period: 'month', window: 7, min: null, max: 0, fte: false, prorate: false }, { who: { tags: ['supernum'] } }),
+  R('r-r1b-fellow', 'limit', 'Fellows: at most 2 weekend ICU calls a month', { codes: ['R1B'], period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(30, { who: { groups: ['fellow'] }, when: { days: [0, 6] } })),
+  R('r-r1b-fair', 'spread', 'Share ICU calls fairly', { codes: ['R1B'], period: 'month', weekendWeight: 2, holidayWeight: 1.5, tolerance: 1, among: ['ICU'] }, soft(10)),
+  R('r-r1b-sat', 'limit', 'At most 2 Saturday ICU calls a month', { codes: ['R1B'], period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(20, { when: { days: [6] } })),
+  // everyone
+  R('r-leave', 'sameDay', 'No calls on leave', { codesA: ['@leave'], codesB: ['@shift'], mode: 'forbid' }),
+  R('r-postcall', 'sameDay', 'Post call is a day off', { codesA: ['x', 'PC', 'PPC'], codesB: ['@shift'], mode: 'forbid' }),
+  R('r-notroster', 'sameDay', 'No calls when not on the roster (Z)', { codesA: ['Z'], codesB: ['@shift'], mode: 'forbid' }),
+  R('r-preleave', 'sequence', 'No post call into leave', { ifCodes: CALLS, thenCodes: ['@leave'], mode: 'forbid', from: 1, to: 1 }, soft(50, { note: PREDICTED })),
+  R('r-req-x', 'requests', 'No call when asked (X)', { request: 'X', codes: CALLS, mode: 'avoid', span: 'day' }),
+  R('r-req-xx', 'requests', 'No call when blocked by the planner', { request: 'XX', codes: CALLS, mode: 'avoid', span: 'day' }),
+  R('r-req-r', 'requests', 'Call when asked (R)', { request: 'R', codes: CALLS, mode: 'want', span: 'day' }, soft(10)),
+  R('r-req-np', 'requests', 'No premed when asked (NP)', { request: 'NP', codes: ['P', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6'], mode: 'avoid', span: 'day' }, soft(30)),
+  R('r-sat2', 'limit', 'At most 2 Saturday calls a month', { codes: CALLS, period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(20, { when: { days: [6] }, note: PREDICTED })),
+  R('r-sat-run', 'sequence', 'No Saturday calls two weeks running', { ifCodes: CALLS, thenCodes: CALLS, mode: 'forbid', from: 7, to: 7 }, soft(30, { when: { days: [6] }, note: 'MedHub (the guide\'s first rule). ' + PREDICTED })),
+  R('r-sun-fri', 'sequence', 'MedHub: no Fri or Sat call after a Sunday call', { ifCodes: CALLS, thenCodes: CALLS, mode: 'forbid', from: 5, to: 6 }, soft(2, { when: { days: [0] }, note: 'The guide: very hard to keep; real rosters break it often (1 in 3 cardiac calls). ' + PREDICTED })),
+  R('r-livot', 'sameDay', 'Avoid calls in liver transplant OT week', { codesA: ['LivOT'], codesB: CALLS, mode: 'forbid' }, soft(5, { note: PREDICTED })),
+  R('r-og-eod', 'sequence', 'No every-other-day obstetric calls', { ifCodes: ['OGC'], thenCodes: ['OGC'], mode: 'forbid', from: 2, to: 2 }, soft(30, { note: PREDICTED })),
+  R('r-baby', 'limit', 'Baby MOs: no calls', { codes: CALLS, period: 'month', window: 7, min: null, max: 0, fte: false, prorate: false }, soft(50, { who: { tags: ['babymo'] }, enabled: false, note: PREDICTED })),
+  // the main calls (off until the rosterer starts filling them in the app)
+  R('r-r1-cover', 'cover', 'One MO1 call (R1) every night', { codes: ['R1'], min: 1, max: 1 }, { enabled: false, note: PREDICTED }),
+  R('r-r2-cover', 'cover', 'One MO2 call (R2) every night', { codes: ['R2'], min: 1, max: 1 }, { enabled: false, note: PREDICTED }),
+  R('r-r3-cover', 'cover', 'One MO3 call (R3) every night', { codes: ['R3'], min: 1, max: 1 }, { enabled: false, note: PREDICTED }),
+  R('r-r1-who', 'eligible', 'R1 only for MO1s', { codes: ['R1'] }, { who: { tags: ['mo1'] }, enabled: false, note: PREDICTED }),
+  R('r-r2-who', 'eligible', 'R2 for MO1s and MO2s', { codes: ['R2'] }, { who: { tags: ['mo1', 'mo2'] }, enabled: false, note: PREDICTED }),
+  R('r-r3-who', 'eligible', 'R3 for MO2s and MO3s', { codes: ['R3'] }, { who: { tags: ['mo2', 'mo3'] }, enabled: false, note: PREDICTED }),
+  R('r-gap', 'sequence', 'No calls on consecutive or alternate days', { ifCodes: ['R1', 'R2', 'R3'], thenCodes: CALLS, mode: 'forbid', from: 1, to: 2 }, soft(30, { enabled: false, note: PREDICTED })),
+  R('r-fair', 'spread', 'Share R1 to R3 calls fairly', { codes: ['R1', 'R2', 'R3'], period: 'month', weekendWeight: 2, holidayWeight: 1.5, tolerance: 1 }, soft(5, { enabled: false, note: PREDICTED })),
+];
+
+const clone = o => JSON.parse(JSON.stringify(o));
+
+export function defaultState() {
+  return migrate({
+    v: 1,
+    settings: { dept: 'NUH Department of Anaesthesia', holidays: {} },
+    groups: clone(DEFAULT_GROUPS),
+    tags: clone(DEFAULT_TAGS),
+    staff: [],
+    duties: clone(DEFAULT_DUTIES),
+    rules: clone(DEFAULT_RULES),
+    rulesLog: [],
+    months: {},
+    cells: {},
+  });
+}
+
+// Fill missing fields (old saves, imports, cloud loads). Mutates and returns the state. Anything a damaged or
+// hand-made file could hold is made safe here: lists hold objects with a string id (or code), duty kinds and colours
+// are from a fixed set (they end up in class names and styles), and maps are plain objects.
+export const DUTY_KINDS = ['shift', 'posting', 'leave', 'request', 'other', 'derived'];
+// settings.onboarding: the Getting started ticks the data can't show (duty codes looked at, a rule opened, an export
+// or backup made) and whether the checklist was hidden or finished (guide.js)
+export const ONBOARDING_KEYS = ['codes', 'rules', 'shared', 'hidden', 'done'];
+const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+const str = (v, dflt = '') => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : dflt);
+const COLOUR = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/;
+const strList = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string' && x) : []);
+// a list a hand-edited file may hold as "a,b" (who lists, weekdays)
+const looseList = v => (typeof v === 'string' && v ? v.split(',').map(x => x.trim()).filter(Boolean) : Array.isArray(v) ? v : []);
+// One duty code made safe (kind from the fixed set, colours as #rgb / #rrggbb). Expects a string `code`.
+export function cleanDuty(d) {
+  const out = { name: d.code, kind: 'other', color: '#e0e0e0', ink: '#333', overnight: false, auto: false, hours: 0, ...d };
+  out.code = str(d.code);
+  if (!DUTY_KINDS.includes(out.kind)) out.kind = 'other';
+  out.name = str(out.name, out.code);
+  if (!COLOUR.test(str(out.color))) out.color = '#e0e0e0';
+  if (!COLOUR.test(str(out.ink))) out.ink = '#333333';
+  out.overnight = !!out.overnight; out.auto = !!out.auto; out.rest2 = !!out.rest2;
+  out.hours = Number(out.hours) || 0;
+  return out;
+}
+// One rule made safe: who lists are lists of strings, days are 0..6, params an object. Expects a string `type`.
+export function cleanRule(r) {
+  const who = isObj(r.who) ? r.who : {}, when = isObj(r.when) ? r.when : {};
+  const lists = Object.fromEntries(['groups', 'tags', 'staff', 'exclude'].map(k => [k, strList(looseList(who[k]))]));
+  return {
+    name: '', enabled: true, hard: true, weight: 10, note: '', ...r,
+    id: str(r.id) || uid('r'), name: str(r.name), note: str(r.note),
+    params: isObj(r.params) ? r.params : {},
+    who: { ...who, ...lists },
+    when: { from: '', to: '', holidays: 'any', ...when, days: looseList(when.days).map(Number).filter(x => Number.isInteger(x) && x >= 0 && x <= 6) },
+  };
+}
+export function migrate(s) {
+  if (!isObj(s)) return defaultState();
+  s.v = 1;
+  s.settings = { dept: 'NUH Department of Anaesthesia', holidays: {}, ...(isObj(s.settings) ? s.settings : {}) };
+  s.settings.dept = str(s.settings.dept, 'NUH Department of Anaesthesia');
+  if (!isObj(s.settings.holidays)) s.settings.holidays = {};
+  for (const [k, v] of Object.entries(s.settings.holidays)) if (!/^\d{4}-\d{2}-\d{2}$/.test(k) || typeof v !== 'string') delete s.settings.holidays[k];
+  // Getting started ticks (guide.js): only true or false, only the known keys
+  if (isObj(s.settings.onboarding)) {
+    const ob = {};
+    for (const k of ONBOARDING_KEYS) if (typeof s.settings.onboarding[k] === 'boolean') ob[k] = s.settings.onboarding[k];
+    s.settings.onboarding = ob;
+  } else delete s.settings.onboarding;
+  const byId = (list, idKey = 'id') => (Array.isArray(list) ? list : []).filter(x => isObj(x) && str(x[idKey])).map(x => ({ ...x, [idKey]: str(x[idKey]) }));
+  s.groups = byId(s.groups).map(g => ({ ...g, name: str(g.name, g.id), kind: g.kind === 'senior' || g.kind === 'junior' ? g.kind : (g.kind ? 'other' : g.kind) }));
+  if (!s.groups.length) s.groups = clone(DEFAULT_GROUPS);
+  s.tags = Array.isArray(s.tags) ? byId(s.tags).map(t => ({ ...t, name: str(t.name, t.id), help: str(t.help) })) : clone(DEFAULT_TAGS);
+  s.duties = byId(s.duties, 'code');
+  if (!s.duties.length) s.duties = clone(DEFAULT_DUTIES);
+  s.duties = s.duties.map(cleanDuty);
+  if (!s.duties.some(d => d.code === 'x')) s.duties.push(clone(DEFAULT_DUTIES.find(d => d.code === 'x')));
+  s.staff = byId(s.staff).map(p => ({
+    short: '', group: 'res1', tags: [], fte: 1, start: '', end: '', note: '', active: true, ...p,
+    name: str(p.name, p.id), short: str(p.short), group: str(p.group, 'res1'), note: str(p.note),
+    start: str(p.start), end: str(p.end), tags: strList(p.tags),
+  }));
+  if (!Array.isArray(s.rules)) s.rules = clone(DEFAULT_RULES);
+  s.rules = s.rules.filter(r => isObj(r) && typeof r.type === 'string').map(cleanRule);
+  if (!Array.isArray(s.rulesLog)) s.rulesLog = [];
+  s.rulesLog = s.rulesLog.filter(isObj);
+  if (s.rulesLog.length > 200) s.rulesLog = s.rulesLog.slice(-200);
+  if (!isObj(s.months)) s.months = {};
+  if (!isObj(s.cells)) s.cells = {};
+  // cells: { date: { staffId: { a: [], r: [], auto: [], note, lock } } }; drop anything else
+  for (const [d, day] of Object.entries(s.cells)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !isObj(day)) { delete s.cells[d]; continue; }
+    for (const [id, c] of Object.entries(day)) {
+      if (!isObj(c)) { delete day[id]; continue; }
+      for (const k of ['a', 'r', 'auto']) if (c[k] !== undefined) c[k] = strList(c[k]);
+      if (c.note !== undefined && typeof c.note !== 'string') c.note = str(c.note);
+    }
+  }
+  return s;
+}
+
+export function uid(prefix = 'id') {
+  return `${prefix}-${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-3)}`;
+}
+
+// ---------- dates (local, never UTC) ----------
+
+const pad = n => String(n).padStart(2, '0');
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+export function iso(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+export function parseISO(s) {
+  const [y, m, d] = String(s).split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+export function addDays(s, n) {
+  const [y, m, d] = String(s).split('-').map(Number);
+  return iso(new Date(y, m - 1, d + n));
+}
+export function monthDays(m) {
+  const [y, mo] = String(m).split('-').map(Number);
+  const last = new Date(y, mo, 0).getDate();
+  const out = [];
+  for (let d = 1; d <= last; d++) out.push(`${y}-${pad(mo)}-${pad(d)}`);
+  return out;
+}
+export function monthOf(s) { return String(s).slice(0, 7); }
+export function addMonths(m, n) {
+  const [y, mo] = String(m).split('-').map(Number);
+  const d = new Date(y, mo - 1 + n, 1);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+}
+// Weekdays are asked for thousands of times per screen (grid, checks, demo): remember them per date string.
+const WEEKDAY = new Map();
+export function weekday(s) {
+  let w = WEEKDAY.get(s);
+  if (w === undefined) {
+    w = parseISO(s).getDay();
+    if (WEEKDAY.size > 5000) WEEKDAY.clear();
+    WEEKDAY.set(s, w);
+  }
+  return w;
+}
+export function isWeekend(s) { const w = weekday(s); return w === 0 || w === 6; }
+export function isHoliday(state, s) { return !!(state && state.settings && state.settings.holidays && state.settings.holidays[s]); }
+export function holidayName(state, s) { return (state && state.settings && state.settings.holidays && state.settings.holidays[s]) || ''; }
+export function fmtDay(s) { const d = parseISO(s); return `${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}`; }
+export function fmtMonth(m) { const [y, mo] = String(m).split('-').map(Number); return `${MONTH[mo - 1]} ${y}`; }
+
+// ---------- lookups ----------
+
+export function dutyMap(state) { return new Map((state.duties || []).map(d => [d.code, d])); }
+// The same map, built once per duties list (read-only use: effectiveCodes and matchesCodes run per cell). It is
+// rebuilt when the list changes, even in place (a duty added, replaced or recoded inside a commit).
+const DUTY_MAPS = new WeakMap();
+function dutyMapCached(state) {
+  const list = state.duties;
+  if (!Array.isArray(list)) return dutyMap(state);
+  const hit = DUTY_MAPS.get(list);
+  if (hit && hit.items.length === list.length && hit.items.every((d, k) => d === list[k] && hit.codes[k] === (d && d.code))) return hit.m;
+  const m = dutyMap(state);
+  DUTY_MAPS.set(list, { m, items: list.slice(), codes: list.map(d => d && d.code) });
+  return m;
+}
+export function groupMap(state) { return new Map((state.groups || []).map(g => [g.id, g])); }
+export function staffMap(state) { return new Map((state.staff || []).map(p => [p.id, p])); }
+
+export function staffActiveOn(person, s) {
+  return !!person && person.active !== false && (!person.start || s >= person.start) && (!person.end || s <= person.end);
+}
+
+// Everyone in post at some point in the month, in sheet order (group order, then the order in state.staff).
+export function staffInMonth(state, m) {
+  const days = monthDays(m), first = days[0], last = days[days.length - 1];
+  const order = new Map((state.groups || []).map((g, i) => [g.id, i]));
+  return (state.staff || [])
+    .map((p, i) => ({ p, i }))
+    .filter(({ p }) => p.active !== false && (!p.start || p.start <= last) && (!p.end || p.end >= first))
+    .sort((a, b) => ((order.get(a.p.group) ?? 999) - (order.get(b.p.group) ?? 999)) || a.i - b.i)
+    .map(({ p }) => p);
+}
+
+// ---------- cells ----------
+
+const EMPTY = Object.freeze([]);
+const uniq = a => [...new Set((Array.isArray(a) ? a : []).filter(c => typeof c === 'string' && c))];
+
+export function getCell(state, s, staffId) {
+  const day = state.cells && state.cells[s];
+  return (day && day[staffId]) || null;
+}
+
+// Merge a patch into a cell: dedupe codes, keep auto ⊆ a, delete the cell (and the day) when nothing is left.
+// Always writes a new cell object (never mutates the old one), so shallow copies of state stay safe.
+export function setCell(draft, s, staffId, patch) {
+  if (!draft.cells) draft.cells = {};
+  const day = draft.cells[s] || (draft.cells[s] = {});
+  const cur = day[staffId] || {};
+  const next = { ...cur, ...patch };
+  const a = uniq(next.a);
+  const cell = { a, r: uniq(next.r), auto: uniq(next.auto).filter(c => a.includes(c)), note: String(next.note || ''), lock: !!next.lock };
+  if (!cell.a.length && !cell.r.length && !cell.note && !cell.lock) delete day[staffId];
+  else day[staffId] = cell;
+  if (!Object.keys(day).length) delete draft.cells[s];
+  return day[staffId] || null;
+}
+
+// Assigned codes plus 'x' when the day before had an overnight shift.
+export function effectiveCodes(state, s, staffId) {
+  const cell = getCell(state, s, staffId);
+  const out = cell && Array.isArray(cell.a) ? [...cell.a] : [];
+  const prev = getCell(state, addDays(s, -1), staffId);
+  if (prev && Array.isArray(prev.a) && prev.a.length) {
+    const dm = dutyMapCached(state);
+    if (prev.a.some(c => dm.get(c) && dm.get(c).overnight) && !out.includes('x')) out.push('x');
+  }
+  if (isPPC(state, s, staffId) && !out.includes('PPC')) out.push('PPC');
+  return out;
+}
+
+// PPC: the day off two days after a duty marked rest2 (the ICU call), when the person is still on the same posting
+// that day (on the last Saturday of a posting there is no day off). Worked out, never stored.
+export function isPPC(state, s, staffId) {
+  const back = getCell(state, addDays(s, -2), staffId), cell = getCell(state, s, staffId);
+  if (!back || !cell || !Array.isArray(back.a) || !Array.isArray(cell.a)) return false;
+  const dm = dutyMapCached(state);
+  if (!back.a.some(c => dm.get(c) && dm.get(c).rest2)) return false;
+  return cell.a.some(c => dm.get(c) && dm.get(c).kind === 'posting' && back.a.includes(c));
+}
+export function postingOf(state, cell) {
+  if (!cell || !Array.isArray(cell.a)) return '';
+  const dm = dutyMapCached(state);
+  return cell.a.find(c => dm.get(c) && dm.get(c).kind === 'posting') || '';
+}
+
+export const TOKENS = ['@posting', '@shift', '@leave', '@other', '@request', '@away', '@present', '@any'];
+
+// Tokens to concrete codes. '@present' is a property of the day, not a code: matchesCodes handles it.
+export function expandTokens(state, codes) {
+  const out = new Set();
+  const all = state.duties || [];
+  const ofKind = k => all.filter(d => d.kind === k).forEach(d => out.add(d.code));
+  for (const c of codes || []) {
+    if (c === '@shift') ofKind('shift');
+    else if (c === '@leave') ofKind('leave');
+    else if (c === '@posting') ofKind('posting');
+    else if (c === '@other') ofKind('other');
+    else if (c === '@request') ofKind('request');
+    else if (c === '@away') { ofKind('leave'); ofKind('other'); out.add('x'); out.add('PPC'); }
+    else if (c === '@any') { all.forEach(d => out.add(d.code)); out.add('x'); }
+    else if (c !== '@present') out.add(c);
+  }
+  return out;
+}
+
+// Does this person's day match any of the codes (requests in r count too)? Handles every token.
+export function matchesCodes(state, s, staffId, codes, eff) {
+  codes = codes || EMPTY;
+  const cell = getCell(state, s, staffId);
+  const effc = eff || effectiveCodes(state, s, staffId);
+  const all = cell && Array.isArray(cell.r) ? [...effc, ...cell.r] : [...effc];
+  if (codes.includes('@any') && all.length) return true;
+  const set = expandTokens(state, codes);
+  if (all.some(c => set.has(c))) return true;
+  if (codes.includes('@present')) {
+    const dm = dutyMapCached(state);
+    const kindOf = c => (c === 'x' || c === 'PPC' ? 'derived' : (dm.get(c) && dm.get(c).kind));
+    if (effc.some(c => kindOf(c) === 'shift')) return true;
+    const person = (state.staff || []).find(p => p.id === staffId);
+    if (person && !staffActiveOn(person, s)) return false;
+    const away = effc.some(c => c === 'x' || c === 'PPC' || kindOf(c) === 'leave' || kindOf(c) === 'other');
+    return !isWeekend(s) && !isHoliday(state, s) && !away;
+  }
+  return false;
+}
