@@ -621,6 +621,9 @@ button.icon-btn { min-width: 40px; }
 .parsed { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; min-height: 22px; margin: 4px 2px 2px; font-size: calc(13px * var(--fs, 1)); color: var(--muted); }
 .parsed .pi small { font-size: calc(11px * var(--fs, 1)); text-transform: uppercase; letter-spacing: .04em; }
 .parsed .pi b { color: var(--ink); }
+/* the initials and age read from the box, in the colours of their highlights there */
+.parsed .pi-ini b { color: var(--accent); }
+.parsed .pi-age b { color: var(--warn, #b45309); }
 .parsed .pi.none { color: var(--warn); }
 .parsed .pi.grow { flex: 1 1 8em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tag-row { display: flex; align-items: center; gap: 8px; }
@@ -1403,8 +1406,8 @@ ul.cases .c-tags { -webkit-mask-image: linear-gradient(to right, #000 calc(100% 
 /* a copy of the box's text on top of it, the words see-through and only the marks showing, like a highlighter pen */
 .box-wrap .box-marks { position: absolute; z-index: 1; margin: 0; box-sizing: border-box; border-style: solid; border-color: transparent; color: transparent; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; overflow: hidden; pointer-events: none; }
 .box-wrap .box-marks mark { color: transparent; border-radius: 4px; box-shadow: 0 0 0 1px transparent; }
-.box-wrap .box-marks mark.m-ini { background: color-mix(in srgb, var(--accent) 22%, transparent); }
-.box-wrap .box-marks mark.m-age { background: color-mix(in srgb, var(--warn, #b45309) 24%, transparent); }
+.box-wrap .box-marks mark.m-ini { background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: inset 0 -2px 0 var(--accent); border-radius: 2px; }
+.box-wrap .box-marks mark.m-age { background: color-mix(in srgb, var(--warn, #b45309) 10%, transparent); box-shadow: inset 0 -2px 0 var(--warn, #b45309); border-radius: 2px; }
 .box-wrap .paste-btn, .box-wrap .clear-btn { z-index: 2; }
 /* the line under the box: only what the age was read as */
 .parsed .pi b { font-weight: 700; }
@@ -1554,7 +1557,7 @@ details.day-note-box > summary { cursor: pointer; color: var(--muted); font-weig
 /* Labelled parts (parts.js, ui-parts.js): labels in bold on Logbook rows and marked in the case box; the Learning
    points page; the label editor and case template in Advanced logging */
 ul.cases .t .part-l, .points-list .part-l { font-weight: 700; }
-.box-wrap .box-marks mark.m-lab { background: color-mix(in srgb, var(--ok, #1a7f37) 18%, transparent); }
+.box-wrap .box-marks mark.m-lab { background: color-mix(in srgb, var(--ok, #1a7f37) 9%, transparent); box-shadow: inset 0 -2px 0 var(--ok, #1a7f37); border-radius: 2px; }
 .too-long { margin: 4px 2px; }
 .lb-points { margin: 8px 0 0; font-size: calc(14px * var(--fs, 1)); }
 ul.points-list { list-style: none; margin: 0; padding: 0; }

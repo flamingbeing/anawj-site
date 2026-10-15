@@ -711,10 +711,14 @@ function paintParsed(typed) {
   // Labelled parts on: which parts the box has ("Parts Learning point · Plan"), so you see a label was read
   const lab = labels();
   const names = lab ? [...new Set(parseParts(details, lab).parts.filter(p => p.text.trim()).map(p => p.name.replace(/ \d+$/, '')))] : [];
-  const key = age + '|' + names.join('|');
+  // the initials as they'll be saved, only when read from the box (not typed in their own field); in the colour of
+  // their highlight in the box, as the age is (owner, 15 Oct 2026)
+  const ini = initials && !draft.initials ? initials : '';
+  const key = ini + '|' + age + '|' + names.join('|');
   if (ui.parsed.dataset.key !== key) {
     ui.parsed.dataset.key = key; ui.parsed.dataset.age = age;
-    fill(ui.parsed, age ? h('span', { class: 'pi' }, h('b', {}, age), ` = ${humanAge(age)}`) : null,
+    fill(ui.parsed, ini ? h('span', { class: 'pi pi-ini' }, h('b', {}, ini), ' = initials') : null,
+      age ? h('span', { class: 'pi pi-age' }, h('b', {}, age), ` = ${humanAge(age)}`) : null,
       names.length ? h('span', { class: 'pi parts-read' }, h('small', {}, 'Parts '), names.join(' · ')) : null);
   }
   if (ui.tooLong) {
@@ -1112,12 +1116,13 @@ function paintBulk(out) {
   // the confident suggestions of every row, ticked in one tap (the bold chips)
   const strong = r => (on && r.details.trim() ? suggest(r.details).filter(s => s.score >= STRONG && !r.cats.includes(s.code)).map(s => s.code) : []);
   const anyStrong = bulkRows.some(r => strong(r).length);
+  // the count and Tick all on one line, so the rows start high on a phone
   fill(out, 
-    h('h3', {}, `${bulkRows.length} case${bulkRows.length === 1 ? '' : 's'}`),
-    anyStrong ? h('div', { class: 'bar', style: 'margin:0 0 8px' }, h('button', { class: 'small', onclick: () => {
-      for (const r of bulkRows) { const add = strong(r); if (add.length) r.cats = sortCodes(withParents([...r.cats, ...add])); }
-      paintBulk(out);
-    } }, 'Tick all suggestions'), h('span', { class: 'hint', style: 'margin:0 0 0 8px' }, 'The confident ones, in bold.')) : null,
+    h('div', { class: 'bar', style: 'margin:0 0 6px;align-items:center' }, h('h3', { style: 'margin:0' }, `${bulkRows.length} case${bulkRows.length === 1 ? '' : 's'}`), h('span', { style: 'flex:1' }),
+      anyStrong ? h('button', { class: 'small', title: 'The confident suggestions (in bold) on every case', onclick: () => {
+        for (const r of bulkRows) { const add = strong(r); if (add.length) r.cats = sortCodes(withParents([...r.cats, ...add])); }
+        paintBulk(out);
+      } }, 'Tick all suggestions') : null),
     missing ? h('p', { class: 'tip' }, `${missing} case${missing === 1 ? ' has' : 's have'} no tag yet.`) : null,
     h('div', { class: 'scroll' }, h('table', { class: 'bulk' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Details'), h('th', {}, 'Tags'), h('th', {}))), tbody)),
     h('div', { class: 'actions' }, h('button', { class: 'primary big', onclick: saveBulk }, `Save all ${bulkRows.length}`),
