@@ -47,6 +47,18 @@ const PLAIN = new Set(['dayNoteOnCase', 'pasteClean', 'shareAsk', 'noteToolbar',
   'labelParts', 'caseTplOn', 'detectInitials', 'oneLetterInitials', 'skipStarts', 'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band']);
 const MAX_JSON = 400 * 1024;
 
+// Reset all settings (Settings, at the bottom; owner, 15 Oct 2026): the account's settings back to their defaults (null),
+// except what is yours rather than a preference: your year and the app's bookkeeping, your profile (its own page has a
+// reset), saved searches, places to send and sync to, and your tags and shorthand unless asked (tags: true).
+// -> the patch for patchLogbook({ settings }); never cases, reflections, notes or drafts (they aren't settings)
+const KEEP_ON_RESET = new Set([...SKIP, 'mode', 'basic', 'show', 'basicOn', 'caseHide', 'savedSearches', 'destinations', 'sync']);
+const TAG_KEYS = ['tagSet', 'subcats', 'catOrder'];
+export function resetAccountPatch(settings, { tags = false } = {}) {
+  const out = {};
+  for (const k of Object.keys(settings || {})) if (!KEEP_ON_RESET.has(k) && (tags || !TAG_KEYS.includes(k)) && settings[k] != null) out[k] = null;
+  return out;
+}
+
 export function settingsFile(logbook, { theme } = {}) {
   const lb = logbook || {};
   const settings = Object.fromEntries(Object.entries(lb.settings || {}).filter(([k, v]) => !SKIP.has(k) && v !== undefined));

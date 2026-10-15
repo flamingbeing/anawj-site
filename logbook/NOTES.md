@@ -590,6 +590,10 @@ portfolio content.
   `apmes-logbook-look-css` for the first paint. A new look key goes in `THEME_KEYS`, `DISPLAY_KEYS` and settings-file
   `PLAIN`; `themes.test.mjs` round-trips every theme.
 
+- **Reset all settings** (Settings, last card; owner, 15 Oct 2026): this device only, or the account too
+  (`settings-file.js` `resetAccountPatch`: your year, profile, saved searches, send and sync places and the app's
+  bookkeeping stay; tags and shorthand only when ticked). Saves a settings file first by default; Undo in the toast.
+
 ## Data, roles and photos (`firestore.rules`)
 
 - **App owner:** `owners/{email}`, set by hand in the Firebase console. May read logbooks and cases and import
