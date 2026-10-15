@@ -54,8 +54,8 @@ Agreed queue (one PR each, in order, once he says go):
     link), Email (mailto), Telegram, Drafts, Bear, Things, Day One; a line for apps with no link (Keep, Notion, OneNote):
     use Share. Check each link on a real iPhone first (owner or Firetop).
 
-Release in three batches (proposed 15 Oct): fixes (1–3), layout (4–8b), power features (9–12; bulk edit gets the full
-tests and a Firetop run on a test account). The app is alpha with almost no users (owner, 15 Oct): no compatibility
+No batching (owner, 15 Oct): build and merge in order, each PR on its own (bulk edit still gets the full tests and a
+Firetop run on a test account). All the Send to presets above are in. The app is alpha with almost no users (owner, 15 Oct): no compatibility
 links or migration niceties needed for moved pages.
 
 Earlier work (all merged): the reliability fixes (#569–#589; follow-ups in `status/wip/README.md`), the app → sheet sync,
