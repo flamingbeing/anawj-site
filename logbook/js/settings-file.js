@@ -47,7 +47,7 @@ const PLAIN = new Set(['dayNoteOnCase', 'pasteClean', 'shareAsk', 'noteToolbar',
   'basic', 'mode', 'weekStart', 'afterSave', 'undoSecs', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'borders', 'reflPoints', 'round', 'shadows', 'bigTaps', 'swipeTabs', 'rowMenu', 'reflToolbar', 'autoTick', 'recentCount',
   // device keys added later (they were dropped on import until 13 Oct 2026; settings-file.test.mjs checks DISPLAY_KEYS)
   'rowCopy', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy', 'hideTabsTyping',
-  'labelParts', 'caseTplOn', 'boxHeight', 'boxGrow', 'totalsCompact', 'totalsTargets', 'detectInitials', 'oneLetterInitials', 'skipStarts', 'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band']);
+  'labelParts', 'caseTplOn', 'boxHeight', 'boxGrow', 'totalsCompact', 'totalsTargets', 'calRefl', 'detectInitials', 'oneLetterInitials', 'skipStarts', 'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band']);
 const MAX_JSON = 400 * 1024;
 
 // Reset all settings (Settings, at the bottom; owner, 15 Oct 2026): the account's settings back to their defaults (null),
