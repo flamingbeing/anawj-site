@@ -11,6 +11,7 @@ import { Numerics, clockText } from './ui/numerics.js';
 import { DrugsPanel, CIRC_ROWS } from './ui/drugs.js';
 import { behindHtml } from './ui/behind.js';
 import { CASES, SIGN_IN, patientSummary, clinicalSummary } from './ui/preop.js';
+import { OPERATION, phaseAt } from './ui/timeline.js';
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -86,6 +87,7 @@ function panels(force = false) {
   if (!$('panel-pt').hidden) {
     const h = eventsHtml(sim.state); if ($('events').innerHTML !== h) $('events').innerHTML = h;
     const rt = resusText(sim.state); if ($('resus-state').textContent !== rt) $('resus-state').textContent = rt;
+    const st = surgText(); if ($('surg-state').textContent !== st) $('surg-state').textContent = st;
   }
   if (!$('panel-aw').hidden) { const t = airwayText(sim.state); if ($('aw-state').textContent !== t) $('aw-state').textContent = t; }
   if ($('behind-box').open) { const h = behindHtml(sim.state); if ($('behind').innerHTML !== h) $('behind').innerHTML = h; }
@@ -93,6 +95,7 @@ function panels(force = false) {
 
 function frame({ frac, wallDt }) {
   if (fast) { tDisp += wallDt; fast.advance(sim.state, tDisp); } else tDisp = Math.max(tDisp, modelT(frac));
+  surgTick();                                            // auto-advance the operation timeline as model time passes
   const src = source();
   for (const l of lanes) l.draw(src, tDisp);
   nums.update(sim.state, performance.now());
@@ -139,11 +142,40 @@ $('talk').addEventListener('click', () => {
   $('talk-reply').textContent = !pd.asleep ? 'Opens their eyes and answers.' : pd.pAsleep < 0.95 ? 'No answer. Stirs a little to a louder voice.' : 'No response.';
 });
 for (const b of document.querySelectorAll('[data-stim]')) b.addEventListener('click', () => { sim.act({ type: 'stimulus', kind: b.dataset.stim }); acted(); });
-$('surgery').addEventListener('click', () => {
-  const on = $('surgery').getAttribute('aria-pressed') !== 'true';
-  $('surgery').setAttribute('aria-pressed', String(on));
-  sim.act({ type: 'stimulus', kind: 'surgery', level: on ? 0.8 : 0 });
+
+// the operation timeline (DESIGN.md M3.2): a scripted surgical-stimulus sequence driven through sim.act(), so it stays
+// deterministic. surgTick fires each step whose offset model time has reached (auto-advance while running); "Skip to
+// next step" fast-forwards model time to the next step. Not the M4 scenario engine — only the surgical stimulus.
+const surg = { startT: null, fired: 0 };
+function surgTick() {
+  if (surg.startT == null) return;
+  while (surg.fired < OPERATION.length && sim.state.t >= surg.startT + OPERATION[surg.fired].at - 1e-6)
+    sim.act(OPERATION[surg.fired++].stim);
+}
+function surgText() {
+  if (surg.startT == null) return 'Not started.';
+  const el = sim.state.t - surg.startT, p = phaseAt(el);
+  const cur = p.current ? p.current.label : 'Starting…';
+  if (!p.next) return `${cur}. Operation complete.`;
+  const dt = Math.max(0, Math.round(surg.startT + p.next.at - sim.state.t));
+  return `${cur}. Next: ${p.next.label} in ${Math.floor(dt / 60)}:${String(dt % 60).padStart(2, '0')}.`;
+}
+$('surg-start').addEventListener('click', () => {
+  surg.startT = sim.state.t; surg.fired = 0;
+  surgTick();                                           // the incision (offset 0) fires now
+  $('surg-start').disabled = true;
+  $('surg-skip').disabled = surg.fired >= OPERATION.length;
   acted();
+});
+$('surg-skip').addEventListener('click', () => {
+  if (surg.startT == null || surg.fired >= OPERATION.length) return;
+  const target = surg.startT + OPERATION[surg.fired].at;
+  if (target > sim.state.t) sim.runTo(target);          // fast-forward model time to the next step
+  surgTick();
+  if (loop.paused) sim.step(1);                          // flush the queued action so it shows at once
+  if (!fast) tDisp = modelT(loop.acc);                   // the lanes restart from the new time
+  refill(); nums.update(sim.state, performance.now(), true); panels(true);
+  $('surg-skip').disabled = surg.fired >= OPERATION.length;
 });
 for (const b of document.querySelectorAll('[data-fluid]')) b.addEventListener('click', () => { sim.act({ type: 'fluid', product: b.dataset.fluid, ml: +b.dataset.ml }); acted(); });
 $('bleed').addEventListener('change', () => { sim.act({ type: 'bleed', mlPerMin: +$('bleed').value }); acted(); });
@@ -284,7 +316,9 @@ if (TEST) {
   window.otsim = {
     sim,
     get state() { return sim.state; },
-    step(n = 1) { sim.step(n); if (!fast) tDisp = modelT(loop.acc); refill(); nums.update(sim.state, performance.now(), true); panels(true); return sim.state.t; },
+    step(n = 1) { sim.step(n); surgTick(); if (!fast) tDisp = modelT(loop.acc); refill(); nums.update(sim.state, performance.now(), true); panels(true); return sim.state.t; },
+    surgStart() { $('surg-start').click(); return sim.state.t; },
+    surgSkip() { $('surg-skip').click(); return sim.state.t; },
     pause(p = true) { setPaused(p); },
     speed: s => setSpeed(s),
     lanes,

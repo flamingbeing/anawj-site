@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-15 by Claude Code (build session: M2.7, M2.8, M3.1, M3.2 slice 1 merged; M3.2 slice 2 pre-op screen).
+Last updated: 2026-10-15 by Claude Code (build session: M2.7, M2.8, M3.1, M3.2 slices 1-2 merged; M3.2 slice 3 operation timeline).
 
 ## Now
 
@@ -19,12 +19,16 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next
 
-1. M3.2 slice 3: the surgical-stimulus timeline with "skip to next event", the Examine and Help tabs. Then M3.3 alarms,
-   then M4.x scenarios (`DESIGN.md` order).
+1. M3.2 slice 4: the Examine and Help tabs. Then M3.3 alarms, then M4.x scenarios (`DESIGN.md` order).
 
 ## Recently done
 
-- M3.2 slice 2 (15 Oct 2026, #608→next): the pre-op screen (`#preop`, `ui/preop.js`). The Elective GA card opens a
+- M3.2 slice 3 (15 Oct 2026, #612→next): the operation timeline (`ui/timeline.js`). The Patient tab's manual "Surgery
+  running" toggle is replaced by an Operation block — Start operation, Skip to next step, live now/next readout —
+  driving a scripted surgical-stimulus sequence (incision → steady → deep dissection → closing → finished) through
+  `sim.act()` (deterministic). Auto-advances while running; Skip fast-forwards. Not the M4 scenario engine.
+  `test/timeline.test.mjs` + e2e.
+- M3.2 slice 2 (15 Oct 2026, #612): the pre-op screen (`#preop`, `ui/preop.js`). The Elective GA card opens a
   briefing — patient summary (demographics from the model patient), the case narrative (ASA/airway/history/allergies/
   fasting/plan) and a paraphrased WHO sign-in checklist (tickable, not enforced) — then "Begin the anaesthetic" into
   the theatre, keeping the same patient. `test/preop.test.mjs` + e2e flow.

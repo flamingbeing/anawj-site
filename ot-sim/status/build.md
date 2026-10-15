@@ -27,5 +27,15 @@
   into the theatre. Begin keeps the whole query and changes only the hash, so the theatre uses the same patient (and
   it's a hashchange, not a reload). `test/preop.test.mjs`; e2e covers the card → pre-op → theatre flow, the checklist,
   axe on the screen, and the unknown-case fallback. `tools/test-ot-sim.sh` green.
-- M3.2 still to come (slice 3+): the surgical-stimulus timeline with "skip to next event", the Examine and Help tabs.
-  Then M3.3 alarms, then M4.x (scenario drugs + the crisis scenarios — the "diverse use cases").
+- M3.2 slice 3 built on this branch (from main after #612 merged): the operation timeline (`ui/timeline.js`). A
+  standard general-surgery case as an ordered surgical-stimulus script (`OPERATION`: incision → steady surgery → deep
+  dissection → closing → finished) at offsets from surgery start. The Patient tab's old manual "Surgery running"
+  toggle is replaced by an **Operation** block: "Start operation", "Skip to next step", and a live now/next readout.
+  A small UI scheduler (`surgTick`) fires each step via `sim.act()` as model time passes (auto-advance while running,
+  in `frame()` and the test step helper); "Skip" fast-forwards model time with `sim.runTo` to the next step. Driven
+  through real actions, so it stays deterministic and replayable. **Not** the M4 scenario engine — only the surgical
+  stimulus over time, for the guided case and free run. `test/timeline.test.mjs` (script well-formed, `phaseAt`, a
+  real sim driven through it, determinism); e2e drives Start → Skip through every step → ends. `tools/test-ot-sim.sh`,
+  check and proofread green.
+- M3.2 still to come (slice 4): the Examine and Help tabs. Then M3.3 alarms, then M4.x (scenario drugs + the crisis
+  scenarios — the "diverse use cases").

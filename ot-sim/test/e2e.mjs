@@ -196,6 +196,22 @@ try {
     assert.match(await page.textContent('#events'), /Incision/);
     assert.match(await page.textContent('#events'), /No longer responds to voice/);
     await axe(page, `${name} theatre, Patient tab`);
+    // the operation timeline: Start fires the incision, Skip fast-forwards model time to each next step (ongoing
+    // surgery stimulus, then a stronger phase), and the last step ends it
+    await page.click('#surg-start');
+    assert.match(await page.textContent('#surg-state'), /incision|Surgery/i, `${name}: operation started`);
+    await page.click('#surg-skip');
+    assert.ok(await page.evaluate(() => otsim.state.pd.stim && otsim.state.pd.stim.kind === 'surgery' && otsim.state.pd.stim.ongoing), `${name}: skip reaches the ongoing surgery stimulus`);
+    const surgT = await page.evaluate(() => otsim.state.t);
+    const surgI = await page.evaluate(() => otsim.state.pd.stim.I);
+    await page.click('#surg-skip');
+    assert.ok(await page.evaluate(() => otsim.state.t) > surgT, `${name}: skip fast-forwards model time`);
+    assert.ok(await page.evaluate(() => otsim.state.pd.stim.I) > surgI, `${name}: the next step is a stronger stimulus`);
+    await page.click('#surg-skip'); // closing
+    await page.click('#surg-skip'); // finished
+    assert.ok(await page.evaluate(() => !otsim.state.pd.stim || !otsim.state.pd.stim.ongoing), `${name}: the operation ends the surgery stimulus`);
+    assert.match(await page.textContent('#surg-state'), /complete/i, `${name}: timeline shows complete`);
+    assert.ok(await page.evaluate(() => document.getElementById('surg-skip').disabled), `${name}: skip is disabled at the end`);
     // Rhythms: impose each from the Patient tab. The ECG keeps drawing and the circulation responds.
     await page.selectOption('#rhythm', 'vt');
     await page.evaluate(() => otsim.step(400));
