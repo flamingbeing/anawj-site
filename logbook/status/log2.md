@@ -5,6 +5,11 @@ go** (15 Oct). Merged today: #599–#603 (Totals tab for everyone, Analytics in 
 frozen names row, Category column ≤ ⅓ width, all-years zip, no tooltips; app version at the bottom of More).
 
 Agreed queue (one PR each, in order, once he says go):
+0. **Bug, first (waiting on the owner's OK to build ahead of the plan):** the reflection editor's "Saved locally ·
+   pending sync" is a snapshot taken once after save (ui-reflect.js, `writes.status` read once) while the header follows
+   `writes.onChange`, so the editor can say pending under a header that says Synced. Make the editor's status follow the
+   queue live (Saving… → pending → Synced, or conflict / failed with its Recover link); check the Notes editor and the
+   case edit page for the same snapshot; test: hold the fake server, see pending, release, see Synced in both places.
 1. **Paeds age + paste ticks:** an age ≤ 16 ticks Paeds (EPA 9: 3 to 16 years); an age > 16 drops every Paeds guess,
    shorthand ones too (bug: "circumcision" shorthand ticked Paeds on an 18/M; suggest.js adult branch only drops
    `why: 'keyword'`); no age: trigger words still suggest. Pasted lists follow Settings → Logging → "Tick confident
@@ -60,6 +65,20 @@ Agreed queue (one PR each, in order, once he says go):
 9c. **Select and bulk edit in Reflections too** (owner): the same press and hold / Select and bar. Bulk edit: heading,
    status (draft / complete), in the portfolio export (tick on / off), JR flag, date; export just these (Word portfolio
    or Markdown); move to the bin. Same warning, 20+ second step and Undo.
+9d. **Bulk edit popup holds the actions too** (owner): while selecting, the bar is only "N selected · Select all ·
+   Select none · Bulk edit… · Done"; the popup has Change (a row per field, each "Unchanged" until chosen) and Actions
+   (export or share just these, merge (Notes), move to the bin); Review changes → warning → Save; the same popup on
+   Logbook, Notes and Reflections.
+9e. **Global search** (owner): a 🔍 in the header on every tab (can also go on the bar; `/` on a computer). The Logbook
+   search language (search-ops.js) plus `in:cases|reflections|notes`, `heading:`, `status:draft|complete`,
+   `is:interesting|planned`, `has:reflection|note`, `no:tag`, `linked:`; an ⓘ list of them; filter chips (type, dates,
+   tags, status, Interesting) kept in step with the typed operators. Results grouped by type with counts, Best match or
+   Newest, highlighted snippets, tap opens the item in its tab; a case row links its reflection and notes. Saved
+   searches shared with the Logbook. Offline for what's on the device (notes load on first search). Results join bulk
+   select (fields shared by the selected types). The Logbook keeps its own box (same engine, cases only).
+9f. **Reflections on the Logbook calendar** (owner; off by default): a "Show reflections" toggle on the Calendar view
+   itself (per device). Days with a reflection get a small reflection mark beside the notes mark; the day's list shows
+   each reflection under its case (or on its own when not linked to a case), tap opens it.
 10. **Grid as a spreadsheet:** thin lines, no boxed inputs; drag to resize columns (per device, double-tap resets);
     lines per row 1 / 2 / 3 / Fit to content.
 11. **Paging by default** (owner's call, 15 Oct): 100 per page, 25 / 50 / 100 / 300 / All (per device); "‹ Page 2 of
