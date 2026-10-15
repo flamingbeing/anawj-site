@@ -50,7 +50,7 @@ try {
     assert.ok(await page.$$eval('#sedHits .hit', e => e.length) > 15, 'hit regions are in place');
     assert.equal(await page.evaluate(() => sedLay().rows.map(r => r.k).join()), 'emg,psi,sr'); assert.equal(await page.evaluate(() => sedLay().well.join()), 'artf,sefl,sefr');
     // action menu: TREND and ANALOG
-    await page.click('[data-a="actiontab"]'); assert.equal(await page.evaluate(() => SED.pop && SED.pop.kind), 'action'); assert.equal(await page.$$eval('#sedPop .act button', e => e.length), 2); assert.equal(await page.$$eval('#sedPop .spopclose', e => e.length), 1, 'the blue close tab is in the popup layer');
+    await page.click('[data-a="actiontab"]'); assert.equal(await page.evaluate(() => SED.pop && SED.pop.kind), 'action'); await page.waitForFunction(() => document.querySelectorAll('#sedPop .act button').length === 2, null, { timeout: 5000 }); assert.equal(await page.$$eval('#sedPop .spopclose', e => e.length), 1, 'the blue close tab is in the popup layer');
     await page.click('#sedPop [data-v="analog"]'); assert.equal(await page.evaluate(() => SED.view), 'analog'); await page.waitForTimeout(300);
     assert.equal(await page.evaluate(() => SED.pop), null);
     await page.click('[data-a="actiontab"]'); await page.click('#sedPop [data-v="trend"]'); assert.equal(await page.evaluate(() => SED.view), 'trend');
@@ -63,7 +63,7 @@ try {
     await scrubAt(0.2); assert.ok(await page.evaluate(() => SED.hold != null && SED.hold < simT - 60), 'scrolled back');
     await scrubAt(0.99); assert.equal(await page.evaluate(() => SED.hold), null);
     // number menu: About, Settings, Expand / Minimise
-    await page.click('.hit[data-a="num"][data-v="artf"]'); assert.deepEqual(await page.$$eval('#sedPop .num button', e => e.map(x => x.textContent)), ['About', 'Settings']);
+    await page.click('.hit[data-a="num"][data-v="artf"]'); await page.waitForSelector('#sedPop .num button'); assert.deepEqual(await page.$$eval('#sedPop .num button', e => e.map(x => x.textContent)), ['About', 'Settings']);
     await page.keyboard.press('Escape'); assert.equal(await page.evaluate(() => SED.pop), null);
     await page.evaluate(() => sedExpand('artf')); assert.equal(await page.evaluate(() => sedLay().rows.map(r => r.k).join()), 'emg,psi,sr,artf'); assert.equal(await page.evaluate(() => sedLay().well.join()), 'sefl,sefr');
     await page.evaluate(() => sedMinimise('psi')); assert.equal(await page.evaluate(() => sedLay().well.includes('psi')), true);

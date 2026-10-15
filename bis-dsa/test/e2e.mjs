@@ -41,7 +41,9 @@ try {
       for (const x of r.l) assert.ok(x.ts <= r.tN + 0.5 && x.x <= 143 + 323 - 17, 'no label beyond the newest column or the data area');
       for (let i = 1; i < r.l.length; i++) assert.equal(r.l[i].ts - r.l[i - 1].ts, 600, 'labels 10 min apart');
       const px = await page.$eval('#c2Dsa', (c, pts) => { const k = c.width / 552, g = c.getContext('2d'); return pts.map(([x, y]) => [...g.getImageData(Math.round((x - 88) * k), Math.round((y - 232) * k), 1, 1).data]); }, [[173, 262], [173, 258 + 118 * (1 - 6 / 30)]]);
-      assert.ok(px[0][2] > 150 && px[0][0] < 160, `awake beta is cyan or green (${px[0]})`); assert.ok(px[1][0] > 200 && px[1][2] < 90, `awake 6 Hz is orange-red (${px[1]})`); }
+      // the top row, read at nine places (the white SEF line can cross any one of them, as the DSA opens with earlier awake trend): the middle value
+      const top = await page.$eval('#c2Dsa', c => { const k = c.width / 552, g = c.getContext('2d'); const v = []; for (let x = 150; x <= 230; x += 10) v.push([...g.getImageData(Math.round((x - 88) * k), Math.round((262 - 232) * k), 1, 1).data]); const med = a => a.slice().sort((p, q) => p - q)[4]; return [med(v.map(q => q[0])), med(v.map(q => q[1])), med(v.map(q => q[2]))]; });
+      assert.ok(top[2] > 150 && top[0] < 160, `awake beta is cyan or green (${top})`); assert.ok(px[1][0] > 200 && px[1][2] < 90, `awake 6 Hz is orange-red (${px[1]})`); }
     // start-up message with a Dismiss button, as on the real monitor
     await page.waitForFunction(re => new RegExp(re).test(document.querySelector('#v2MsgT').textContent), String.raw`Factory settings restored`, { timeout: 4000 });
     await page.click('#v2Dismiss'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Msg', true], { timeout: 5000 });
