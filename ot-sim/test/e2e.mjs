@@ -171,6 +171,21 @@ try {
     assert.ok(await page.evaluate(() => otsim.state.vol.mac) > 0.8, `${name}: sevoflurane raises MAC`);
     assert.match(await page.textContent('#n-agent'), /^\d/);
     await axe(page, `${name} theatre, Breathing tab`);
+    // the Airway tab: laryngoscopy shows a view; an oesophageal tube reads no CO2, a tracheal tube restores it
+    await page.click('#tab-aw');
+    await page.click('#aw-laryn');
+    await page.evaluate(() => otsim.step(10));
+    assert.ok(await page.evaluate(() => otsim.state.aw.view >= 1), `${name}: laryngoscopy shows a view`);
+    await page.selectOption('#aw-place', 'oesophageal');
+    await page.click('#aw-intubate');
+    await page.evaluate(() => otsim.step(600));
+    assert.ok(await page.evaluate(() => otsim.state.gas.etco2 < 5), `${name}: oesophageal tube shows no CO2`);
+    await page.selectOption('#aw-place', 'tracheal');
+    await page.click('#aw-intubate');
+    await page.evaluate(() => otsim.step(900));
+    assert.ok(await page.evaluate(() => otsim.state.gas.etco2 > 25), `${name}: tracheal tube restores CO2`);
+    assert.match(await page.textContent('#aw-state'), /Tracheal tube/);
+    await axe(page, `${name} theatre, Airway tab`);
     await page.click('#tab-drugs');
     // the Patient tab: asleep under TCI; a stimulus shows in the events
     await page.evaluate(() => { otsim.sim.act({ type: 'tci', drug: 'propofol', target: 4 }); otsim.step(3000); });
@@ -181,6 +196,48 @@ try {
     assert.match(await page.textContent('#events'), /Incision/);
     assert.match(await page.textContent('#events'), /No longer responds to voice/);
     await axe(page, `${name} theatre, Patient tab`);
+    // Rhythms: impose each from the Patient tab. The ECG keeps drawing and the circulation responds.
+    await page.selectOption('#rhythm', 'vt');
+    await page.evaluate(() => otsim.step(400));
+    assert.equal(await page.evaluate(() => otsim.state.rh.rhythm), 'vt', `${name}: VT set`);
+    assert.ok((await lit(page, '#c-ecg')) > 500, `${name}: VT draws`);
+    await page.selectOption('#rhythm', 'vf');
+    await page.evaluate(() => otsim.step(400));
+    assert.ok(await page.evaluate(() => otsim.state.cv.co < 0.3), `${name}: VF makes no output`);
+    assert.ok((await lit(page, '#c-ecg')) > 500, `${name}: VF draws`);
+    assert.equal(await page.textContent('#n-hr'), '--', `${name}: VF has no readable HR`);
+    assert.match(await page.textContent('#n-rhythm'), /fibrillation/i, `${name}: rhythm labelled`);
+    await page.selectOption('#rhythm', 'asystole');
+    await page.evaluate(() => otsim.step(300));
+    assert.equal(await page.textContent('#n-hr'), '0', `${name}: asystole HR 0`);
+    await page.selectOption('#rhythm', 'flutter');
+    await page.evaluate(() => otsim.step(400));
+    assert.ok((await lit(page, '#c-ecg')) > 500, `${name}: flutter draws`);
+    // resuscitation: VF, then compressions make an output and raise EtCO2; a shock records an outcome; pacing an
+    // asystolic heart at a high output captures and drives a paced rhythm
+    await page.selectOption('#rhythm', 'vf');
+    await page.evaluate(() => otsim.step(200));
+    const etcoVF = await page.evaluate(() => otsim.state.gas.etco2);
+    await page.click('#cpr');
+    assert.equal(await page.getAttribute('#cpr', 'aria-pressed'), 'true');
+    await page.evaluate(() => otsim.step(900));
+    assert.ok(await page.evaluate(() => otsim.state.cv.co > 0.5), `${name}: compressions make an output`);
+    assert.ok(await page.evaluate(e => otsim.state.gas.etco2 > e, etcoVF), `${name}: EtCO2 rises with CPR`);
+    assert.match(await page.textContent('#resus-state'), /Compressions/);
+    await page.click('#defib');
+    await page.evaluate(() => otsim.step(5));
+    assert.match(await page.textContent('#resus-state'), /shock/);
+    await page.click('#cpr'); // stop compressions
+    await page.selectOption('#rhythm', 'asystole');
+    await page.evaluate(() => otsim.step(100));
+    await page.fill('#pace-ma', '140');
+    await page.click('#pace');
+    await page.evaluate(() => otsim.step(150));
+    assert.ok(await page.evaluate(() => otsim.state.resus.pace.capturing), `${name}: pacing captures at a high output`);
+    assert.equal(await page.evaluate(() => otsim.state.rh.rhythm), 'paced', `${name}: paced rhythm`);
+    await page.click('#pace'); // pacer off
+    await page.selectOption('#rhythm', 'sinus'); // back to sinus for the rest of the run
+    await page.evaluate(() => otsim.step(400));
     await page.click('#tab-drugs');
     // a custom dose
     await page.fill('#bd-fentanyl', '75');

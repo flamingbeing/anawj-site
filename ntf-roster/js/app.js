@@ -303,11 +303,17 @@ function markTabs() {
   });
 }
 
+// Header parts are rewritten only when their text changes: it is redrawn after every edit, and rewriting the same
+// markup still makes the browser restyle it (speed).
+const headerSeen = new WeakMap();
+function setHTML(el, html) { if (headerSeen.get(el) !== html) { el.innerHTML = html; headerSeen.set(el, html); } }
+
 function renderHeader() {
   const state = app.store.get();
-  $('#dept').textContent = state.settings?.dept || '';
+  const dept = state.settings?.dept || '';
+  if ($('#dept').textContent !== dept) $('#dept').textContent = dept;
   const longM = M.fmtMonth(app.month);   // 'October 2026'; phones show 'Oct 2026'
-  $('#month').innerHTML = `<span class="m-long">${esc(longM)}</span><span class="m-short" aria-hidden="true">${esc(longM.slice(0, 3) + ' ' + app.month.slice(0, 4))}</span>`;
+  setHTML($('#month'), `<span class="m-long">${esc(longM)}</span><span class="m-short" aria-hidden="true">${esc(longM.slice(0, 3) + ' ' + app.month.slice(0, 4))}</span>`);
   $('#today').title = 'Go to today (' + M.fmtDay(M.iso(new Date())) + ')';
   const u = $('#undo'), r = $('#redo');
   u.disabled = !app.store.canUndo();
@@ -328,7 +334,7 @@ function renderHeader() {
   p.className = 'problems ' + (bad ? 'has-hard' : 'is-ok');
   const hardTxt = ev.error ? 'Rule check failed' : ev.hard ? `${ev.hard} problem${ev.hard === 1 ? '' : 's'}` : 'No problems';
   const extra = nFailed ? `${nFailed} rule${nFailed === 1 ? '' : 's'} can't be checked` : ev.soft ? `${ev.soft} to improve` : '';
-  p.innerHTML = `${icon(bad ? 'alert' : 'ok')}<span class="p-hard">${hardTxt}</span>${extra ? `<span class="p-soft">${extra}</span>` : ''}`;
+  setHTML(p, `${icon(bad ? 'alert' : 'ok')}<span class="p-hard">${hardTxt}</span>${extra ? `<span class="p-soft">${extra}</span>` : ''}`);
   p.setAttribute('aria-label', `${hardTxt}${extra ? `, ${extra}` : ''}. Open Check`);
   p.title = 'Rule check for ' + M.fmtMonth(app.month) + ': must-fix problems (hard rules) and things to improve (soft rules)';
   const bb = document.querySelector('.bb-badge');
@@ -593,22 +599,29 @@ function fatal(msg) {
 }
 
 async function start() {
+  const demo = new URLSearchParams(location.search).has('demo');
+  // Ask for every module the first screen needs at once, not one after another (each is a round trip on a slow
+  // line): the model, rules, store, the practice department and the first screen's own view (from the link; phones
+  // open on Day). Each is still awaited, and handled, where it was before.
+  const quiet = p => { p.catch(() => {}); return p; };
+  const pM = quiet(import('./model.js')), pR = quiet(import('./rules.js')), pS = quiet(import('./store.js'));
+  const pD = demo ? quiet(import('./demo.js')) : null;
+  quiet(import((TABS[location.hash.replace(/^#/, '').split('?')[0]] || TABS[isPhone() ? 'day' : 'roster']).mod));
   try {
-    M = await import('./model.js');
+    M = await pM;
   } catch (e) {
     console.error(e);
     fatal('A part of the app did not load. Check your connection and reload the page.');
     return;
   }
-  try { R = await import('./rules.js'); } catch (e) { console.warn('rules.js not loaded; rule checks are off', e); }
+  try { R = await pR; } catch (e) { console.warn('rules.js not loaded; rule checks are off', e); }
   app.model = M; app.rules = R;
-  const demo = new URLSearchParams(location.search).has('demo');
   app.isDemo = demo;
   let demoState = null;
   if (demo) {
-    try { ({ demoState } = await import('./demo.js')); } catch (e) { console.warn('demo.js not loaded; starting empty', e); }
+    try { ({ demoState } = await pD); } catch (e) { console.warn('demo.js not loaded; starting empty', e); }
   }
-  const { createStore } = await import('./store.js');
+  const { createStore } = await pS;
   app.store = createStore({
     demo,
     fallback: () => (demo && typeof demoState === 'function' ? demoState(M.iso(new Date())) : M.defaultState()),

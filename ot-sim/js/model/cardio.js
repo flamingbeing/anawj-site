@@ -132,6 +132,13 @@ export const cardio = {
     const fill = Math.min(1, (1 - exp(-Math.max(0.05, c.rr - CV.tSys) / CV.fillTau)) / fx.fill0);
     const R = solveAtrium(CV.rv, fx.Arv, eesR, Psv, CV.Rvr, Pp, ppl, c.rr, fill, ppl);
     const L = solveAtrium(CV.lv, fx.Alv, eesL, Pp, fx.Rpv, Psa, ppl, c.rr, fill, 0);
+    // the rhythm's mechanical effectiveness (rhythm.js): 1 for sinus, less for the fast and poorly-filled rhythms,
+    // 0 for VF, asystole and PEA. A non-perfusing rhythm makes an output only through chest compressions
+    // (resus.js, resus.cprFrac); without compressions the arterial pressure decays (the Schipke curve) [D]
+    const rhOut = prev.rh && prev.rh.output != null ? prev.rh.output : 1;
+    const perfusing = !(prev.rh && prev.rh.perfusing === false);
+    const cprFrac = prev.resus ? prev.resus.cprFrac : 0;
+    const out = perfusing ? rhOut : cprFrac;
     // beats in the previous step latch new stroke volumes and the interval
     let svL = c.svL, svR = c.svR, rr = c.rr, edvL = c.edvL;
     const beats = prev.rh ? prev.rh.events : [];
@@ -139,12 +146,16 @@ export const cardio = {
       rr = Math.max(0.25, b.rr || rr);
       svR = R.sv; svL = L.sv;
       edvL = edv(CV.lv, fx.Alv, L.P - ppl);
-      const pp = (CV.ppFactor * svL) / CV.Ca;
-      ctx.emit({ kind: 'beat', t: b.t, rr, sv: svL, sbp: Psa + (2 / 3) * pp, dbp: Psa - pp / 3 });
+      const pp = (CV.ppFactor * svL * out) / CV.Ca;
+      ctx.emit({ kind: 'beat', t: b.t, rr, morph: b.morph || 'sinus', sv: svL * out, sbp: Psa + (2 / 3) * pp, dbp: Psa - pp / 3 });
     }
-    // flows over this step (mL), capped at what is available
-    const qL = Math.min((svL / rr) * dt, Math.max(0, c.Vp - 1)), qR = Math.min((svR / rr) * dt, Math.max(0, c.Vv - 1));
-    const qS = Math.min(Math.max(0, (Psa - Psv) / Rsys) * dt, Math.max(0, c.Va - 1));
+    // flows over this step (mL), capped at what is available; gated by the rhythm's effectiveness
+    const qL = Math.min((svL * out / rr) * dt, Math.max(0, c.Vp - 1)), qR = Math.min((svR * out / rr) * dt, Math.max(0, c.Vv - 1));
+    // arterial drainage. In a non-perfusing rhythm with no compressions, arteriolar tone is kept, so the arterial
+    // pressure decays slowly towards the mean filling pressure (Schipke 2003: about 24 mmHg at 13 s) rather than
+    // collapsing at once; once compressions (or any perfusing rhythm) produce flow, drainage is normal again [D].
+    const arrest = !perfusing && cprFrac <= 0;
+    const qS = Math.min(Math.max(0, (Psa - Psv) / (arrest ? Rsys * 6 : Rsys)) * dt, Math.max(0, c.Va - 1));
     // fluids in and blood out through the veins (fluids.js)
     const F = stepFluids(fluidActions(c.fl, ctx.actions), c.Va + c.Vv + c.Vp, c.Vv, Psa, dt);
     const Va = c.Va + qL - qS, Vv = c.Vv + qS - qR + F.dV, Vp = c.Vp + qR - qL;
@@ -176,7 +187,7 @@ export const cardio = {
     // agonists add to it (vaso.js)
     const hp = Math.max(0.3, fx.T0 + fx.aV * Math.min(1, eff.hpV * D.V.vagal + D.V.vt) - fx.aS * (eff.hpS * D.V.hrSym + D.V.b1));
     const store = stepStore(c.store ?? 1, D.A.relNow, dt / 60);
-    const pp = (CV.ppFactor * svL) / CV.Ca, co = (svL / rr) * 0.06;
+    const pp = (CV.ppFactor * svL * out) / CV.Ca, co = (svL * out / rr) * 0.06;
     return {
       ...c, Va, Vv, Vp, svL, svR, rr, hp, mapF, sHist, eff, edvL, s, dc, fl: F.fl, bloodVol, hb: hbOf(F.fl, bloodVol), store,
       hr: 60 / rr, map: Psa, sbp: Psa + (2 / 3) * pp, dbp: Psa - pp / 3, cvp: R.P, lap: L.P, pa: Pp, co,

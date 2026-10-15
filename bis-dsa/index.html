@@ -57,6 +57,17 @@ header p{color:var(--muted)}
 .monswitch button{min-height:44px;padding:6px 4px;font:600 13px/1.15 var(--f-body);color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:10px;cursor:pointer}
 .monswitch button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .monswitch button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+/* the case timeline under the monitor switch: a bar (tap to jump there) and jump buttons */
+.tline{display:grid;gap:6px}
+.tbar{position:relative;display:flex;align-items:center;gap:10px}
+.tbar canvas{flex:1;min-width:0;height:28px;cursor:pointer;touch-action:manipulation}
+.tbar span{font:600 13px/1.2 var(--f-mono);color:var(--muted);white-space:nowrap}
+.tbtns{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.tbtns button{min-height:40px;padding:4px 2px;font:600 13px/1 var(--f-body);color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.tbtns button:disabled{opacity:.45;cursor:default}
+.tbtns button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.tline.busy .tbar span{color:var(--fg)}
+@media (max-width:600px){.tbar{flex-direction:column;align-items:stretch;gap:2px}.tbar canvas{flex:none;width:100%}.tbtns{gap:4px}.tbtns button{font-size:12px}}
 section{display:grid;gap:16px;min-width:0}
 .sec-head{display:grid;gap:6px;max-width:72ch}
 .sec-head p{color:var(--muted)}
@@ -384,6 +395,8 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
       <div class="softkeys keyrow" id="keySeg" hidden role="group" aria-label="Monitor settings">
         <button id="kSmooth">Smoothing 15 s</button><button id="kScale">EEG ±100 µV</button><button id="kSweep">EEG sweep auto</button><button id="kTrend">Trend 5 min</button><button id="kBottom">Bottom: BIS trend</button>
       </div>
+    <div class="tline" id="tLine"><div class="tbar"><canvas id="tCv" aria-hidden="true"></canvas><span id="tNow">Case 0:00</span></div>
+   <div class="tbtns" id="tBtns" role="group" aria-label="Jump in time"><button type="button" data-j="-900">−15 min</button><button type="button" data-j="-300">−5 min</button><button type="button" data-j="-60">−1 min</button><button type="button" data-j="60">+1 min</button><button type="button" data-j="300">+5 min</button><button type="button" data-j="900">+15 min</button></div></div>
     <div class="teachstrip" id="teachStrip" aria-label="Readouts the real monitor does not show as numbers">
       <span class="ts" id="bilSum" hidden></span><span class="ts"><b>Block</b> <span id="s2Nm">--</span></span><span class="ts"><b>SQI</b> <span id="s2Sqi">--</span>%</span><span class="ts"><b>EMG</b> <span id="s2Emg">--</span> dB</span><span class="ts"><b>SR</b> <span id="s2Sr">0</span>%</span><span class="ts"><b>SEF</b> <span id="s2Sef">--</span> Hz</span><span class="ts"><b>TP</b> <span id="s2Tp">--</span></span><span class="ts"><b>BC</b> <span id="s2Bc">0</span>/min</span><span class="ts zone" id="s2Zone">--</span><span class="ts"><b>Suppression</b> <span id="s2Sup">0:00</span></span><span class="ts"><b>BIS&lt;40</b> <span id="s2Low">0:00</span></span><button type="button" class="tclr" id="tReset2" aria-label="Reset the suppression and BIS under 40 timers">Reset</button>
     </div>
@@ -538,5 +551,6 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 <script src="sed-menu.js"></script>
 <script src="pv-screen.js"></script>
 <script src="app.js"></script>
+<script src="timeline.js"></script>
 </body>
 </html>

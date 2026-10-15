@@ -30,6 +30,7 @@ From the repo root:
 ```
 for f in ntf-roster/test/*.test.mjs; do node "$f"; done   # rules engine, solver, Excel parser (no browser)
 node ntf-roster/test/e2e.mjs                              # browser test: needs the server above on port 8080
+node ntf-roster/test/perf.e2e.mjs                         # speed budgets on a slowed phone (by hand, not in CI)
 tools/test-rules.sh                                       # firestore.rules in the local emulator (all apps)
 node tools/check.mjs                                      # repo check (sw.js SHELL lists files that exist)
 ```
@@ -41,6 +42,8 @@ node tools/check.mjs                                      # repo check (sw.js SH
   cell editor, paint and undo/redo, a new rule appearing in the grid and Check, Auto-fill next month to zero must-fix
   problems, Excel export then import, backup and restore, the app version lines (~85 checks, ~45 s). `SHOTS=<dir>`
   saves screenshots.
+- `test/perf.e2e.mjs`: tap a cell → editor, tap a code → grid, switch month, timed at 390×844 with the CPU 4x slower,
+  against budgets (~1 min). Timings vary by machine, so it is not in the Checks workflow.
 - `test/rules.emulator.mjs`: the Firestore rules (run by `tools/test-rules.sh`).
 
 ## Code

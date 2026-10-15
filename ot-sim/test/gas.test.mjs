@@ -27,7 +27,9 @@ function apnoeaTo90(profile, pre, during, obstruct = true, maxMin = 25) {
   const s = mk(profile);
   s.act({ type: 'o2', fio2: pre }); s.step(1800);
   s.act({ type: 'tci', drug: 'propofol', target: 4 }); s.act(bol('rocuronium', 1.2, 'mg/kg')); s.step(300);
-  if (obstruct) s.state = { ...s.state, aw: { obstruction: 1 } };
+  // obstruct = closed-system apnoea: a paralysed natural airway obstructs, so no apnoeic oxygenation (airway.js).
+  // Otherwise secure the airway (a tube) so a patent airway on oxygen gives apnoeic oxygenation.
+  if (!obstruct) s.act({ type: 'intubate' });
   s.act({ type: 'o2', fio2: during });
   const t0 = s.state.t;
   for (let i = 0; i < maxMin * 600; i++) { s.step(1); if (s.state.gas.sao2 < 90) return (s.state.t - t0) / 60; }
@@ -42,7 +44,7 @@ assert.equal(apnoeaTo90({}, 1, 1, false, 12), Infinity, 'apnoeic oxygenation thr
 {
   const s = mk();
   s.act({ type: 'tci', drug: 'propofol', target: 4 }); s.act(bol('rocuronium', 1.2, 'mg/kg')); s.step(600);
-  s.state = { ...s.state, aw: { obstruction: 1 } };
+  // the paralysed natural airway obstructs (airway.js), so this is apnoea: CO2 rises
   const p0 = s.state.gas.paco2; s.step(600); const p1 = s.state.gas.paco2; s.step(2400); const p5 = s.state.gas.paco2;
   inRange(p1 - p0, 2.5, 12, 'PaCO2 rise in the first minute (the venous-equilibration jump is not modelled: a known miss)'); inRange((p5 - p1) / 4, 2.5, 4.5, 'PaCO2 rise per minute after');
 }

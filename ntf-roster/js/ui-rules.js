@@ -294,8 +294,10 @@ export function mount(el, app) {
     if (!(Number(draft.weight) >= 1)) draft.weight = 10;
     const startJSON = JSON.stringify(draft);   // closing with changes asks first (Back, Esc, X, tap outside)
 
-    let timer = 0;
-    const changed = () => { clearTimeout(timer); timer = setTimeout(preview, 120); };
+    // the live check runs at most once a frame, straight after a change (it takes a few milliseconds), instead of
+    // waiting for a pause in typing (speed: it used to wait 120 ms)
+    let raf = 0;
+    const changed = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; preview(); }); };
 
     // live preview: sentence, problems with the rule as written, and what it finds this month
     const pvSentence = h('p', { class: 'rb-sentence' });
@@ -392,7 +394,7 @@ export function mount(el, app) {
       },
     });
     app.sheet({
-      title: title || (isNew ? `New rule: ${t.label}` : 'Edit rule'), body, actions, wide: true, className: 'rb-sheet', onClose: () => clearTimeout(timer),
+      title: title || (isNew ? `New rule: ${t.label}` : 'Edit rule'), body, actions, wide: true, className: 'rb-sheet', onClose: () => cancelAnimationFrame(raf),
       beforeClose: () => JSON.stringify(draft) === startJSON || app.confirm(isNew ? 'Close without adding this rule?' : 'Close without saving your changes to this rule?', { ok: 'Discard', danger: true }),
     });
     preview();

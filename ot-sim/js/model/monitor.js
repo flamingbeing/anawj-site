@@ -38,11 +38,17 @@ export const monitor = {
   step(prev, ctx) {
     const m = prev.mon, dt = ctx.dt, t = ctx.t;
     const out = { ...m };
-    // a beat or breath happened when the model's next event time moved on
-    const rh = prev.rh;
-    if (rh && rh.next !== m.seenBeat) {
-      out.rrs = push(m.rrs, rh.next - m.seenBeat, HR_BEATS);
-      out.hr = 60 / mean(out.rrs);
+    // a beat happened when the model's next ventricular event time moved on. VF and torsades have no countable beats
+    // (HR reads nothing), asystole reads 0; a rhythm change resyncs without recording a bogus interval.
+    const rh = prev.rh, base = rh ? rh.base : null;
+    if (base === 'vf' || base === 'torsades') { out.hr = NaN; out.rrs = []; out.seenBeat = rh.next; }
+    else if (base === 'asystole') { out.hr = 0; out.rrs = []; out.seenBeat = rh.next; }
+    else if (rh && rh.next !== m.seenBeat) {
+      const d = rh.next - m.seenBeat;
+      if (rh.next < 1e6 && d > 0 && d < 6) {
+        out.rrs = push(m.rrs, d, HR_BEATS);
+        out.hr = 60 / mean(out.rrs);
+      }
       out.seenBeat = rh.next;
     }
     const rs = prev.resp, g = prev.gas;

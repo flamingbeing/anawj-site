@@ -1,4 +1,4 @@
-// Fake data only. Settings, bottom: the app version, and "Get the latest version" (throws the saved copy of the app
+// Fake data only. More, bottom: the app version, and "Get the latest version" (throws the saved copy of the app
 // away and reloads; never the logbook's data). Service workers on, as on a phone.
 import assert from 'node:assert/strict';
 import { launch, engine } from './browsers.mjs';
@@ -13,7 +13,7 @@ try {
   await p.goto(base + '?demo#log'); await p.waitForFunction(() => Number(document.body.dataset.cases) > 0);
   await p.waitForFunction(() => navigator.serviceWorker.controller, null, { timeout: 20000 });
   const sw = await p.evaluate(async () => (await caches.keys()).find(k => k.startsWith('logbook-')));
-  await p.evaluate(() => { location.hash = '#settings'; });
+  await p.evaluate(() => { location.hash = '#more'; });
   const line = p.locator('.app-ver');
   await p.waitForFunction(() => /App version [^…]/.test(document.querySelector('.app-ver')?.textContent || ''));
   assert.ok((await line.innerText()).includes(sw.replace(/^logbook-/, '')), 'shows the saved copy’s version');

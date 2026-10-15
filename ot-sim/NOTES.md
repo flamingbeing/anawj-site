@@ -69,6 +69,52 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Decisions log
 
+- 15 Oct 2026 (M3.1): the airway (`airway.js`, a new subsystem after pd, before resp). It owns `aw` and decides
+  `aw.toLungs` (fraction of the breath reaching the alveoli), which resp.js multiplies into the alveolar ventilation;
+  a patent airway is 1, so resp/gas calibration is untouched (the airway only ever reduces delivery). Per-patient
+  difficulty (Cormack-Lehane direct/video, mask grade, pharyngeal collapsibility, FONA) drawn once from a new `airway`
+  sub-stream in `airway.init(state, ctx)` — init receives ctx, so the draw is seeded and deterministic. Obstruction
+  under sedation/paralysis (from pd.bisLike and pd.nmb.upperAirway), relieved by jaw thrust/OPA/NPA or bypassed by a
+  SAD/tube; mask seal sets delivery and pre-oxygenation entrainment; tube placement tracheal/oesophageal/endobronchial
+  (oesophageal → no CO2 then desat; endobronchial → one-lung shunt via resp.shuntAdd, read by gas). Controlled
+  ventilation on a natural airway counts as secured (backward-compatible with the pre-airway ventilator, so the old
+  gas/resp tests hold). Two gas/resp tests that used to inject a bare `aw:{obstruction:1}` now use the real model (a
+  paralysed natural airway obstructs; intubating gives apnoeic oxygenation) — airway.step is authoritative over `aw`,
+  so injecting a partial slice no longer works. UI: an Airway tab. Known miss: laryngospasm is a crisis condition
+  (M4), and a laryngoscopy attempt doesn't yet suspend ventilation for its duration.
+
+- 15 Oct 2026 (M2.8): resuscitation (`resus.js`, a new subsystem between rhythm and cardio). It owns the arrest
+  "devices": chest compressions (`cprFrac`, an output fraction by quality with a coronary build-up), the defibrillator
+  (shock success by time-in-VF and perfusion, exported as `shockSuccess`), and transcutaneous pacing (capture at the
+  patient's drawn `paceThresh`). Cardio reads `resus.cprFrac` as the output of a non-perfusing rhythm; rhythm reads
+  `resus.convert` (a successful shock → sinus) and `resus.pace.capturing` (→ paced). Two gas couplings were added,
+  both gated below the normal cardiac-output range so every earlier gas/anaesthetised/apnoea calibration is untouched
+  (they all run at normal CO): CO2 clearance follows pulmonary blood flow (saturating knee at the resting CO 5.0 —
+  steady-state EtCO2 is VCO2/VA and flow-independent, so only arrest/CPR lowers it, giving the clinical EtCO2 feedback),
+  and the arterial/venous O2 pools stagnate at very low flow so SpO2 falls in an untreated arrest and recovers with
+  compressions — this closes the M2.7 known miss. `patient.paceThresh` is drawn last in makePatient so every
+  already-fixed test patient and the earlier draws are unchanged. UI: a Resuscitation block on the Patient tab (CPR +
+  quality, defibrillate + joules + amiodarone, pacer + mA) with a live status line; the pacing threshold is hidden so
+  the learner discovers it. Amiodarone the drug is M4.0; `{type:'amiodarone'}` sets the shock-success hook for now.
+
+- 15 Oct 2026 (M2.7): rhythms and the ECG. `rhythm.js` grew from sinus-only into an atrial clock, an AV node and a
+  ventricular clock with a rhythm catalogue (`CATALOG`): sinus (brady, tachy), junctional, the AV blocks (first-degree,
+  Wenckebach, Mobitz II, complete), AF, flutter, SVT, bigeminy, VT, torsades, VF, PEA, asystole, paced and the three
+  hyperkalaemia stages. Each rhythm carries `rh.output` (mechanical effectiveness, 0..1) and `rh.perfusing`; cardio
+  multiplies cardiac output by `output`, so the fast and poorly-filled rhythms drop the pressure and VF/torsades/
+  asystole/PEA make no pulse. Sinus keeps `output: 1`, so the whole M2.1 circulation calibration is untouched (that was
+  the key constraint — all earlier tests still pass unchanged). Beats carry a `morph` the ECG renderer (`ui/synth.js`)
+  draws (narrow, wide, paced spike, no-P, peaked/broad hyperK T), and the disorganised rhythms add a continuous
+  baseline (AF fibrillation, flutter sawtooth, VF chaos coarsening over minutes, torsades twist, asystole flat, hyperK
+  sine, and marching P waves for the blocks). The monitor reads no HR for VF/torsades and 0 for asystole. In a
+  non-perfusing rhythm cardio keeps arteriolar tone (×6 drainage resistance) so the arterial pressure decays on roughly
+  the Schipke curve (~29 mmHg at 13 s vs ~24) instead of collapsing at once. Known misses: the arrest decay is a little
+  fast and its plateau a little high vs Schipke; SpO2 does not yet fall during an arrest (output–oxygenation coupling
+  comes with resuscitation, M2.8). UI: a rhythm picker and a rhythm label on the ECG, both on the Patient tab (the
+  scenarios will drive the same `{ type: 'rhythm', to }` action). A ventricular beat that was not cleared on no-beat
+  steps caused duplicate beats in an early draft — the step now returns a fresh slice whenever the previous step had
+  events, so `rh.events` is emptied.
+
 - 15 Oct 2026 (M2.6): `temp.js` (two compartments, core and periphery, energy balance in kcal). Anaesthesia opens the
   core-peripheral conductance (K 23 awake, 37 asleep), which redistributes heat and gives the early fall (about -0.8 C
   in hour 1, then slower); heat production falls 30% asleep; the periphery loses to a 21 C theatre; cold fluids cool

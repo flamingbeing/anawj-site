@@ -349,6 +349,23 @@ lower MAP about 5–12 mmHg; ephedrine 6 mg +11 then less with each repeat [D].
   `research/cardio.md`), with Fridericia QT and PR shortening with rate. Not the ECGSYN model (needs fast integration,
   PR and QT scale wrongly, GPL code).
 
+As built in M2.7 (`rhythm.js`, `test/rhythm.test.mjs`, the ECG templates in `ui/synth.js`): an atrial clock, an AV node
+and a ventricular clock drive the beats cardio turns into stroke volumes. Sinus follows the baroreflex heart period
+(unchanged, output 1); every other rhythm runs at its own rate and carries a mechanical effectiveness `rh.output` the
+circulation multiplies into cardiac output. The catalogue (default rates [V], output mapping [D]): sinus, sinus brady
+45 and tachy 120; junctional 50; first-degree block (long PR); second-degree Wenckebach (4:3 of an atrial 75 ≈ 56) and
+Mobitz II (3:2 ≈ 50); complete block (ventricular escape ~38, independent of the atrial 75); AF (irregularly irregular,
+mean ~130, fibrillatory baseline); flutter (2:1 of an atrial 300 ≈ 150, sawtooth); SVT 180; bigeminy; VT 180 (wide,
+output 0.35 — a weak pulse); torsades, VF and asystole (output 0, no pulse); PEA (organised electrical activity, a rate
+on the monitor but output 0); paced 70 (a spike then a wide QRS); hyperkalaemia stages (peaked T → wide QRS → sine
+wave). VF, torsades and asystole draw a continuous baseline and emit no complexes (the monitor shows no HR, or 0 for
+asystole); the others draw per-beat morphologies plus, where needed, marching P waves. In a non-perfusing rhythm the
+arteriolar tone is kept, so the arterial pressure decays slowly towards the mean filling pressure — about 29 mmHg at 13 s
+in the model (Schipke 2003: ~24 mmHg), then both pressures converge on ~10–17 mmHg; the decay is a little faster and the
+plateau a little higher than Schipke's (a known miss) [D]. SpO2 does not yet fall during an arrest (no output–oxygenation
+coupling; comes with resuscitation, M2.8) [known miss]. Impose a rhythm with `{ type: 'rhythm', to }` (the Patient tab;
+the scenarios drive it the same way).
+
 ## 7. Breathing: mechanics, ventilator, drive
 
 - **Mechanics:** total respiratory compliance under GA 60 mL/cmH2O by default (band 50–80; Pelosi 1996 lung 107 and
@@ -458,6 +475,23 @@ Prototyped (`research/prototypes.md`): one alveolar store, arterial and venous O
   (no published timing found) [D]; negative-pressure pulmonary oedema after forceful efforts against a closed glottis
   [V].
 
+As built in M3.1 (`airway.js`, `test/airway.test.mjs`): a hidden per-patient difficulty is drawn from the `airway`
+sub-stream — a Cormack-Lehane view (direct and video) with a realistic distribution (grade 1 about 50%, 2 about 40%,
+3 about 8%, 4 about 2%), a mask-ventilation grade, a pharyngeal collapsibility and a front-of-neck difficulty. The
+airway decides `aw.toLungs`, the fraction of the breath reaching the alveoli, which `resp.js` multiplies into the
+alveolar ventilation (a patent airway is 1, so every earlier calibration is unchanged). A natural airway obstructs as
+the patient deepens (from the BIS-like depth) or is paralysed (the upper-airway muscle block); a jaw thrust, oro- or
+nasopharyngeal airway relieves it; a supraglottic airway or tube bypasses it. A face mask delivers through the upper
+airway (so obstruction still counts) and its seal sets both delivery and the room-air entrainment that dilutes a
+pre-oxygenation (a leaky mask reaches a lower end-tidal O2). A tracheal tube delivers fully; an oesophageal tube sends
+nothing to the lungs (no CO2 — the capnograph is the catch — then desaturation on the closed FRC store); an
+endobronchial tube ventilates one lung (reduced delivery plus an added shunt, slower desaturation). Laryngoscopy
+reports the patient's view and repeated attempts worsen it. Controlled ventilation on a natural airway is treated as a
+secured airway (backward-compatible with the ventilator before the airway existed). UI: an Airway tab (manoeuvre,
+device, laryngoscopy direct/video, intubate with placement, extubate) with a live airway state line. Known miss:
+laryngospasm is a condition owned by the crisis engine (section 11, M4), not here; a laryngoscopy attempt does not yet
+suspend ventilation for its duration (noted) [D].
+
 ## 10. Temperature
 
 - Two compartments: core (trunk and head, about 66% of mass) and periphery, with a core-peripheral conductance that
@@ -533,6 +567,22 @@ success for VF falls with minutes in VF and with poor perfusion before the shock
 several percent a minute) [U shape]; amiodarone raises it after repeated shocks; return of circulation needs an
 organised rhythm with enough output (shockable: a successful shock; non-shockable: the cause reversed); transcutaneous
 pacing capture threshold drawn per patient (about 50–90 mA [U]), output set about 10 mA above capture (QRH 2-6) [V].
+
+As built in M2.8 (`resus.js`, `test/resus.test.mjs`, with couplings in `cardio.js` and `gas.js`): compressions
+(`{type:'cpr', on, quality}`) make a fraction of the normal output by quality (poor 0.10, good 0.23, excellent 0.33),
+scaled by a coronary-perfusion build-up that rises over about 25 s of compressions and falls on a pause; cardio reads
+`resus.cprFrac` as the output of a non-perfusing rhythm. With CO coupled into gas exchange (CO2 clearance follows
+pulmonary blood flow, saturating at the resting output so normal and anaesthetised patients are unchanged; and the
+arterial/venous O2 pools stagnate at very low flow), the model gives EtCO2 about 16 (poor) / 24 (good) / 27 (excellent)
+and MAP about 29 / 43 / 53 under compressions, and — closing the M2.7 known miss — SpO2 now falls over minutes in an
+untreated arrest and recovers with compressions or a restored rhythm. A shock (`{type:'defib', joules}`) converts a
+shockable rhythm (VF, VT, torsades) with a probability that is high in the first minute and falls about 9%/min, better
+with perfusion before the shock and after amiodarone past three shocks (`shockSuccess`); success switches the rhythm to
+sinus (return of circulation), and the circulation recovers. Transcutaneous pacing (`{type:'pace', on, mA}`) captures
+once the current reaches the patient's drawn threshold (`patient.paceThresh`, ~45–95 mA), driving a paced rhythm.
+Known miss as flagged: a non-shockable arrest (PEA, asystole) returns only by reversing the cause, which the scenarios
+(M4) drive; here it is a manual rhythm change. The amiodarone drug itself is M4.0; `{type:'amiodarone'}` sets the
+success hook for now.
 
 ## What is not modelled (first version)
 

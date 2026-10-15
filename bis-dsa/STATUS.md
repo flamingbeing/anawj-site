@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-14 by Claude Code (final integration of the three monitor skins).
+Last updated: 2026-10-15 by Claude Code (IntelliVue, case timeline, look pass).
 
 ## Now
 
@@ -16,9 +16,17 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 1. More states: nitrous oxide, opioid-heavy, hypothermia.
 2. Owner to compare each skin with his own unit or photos (only the Medtronic one was built from the owner's photos); known gaps per skin are in `NOTES.md`, "The three monitor skins at a glance".
-3. Decide whether to push the local skin commits (not pushed yet) and open a PR.
+3. Planned with the owner, not started: DSATrainer-inspired additions (CSA and power-spectrum panels, ECG R-wave bleed-through case,
+   multitaper option, burst-suppression parameters), built our own.
+4. IntelliVue: alarm sounds, SQI triangle / EMG bar (Release L+) if the owner wants them.
 
 ## Recently done
+
+- 15 Oct 2026 (owner feedback from phone use), all merged: #585 Medtronic/Advance DSA colours (saved colour range ignored),
+  Advance opens on the main screen, DSA + EEG by default, monitor switch at the top; #588 SedLine EEG flicker fixed and EEG
+  from the simulation, SedLine font Hind, device cases around each monitor, Medtronic opens with 35 min of earlier trend,
+  finer Advance DSA grain; #591 Philips IntelliVue screen (no DSA: IntelliVue has none); #595 case timeline (jump back and
+  forward 1, 5, 15 min; tap the bar) and a paler IntelliVue yellow. Owner: Medtronic keeps DSA + AMPL.
 
 - Final integration of the three skins (14 Oct 2026, local commits, not pushed): all checks green (`tools/check.mjs`, `tools/proofread.mjs`, engine check, full e2e including the Advance and SedLine tests); a race in the Advance battery-low test fixed (it read the text before the next frame; assertion unchanged); NOTES has a table of what is cloned from evidence, inferred or unknown for each skin; fonts listed with licences; no reference images or manual text in the repo.
 

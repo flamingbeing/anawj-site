@@ -163,10 +163,40 @@ Greedy construction (hardest slots first), then simulated annealing with increme
 drop), then it drops any duty no rule needs. Hard problems always come first: a move's hard change is scaled far
 above any soft change, and the best roster is the one with the fewest hard points, then the fewest soft, so no
 preference can buy a must-fix problem. An overnight duty is never placed the day before a fixed code that can't go with
-post call. Deterministic for a seed (fixed iteration budget; the time limit only cuts
-it short on a slow phone). On the practice department, November's 82 must-fix problems go to 0 in about 3 s. The
-preview shows shifts added and removed, must-fix and soft counts before and after, and anything unfilled; Apply is
-one undo step.
+post call. Deterministic for a seed: the search length is a budget of tries (500 per unfilled slot, 12,000 to
+100,000, from a cool start, T0 1), and it ends early once it has converged (no must-fix problems left and nothing
+better in the last 60% of the budget); the time option (3, 6 or 15 s) is only an upper bound for a slow phone. Tuned on
+four practice departments (Oct 2026): the same quality as the first version's 1,500 tries per slot from T0 25, in a
+third of the tries. On the practice department, November's 82 must-fix problems go to 0 in about 0.6 s on a laptop.
+The dialog shows the first draft's counts at once. The preview shows shifts added and removed, must-fix and soft counts
+before and after, and anything unfilled; Apply is one undo step.
+
+## Speed (Oct 2026)
+
+The owner found the first version slow on a phone. What keeps it quick, and what to keep in mind when changing it:
+
+- **Grid edits swap cells, not the grid.** `renderGrid()` builds each person's row from a signature (`rowSig`: their
+  cells, the day before the month, problems, details, the selected cell); a row whose signature is unchanged reuses
+  last render's HTML, and a changed row swaps only the cells (and footer counts) that differ. The duty-colour
+  `<style>`, the toolbar selects and the paint bar are rewritten only when they change (rewriting a `<style>`
+  restyles every element on the page). The cell editor is built once and updated in place.
+- **Full redraws are progressive** (another month, back from another tab, a filter, Auto-fill or an import changing
+  most rows): the rows in the grid's window go in first, then the rest over the next frames; rows above the window
+  wait in a spacer (`tr.r-spacer`) sized from the last drawing, and the scroll position is corrected when they arrive.
+  Code that needs a row that may not be drawn yet calls `flushRows()` (`selBtn()`, keyboard moves and paint already
+  do). The first screen after the app starts is drawn whole.
+- **The rule check** (`evaluate`, about 5 ms a month on a laptop) rules out most person-days with one bit test per
+  code list (`compileCodes`) and lists each person's request days once (`requests` rules), which also made Auto-fill's
+  search about twice as fast with identical results.
+- **Start-up**: the first screen's modules are fetched side by side; weekdays and the duty map are memoised in
+  `model.js`. The Google Fonts stylesheet in `index.html` is render-blocking (it held the first paint by ~0.4 s on a
+  slow connection in testing): self-hosted fonts with `font-display: swap`, or a non-blocking link, remove that.
+- **Guard**: `node ntf-roster/test/perf.e2e.mjs` (Playwright, phone size, CPU 4x slower) times tap a cell → editor,
+  tap a code → grid, and switch month, against budgets of about 2x the Oct 2026 numbers. Not in the Checks workflow.
+- Measured in Chromium at 390 px with the CPU 4x slower (medians, before → after): switch month 0.75 s → 0.32 s
+  until the new month shows (about 0.8 s until every row is in, as before); tab to Roster 0.83 s → 0.35 s; tap a code
+  → grid 0.35 s → 0.26 s; rule builder live check 0.16 s → 0.07 s; Auto-fill to the preview 3.4 s → 1.1 s (laptop
+  2.8 s → 0.7 s). On a laptop: switch month 150 → 70 ms, tab to Roster 150 → 67 ms, tap a code 66 → 43 ms.
 
 ## Screens
 
@@ -230,7 +260,8 @@ restriction" (same day, following days, between two people, and ready-made ones)
 ## Known limits
 
 - The cell editor lists every code (long, but it scrolls).
-- Switching month redraws the whole grid: about 80 to 110 ms for 80 people (edits redraw only changed rows, ~30 ms).
+- The grid is one big table (about 2,000 cells for 65 people): on a slow phone a full redraw still takes about a
+  second of work in total, though the rows on screen show first (Speed, above).
 - `spread` is always soft; `sameDay` forbid needs two different code lists (`@shift` + `@shift` means two shifts).
 - The solver may meet a `standing` rule by putting the person on call the day before (post call counts as away).
 - On phones the fairness table scrolls sideways with the name column fixed (cards for 60 people were too long).

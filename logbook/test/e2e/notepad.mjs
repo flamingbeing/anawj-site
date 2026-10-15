@@ -156,7 +156,7 @@ try { for (const width of [390, 1280]) {
   await p.evaluate(() => { location.hash = '#notes'; });
   await p.getByRole('button', { name: 'Add Notes to the tab bar' }).click();
   await p.locator('[role=tab][data-tab=notes]').waitFor();
-  assert.deepEqual(await barTabs(), ['log', 'logbook', 'reflect', 'progress', 'notes', 'more']);
+  assert.deepEqual(await barTabs(), ['log', 'logbook', 'totals', 'reflect', 'notes', 'more']);
   assert.equal(await p.getByRole('button', { name: 'Add Notes to the tab bar' }).count(), 0);
   // the More pages can go on the bar too, and their own pages select them; seven tabs at most, so an eighth asks
   // which tab it replaces (and takes its place)
@@ -170,16 +170,16 @@ try { for (const width of [390, 1280]) {
   await p.getByLabel('Show Export / Import', { exact: true }).check();
   await p.locator('dialog[open]').getByRole('button', { name: 'Notes' }).click();
   await p.locator('[role=tab][data-tab=data]').filter({ hasText: 'Export' }).waitFor();
-  assert.deepEqual(await barTabs(), ['log', 'logbook', 'reflect', 'progress', 'data', 'settings', 'more']);
+  assert.deepEqual(await barTabs(), ['log', 'logbook', 'totals', 'reflect', 'data', 'settings', 'more']);
   // More still lists every page; a hidden main tab comes first
-  await p.getByLabel('Show Analytics', { exact: true }).uncheck();
+  await p.getByLabel('Show Totals', { exact: true }).uncheck();
   await p.locator('[role=tab][data-tab=more]').click();
-  assert.match(await p.locator('.more-list li').first().innerText(), /Analytics/);
+  assert.match(await p.locator('.more-list li').first().innerText(), /Programme totals/);
   assert.equal(await p.locator('.more-list a[data-go=settings]').count(), 1);
   // over seven (a settings file, say): the last ones before More go to More
   assert.deepEqual(await p.evaluate(async () => { const { arrangeTabs, BAR_TABS } = await import('./js/ui-settings.js');
     return arrangeTabs(BAR_TABS.map(([id]) => id), { tabHidden: [], tabOrder: BAR_TABS.map(([id]) => id) }).shown; }),
-    ['caselogs', 'log', 'logbook', 'reflect', 'progress', 'notes', 'more']);
+    ['caselogs', 'log', 'logbook', 'totals', 'reflect', 'progress', 'more']);
   await p.evaluate(async () => { const { applyDisplay, setDisplay } = await import('./js/ui-settings.js'); applyDisplay(setDisplay({ tabHidden: null, tabOrder: null })); });
 
   // at 2,000 notes, no more; the list shows 100 at a time (fillers go into the demo store in one write, then one save

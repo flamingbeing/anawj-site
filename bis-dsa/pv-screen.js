@@ -4,7 +4,7 @@
 // IntelliVue has no BIS DSA: the screen shows the EEG wave and the numbers only. ECG, Pleth, SpO2 and NBP are simple stand-ins so the
 // screen reads as a whole monitor; only BIS, its EEG and its numbers come from the simulation. Reads app.js globals only when called.
 const PV_W=1440,PV_H=900,PV_FONT='Selawik,"Segoe UI","Open Sans",system-ui,sans-serif';
-const PC={bg:'#000',ecg:'#4fe08a',spo2:'#3cbcf2',nbp:'#c49ae8',bis:'#f2f2f2',yelBis:'#f4e85a',dim:'#9aa0a8',lbl:'#d8dce2',inop:'#4ab4e6',yel:'#f4e04a',key:'#1f2a3a',keyHi:'#2f6fe0'};
+const PC={bg:'#000',ecg:'#4fe08a',spo2:'#3cbcf2',nbp:'#c49ae8',bis:'#f2f2f2',yelBis:'#e4da98',dim:'#9aa0a8',lbl:'#d8dce2',inop:'#4ab4e6',yel:'#f4e04a',key:'#1f2a3a',keyHi:'#2f6fe0'};
 const PV={built:false,cv:null,st:null,set:{bisOn:true,hi:70,lo:20,alarms:true,scale:100,sqi:true,emg:true,sr:true,sef:false,tp:false,colour:'yellow'},
  menu:null,ack:{},wv:null,nbp:null,lastCheck:null,checkUntil:0,keyMsg:null,_k:null,_sec:null,dirty:true};
 const pq=id=>document.getElementById(id);

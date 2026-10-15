@@ -23,8 +23,10 @@ try { for (const width of [390, 1280]) {
   await group('logbook').getByLabel('Copy and Reflect buttons on each case').uncheck();
   await group('bar').getByLabel('Notes on the tab bar').check();
   await p.locator('[role=tab][data-tab=notes]').waitFor();
-  await group('bar').getByLabel('Analytics on the tab bar').uncheck();
-  await p.waitForFunction(() => !document.querySelector('[role=tab][data-tab=progress]'));
+  // Analytics starts in More (Case, Logbook, Totals, Reflections, More); put it on the bar
+  assert.equal(await p.locator('[role=tab][data-tab=progress]').count(), 0);
+  await group('bar').getByLabel('Analytics on the tab bar').check();
+  await p.locator('[role=tab][data-tab=progress]').waitFor();
   assert.equal((await st()).d.rowMenu, true);
 
   // resetting one group leaves the others alone
@@ -38,8 +40,8 @@ try { for (const width of [390, 1280]) {
   assert.equal(now.s.hideTips, true); assert.equal(now.d.rowMenu, true);
   await group('bar').getByRole('button', { name: 'Reset this group' }).click();
   await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click();
-  await p.locator('[role=tab][data-tab=progress]').waitFor();
-  await p.waitForFunction(() => !document.querySelector('[role=tab][data-tab=notes]'));
+  await p.waitForFunction(() => !document.querySelector('[role=tab][data-tab=notes]') && !document.querySelector('[role=tab][data-tab=progress]'));
+  assert.deepEqual((await p.locator('[role=tab]').evaluateAll(t => t.map(x => x.dataset.tab))), ['log', 'logbook', 'totals', 'reflect', 'more'], 'Case, Logbook, Totals, Reflections, More');
   now = await st();
   assert.equal(now.s.hideTips, true); assert.equal(now.d.rowMenu, true);
   await group('tips').getByRole('button', { name: 'Reset this group' }).click();
@@ -60,7 +62,7 @@ try { for (const width of [390, 1280]) {
   const tabsAdvanced = await tabsNow();
   await pickProfile('basic');
   await p.waitForFunction(() => document.body.classList.contains('basic'));
-  assert.deepEqual(await tabsNow(), tabsAdvanced.filter(t => t !== 'progress'), 'Analytics moves into More');
+  assert.deepEqual(await tabsNow(), tabsAdvanced, 'the same tabs; Analytics in More');
   await p.locator('[role=tab][data-tab=more]').click();
   await p.locator('.more-list a[data-go=progress]').waitFor();
   // settings stay: the advanced settings links and cards are all there
@@ -108,7 +110,7 @@ try { for (const width of [390, 1280]) {
   await pickProfile('logbook');
   await p.waitForFunction(() => document.body.classList.contains('logbook-only'));
   assert.ok(!(await st()).s.show, 'picking a profile starts from its defaults');
-  assert.deepEqual(await tabsNow(), tabsAdvanced.filter(t => t !== 'progress' && t !== 'reflect'));
+  assert.deepEqual(await tabsNow(), tabsAdvanced.filter(t => t !== 'reflect'));
   await p.locator('[role=tab][data-tab=logbook]').click();
   await p.locator('main .seg button').filter({ hasText: /^List$/ }).click();
   await p.locator('ul.cases li').first().waitFor();
@@ -137,14 +139,28 @@ try { for (const width of [390, 1280]) {
   assert.deepEqual(new Set(await tabsNow()), new Set(tabsAdvanced));
   await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { caseHide: null } }); });
 
-  // Faculty / PCs (faculty, PDs and admins; the demo user is an admin): Case logs, Analytics (the programme's), More
+  // Faculty / PCs (faculty, PDs and admins; the demo user is an admin): Totals, Admin, More (Case logs, Analytics first in it)
   await pickProfile('faculty');
   await p.waitForFunction(() => document.body.classList.contains('faculty-profile'));
-  assert.deepEqual(await tabsNow(), ['caselogs', 'progress', 'admin', 'more'], 'admins get the Admin portal left of More');
+  assert.deepEqual(await tabsNow(), ['totals', 'admin', 'more'], 'admins get the Admin portal left of More');
+  await p.locator('[role=tab][data-tab=totals]').click();
+  await p.getByRole('heading', { name: 'Programme totals' }).waitFor();
+  await p.locator('table.totals td.n').first().waitFor();
+  // Totals: Category column, names row frozen, no tap-and-hold tooltips, the count switch below the table, every year as a zip
+  assert.equal(await p.locator('table.totals thead th').first().innerText(), 'Category');
+  assert.equal(await p.locator('table.totals thead th.rot').first().evaluate(e => getComputedStyle(e).position), 'sticky');
+  assert.equal(await p.locator('table.totals td.n[title]').count(), 0);
+  assert.equal(await p.locator('table.totals td.cat .cat-in').first().evaluate(e => getComputedStyle(e).overflowX), 'auto', 'a long category scrolls sideways');
+  assert.equal(await p.locator('table.totals td[title]').count(), 0, 'no tooltips');
+  assert.ok(await p.evaluate(() => { const t = document.querySelector('table.totals'), sw = [...document.querySelectorAll('main .seg button')].find(b => /All tags/.test(b.textContent)); return !!sw && !!(t.compareDocumentPosition(sw) & Node.DOCUMENT_POSITION_FOLLOWING); }), 'All tags / Towards minimums below the table');
+  const zipDl = p.waitForEvent('download'); await p.getByRole('button', { name: 'Download all years (zip)' }).click();
+  assert.match((await zipDl).suggestedFilename(), /^totals-all-years-\d{4}-\d{2}-\d{2}\.zip$/);
   await p.locator('[role=tab][data-tab=admin]').click();
   await p.locator('a[data-go=adminresidents]').click();
   assert.equal(await p.locator('[role=tab][data-tab=admin]').getAttribute('aria-selected'), 'true', 'Admin portal pages sit under its tab');
-  await p.locator('[role=tab][data-tab=caselogs]').click();
+  await p.locator('[role=tab][data-tab=more]').click();
+  assert.equal(await p.locator('.more-list li a').first().getAttribute('data-go'), 'caselogs', 'Case logs first in More');
+  await p.locator('.more-list a[data-go=caselogs]').click();
   await p.locator('.caselog-list li').filter({ hasText: 'Resident A' }).waitFor();
   assert.match(await p.locator('.caselog-list li').filter({ hasText: 'Resident A' }).innerText(), /\d+ cases/);
   await p.getByLabel('Find a resident').fill('resident b');
@@ -153,15 +169,16 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('heading', { name: 'Resident B' }).waitFor();
   await p.locator('table.totals td.n').first().waitFor();
   await p.getByRole('heading', { name: /^Reflections · \d+ of \d+ headings met$/ }).waitFor();
-  assert.equal(await p.locator('[role=tab][data-tab=caselogs]').getAttribute('aria-selected'), 'true', 'a case log sits under Case logs');
+  assert.equal(await p.locator('[role=tab][data-tab=more]').getAttribute('aria-selected'), 'true', 'a case log sits under Case logs, in More');
   const logDl = p.waitForEvent('download'); await p.getByRole('button', { name: 'Download Excel' }).click();
   assert.match((await logDl).suggestedFilename(), /^case-log-Resident-B-\d{4}-\d{2}-\d{2}\.xlsx$/);
-  await p.locator('[role=tab][data-tab=progress]').click();
-  await p.getByRole('heading', { name: 'Programme analytics' }).waitFor();
-  await p.getByRole('heading', { name: 'Programme totals' }).waitFor();
-  // their own Case, Logbook and Reflections are first in More
+  // then Analytics (the programme's: who's behind, no totals) and their own Case, Logbook and Reflections in More
   await p.locator('[role=tab][data-tab=more]').click();
-  assert.deepEqual((await p.locator('.more-list li a').evaluateAll(as => as.map(a => a.dataset.go))).slice(0, 3), ['log', 'logbook', 'reflect']);
+  const moreIds = await p.locator('.more-list li a').evaluateAll(as => as.map(a => a.dataset.go));
+  assert.deepEqual(moreIds.slice(0, 5), ['caselogs', 'progress', 'log', 'logbook', 'reflect']);
+  await p.locator('.more-list a[data-go=progress]').click();
+  await p.getByRole('heading', { name: 'Programme analytics' }).waitFor();
+  assert.equal(await p.getByRole('heading', { name: 'Programme totals' }).count(), 0, 'no totals in Analytics');
   await pickProfile('advanced');
   await p.waitForFunction(() => !document.body.classList.contains('faculty-profile'));
   assert.deepEqual(new Set(await tabsNow()), new Set(tabsAdvanced));

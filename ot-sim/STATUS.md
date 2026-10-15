@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-15 by Claude Code (build session: M2.2-M2.6, one combined PR).
+Last updated: 2026-10-15 by Claude Code (build session: M2.7 rhythms #598, M2.8 resuscitation #604, then M3.1 airway).
 
 ## Now
 
@@ -19,11 +19,25 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next
 
-1. M2.2 (fluids and bleeding), M2.3 (vasoactive drugs), M2.4 (gas exchange and breathing), then the rest of the PR
-   order in `DESIGN.md`, one PR at a time, each merged before the next.
+1. M3.2 (case flow: `presets.js`, the elective GA from pre-oxygenation to extubation, surgical-stimulus timeline,
+   Examine/Help tabs), then M3.3 alarms, then M4.x scenarios, one PR at a time, each merged before the next
+   (`DESIGN.md` order).
 
 ## Recently done
 
+- M3.1 (15 Oct 2026): the airway (`airway.js`): per-patient Cormack-Lehane/mask difficulty; obstruction under
+  sedation/paralysis relieved by manoeuvres or a device; mask seal and pre-oxygenation entrainment; tube placement
+  (tracheal/oesophageal → no CO2/endobronchial one-lung). An Airway tab. resp/gas calibration unchanged (a patent
+  airway delivers fully).
+- M2.8 (15 Oct 2026, #604): resuscitation (`resus.js`): chest compressions (output + EtCO2 + DBP by quality),
+  defibrillation (time-in-VF success curve → ROSC), transcutaneous pacing (per-patient capture threshold); SpO2 now
+  falls in an untreated arrest and recovers with CPR (CO coupled into gas exchange). Resuscitation controls on the
+  Patient tab.
+- M2.7 (15 Oct 2026, #598): rhythms and the ECG (`rhythm.js`, cardio output gate, `ui/synth.js` morphologies/baselines): the
+  blocks, AF, flutter, SVT, VT, torsades, VF, asystole, PEA, bigeminy, paced and hyperkalaemia; a rhythm picker and
+  label on the Patient tab. Non-perfusing rhythms decay on the Schipke curve; sinus unchanged (calibration intact).
+- M2.2-M2.6 (15 Oct 2026, #582): fluids and bleeding, vasoactive drugs, gas exchange and breathing, volatile agents,
+  temperature — the full closed-loop patient model.
 - M2.1 (15 Oct 2026): circulation (`cardio.js`, `rhythm.js`): three compartments, beat-latched stroke volumes, the
   baroreflex, empty-ventricle decompensation, propofol, opioid and stimulus drives. Heart rate, blood pressure and the
   waveforms now follow the model; "Behind the monitor" shows output, SVR, CVP and the reflex.

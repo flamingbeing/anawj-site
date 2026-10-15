@@ -45,6 +45,10 @@ merged or live.
 
 ## Recently done
 
+- 2026-10-15: back to the NUHS design system (owner, after trying NTF's app design in #605): the look is the first
+  version's again; the speed work from #605 stays (grid patches cells, progressive month redraw, live rule checks once per
+  frame, Auto-fill about 3x faster with the tight-department fix), plus the paint Clear fix; `test/perf.e2e.mjs` in Checks.
+- 2026-10-15: #580 first version merged; #605 (NTF app design language + speed) merged, then its look reverted.
 - 2026-10-15: fixed what three reviews (engine, phone UX, robustness) found: hard rules now always beat soft ones in
   Auto-fill; month-edge checks (long rolling windows, weekend requests and post call across the month boundary,
   last month's excess); malformed rules or backups no longer switch checks off or break screens; a stored XSS through a
@@ -58,6 +62,9 @@ merged or live.
 
 ## Decisions log
 
+- 2026-10-15: this app follows the NUHS design system (`../nuhsdesign/tokens.css`, the four-colour band), like the other
+  anawj.com apps. NTF's app design language (anantf-site `DESIGN-APP.md`) was tried in #605 and reverted the same day at the
+  owner's request; don't switch again without asking.
 - 2026-10-15: home is anawj-site, `ntf-roster/` at `ntfroster.anawj.com` (sibling of nuh-roster; anantf.com's rules
   keep rotas off that site). Own subdomain because it saves data.
 - 2026-10-15: one monthly grid like the department's leave request sheet (staff by grade group × days), assignments

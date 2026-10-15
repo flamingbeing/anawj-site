@@ -77,12 +77,8 @@ export function renderProgress() {
       strip('Tags done', lg.done, cohort.tags, lg.total), strip('Cases logged', S.cases.length, cohort.cases)) : null,
     h('label', { class: 'check', style: 'margin:0 0 4px' }, h('input', { type: 'checkbox', checked: !!pview.hideDone, onchange: e => { pview.hideDone = e.target.checked; hooks.render(); } }), 'Hide done'),
     progList(shown, fc));
-  // everyone's counts (counts only) for comparison
-  const compare = h('section', { class: 'card more-list an-compare' },
-    h('ul', {}, h('li', {}, h('a', { href: '#totals' },
-      h('span', { class: 'mt' }, h('b', {}, 'Compare with your intake'), h('small', {}, 'Case counts per tag across residents in your year (Totals)')),
-      h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
-  return h('div', {}, head, urgentSec, quietSec, targets, reflectionsOn() ? reflCard() : null, advanced() ? todoCard() : null, advanced() ? trendsCard() : null, totalsOn ? compare : null);
+  // everyone's counts are on their own tab, Totals (owner, 15 Oct 2026), not linked from here
+  return h('div', {}, head, urgentSec, quietSec, targets, reflectionsOn() ? reflCard() : null, advanced() ? todoCard() : null, advanced() ? trendsCard() : null);
 }
 const reflectionsOn = () => !basicHides('reflect') && !basicHides('reflHeadings');
 
@@ -347,15 +343,17 @@ export function renderTotals() {
         years.map(y => h('option', { value: String(y), selected: y === tview.year }, groupName(y, all)))),
       h('span', { class: 'grow' }),
       h('button', { class: 'small', onclick: () => { tview.summaries = null; hooks.render(); } }, 'Refresh'),
-      h('button', { class: 'small', onclick: () => downloadTotals(table.data) }, 'Download Excel')),
-    h('p', { class: 'hint help' }, 'Case counts only, so residents can see how they compare. Under each tag: its targets. Colours use each resident’s own year (tap and hold a red or amber count to see how many short).'),
-    h('div', { class: 'bar' }, countSwitch()),
-    h('p', { class: 'hint help' }, countMode() === 'min'
-      ? 'Towards minimums: each tag counts up to its last target, so extra cases past it don’t add (tags without a target show –).'
-      : 'All tags: every case with that tag, all years added up. A case with 3 tags adds 3 to Total tags.'),
+      h('button', { class: 'small', onclick: () => downloadTotals(table.data) }, 'Download Excel'),
+      h('button', { class: 'small', onclick: () => downloadAllYears(all) }, 'Download all years (zip)')),
     legend(),
-    // scrolls sideways on phones: focusable and named so the keyboard can reach it
-    h('div', { class: 'scroll', style: 'margin-top:8px', tabindex: '0', role: 'region', 'aria-label': 'Totals table' }, table.el));
+    // scrolls both ways inside the card (focusable and named so the keyboard can reach it), so the names row and the
+    // category column stay put (owner, 15 Oct 2026)
+    h('div', { class: 'scroll tscroll', style: 'margin-top:8px', tabindex: '0', role: 'region', 'aria-label': 'Totals table' }, table.el),
+    // how the counts add up, below the table (owner, 15 Oct 2026)
+    h('div', { class: 'bar', style: 'margin-top:10px' }, countSwitch()),
+    h('p', { class: 'hint help' }, countMode() === 'min'
+      ? 'Towards minimums: each category counts up to its last target, so extra cases past it don’t add (categories without a target show –).'
+      : 'All tags: every case with that category, all years added up. A case with 3 tags adds 3 to Total tags.'));
   return card;
 }
 
@@ -398,32 +396,28 @@ export function countSwitch() {
     [['all', 'All tags'], ['min', 'Towards minimums']].map(([v, t]) => h('button', { type: 'button', class: 'small', 'aria-pressed': String(countMode() === v), onclick: set(v) }, t)));
 }
 
+// a Category cell: at most a third of the width; long names wrap, and a word too wide for it scrolls sideways inside
+// the cell (owner, 15 Oct 2026). No tooltips (tap and hold clashed with selecting text).
+const catCell = (...kids) => h('td', { class: 'cat' }, h('div', { class: 'cat-in' }, ...kids));
 export function totalsTable(people) {
   const prog = people.map(p => Object.fromEntries(progress(p.counts || {}, p.rYear || 1).map(x => [x.code, x])));
   const codes = CATEGORIES.filter(c => !c.retired || people.some(p => (p.counts || {})[c.code])).map(c => c.code);
   const meId = S.resident && S.resident.rid;
   const data = { columns: people.map(p => `${p.name} (${p.smo ? 'SMO' : 'R' + (p.rYear || '?')})`), rows: [] };   // the download keeps R4/R5
   const tbody = h('tbody');
-  // How far behind: the earliest target a resident has missed (behind) or must meet this year (due)
-  const short = pr => {
-    if (!pr || (pr.status !== 'late' && pr.status !== 'due')) return 0;
-    const m = pr.milestones.find(x => !x.met && (x.due === 'past' || x.due === 'now'));
-    return m ? m.n - pr.count : 0;
-  };
   const min = countMode() === 'min';
   for (const code of codes) {
     const all = people.map(p => (p.counts || {})[code] || 0);
     // towards the minimums: up to the tag's last target; a tag without one counts towards none (–)
     const vals = min ? all.map(v => (finalTarget(code) == null ? null : towardsMinimum(code, v))) : all;
     const sts = prog.map(pr => (pr[code] ? pr[code].status : 'none'));
-    const gaps = prog.map(pr => short(pr[code]));
     // the targets under the name: "10 by R3 | 15 by R5"
     const t = BY_CODE[code].targets || {};
     const tgt = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${appYear(y)}`).join(' | ');
     const tgtR = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${y}`).join(' | ');   // the download keeps R4/R5
     data.rows.push({ label: catName(code) + (tgtR ? ` [${tgtR}]` : ''), values: vals, statuses: sts });
-    add(tbody, h('tr', {}, h('td', { class: 'cat', title: BY_CODE[code].full }, catName(code), tgt ? h('small', { class: 'tgt' }, tgt) : null),
-      vals.map((v, i) => h('td', { class: `n ${sts[i]}`, title: gaps[i] ? `${gaps[i]} short of the target` : min && all[i] > (v || 0) ? `${all[i]} logged` : '' }, v == null ? '–' : String(v)))));
+    add(tbody, h('tr', {}, catCell(catName(code), tgt ? h('small', { class: 'tgt' }, tgt) : null),
+      vals.map((v, i) => h('td', { class: `n ${sts[i]}` }, v == null ? '–' : String(v)))));   // no tooltips: tap and hold clashed with selecting text (owner)
   }
   const totals = people.map(p => p.total || 0);
   const tags = people.map(p => tagTotal(p.counts, min ? 'min' : 'all'));
@@ -431,16 +425,31 @@ export function totalsTable(people) {
   const tagLabel = min ? `Total towards the minimums (of ${MINIMUM_TOTAL})` : 'Total tags (all cases, every year)';
   data.rows.push({ label: tagLabel, values: tags }, { label: 'Total cases', values: totals }, { label: 'Reflections (towards the 96 needed)', values: refl });
   add(tbody, 
-    h('tr', { class: 'total' }, h('td', { class: 'cat', title: min ? 'Each tag counted up to its last target' : 'Every tag on every case, added up (a case with 3 tags adds 3)' },
+    h('tr', { class: 'total' }, catCell(
       min ? 'Towards minimums' : 'Total tags', h('small', { class: 'tgt' }, min ? `of the ${MINIMUM_TOTAL} needed` : 'every tag on every case')), tags.map(v => h('td', { class: 'n' }, String(v)))),
-    h('tr', { class: 'total' }, h('td', { class: 'cat' }, 'Total cases'), totals.map(v => h('td', { class: 'n' }, String(v)))),
-    h('tr', {}, h('td', { class: 'cat', title: 'Counted towards each heading’s minimum only' }, 'Reflections', h('small', { class: 'tgt' }, 'towards the 96 needed')), refl.map(v => h('td', { class: 'n' }, String(v)))));
-  const thead = h('thead', {}, h('tr', {}, h('th', {}, 'Tag'),
-    people.map(p => h('th', { class: `rot ${p.rid === meId ? 'me' : ''}`, title: p.name }, `${p.name} · ${p.smo ? 'SMO' : p.rYear ? yearName(p.rYear) : '?'}`))));
+    h('tr', { class: 'total' }, catCell('Total cases'), totals.map(v => h('td', { class: 'n' }, String(v)))),
+    h('tr', {}, catCell('Reflections', h('small', { class: 'tgt' }, 'towards the 96 needed')), refl.map(v => h('td', { class: 'n' }, String(v)))));
+  const thead = h('thead', {}, h('tr', {}, h('th', {}, 'Category'),
+    people.map(p => h('th', { class: `rot ${p.rid === meId ? 'me' : ''}` }, `${p.name} · ${p.smo ? 'SMO' : p.rYear ? yearName(p.rYear) : '?'}`))));
   data.title = `${tview.year ? (tview.year === 3 && people.some(p => p.smo) ? 'R3 / SMO' : 'R' + tview.year) : 'Year unknown'} totals${min ? ' (towards the minimums)' : ''} — ${todayISO()}`;
   return { el: h('table', { class: 'totals' }, thead, tbody), data };
 }
 
+// every residency year's table, one Excel file each, in one zip (the count mode as shown)
+async function downloadAllYears(all) {
+  const was = tview.year;
+  try {
+    const [{ needZip }] = await Promise.all([import('./portfolio.js'), needExcel()]);
+    const zip = new (await needZip())();
+    for (const y of [...new Set(all.map(s => s.rYear || 0))].sort((a, b) => (a || 9) - (b || 9))) {
+      tview.year = y;   // totalsTable names the year from it
+      const people = all.filter(s => (s.rYear || 0) === y).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+      zip.file(`totals-${y ? groupName(y, all).replace(/[^A-Za-z0-9]+/g, '-') : 'year-unknown'}-${todayISO()}.xlsx`, await exportTotals(totalsTable(people).data));
+    }
+    download(`totals-all-years-${todayISO()}.zip`, await zip.generateAsync({ type: 'blob' }));
+  } catch (err) { toast('Could not export: ' + err.message); }
+  finally { tview.year = was; }
+}
 export async function downloadTotals(data, name = `totals-${tview.year ? 'R' + tview.year : 'year-unknown'}-${todayISO()}.xlsx`) {
   try {
     await needExcel();

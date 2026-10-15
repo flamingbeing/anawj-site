@@ -78,7 +78,7 @@ Rules that bite:
   `<app>-`; show the rest as it is if it isn't dated; show nothing without one). Second, a link-styled button
   `Not updating? Get the latest version`: it fetches the app's `sw.js` with `cache: 'no-store'` first (no signal: say so and
   change nothing), then unregisters only this app's service worker, deletes only caches starting `<app>-` and reloads.
-  It never touches saved data (localStorage, IndexedDB, sign-in). A browser test checks both lines. The same goes for
+  It never touches saved data (localStorage, IndexedDB, sign-in). (Logbook keeps them at the bottom of More instead; owner, 15 Oct 2026.) A browser test checks both lines. The same goes for
   apps in other repos (anantf.com's `babymo/`).
 - One repo, one PR number sequence for every app: start PR titles with the app ("Logbook: …", "Prewarm: …"); a
   workflow labels each PR by the folders it touches (`.github/labeler.yml`), so filter the PR list by label. Outside
@@ -103,7 +103,8 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - NUH roster changes: run `node nuh-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe on every tab;
   under a minute; also in the Checks workflow).
 - NTF roster changes: run `node ntf-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe; also in the
-  Checks workflow) and the unit tests in `ntf-roster/test/`.
+  Checks workflow), `node ntf-roster/test/perf.e2e.mjs` (speed budgets on a slowed phone; also in the Checks workflow)
+  and the unit tests in `ntf-roster/test/`.
 - Hand log changes: run `node hand-log/test/e2e.mjs`.
 - OT simulator changes: run `tools/test-ot-sim.sh` (model tests, repo check, browser test; see `ot-sim/NOTES.md`).
 - BIS to DSA changes: run `node bis-dsa/test/e2e.mjs` (it also runs `adv.e2e.mjs` and `sed.e2e.mjs`) and `node bis-dsa/test/engine.check.mjs` (engine tuning, no browser).

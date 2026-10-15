@@ -112,20 +112,20 @@ const icon = id => {
 };
 
 const TABS = [
-  // Faculty / PCs profile (faculty, PDs and admins): residents' compiled case logs, from the counts summaries
+  // Faculty / PCs profile (faculty, PDs and admins): residents' compiled case logs, from the counts summaries (in More)
   { id: 'caselogs', label: 'Case logs', render: page(['caselogs'], m => m.caselogs.renderCaseLogs()), faculty: true, desc: 'Residents’ case logs: counts per tag against the targets' },
   { id: 'log', label: 'Case', render: renderLog },
   { id: 'logbook', label: 'Logbook', render: page(['logbook'], m => m.logbook.renderLogbook()) },
+  // Programme totals, its own tab (owner, 15 Oct 2026): the first tab in Faculty / PCs, after the Logbook for residents
+  { id: 'totals', label: 'Totals', moreLabel: 'Programme totals', render: page(['progress'], m => m.progress.renderTotals()), desc: 'Every resident’s case counts per tag, by residency year' },
   { id: 'reflect', label: 'Reflections', render: page(['reflect'], m => m.reflect.renderReflect()), desc: 'Your reflections' },
-  // Faculty / PCs: programme analytics instead of your own
+  // in More (owner, 15 Oct 2026); Faculty / PCs: programme analytics instead of your own (Totals has its own tab)
   { id: 'progress', label: 'Analytics', render: page(['progress', 'caselogs'], m => (facultyMode() ? m.caselogs.renderProgramme() : m.progress.renderProgress())), desc: 'Your progress against the APMES targets' },
   // a personal notepad: on the bar only if chosen (Arrange tabs); otherwise first in More
   { id: 'notes', label: 'Notes', moreLabel: 'Notes (beta)', render: renderNotes, desc: 'Your own notes: private, never in your portfolio' },
   // five tabs on the bar; the rest live under More (still reachable by #totals, #account, #settings)
   { id: 'more', label: 'More', render: () => renderMore() },
   { id: 'caselog', label: 'Case log', render: page(['caselogs'], m => m.caselogs.renderCaseLog()), faculty: true, hidden: true, under: 'caselogs', unlisted: true },
-  // under Analytics: how your counts compare with your intake
-  { id: 'totals', label: 'Totals', render: page(['progress'], m => m.progress.renderTotals()), hidden: true, under: 'progress', unlisted: true },
   // under the Logbook: every learning point (or other labelled part), from Filter (Labelled parts on)
   { id: 'points', label: 'Learning points', render: page(['parts'], m => m.parts.renderPoints()), hidden: true, under: 'logbook', unlisted: true },
   { id: 'account', bar: true, label: 'Account', render: page(['account', 'settings'], m => m.account.renderAccount()), hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
@@ -170,16 +170,19 @@ const menuItem = (id, label, desc, onclick) => h('li', {}, h('a', { href: '#' + 
 function renderMore() {
   const items = visibleTabs().filter(t => t.under === 'more' && !t.unlisted);
   // tabs hidden from the bar (Advanced display) come first, so they are one tap away
-  // (Case logs, for faculty, PDs and admins outside their own profile, after the person's own tabs)
+  // (Faculty / PCs: Case logs, then Analytics, then the person's own tabs; other profiles: Case logs last)
+  const rank = facultyMode() ? id => ['caselogs', 'progress'].indexOf(id) + 1 || 9 : id => (id === 'caselogs' ? 9 : 0);
   const hidden = arrangeTabs(barCandidates(), display()).hidden.filter(id => !TABS.find(t => t.id === id).hidden)
-    .sort((a, b) => (a === 'caselogs') - (b === 'caselogs'));
+    .sort((a, b) => rank(a) - rank(b));
+  const descOf = t => (t.id === 'progress' && facultyMode() ? 'Who’s behind in each residency year' : t.desc || 'Hidden from the tab bar');
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
-      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.moreLabel || t.label, t.desc || 'Hidden from the tab bar')), items.map(t => menuItem(t.id, t.moreLabel || t.label, t.desc)))),
+      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.moreLabel || t.label, descOf(t))), items.map(t => menuItem(t.id, t.moreLabel || t.label, t.desc)))),
     privacyCard(),
     creditsCard(),
     installCard(),
-    signOutCard());
+    signOutCard(),
+    versionLine());
 }
 
 // "Install the app" (More): Android and desktop Chrome/Edge offer their own install prompt, which we
@@ -322,11 +325,10 @@ function renderSettingsMenu() {
     h('section', { class: 'card more-list settings-menu' }, h('h2', {}, 'Settings'),
       settingsGroups().map(([name, ids]) => [h('h3', {}, name), h('ul', {}, ids.map(item))])),
     settingsFileCard(),
-    connectClaudeCard(),
-    versionLine());
+    connectClaudeCard());
 }
 
-// at the very bottom: which app version this device runs, and a way to fetch the latest when it seems stuck on an old
+// at the very bottom of More (owner, 15 Oct 2026; was Settings): which app version this device runs, and a way to fetch the latest when it seems stuck on an old
 // one (the "Update available" banner is the usual way)
 function versionLine() {
   const ver = h('span', {}, 'App version …');
@@ -450,7 +452,7 @@ const banner = document.getElementById('banner');
 // ---------- tabs and routing (#log, #logbook, ...) ----------
 
 // Totals (names and counts of programme residents) is for the programme only; the rules agree.
-const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (!t.owner || S.owner) && (!t.faculty || facultyRole()) && (t.id !== 'totals' || S.admin || S.pd || S.resident));
+const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (!t.owner || S.owner) && (!t.faculty || facultyRole()) && (t.id !== 'totals' || ((facultyRole() || S.resident) && !basicHides('totals'))));
 // the tabs that can sit on the bar: the main ones, and the pages in the More list (bar: true), when put there
 const barCandidates = () => visibleTabs().filter(t => !t.hidden || t.bar).map(t => t.id);
 const TAB_ALIASES = { reflections: 'reflect' };

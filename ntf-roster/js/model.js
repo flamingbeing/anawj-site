@@ -235,7 +235,17 @@ export function addMonths(m, n) {
   const d = new Date(y, mo - 1 + n, 1);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 }
-export function weekday(s) { return parseISO(s).getDay(); }
+// Weekdays are asked for thousands of times per screen (grid, checks, demo): remember them per date string.
+const WEEKDAY = new Map();
+export function weekday(s) {
+  let w = WEEKDAY.get(s);
+  if (w === undefined) {
+    w = parseISO(s).getDay();
+    if (WEEKDAY.size > 5000) WEEKDAY.clear();
+    WEEKDAY.set(s, w);
+  }
+  return w;
+}
 export function isWeekend(s) { const w = weekday(s); return w === 0 || w === 6; }
 export function isHoliday(state, s) { return !!(state && state.settings && state.settings.holidays && state.settings.holidays[s]); }
 export function holidayName(state, s) { return (state && state.settings && state.settings.holidays && state.settings.holidays[s]) || ''; }
@@ -245,6 +255,18 @@ export function fmtMonth(m) { const [y, mo] = String(m).split('-').map(Number); 
 // ---------- lookups ----------
 
 export function dutyMap(state) { return new Map((state.duties || []).map(d => [d.code, d])); }
+// The same map, built once per duties list (read-only use: effectiveCodes and matchesCodes run per cell). It is
+// rebuilt when the list changes, even in place (a duty added, replaced or recoded inside a commit).
+const DUTY_MAPS = new WeakMap();
+function dutyMapCached(state) {
+  const list = state.duties;
+  if (!Array.isArray(list)) return dutyMap(state);
+  const hit = DUTY_MAPS.get(list);
+  if (hit && hit.items.length === list.length && hit.items.every((d, k) => d === list[k] && hit.codes[k] === (d && d.code))) return hit.m;
+  const m = dutyMap(state);
+  DUTY_MAPS.set(list, { m, items: list.slice(), codes: list.map(d => d && d.code) });
+  return m;
+}
 export function groupMap(state) { return new Map((state.groups || []).map(g => [g.id, g])); }
 export function staffMap(state) { return new Map((state.staff || []).map(p => [p.id, p])); }
 
@@ -294,7 +316,7 @@ export function effectiveCodes(state, s, staffId) {
   const out = cell && Array.isArray(cell.a) ? [...cell.a] : [];
   const prev = getCell(state, addDays(s, -1), staffId);
   if (prev && Array.isArray(prev.a) && prev.a.length) {
-    const dm = dutyMap(state);
+    const dm = dutyMapCached(state);
     if (prev.a.some(c => dm.get(c) && dm.get(c).overnight) && !out.includes('x')) out.push('x');
   }
   return out;
@@ -329,7 +351,7 @@ export function matchesCodes(state, s, staffId, codes, eff) {
   const set = expandTokens(state, codes);
   if (all.some(c => set.has(c))) return true;
   if (codes.includes('@present')) {
-    const dm = dutyMap(state);
+    const dm = dutyMapCached(state);
     const kindOf = c => (c === 'x' ? 'derived' : (dm.get(c) && dm.get(c).kind));
     if (effc.some(c => kindOf(c) === 'shift')) return true;
     const person = (state.staff || []).find(p => p.id === staffId);

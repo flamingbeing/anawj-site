@@ -44,9 +44,11 @@ export function whenMatches(when, d, state) {
 // Does this person have any of `codes` on day d? Fast path for plain codes; tokens (@shift, x…) go through the model.
 export function makeHasCodes(state) {
   const overnight = new Set((state.duties || []).filter(d => d.overnight).map(d => d.code));
+  const plainOf = new WeakMap();   // codes list -> no tokens in it (asked once per list, not once per cell)
   return function hasCodes(d, sid, codes) {
     if (!codes || !codes.length) return false;
-    const plain = codes.every(c => c[0] !== '@' && c !== 'x');
+    let plain = plainOf.get(codes);
+    if (plain === undefined) { plain = codes.every(c => c[0] !== '@' && c !== 'x'); plainOf.set(codes, plain); }
     if (!plain) {
       try { return M.matchesCodes(state, d, sid, codes); } catch (e) { return false; }
     }
@@ -74,13 +76,22 @@ export function coverLabel(rule, state) {
 }
 
 // Cover status of every enabled cover rule on day d: [{ rule, label, n, min, max, status, people }]
+// Who a rule covers is worked out once per rule and staff list (the grid asks for every day of the month).
+const coverWho = new WeakMap();   // rule -> { list, people }
+function coverPeople(rule, staffList) {
+  const hit = coverWho.get(rule);
+  if (hit && hit.list === staffList) return hit.people;
+  const people = staffList.filter(p => whoMatches(rule.who, p));
+  coverWho.set(rule, { list: staffList, people });
+  return people;
+}
 export function coverOn(state, d, staffList, hasCodes) {
   const out = [];
   for (const rule of state.rules || []) {
     if (rule.type !== 'cover' || rule.enabled === false) continue;
     if (!whenMatches(rule.when, d, state)) continue;
     const codes = rule.params?.codes || [];
-    const people = staffList.filter(p => whoMatches(rule.who, p) && M.staffActiveOn(p, d) && hasCodes(d, p.id, codes));
+    const people = coverPeople(rule, staffList).filter(p => M.staffActiveOn(p, d) && hasCodes(d, p.id, codes));
     const n = people.length;
     const min = numOrNull(rule.params?.min), max = numOrNull(rule.params?.max);
     const status = min != null && n < min ? 'short' : max != null && n > max ? 'over' : 'ok';
@@ -173,6 +184,7 @@ export function mount(el, app) {
   root.append(personHost);
 
   // ---------- toolbar options ----------
+  let selectsKey = '';   // what the selects were last built from (rebuilt only when that changes: speed)
   function fillSelects(state) {
     const groups = (state.groups || []);
     const opts = [['', 'All groups'], ['@senior', 'Seniors'], ['@junior', 'Juniors'], ...groups.map(g => [g.id, g.name])];
@@ -180,6 +192,9 @@ export function mount(el, app) {
     const tags = state.tags || [];
     if (ui.group && !opts.some(([v]) => v === ui.group)) { ui.group = ''; saveUi(ui); }
     if (ui.tag && !tags.some(t => t.id === ui.tag)) { ui.tag = ''; saveUi(ui); }
+    const k = JSON.stringify([opts, tags.map(t => [t.id, t.name]), (state.duties || []).map(d => [d.code, d.name, d.kind]), ui.group, ui.tag, ui.hi]);
+    if (k === selectsKey) return;
+    selectsKey = k;
     groupSel.innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}"${v === ui.group ? ' selected' : ''}>${esc(l)}</option>`).join('');
     tagSel.innerHTML = [['', 'All tags'], ...tags.map(t => [t.id, t.name])].map(([v, l]) => `<option value="${esc(v)}"${v === ui.tag ? ' selected' : ''}>${esc(l)}</option>`).join('');
     tagSel.hidden = !tags.length;
@@ -190,12 +205,17 @@ export function mount(el, app) {
     }).join('');
   }
 
+  let paintKey = '';   // what the paint bar was last built from (each painted cell re-renders: don't rebuild it then)
   function renderPaintBar(state) {
     paintBar.hidden = !ui.paint;
     paintBtn.setAttribute('aria-pressed', String(ui.paint));
-    if (!ui.paint) return;
+    if (!ui.paint) { paintKey = ''; return; }
     const duties = (state.duties || []).filter(d => d.kind !== 'derived');
-    if (!ui.paintCode || !duties.some(d => d.code === ui.paintCode)) ui.paintCode = (duties.find(d => d.code === 'AL') || duties[0] || {}).code || '';
+    // ('__clear' is the Clear chip, not a duty: keep it)
+    if (ui.paintCode !== '__clear' && (!ui.paintCode || !duties.some(d => d.code === ui.paintCode))) ui.paintCode = (duties.find(d => d.code === 'AL') || duties[0] || {}).code || '';
+    const k = JSON.stringify([ui.paintCode, duties.map(d => [d.code, d.name, d.kind, d.color, d.ink])]);
+    if (k === paintKey) return;
+    paintKey = k;
     paintBar.innerHTML = '';
     paintBar.append(h('span', { class: 'pb-label' }, 'Paint:'));
     for (const [k, label] of KIND_ORDER) {
@@ -236,7 +256,67 @@ export function mount(el, app) {
 
   // ---------- grid ----------
   let ctx = null;   // lookups for the current render
-  let prevRender = null;   // { shape, head, rows, foot } of the last grid render
+  let prevRender = null;   // { shape, head, rows, foot, keys, parts, footParts } of the last grid render
+  let rowCache = new Map(), rowCacheKey = '';   // staffId -> { k, html, parts } from the last render (see rowSig)
+
+  // Progressive drawing. A full redraw (another month, back from another tab, a filter) puts only the rows in the
+  // grid's window into the page first and adds the rest over the next frames, so the month shows at once even on a
+  // slow phone (the browser's work grows with the number of cells). Rows above the window wait in a spacer sized from
+  // the rows drawn before (same people, so nearly the same heights); when they come in, the scroll position is
+  // corrected by any difference, so nothing on screen moves. Anything that needs a row not drawn yet calls
+  // flushRows() first, which draws the rest at once. The first screen after the app starts is drawn whole.
+  let pending = null;   // { rows, top, next, raf, timer }: rows [0, top) wait in the spacer, rows [next, end) below
+  const BATCH = 24;     // rows added per frame below the window
+  function queueRows(rows, top, next) {
+    pending = { rows, top, next, raf: 0, timer: 0 };
+    later();
+  }
+  function later() {   // the next step after the next paint
+    const p = pending;
+    p.raf = requestAnimationFrame(() => { p.timer = setTimeout(step, 0); });
+  }
+  function step() {
+    const p = pending;
+    if (!p) return;
+    const tb = scroll.querySelector('table.grid')?.tBodies[0];
+    if (!tb) { pending = null; return; }
+    if (p.top) drawAbove(tb, p);
+    else {
+      const end = Math.min(p.rows.length, p.next + BATCH);
+      tb.insertAdjacentHTML('beforeend', p.rows.slice(p.next, end).join(''));
+      p.next = end;
+    }
+    if (!p.top && p.next >= p.rows.length) pending = null;
+    else later();
+  }
+  // the rows above the window replace the spacer; keep what is on screen where it is
+  function drawAbove(tb, p) {
+    const spacer = tb.querySelector('tr.r-spacer');
+    if (spacer) {
+      const anchor = spacer.nextElementSibling;
+      const y0 = anchor ? anchor.offsetTop : 0;
+      spacer.insertAdjacentHTML('beforebegin', p.rows.slice(0, p.top).join(''));
+      spacer.remove();
+      const dy = anchor ? anchor.offsetTop - y0 : 0;
+      if (dy) scroll.scrollTop += dy;
+    }
+    p.top = 0;
+  }
+  function flushRows() {
+    const p = pending;
+    if (!p) return;
+    pending = null;
+    cancelAnimationFrame(p.raf); clearTimeout(p.timer);
+    const tb = scroll.querySelector('table.grid')?.tBodies[0];
+    if (!tb) return;
+    if (p.top) drawAbove(tb, p);
+    if (p.next < p.rows.length) tb.insertAdjacentHTML('beforeend', p.rows.slice(p.next).join(''));
+  }
+  function dropRows() {   // a new full redraw replaces them anyway
+    if (!pending) return;
+    cancelAnimationFrame(pending.raf); clearTimeout(pending.timer);
+    pending = null;
+  }
 
   function filteredStaff(state) {
     let list = M.staffInMonth(state, app.month);
@@ -273,13 +353,16 @@ export function mount(el, app) {
     return { state, days, dmap, dutyIdx, overnight, ev, today, dayMeta, autoCodes, personV, hasCodes: makeHasCodes(state), gmap: M.groupMap(state) };
   }
 
+  let lastCss = null;
   function dutyStyles(state) {
     let css = (state.duties || []).map((d, i) => { const v = chipVars(d); return `.dc-${i}{--c:${v['--c']};--i:${v['--i']}}`; }).join('');
     if (ui.hi && ctx) {
       const i = ctx.dutyIdx.get(ui.hi);
       css += i == null ? '' : `.grid.hi .chip:not(.dc-${i}){opacity:.14}.grid.hi .chip.dc-${i}{box-shadow:0 0 0 2px #002f6c}`;
     }
-    styleEl.textContent = css;
+    // rewriting a <style> makes the browser restyle every element on the page (thousands in the grid): only when
+    // the CSS really changed (speed: each edit used to pay for it)
+    if (css !== lastCss) { styleEl.textContent = css; lastCss = css; }
   }
 
   function applyHighlight() {
@@ -332,6 +415,22 @@ export function mount(el, app) {
     return `<td class="${cls}"><button class="cell" data-d="${d}" data-s="${esc(sid)}" tabindex="${focusable ? 0 : -1}" aria-label="${esc(label)}"${title}>${marks}${chips}</button></td>`;
   }
 
+  // Everything one person's row is drawn from (their cells, the day before the month for post call, problems,
+  // details, the selected cell), as a string. A row whose string is the same as last render reuses last render's
+  // HTML: an edit changes one or two rows, and building all 2,000 cells again was most of an edit's cost (speed).
+  function rowSig(c, p, pv, focusDay) {
+    const cells = c.state.cells || {};
+    let k = JSON.stringify([p.name, p.short, p.tags, p.note, p.start, p.end, p.active, focusDay,
+      pv.map(v => [v.hard, v.msg]), (cells[c.dayMeta[0].prev] || {})[p.id] || 0]);
+    for (const dm of c.dayMeta) {
+      const cell = (cells[dm.d] || {})[p.id];
+      if (cell) k += '|' + dm.num + JSON.stringify(cell);
+      const vs = c.ev.byCell?.get(key(dm.d, p.id));
+      if (vs && vs.length) k += '!' + dm.num + vs.map(v => (v.hard ? 'H' : 'S') + v.msg).join('\u0001');
+    }
+    return k;
+  }
+
   function renderGrid() {
     const t0 = performance.now();
     const state = app.store.get();
@@ -375,27 +474,41 @@ export function mount(el, app) {
     html += '</tr></thead>';
     const head = html;
     const rows = [];   // one string per body row, so a re-render can replace only the rows that changed
+    const keys = [];   // what each row is (a person's id, or 'g:' and a group): sizes the space for rows drawn later
+    const parts = [];  // a person row's cells, one string each (an edit then swaps only the cells that changed)
 
     const groups = state.groups || [];
     const byGroup = new Map();
     for (const p of staff) { if (!byGroup.has(p.group)) byGroup.set(p.group, []); byGroup.get(p.group).push(p); }
     const groupOrder = [...groups.map(g => g.id), ...[...byGroup.keys()].filter(id => !groups.some(g => g.id === id))];
     const tagMap = new Map((state.tags || []).map(t => [t.id, t]));
+    // what every row shares (month, today, duty codes, holidays, tag names, summary columns): when it changes, no
+    // row's old HTML can be reused
+    const allKey = JSON.stringify([app.month, c.today, sumCodes, hasC, [...c.overnight], c.dayMeta.map(dm => dm.hol),
+      (state.duties || []).map(d => [d.code, d.name, d.kind]), (state.tags || []).map(t => [t.id, t.name])]);
+    if (allKey !== rowCacheKey) { rowCache = new Map(); rowCacheKey = allKey; }
+    const nextCache = new Map();
     for (const gid of groupOrder) {
       const people = byGroup.get(gid);
       if (!people || !people.length) continue;
       const g = c.gmap.get(gid);
       rows.push(`<tr class="grp-row"><th colspan="${nCols}" scope="colgroup" class="grp"><span class="grp-label">${esc(g ? g.name : 'No group')}<span class="grp-n">${people.length}</span></span></th></tr>`);
+      keys.push('g:' + gid); parts.push(null);
       for (const p of people) {
+        const pv = c.personV.get(p.id) || [];
+        const sig = rowSig(c, p, pv, sel && sel.staffId === p.id ? sel.date : '');
+        const hit = rowCache.get(p.id);
+        keys.push(p.id);
+        if (hit && hit.k === sig) { rows.push(hit.html); parts.push(hit.parts); nextCache.set(p.id, hit); continue; }
         const tagTxt = (p.tags || []).map(t => tagMap.get(t)?.name || t);
         const tagBadge = (p.tags || []).includes('babymo') ? '<span class="tagb" title="Baby MO">B</span>' : (p.tags || []).includes('parttime') ? '<span class="tagb tagb-pt" title="Part time">PT</span>' : '';
-        const pv = c.personV.get(p.id) || [];
         const pvTxt = pv.length ? ' · ' + pv.map(v => (v.hard ? '⛔ ' : '⚠ ') + v.msg).join(' · ') : '';
         const pvMark = pv.length ? `<span class="vx-nm ${pv.some(v => v.hard) ? 'vh' : 'vs'}" aria-hidden="true"></span>` : '';
-        html = `<tr><th scope="row" class="nm"><button type="button" class="nm-btn" data-p="${esc(p.id)}" title="${esc(p.name + (tagTxt.length ? ' · ' + tagTxt.join(', ') : '') + (p.note ? ' · ' + p.note : '') + pvTxt + '. Open their month')}"${pv.length ? ` aria-label="${esc(`${p.short || p.name}, ${pv.length} problem${pv.length > 1 ? 's' : ''} this month. Open their month`)}"` : ''}><span class="nm-txt">${esc(p.short || p.name)}</span>${tagBadge}${pvMark}</button></th>`;
+        const cellsOut = [];
+        cellsOut.push(`<th scope="row" class="nm"><button type="button" class="nm-btn" data-p="${esc(p.id)}" title="${esc(p.name + (tagTxt.length ? ' · ' + tagTxt.join(', ') : '') + (p.note ? ' · ' + p.note : '') + pvTxt + '. Open their month')}"${pv.length ? ` aria-label="${esc(`${p.short || p.name}, ${pv.length} problem${pv.length > 1 ? 's' : ''} this month. Open their month`)}"` : ''}><span class="nm-txt">${esc(p.short || p.name)}</span>${tagBadge}${pvMark}</button></th>`);
         for (const dm of c.dayMeta) {
           const focusable = sel && sel.staffId === p.id && sel.date === dm.d;
-          html += M.staffActiveOn(p, dm.d) ? cellHtml(c, p, dm, focusable) : `<td class="c off${dm.we ? ' we' : ''}"><span class="sr-only">not in post</span></td>`;
+          cellsOut.push(M.staffActiveOn(p, dm.d) ? cellHtml(c, p, dm, focusable) : `<td class="c off${dm.we ? ' we' : ''}"><span class="sr-only">not in post</span></td>`);
         }
         // counts
         const counts = {};
@@ -406,13 +519,16 @@ export function mount(el, app) {
           for (const code of a) counts[code] = (counts[code] || 0) + 1;
           if (a.includes('C') && (M.isWeekend(d) || M.isHoliday(state, d))) wk++;
         }
-        sumCodes.forEach((code, i) => { html += `<td class="sc${i ? '' : ' s1'}${counts[code] ? '' : ' zero'}">${counts[code] || 0}</td>`; });
-        if (hasC) html += `<td class="sc${sumCodes.length ? '' : ' s1'}${wk ? '' : ' zero'}">${wk}</td>`;
-        html += '</tr>';
+        sumCodes.forEach((code, i) => { cellsOut.push(`<td class="sc${i ? '' : ' s1'}${counts[code] ? '' : ' zero'}">${counts[code] || 0}</td>`); });
+        if (hasC) cellsOut.push(`<td class="sc${sumCodes.length ? '' : ' s1'}${wk ? '' : ' zero'}">${wk}</td>`);
+        html = '<tr>' + cellsOut.join('') + '</tr>';
         rows.push(html);
+        parts.push(cellsOut);
+        nextCache.set(p.id, { k: sig, html, parts: cellsOut });
       }
     }
-    if (!staff.length) rows.push(`<tr><td colspan="${nCols}" class="nobody">Nobody matches these filters.</td></tr>`);
+    rowCache = nextCache;
+    if (!staff.length) { rows.push(`<tr><td colspan="${nCols}" class="nobody">Nobody matches these filters.</td></tr>`); keys.push(''); parts.push(null); }
     html = '';
 
     // cover rows: per day, each cover rule's count vs min/max
@@ -420,41 +536,87 @@ export function mount(el, app) {
     const covByDay = covRules.length && staff.length ? c.days.map(d => coverOn(state, d, all, c.hasCodes)) : [];
     // a rule with no day this month (public holidays only, in a month without one) gets no empty row
     covRules = covRules.filter(rule => covByDay.some(day => day.some(x => x.rule === rule)));
+    const footParts = [];   // per cover row: [row start tag, cells...] (an edit swaps only the cells that changed)
     if (covRules.length && staff.length) {
-      html += '<tfoot>';
       covRules.forEach((rule, ri) => {
         const desc = safeDescribe(rule, state);
-        html += `<tr style="--b:${(covRules.length - 1 - ri) * 24}px"><th scope="row" class="nm cov-nm" title="${esc(desc)}">${esc(coverLabel(rule, state))}</th>`;
+        const cells = [`<tr style="--b:${(covRules.length - 1 - ri) * 24}px">`, `<th scope="row" class="nm cov-nm" title="${esc(desc)}">${esc(coverLabel(rule, state))}</th>`];
         c.days.forEach((d, di) => {
           const cv = covByDay[di].find(x => x.rule === rule);
-          if (!cv) { html += '<td class="cov na"></td>'; return; }
+          if (!cv) { cells.push('<td class="cov na"></td>'); return; }
           const need = cv.min != null ? cv.min : cv.max;
           const txt = need != null ? `${cv.n}/${need}` : String(cv.n);
-          html += `<td class="cov ${cv.status}" title="${esc(`${M.fmtDay(d)}: ${cv.n} on ${(rule.params?.codes || []).join('/')}${cv.min != null ? `, needs ${cv.min}` : ''}${cv.max != null ? `, at most ${cv.max}` : ''}`)}">${txt}</td>`;
+          cells.push(`<td class="cov ${cv.status}" title="${esc(`${M.fmtDay(d)}: ${cv.n} on ${(rule.params?.codes || []).join('/')}${cv.min != null ? `, needs ${cv.min}` : ''}${cv.max != null ? `, at most ${cv.max}` : ''}`)}">${txt}</td>`);
         });
-        html += nSum ? `<td colspan="${nSum}" class="cov-sum s1"></td></tr>` : '</tr>';
+        if (nSum) cells.push(`<td colspan="${nSum}" class="cov-sum s1"></td>`);
+        footParts.push(cells);
       });
-      html += '</tfoot>';
+      html += '<tfoot>' + footParts.map(r => r.join('') + '</tr>').join('') + '</tfoot>';
     }
     const foot = html;
 
+    // the banner first: it changes the grid's height, so the one layout the grid needs below includes it (speed)
+    renderBanner(state, c);
     const hadFocus = scroll.contains(document.activeElement) && document.activeElement.classList.contains('cell');
-    const st = scroll.scrollTop, sl = scroll.scrollLeft;
     const shape = [app.month, open, rows.length, foot ? 1 : 0].join('|');
     const table = scroll.querySelector('table.grid');
-    if (prevRender && prevRender.shape === shape && table && table.tBodies[0] && table.tBodies[0].rows.length === rows.length) {
-      // Same layout as last time: swap only what changed (a typical edit touches a handful of rows).
+    let patch = !!(prevRender && prevRender.shape === shape && table && table.tBodies[0]);
+    if (patch && document.body.classList.contains('ready')) {
+      // more changed rows than fit on a screen (Auto-fill, an import, undoing them): redraw, progressively, instead
+      let n = 0;
+      for (let i = 0; i < rows.length && n <= 30; i++) if (rows[i] !== prevRender.rows[i]) n++;
+      if (n > 30) patch = false;
+    }
+    // rows of the last render still to be drawn: draw them if this render patches it, drop them if it replaces it
+    if (pending) { if (patch) flushRows(); else dropRows(); }
+    if (patch && table.tBodies[0].rows.length !== rows.length) patch = false;
+    if (patch) {
+      // Same layout as last time: swap only what changed (a typical edit touches a cell or two).
       if (head !== prevRender.head) table.tHead.outerHTML = head;
       const trs = table.tBodies[0].rows;
-      for (let i = rows.length - 1; i >= 0; i--) if (rows[i] !== prevRender.rows[i]) trs[i].outerHTML = rows[i];
-      if (foot !== prevRender.foot && table.tFoot) table.tFoot.outerHTML = foot;
+      for (let i = rows.length - 1; i >= 0; i--) {
+        if (rows[i] === prevRender.rows[i]) continue;
+        // a person's row with the same cells as before: swap only the cells that changed (usually one or two), so
+        // the browser restyles and repaints a cell, not the row
+        const a = parts[i], z = prevRender.parts && prevRender.parts[i], tds = trs[i].cells;
+        if (a && z && a.length === z.length && tds.length === a.length) { for (let j = a.length - 1; j >= 0; j--) if (a[j] !== z[j]) tds[j].outerHTML = a[j]; }
+        else trs[i].outerHTML = rows[i];
+      }
+      if (foot !== prevRender.foot && table.tFoot) {
+        // the same cover rows: swap only the counts that changed (each footer cell is pinned to the bottom, so
+        // replacing them all is costly); otherwise the whole footer
+        const a = footParts, z = prevRender.footParts || [], trs = table.tFoot.rows;
+        const same = a.length === z.length && trs.length === a.length && a.every((r, i) => r.length === z[i].length && r[0] === z[i][0] && trs[i].cells.length === r.length - 1);
+        if (same) a.forEach((r, i) => { for (let j = r.length - 1; j >= 1; j--) if (r[j] !== z[i][j]) trs[i].cells[j - 1].outerHTML = r[j]; });
+        else table.tFoot.outerHTML = foot;
+      }
     } else {
-      scroll.innerHTML = open + head + '<tbody>' + rows.join('') + '</tbody>' + foot + '</table>';
+      // (the scroll position is read only here: reading it makes the browser lay the page out first, which an edit
+      // that patches rows doesn't need)
+      const st = scroll.scrollTop, sl = scroll.scrollLeft;
+      let top = 0, end = rows.length, gap = 0;   // draw rows [top, end) now; the rows above wait in a gap of this height
+      if (document.body.classList.contains('ready') && rows.length > 30) {
+        // heights of the rows drawn last time, by person or group (the same people are mostly in the same places),
+        // to size the space above the window; at the top there is none (and reading heights costs a layout)
+        const old = new Map(), trs = st > 66 ? table?.tBodies[0]?.rows : null;
+        if (trs && prevRender && prevRender.keys && trs.length === prevRender.keys.length && !table.querySelector('tr.r-spacer')) {
+          for (let i = 0; i < trs.length; i++) old.set(prevRender.keys[i], trs[i].offsetHeight);
+        }
+        const est = i => old.get(keys[i]) || (keys[i].startsWith('g:') ? 25 : 33);
+        const view = scroll.clientHeight || 800;
+        let y = 0, i = 0;
+        while (i < rows.length && y + est(i) <= st - 66) { y += est(i); i++; }   // keep two rows above the window
+        top = i; gap = y;
+        while (i < rows.length && y < st + view + 132) { y += est(i); i++; }     // and four below it
+        end = Math.max(i, Math.min(rows.length, top + 12));
+      }
+      const spacer = top ? `<tr class="r-spacer" aria-hidden="true"><td colspan="${nCols}" style="height:${gap}px;padding:0;border:0"></td></tr>` : '';
+      scroll.innerHTML = open + head + '<tbody>' + spacer + rows.slice(top, end).join('') + '</tbody>' + foot + '</table>';
       scroll.scrollTop = st; scroll.scrollLeft = sl;
+      if (top || end < rows.length) queueRows(rows, top, end);
     }
-    prevRender = { shape, head, rows, foot };
+    prevRender = { shape, head, rows, foot, keys, parts, footParts };
     if (hadFocus) { const b = selBtn(); if (b) { b.tabIndex = 0; if (document.activeElement !== b) b.focus({ preventScroll: true }); } }
-    renderBanner(state, c);
     ctx.renderMs = performance.now() - t0;
     root.dataset.renderMs = ctx.renderMs.toFixed(1);
   }
@@ -496,7 +658,10 @@ export function mount(el, app) {
 
   function selBtn() {
     if (!sel) return null;
-    return scroll.querySelector(`.cell[data-d="${sel.date}"][data-s="${CSS.escape(sel.staffId)}"]`);
+    const q = () => scroll.querySelector(`.cell[data-d="${sel.date}"][data-s="${CSS.escape(sel.staffId)}"]`);
+    let b = q();
+    if (!b && pending) { flushRows(); b = q(); }   // its row may not be drawn yet
+    return b;
   }
 
   function setSel(d, s, focus = true) {
@@ -554,6 +719,7 @@ export function mount(el, app) {
 
   function moveSel(dx, dy) {
     if (!sel) return;
+    flushRows();
     const days = ctx.days;
     const rows = [...scroll.querySelectorAll('tbody tr:not(.grp-row) .nm-btn')].map(b => b.dataset.p);
     let di = days.indexOf(sel.date) + dx, ri = rows.indexOf(sel.staffId) + dy;
@@ -672,6 +838,7 @@ export function mount(el, app) {
   }
 
   function addPaintCell(b) {
+    flushRows();
     const d = b.dataset.d, s = b.dataset.s;
     const last = paintDrag.last;
     // fast drags skip cells: fill the gap along the same row
@@ -725,64 +892,98 @@ export function mount(el, app) {
     return p ? (p.short || p.name) : 'Someone';
   }
 
+  // The editor is built once and then updated in place after each change (the chips' on/off, the problems, the
+  // note): rebuilding ~45 buttons and re-focusing one made every tap in it slow on phones (speed).
   function editorBody(d, sid) {
     const wrap = h('div', { class: 'ced' });
+    let built = null;   // { key, chips: [{ b, code, kind, field }], firstSec, noteSec, note, lock, clear, extras: [] }
+    const cellNow = () => ({ ...emptyCell(), ...(M.getCell(app.store.get(), d, sid) || {}) });
+    const who = () => `${personName(app.store.get(), sid)} ${M.fmtDay(d)}`;
+
+    function build(state, key) {
+      wrap.innerHTML = '';
+      const chips = [], secs = [];
+      for (const [kind, title] of KIND_ORDER) {
+        const list = (state.duties || []).filter(x => x.kind === kind);
+        if (!list.length) continue;
+        const field = kind === 'request' ? 'r' : 'a';
+        const sec = h('div', { class: 'ced-sec' }, h('h3', { class: 'ced-h' }, title));
+        const box = h('div', { class: 'ced-chips' });
+        for (const du of list) {
+          const b = h('button', {
+            type: 'button', class: `tchip k-${kind}`, 'aria-pressed': 'false',
+            'data-code': du.code, title: du.name, 'aria-label': `${du.code}, ${du.name}`, style: chipVars(du),
+            onclick: () => {
+              const on = (cellNow()[field] || []).includes(du.code);
+              app.store.commit(`${on ? 'Remove' : 'Add'} ${du.code} · ${who()}`, draft => toggleCode(draft, d, sid, du.code, !on, M.dutyMap(draft)));
+            },
+          }, h('span', { class: 'tc-code' }, du.code), h('span', { class: 'tc-name' }, du.name));
+          chips.push({ b, code: du.code, kind, field });
+          box.append(b);
+        }
+        sec.append(box);
+        secs.push(sec);
+        wrap.append(sec);
+      }
+      const note = h('textarea', { class: 'input ced-note', rows: '2', placeholder: 'Note (e.g. 3-4.30pm meeting)', 'aria-label': 'Note' });
+      note.addEventListener('change', () => {
+        const v = note.value.trim();
+        if (v === (cellNow().note || '')) return;
+        app.store.commit(`Note · ${who()}`, draft => M.setCell(draft, d, sid, { note: v }));
+      });
+      const lockId = 'lk-' + Math.random().toString(36).slice(2, 7);
+      const lock = h('input', { type: 'checkbox', id: lockId });
+      lock.addEventListener('change', () => app.store.commit(`${lock.checked ? 'Lock' : 'Unlock'} ${who()}`, draft => M.setCell(draft, d, sid, { lock: lock.checked })));
+      const noteSec = h('div', { class: 'ced-sec' }, h('h3', { class: 'ced-h' }, 'Note'), note);
+      wrap.append(noteSec);
+      const clear = h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm', onclick: () => clearCell(d, sid) }, 'Clear');
+      wrap.append(h('div', { class: 'ced-row' },
+        h('label', { class: 'switch', for: lockId }, lock, h('span', { class: 'sw-track', 'aria-hidden': 'true' }), h('span', null, 'Lock (auto-fill won\'t change it)')),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { app.go('day', { d, m: app.month }); closeEditor(); } }, 'Open day'),
+        clear));
+      built = { key, chips, firstSec: secs[0] || noteSec, noteSec, note, lock, clear, extras: [] };
+    }
+
     const fill = () => {
       const state = app.store.get();
+      const dkey = JSON.stringify((state.duties || []).map(x => [x.code, x.name, x.kind, x.color, x.ink]));
+      if (!built || built.key !== dkey) build(state, dkey);
       const dmap = M.dutyMap(state);
-      const cell = { ...emptyCell(), ...(M.getCell(state, d, sid) || {}) };
+      const cell = cellNow();
       const ev = app.evaluation();
       const vs = ev.byCell?.get(key(d, sid)) || [];
-      const active = document.activeElement;
-      const focusCode = active && wrap.contains(active) ? active.dataset.code : null;
-      wrap.innerHTML = '';
+      // the lines above the chips (post call, auto-filled, locked, problems) and the unknown-codes line: small, redrawn
+      for (const x of built.extras) x.remove();
+      built.extras = [];
       const post = prevHasOvernight(state, d, sid, new Set((state.duties || []).filter(x => x.overnight).map(x => x.code)));
       if (post || (cell.auto || []).length || cell.lock) {
         const info = h('p', { class: 'ced-info' });
         if (post) info.append(h('span', { class: 'chip dx' }, 'x'), ' Post call (after an overnight duty). ');
         if ((cell.auto || []).length) info.append(`Auto-filled: ${cell.auto.join(', ')}. Editing a code makes it yours; auto-fill then keeps it. `);
         if (cell.lock) info.append('Locked: auto-fill leaves this cell alone.');
-        wrap.append(info);
+        built.extras.push(info);
       }
       if (vs.length) {
-        wrap.append(h('ul', { class: 'ced-viol' }, vs.map(v => h('li', { class: v.hard ? 'vh' : 'vs' },
+        built.extras.push(h('ul', { class: 'ced-viol' }, vs.map(v => h('li', { class: v.hard ? 'vh' : 'vs' },
           h('span', { class: 'vi', html: app.icon('alert') }), h('span', null, v.msg, v.hard ? '' : h('span', { class: 'muted' }, ' (soft)'))))));
       }
-      for (const [kind, label] of KIND_ORDER) {
-        const list = (state.duties || []).filter(x => x.kind === kind);
-        if (!list.length) continue;
-        const field = kind === 'request' ? 'r' : 'a';
-        const sec = h('div', { class: 'ced-sec' }, h('h3', { class: 'ced-h' }, label));
-        const chips = h('div', { class: 'ced-chips' });
-        for (const du of list) {
-          const on = (cell[field] || []).includes(du.code);
-          chips.append(h('button', {
-            type: 'button', class: `tchip k-${kind}${on ? ' on' : ''}${(cell.auto || []).includes(du.code) ? ' au' : ''}`, 'aria-pressed': String(on),
-            'data-code': du.code, title: du.name, 'aria-label': `${du.code}, ${du.name}`, style: chipVars(du),
-            onclick: () => app.store.commit(`${on ? 'Remove' : 'Add'} ${du.code} · ${personName(state, sid)} ${M.fmtDay(d)}`, draft => toggleCode(draft, d, sid, du.code, !on, M.dutyMap(draft))),
-          }, h('span', { class: 'tc-code' }, du.code), h('span', { class: 'tc-name' }, du.name)));
-        }
-        sec.append(chips);
-        wrap.append(sec);
-      }
-      // unknown codes (imported, no longer defined)
+      for (const x of built.extras) wrap.insertBefore(x, built.firstSec);
       const unknown = [...(cell.a || []), ...(cell.r || [])].filter(c => !dmap.has(c));
-      if (unknown.length) wrap.append(h('p', { class: 'ced-info' }, `Codes not in the list: ${unknown.join(', ')}. Add them under People › Duty codes.`));
-      const note = h('textarea', { class: 'input ced-note', rows: '2', placeholder: 'Note (e.g. 3-4.30pm meeting)', 'aria-label': 'Note', value: cell.note || '' });
-      note.addEventListener('change', () => {
-        const v = note.value.trim();
-        if (v === (cell.note || '')) return;
-        app.store.commit(`Note · ${personName(state, sid)} ${M.fmtDay(d)}`, draft => M.setCell(draft, d, sid, { note: v }));
-      });
-      const lockId = 'lk-' + Math.random().toString(36).slice(2, 7);
-      const lock = h('input', { type: 'checkbox', id: lockId, checked: !!cell.lock });
-      lock.addEventListener('change', () => app.store.commit(`${lock.checked ? 'Lock' : 'Unlock'} ${personName(state, sid)} ${M.fmtDay(d)}`, draft => M.setCell(draft, d, sid, { lock: lock.checked })));
-      wrap.append(h('div', { class: 'ced-sec' }, h('h3', { class: 'ced-h' }, 'Note'), note));
-      wrap.append(h('div', { class: 'ced-row' },
-        h('label', { class: 'switch', for: lockId }, lock, h('span', { class: 'sw-track', 'aria-hidden': 'true' }), h('span', null, 'Lock (auto-fill won\'t change it)')),
-        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { app.go('day', { d, m: app.month }); closeEditor(); } }, 'Open day'),
-        h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm', disabled: !M.getCell(state, d, sid), onclick: () => clearCell(d, sid) }, 'Clear')));
-      if (focusCode) wrap.querySelector(`[data-code="${CSS.escape(focusCode)}"]`)?.focus({ preventScroll: true });
+      if (unknown.length) {
+        const u = h('p', { class: 'ced-info' }, `Codes not in the list: ${unknown.join(', ')}. Add them under People › Duty codes.`);
+        wrap.insertBefore(u, built.noteSec);
+        built.extras.push(u);
+      }
+      for (const { b, code, kind, field } of built.chips) {
+        const on = (cell[field] || []).includes(code);
+        const cls = `tchip k-${kind}${on ? ' on' : ''}${(cell.auto || []).includes(code) ? ' au' : ''}`;
+        if (b.className !== cls) b.className = cls;
+        b.setAttribute('aria-pressed', String(on));
+      }
+      // a note being typed is kept; otherwise show the saved one
+      if (document.activeElement !== built.note) built.note.value = cell.note || '';
+      built.lock.checked = !!cell.lock;
+      built.clear.disabled = !M.getCell(state, d, sid);
     };
     fill();
     return { wrap, fill };
@@ -823,6 +1024,7 @@ export function mount(el, app) {
 
   function positionPopover(anchor) {
     if (!editor || !editor.el) return;
+    if (!(anchor && document.contains(anchor))) flushRows();
     const a = anchor && document.contains(anchor) ? anchor : scroll.querySelector(`.cell[data-d="${editor.d}"][data-s="${CSS.escape(editor.s)}"]`);
     if (!a) return;
     const r = a.getBoundingClientRect();
@@ -985,7 +1187,7 @@ export function mount(el, app) {
   return {
     update(state, info = {}) { render({ month: !!info.month }); },
     route(params) { render({ month: false }); },
-    unmount() { closeEditor(); clearTimeout(typedTimer); },
+    unmount() { closeEditor(); clearTimeout(typedTimer); if (pending) { cancelAnimationFrame(pending.raf); clearTimeout(pending.timer); pending = null; } },
   };
 }
 
@@ -1087,8 +1289,9 @@ export function openAutofill(app) {
         n.locked ? h('li', null, `${n.locked} locked cell${n.locked > 1 ? 's are' : ' is'} left alone.`) : null,
         n.auto ? h('li', null, `${n.auto} earlier auto-filled shift${n.auto > 1 ? 's' : ''} may change.`) : null,
         h('li', null, 'Nothing changes until you press Apply, and Apply can be undone.')));
+    // upper bounds: the search usually ends sooner, once it stops finding a better roster
     const times = [[3000, 'Quick', '3 s'], [6000, 'Normal', '6 s'], [15000, 'Thorough', '15 s']];
-    const fs = h('fieldset', { class: 'af-time' }, h('legend', null, 'How long to search'));
+    const fs = h('fieldset', { class: 'af-time' }, h('legend', null, 'Search for at most'));
     for (const [ms, label, sub] of times) {
       const id = 'af-t-' + ms;
       const r = h('input', { type: 'radio', name: 'af-time', id, value: String(ms), checked: ms === timeMs });
@@ -1114,6 +1317,7 @@ export function openAutofill(app) {
         h('div', { class: 'af-num' }, h('span', { class: 'af-n af-time-n' }, '0 s'), h('span', null, 'elapsed'))),
       h('div', { class: 'af-actions' }, h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => { stopWorker(); stageOptions(); }, html: `${app.icon('stop')}<span>Stop</span>` })));
     t0 = performance.now();
+    shownPct = 0;
     tick = setInterval(() => {
       const el = wrap.querySelector('.af-time-n');
       if (el) el.textContent = Math.round((performance.now() - t0) / 1000) + ' s';
@@ -1122,9 +1326,11 @@ export function openAutofill(app) {
     }, 250);
   }
 
+  let shownPct = 0;   // the bar only moves forward (the clock and the solver's own count both feed it)
   function setPct(pct) {
     const bar = wrap.querySelector('.af-bar');
     if (!bar) return;
+    pct = shownPct = Math.max(shownPct, pct);
     bar.setAttribute('aria-valuenow', String(Math.round(pct)));
     bar.firstChild.style.width = pct + '%';
   }

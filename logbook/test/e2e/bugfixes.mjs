@@ -174,7 +174,7 @@ try { for (const width of [390, 1280]) {
   await p.evaluate(async () => {
     const { patchLogbook } = await import('./js/ui-core.js'), { applyDisplay, setDisplay } = await import('./js/ui-settings.js');
     await patchLogbook({ settings: { mode: 'advanced', show: null, basicOn: null } });
-    applyDisplay(setDisplay({ tabHidden: ['caselogs', 'notes', 'account', 'settings', 'recovery', 'data', 'admin'] }));   // arranged by hand
+    applyDisplay(setDisplay({ tabHidden: ['caselogs', 'progress', 'notes', 'account', 'settings', 'recovery', 'data', 'admin'] }));   // arranged by hand
   });
   await importFile({ mode: 'personal' });
   assert.equal((await st()).mode, 'personal');
@@ -186,7 +186,7 @@ try { for (const width of [390, 1280]) {
   await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { mode: 'advanced', show: { targets: false } } }); });
   await goHash('showhide');
   const apmes = p.locator('.showhide [data-group=apmes]');
-  await apmes.getByRole('switch', { name: 'Programme totals (Compare with your intake)' }).waitFor();
+  await apmes.getByRole('switch', { name: 'Programme totals (the Totals tab, You and your year)' }).waitFor();
   assert.equal(await apmes.getByText('Shows only with Counts against the APMES targets on.').count(), 4, 'Still needed, totals, year and the save toast');
   await apmes.getByRole('switch', { name: 'Counts against the APMES targets' }).check();
   await p.waitForFunction(() => !document.querySelector('.showhide [data-group=apmes]').textContent.includes('Shows only with Counts'));
