@@ -13,75 +13,76 @@ export const LOCATIONS = ['Operating theatre', 'Preop Clinic', 'ICU', 'Delivery 
 // ---------- styles for the resident screens (kept here so style.css stays the shell's) ----------
 
 const CSS = `
-.e-rq-steps { display:flex; align-items:center; gap:8px; margin:0 0 12px; font-size:var(--n-text-sm); color:var(--e-muted-on-grey); }
-.e-rq-steps b { color:var(--n-navy); }
-.e-rq-steps .e-rq-bar { flex:1; height:4px; background:var(--e-track); }
-.e-rq-steps .e-rq-bar > span { display:block; height:100%; background:var(--n-navy); }
+.e-rq-steps { display:flex; align-items:center; gap:10px; margin:0 4px 4px; font-size:var(--a-text-sm); color:var(--a-ink-2); }
+.e-rq-steps b { color:var(--a-ink); font-weight:600; }
+.e-rq-steps .e-rq-bar { flex:1; height:4px; border-radius:2px; overflow:hidden; background:var(--a-surface-2); }
+.e-rq-steps .e-rq-bar > span { display:block; height:100%; border-radius:2px; background:var(--a-tint); }
 .e-rq-search { position:relative; margin:0 0 8px; }
-.e-rq-search .e-ico { position:absolute; left:12px; top:50%; transform:translateY(-50%); width:20px; height:20px; color:var(--n-muted); pointer-events:none; }
-.e-rq-search input { padding-left:40px; }
+.e-rq-search .e-ico { position:absolute; left:11px; top:50%; transform:translateY(-50%); width:19px; height:19px; color:var(--a-ink-3); pointer-events:none; }
+.e-rq-search input { padding-left:38px; }
 .e-rq-item .e-row__title { -webkit-line-clamp:3; }
-.e-rq-tags { display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; margin-top:4px; font-size:12px; color:var(--n-muted); }
+.e-rq-tags { display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; margin-top:4px; font-size:13px; color:var(--a-ink-2); }
 .e-rq-done { font-weight:var(--n-semibold); color:var(--n-ink); }
 .e-rq-done.is-met { color:var(--e-ok); }
-.e-rq-epa { background:var(--n-bg); border-bottom:1px solid var(--n-line); }
-.e-rq-epa > summary { display:flex; align-items:center; gap:10px; min-height:56px; padding:8px 16px; cursor:pointer; list-style:none; font-weight:var(--n-semibold); }
+.e-rq-epa { background:var(--a-surface); }
+.e-rq-epa > summary { display:flex; align-items:center; gap:12px; min-height:56px; padding:10px 16px; cursor:pointer; list-style:none; font-weight:600; transition:background .25s; }
+.e-rq-epa > summary:active { background:var(--a-surface-2); transition:none; }
 .e-rq-epa > summary::-webkit-details-marker { display:none; }
-.e-rq-epa > summary::after { content:""; flex:none; width:10px; height:10px; margin-left:auto; border-right:2px solid var(--n-muted); border-bottom:2px solid var(--n-muted); transform:rotate(45deg); transition:transform .15s; }
+.e-rq-epa > summary::after { content:""; flex:none; width:8px; height:8px; margin-left:auto; border-right:2px solid var(--a-ink-3); border-bottom:2px solid var(--a-ink-3); transform:rotate(45deg); transition:transform .2s; opacity:.8; }
 .e-rq-epa[open] > summary::after { transform:rotate(-135deg); }
-.e-rq-epa > summary .e-rq-epa__n { flex:none; min-width:44px; padding:2px 6px; background:var(--n-navy); color: var(--e-on-accent); font-size:12px; text-align:center; border-radius:var(--n-radius-sm); }
-.e-rq-epa > summary .e-rq-epa__t { font-size:var(--n-text-sm); line-height:1.3; }
+.e-rq-epa > summary .e-rq-epa__n { flex:none; display:grid; place-items:center; min-width:34px; height:30px; padding:0 6px; background:var(--a-tint); color:var(--a-tint-ink); font-size:13px; font-weight:700; text-align:center; border-radius:8px; }
+.e-rq-epa > summary .e-rq-epa__t { flex:1; min-width:0; font-size:15px; line-height:1.3; }
+.e-rq-epa > .e-list { border-radius:0; box-shadow:inset 0 .5px 0 var(--a-sep); }
 .e-rq-epa .e-list { border-bottom:0; }
-.e-rq-chosen { display:flex; align-items:flex-start; gap:12px; padding:12px 16px; background:var(--n-bg); border:1px solid var(--n-line); margin:0 0 8px; }
+.e-rq-chosen { display:flex; align-items:flex-start; gap:12px; padding:12px 12px 12px 16px; background:var(--a-surface); border-radius:var(--a-r); margin:0 0 4px; }
 .e-rq-chosen__body { flex:1; min-width:0; }
 .e-rq-chosen__body p { margin:0; line-height:1.35; }
 .e-rq-chosen .e-btn-link { flex:none; min-height:40px; }
 .e-rq-chosen__btns { display:flex; flex-direction:column; align-items:flex-end; flex:none; }
 .e-rq-days { margin-bottom:8px; }
-.e-rq-field { margin:0 0 16px; }
-.e-rq-field > .e-label { display:block; margin:0 0 6px; }
+.e-rq-field { margin:0 0 20px; }
+.e-rq-field > .e-label { display:block; margin:0 0 8px; }
 .e-rq-field .e-chips { margin-bottom:8px; }
 .e-rq-row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .e-rq-initials { text-transform:uppercase; letter-spacing:.15em; font-weight:var(--n-semibold); }
-.e-rq-err { margin:4px 0 0; font-size:var(--n-text-sm); color:var(--n-red); }
-.e-rq-sendbar { position:sticky; bottom:0; z-index:5; margin:16px -16px -16px; padding:12px 16px calc(12px + var(--e-safe-b)); background: var(--e-surface); border-top:1px solid var(--n-line); }
-.e-rq-sendbar .n-btn { width:100%; }
+.e-rq-err { margin:6px 0 0; font-size:var(--a-text-sm); color:var(--a-danger); font-weight:600; }
+.e-rq-sendbar { position:sticky; bottom:0; z-index:5; margin:16px -16px -16px; padding:10px 16px calc(10px + var(--a-safe-b)); background:var(--a-bar); -webkit-backdrop-filter:saturate(1.8) blur(20px); backdrop-filter:saturate(1.8) blur(20px); border-top:.5px solid var(--a-sep); border-radius:0 0 var(--a-r) var(--a-r); }
+.e-rq-sendbar .a-btn { width:100%; }
 .e-rq-done-head { display:flex; align-items:center; gap:12px; }
-.e-rq-done-head .e-ico { flex:none; width:36px; height:36px; padding:6px; border-radius:50%; background:var(--e-go); color: var(--e-on-accent); stroke-width:3; }
+.e-rq-done-head .e-ico { flex:none; width:40px; height:40px; padding:8px; border-radius:50%; background:var(--a-ok); color:#fff; stroke-width:3; }
 .e-rq-qrbtn { display:block; padding:0; border:0; background:none; cursor:zoom-in; }
-.e-rq-btns { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.e-rq-btns { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .e-rq-btns > .e-btn-big { grid-column:1 / -1; }
 .e-qr--full { cursor:zoom-out; }
 .e-qr--full svg { width:min(92vw, 92vh - 120px, 520px); }
-.e-rq-hint { margin:8px 16px; font-size:var(--n-text-sm); color:var(--e-muted-on-grey); }
+.e-rq-hint { margin:8px 16px; font-size:var(--a-text-xs); color:var(--a-ink-2); }
 .e-rq-strip { display:flex; flex-direction:column; gap:0; }
 .e-rq-big { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; min-height:64px; font-size:var(--n-text-lg); }
 .e-rq-big .e-ico { width:26px; height:26px; stroke-width:2.5; }
-.e-rq-ans { width:100%; text-align:left; display:grid; grid-template-columns:1fr auto; gap:4px 12px; align-items:start; padding:12px 16px; border:0; border-bottom:1px solid var(--n-line); background:var(--n-bg); color:var(--n-ink); cursor:pointer; font:inherit; }
+.e-rq-ans { width:100%; text-align:left; display:grid; grid-template-columns:1fr auto; gap:4px 12px; align-items:start; padding:12px 16px; border:0; background:var(--a-surface); color:var(--a-ink); cursor:pointer; font:inherit; }
 .e-rq-ans.is-stack { grid-template-columns:1fr; }
 .e-rq-ans.is-stack .e-rq-ans__v { text-align:left; white-space:normal; }
-.e-rq-ans:last-child { border-bottom:0; }
 .e-rq-ans__q { font-size:var(--n-text-sm); line-height:1.35; }
 .e-rq-ans__v { font-weight:var(--n-bold); color:var(--n-navy); white-space:nowrap; text-align:right; }
-.e-rq-ans__d { grid-column:1 / -1; margin:0; padding:8px 10px; background:var(--n-bg-blue); font-size:var(--n-text-sm); line-height:1.4; }
+.e-rq-ans__d { grid-column:1 / -1; margin:0; padding:8px 10px; border-radius:8px; background:var(--a-tint-soft); font-size:var(--a-text-sm); line-height:1.4; }
 .e-rq-ans:not(.is-open) .e-rq-ans__d { display:none; }
 .e-rq-quote { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.5; }
 .e-rq-big-level { display:flex; align-items:center; gap:14px; }
-.e-rq-big-level__n { flex:none; display:grid; place-items:center; width:56px; height:56px; border-radius:50%; background:var(--n-navy); color: var(--e-on-accent); font-size:26px; font-weight:var(--n-bold); }
-.e-rq-big-level__n.is-band-1 { background:var(--n-red); } .e-rq-big-level__n.is-band-3 { background:var(--e-go); }
+.e-rq-big-level__n { flex:none; display:grid; place-items:center; width:56px; height:56px; border-radius:50%; background:var(--a-tint); color:var(--a-tint-ink); font-size:26px; font-weight:700; }
+.e-rq-big-level__n.is-band-1 { background:var(--a-danger); color:#fff; } .e-rq-big-level__n.is-band-3 { background:var(--a-ok); color:#fff; }
 .e-rq-sum { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px; }
 .e-rq-sum .e-chip { font-size:var(--n-text-sm); padding:4px 10px; }
 .e-rq-legend { display:flex; flex-wrap:wrap; gap:6px 14px; margin:0 4px 12px; font-size:12px; color:var(--e-muted-on-grey); }
-.e-rq-legend span::before { content:""; display:inline-block; width:10px; height:10px; margin-right:5px; vertical-align:-1px; background:var(--c); }
+.e-rq-legend span::before { content:""; display:inline-block; width:10px; height:10px; margin-right:5px; vertical-align:-1px; border-radius:3px; background:var(--c); }
 .e-rq-state { font-size:12px; font-weight:var(--n-semibold); }
 .e-rq-state--done { color:var(--e-ok); } .e-rq-state--overdue { color:var(--n-red); } .e-rq-state--due-soon { color:var(--e-due); }
 .e-rq-state--on-track { color:var(--n-navy); } .e-rq-state--later { color:var(--n-muted); }
-.e-rq-gitem { display:flex; align-items:center; gap:10px; width:100%; min-height:48px; padding:8px 16px 8px 28px; border:0; border-top:1px solid var(--n-line); background: var(--e-surface); color:var(--n-ink); text-align:left; font:inherit; font-size:var(--n-text-sm); cursor:pointer; }
-.e-rq-gitem:hover { background:var(--e-hover); }
+.e-rq-gitem { display:flex; align-items:center; gap:10px; width:100%; min-height:48px; padding:8px 14px 8px 28px; border:0; box-shadow:inset 0 .5px 0 var(--a-sep); background:var(--a-surface); color:var(--a-ink); text-align:left; font:inherit; font-size:var(--a-text-sm); cursor:pointer; }
+.e-rq-gitem:active { background:var(--a-surface-2); }
 .e-rq-gitem__t { flex:1; min-width:0; line-height:1.35; }
 .e-rq-gitem__n { flex:none; min-width:28px; text-align:center; font-weight:var(--n-semibold); }
 .e-rq-gitem__n.is-zero { color:var(--n-muted); font-weight:var(--n-regular); }
-.e-rq-epa .e-prow { border-bottom:0; border-top:1px solid var(--n-line); padding-bottom:8px; }
+.e-rq-epa .e-prow { box-shadow:inset 0 .5px 0 var(--a-sep); padding-bottom:8px; }
 .e-rq-epa__bar { flex:none; width:64px; }
 @media print {
   .e-rq-ans .e-rq-ans__d { display:block !important; }
@@ -176,7 +177,7 @@ function qrSvgNow(qrcode, text) {
 // Full-screen QR for the assessor to scan; tap or Esc closes.
 export function fullQR(link, caption) {
   const back = document.activeElement;
-  const closeBtn = h('button', { type: 'button', class: 'n-btn n-btn--outline e-btn-quiet' }, 'Close');
+  const closeBtn = h('button', { type: 'button', class: 'a-btn a-btn--tinted e-btn-quiet' }, 'Close');
   const el = h('div', { class: 'e-qr e-qr--full', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'QR code', tabindex: '-1' },
     qrSvg(link), h('p', { class: 'e-qr__caption' }, caption || 'Scan to open the form'), closeBtn);
   // modal: Tab stays on Close, and focus goes back to the button that opened it
@@ -225,9 +226,9 @@ export function sharePanel(ev) {
       h('p', { class: 'e-qr__caption' }, `Ask ${who} to scan this, or send the link.`),
       h('p', { class: 'e-qr__caption' }, h('a', { href: url, 'data-link': '' }, url))),
     h('div', { class: 'e-rq-btns' },
-      h('button', { type: 'button', class: 'n-btn e-btn-big', onclick: () => shareEval(ev) }, icon('share'), navigator.share ? 'Share link' : 'Copy message'),
-      h('button', { type: 'button', class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => fullQR(url, `${toolLabel(ev.tool)} for ${who}`) }, icon('qr'), 'Full screen'),
-      h('button', { type: 'button', class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => copyText(url) }, 'Copy link')));
+      h('button', { type: 'button', class: 'a-btn a-btn--block e-btn-big', onclick: () => shareEval(ev) }, icon('share'), navigator.share ? 'Share link' : 'Copy message'),
+      h('button', { type: 'button', class: 'a-btn a-btn--tinted e-btn-quiet', onclick: () => fullQR(url, `${toolLabel(ev.tool)} for ${who}`) }, icon('qr'), 'Full screen'),
+      h('button', { type: 'button', class: 'a-btn a-btn--tinted e-btn-quiet', onclick: () => copyText(url) }, 'Copy link')));
 }
 export function shareSheet(ev, title = 'Send the link') {
   return modal(title, sharePanel(ev));
@@ -281,7 +282,7 @@ export function assessorPicker({ onpick, exclude = [], current = null } = {}) {
 }
 // segment without the edge-to-edge margins (it sits inside cards and sheets)
 function segment2(items, cur, onpick) {
-  return h('div', { class: 'e-segment', role: 'tablist', style: 'margin:0 0 8px' }, items.map(it => h('button', {
+  return h('div', { class: 'a-seg e-segment', role: 'tablist', style: 'margin:0 0 8px' }, items.map(it => h('button', {
     type: 'button', role: 'tab', 'aria-selected': String(it.id === cur), onclick: () => onpick(it.id) }, it.label)));
 }
 
@@ -584,7 +585,7 @@ function stepCase() {
     noteWarn.textContent = w || ''; noteWarn.hidden = !w;
   }
 
-  const sendBtn = h('button', { type: 'submit', class: 'n-btn e-go e-btn-big', disabled: F.sending }, F.sending ? 'Sending…' : 'Send request');
+  const sendBtn = h('button', { type: 'submit', class: 'a-btn a-btn--block e-go e-btn-big', disabled: F.sending }, F.sending ? 'Sending…' : 'Send request');
   const form = h('form', { class: 'e-card', novalidate: true, onsubmit: e => { e.preventDefault(); send(); } },
     h('div', { class: 'e-rq-field' }, h('label', { class: 'e-label', for: 'rq-date' }, 'Date of case'), h('div', { class: 'e-chips e-rq-days' }, dayBtns), date, err('date')),
     h('div', { class: 'e-rq-field' }, h('span', { class: 'e-label', id: 'rq-loc-l' }, 'Location'), locChips, locInput, err('location')),
@@ -658,10 +659,10 @@ function stepShare() {
           h('p', { class: 'e-small e-muted', style: 'margin:0' }, `${toolLabel(ev.tool)} · ${ev.assessorName}`)))),
     sharePanel(ev),
     h('div', { class: 'e-stack' },
-      h('button', { type: 'button', class: 'n-btn n-btn--secondary e-btn-big', onclick: anotherEPA }, 'Assess this case for another EPA'),
+      h('button', { type: 'button', class: 'a-btn a-btn--tinted a-btn--block e-btn-big', onclick: anotherEPA }, 'Assess this case for another EPA'),
       h('div', { class: 'e-actions' },
-        h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#r/' + encodeURIComponent(ev.id), onclick: e => { e.preventDefault(); leave('r/' + ev.id); } }, 'View request'),
-        h('button', { type: 'button', class: 'n-btn', onclick: () => leave('home') }, 'Done'))),
+        h('a', { class: 'a-btn a-btn--tinted e-btn-quiet', href: '#r/' + encodeURIComponent(ev.id), onclick: e => { e.preventDefault(); leave('r/' + ev.id); } }, 'View request'),
+        h('button', { type: 'button', class: 'a-btn', onclick: () => leave('home') }, 'Done'))),
   ];
 }
 

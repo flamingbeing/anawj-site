@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>APMES People</title>
 <meta name="description" content="The APMES people lists (residents, faculty, programme directors) that the logbook and evals share.">
-<meta name="theme-color" content="#002f6c">
+<meta name="theme-color" content="#f9f9fb">
 <link rel="icon" type="image/png" sizes="32x32" href="../evals/icons/favicon-32.png">
 <link rel="apple-touch-icon" href="../evals/icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -19,30 +19,33 @@
   try { var t = localStorage.getItem('evals-theme'); if (t === 'auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light'; } catch (e) {}
 </script>
 <link rel="stylesheet" href="../nuhsdesign/tokens.css">
+<link rel="stylesheet" href="../nuhsdesign/app.css">
 <link rel="stylesheet" href="../evals/style.css">
+<script src="../nuhsdesign/app.js" defer></script>
 <style>
-  .p-years { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
-  .p-years li { padding: 2px 10px; border: 1px solid var(--n-line); border-radius: 999px; font-size: var(--n-text-sm); }
-  .p-apps { margin: 4px 0 0; font-size: var(--n-text-sm); color: var(--n-muted); }
-  .p-issue { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; border-top: 1px solid var(--n-line); background: var(--e-surface); }
+  .p-years { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+  .p-years li { padding: 3px 10px; border-radius: 6px; background: var(--a-surface-2); color: var(--a-ink-2); font-size: var(--a-text-xs); font-weight: 600; }
+  .p-apps { margin: 4px 0 0; font-size: var(--a-text-sm); color: var(--a-ink-2); }
+  .p-issue { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; border-top: .5px solid var(--a-sep); background: var(--a-surface); }
   .p-issue:first-child { border-top: 0; }
   .p-issue > div { flex: 1 1 200px; min-width: 0; }
   .p-issue .e-row__meta { white-space: normal; }
 </style>
 </head>
-<body>
-<header class="e-appbar">
-  <div class="e-appbar__bar">
-    <button type="button" id="back" class="e-appbar__back" aria-label="Back" hidden><svg viewBox="0 0 24 24" class="e-ico" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+<body class="a-app">
+<header class="a-bar e-appbar">
+  <div class="a-band"><i></i><i></i><i></i><i></i></div>
+  <div class="a-bar-row">
+    <button type="button" id="back" class="a-bar-btn e-appbar__back" aria-label="Back" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span aria-hidden="true">Back</span></button>
     <div class="e-appbar__titles">
-      <h1 id="title" class="e-appbar__title">APMES People</h1>
+      <h1 id="title" class="a-bar-title e-appbar__title">APMES People</h1>
       <p id="sub" class="e-appbar__sub" hidden></p>
     </div>
     <div id="me" class="e-appbar__right"></div>
   </div>
 </header>
-<main id="app"><p class="e-loading">Loading…</p></main>
-<div id="toast" role="status" aria-live="polite"></div>
+<main id="app" class="a-main"><p class="e-loading">Loading…</p></main>
+<div id="toast" class="a-toast" role="status" aria-live="polite"></div>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>
