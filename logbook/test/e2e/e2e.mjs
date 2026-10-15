@@ -66,12 +66,18 @@ async function run(label, ctxOpts) {
   const sub = () => p.evaluate(() => document.getElementById('sub').textContent);
   const nCases = async () => parseInt(await p.evaluate(() => document.body.dataset.cases), 10);
   // Account, Settings, Export / Import, Admin and Analytics live under More; Settings is a menu of pages
-  const SETTINGS_PAGES = ['themes', 'display', 'access', 'logging', 'tags', 'reflset', 'sharefmt', 'bin'];
+  const SETTINGS_PAGES = ['themes', 'display', 'access', 'logging', 'tags', 'reflset', 'sharefmt'];
   const tab = async t => {
     // a settings page's Advanced page: open the page, then its Advanced link
     if (t === 'displayadv' || t === 'loggingadv') { await tab(t.replace('adv', '')); await p.locator(`a[data-go="${t}"]`).click(); await nap(350); return; }
+    // the recycle bin: Recover → Recently deleted (15 Oct 2026)
+    if (t === 'bin') { await p.evaluate(() => { location.hash = '#recovery'; }); await p.locator('.recover-sec[data-sec=deleted][open] .bin-view').waitFor(); await nap(350); return; }
     if (SETTINGS_PAGES.includes(t)) { await tab('settings'); await p.locator(`.more-list a[data-go="${t}"]`).click(); }
-    else if (['account', 'settings', 'admin', 'data', 'progress'].includes(t)) { await p.locator('.tabs button[data-tab="more"]').click(); await nap(150); await p.locator(`.more-list a[data-go="${t}"]`).click(); }
+    // on the tab bar if the profile puts it there (Advanced: Analytics), else in More
+    else if (['account', 'settings', 'admin', 'data', 'progress'].includes(t)) {
+      if (await p.locator(`.tabs button[data-tab="${t}"]`).count()) await p.locator(`.tabs button[data-tab="${t}"]`).click();
+      else { await p.locator('.tabs button[data-tab="more"]').click(); await nap(150); await p.locator(`.more-list a[data-go="${t}"]`).click(); }
+    }
     else await p.locator(`.tabs button[data-tab="${t}"]`).click();
     await nap(350);
   };
@@ -133,7 +139,7 @@ async function run(label, ctxOpts) {
     const waitSaved = async () => { await p.waitForFunction(() => document.querySelector('.acct-status')?.textContent === 'Saved', null, { timeout: 5000 }); };
 
     await step('account + settings: separate tabs; More has credits and sign out at the bottom', async () => {
-      assert(await p.locator('.tabs button').count() <= 5, 'more than 5 tabs: ' + await p.locator('.tabs button').count());
+      assert(await p.locator('.tabs button').count() <= 6, 'more than 6 tabs: ' + await p.locator('.tabs button').count());   // (Advanced: Case, Logbook, Totals, Reflections, Analytics, More)
       await p.locator('.tabs button[data-tab="more"]').click();
       const more = await p.locator('.more-list a').evaluateAll(as => as.map(a => a.dataset.go));
       assert(more.includes('account') && more.includes('settings') && more.includes('data'), 'More list ' + more);
@@ -424,8 +430,7 @@ async function run(label, ctxOpts) {
       await shot4('recycle-bin');
       await items.first().locator('button', { hasText: 'Restore' }).click();
       await nap(700);
-      // the bin is a dialog over Settings
-      await p.locator('dialog[open] button', { hasText: 'Close' }).first().click();
+      // (the bin is Recover's Recently deleted, a page now: nothing to close)
       await tab('reflect');
       // count in edit mode, where every heading is open (met ones start folded otherwise)
       await editBtn().click(); await nap(300);
@@ -994,7 +999,7 @@ async function run(label, ctxOpts) {
     await tab('settings');
     await p.locator('.back-row a', { hasText: 'More' }).click();
     await nap(300);
-    assert(await p.locator('.more-list').count() === 1, 'back did not open the More list');
+    assert(await p.locator('.more-list').count() >= 1, 'back did not open the More list');
   });
 
   await step('attrited resident comes off Totals', async () => {
@@ -1730,13 +1735,13 @@ async function run(label, ctxOpts) {
     await tab('displayadv');
     await p.getByLabel('Show Reflections').uncheck();
     await p.locator('.tab-order li', { hasText: 'Logbook' }).getByRole('button', { name: 'Move up' }).click(); await nap(150);
-    assert(JSON.stringify(await p.locator('.tabs button').evaluateAll(bs => bs.map(b => b.dataset.tab))) === JSON.stringify(['logbook', 'log', 'totals', 'more']), 'tab bar not rearranged');
+    assert(JSON.stringify(await p.locator('.tabs button').evaluateAll(bs => bs.map(b => b.dataset.tab))) === JSON.stringify(['logbook', 'log', 'totals', 'progress', 'more']), 'tab bar not rearranged');
     await p.locator('.tabs button[data-tab="more"]').click(); await nap(300);
-    assert(/Reflections/.test(await p.locator('.more-list li').first().innerText()), 'hidden tab not first on More');
+    assert(/Reflections/.test((await p.locator('.more-list').first().locator('li').allInnerTexts()).slice(0, 2).join(' ')), 'hidden tab not first on More');   // (with Notes, also off the bar)
     await tab('displayadv');
     await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
     await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);
-    assert(await p.locator('.tabs button').count() === 5, 'reset did not bring the tab back');
+    assert(await p.locator('.tabs button').count() === 6, 'reset did not bring the tab back');
     await tab('themes');
     await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
     await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);
@@ -1765,9 +1770,10 @@ async function run(label, ctxOpts) {
       await tab('log'); await p.waitForSelector('textarea.details');
       await swipe(300, 100, 'textarea.details'); await nap(300);
       assert(/#log$/.test(p.url()), 'a swipe in the case box changed tab');
-      // a page under a tab counts as that tab: Settings → Display is under More, so a swipe right goes to Reflections
+      // a page under a tab counts as that tab: Settings → Display is under More, so a swipe right goes to the tab
+      // before More (Analytics in Advanced, 15 Oct 2026)
       await tab('display');
-      await swipe(100, 300, 'main section.card'); await p.waitForURL(/#reflect$/);
+      await swipe(100, 300, 'main section.card'); await p.waitForURL(/#progress$/);
       await until(async () => !(await p.locator('main#app').evaluate(el => el.style.transform)), 'page left mid-slide');
       // switched off: no change of tab
       await tab('access');
