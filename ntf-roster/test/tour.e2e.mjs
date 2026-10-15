@@ -264,8 +264,8 @@ await page.click('[data-tour="addrule"]');
 await page.click('.rp-sheet [data-kind="together"]');
 await page.waitForSelector('.rb-sheet .bx-who-sel');
 await page.click('.task-show');   // (the task card stays above the window, and Show me finds the picker in it)
-await page.waitForSelector('.tour-tip');
-ok(/^Choose /.test(await page.textContent('.tour-tip')), 'Show me works inside the rule builder');
+// (wait for the text, not just the tip: on slow machines the tip shows before its words are swapped in)
+ok(await page.waitForFunction(() => /^Choose /.test(document.querySelector('.tour-tip')?.textContent || ''), null, { timeout: 10000 }).then(() => true, () => false), 'Show me works inside the rule builder');
 await page.locator('.rb-sheet .bx-who-sel').nth(0).selectOption(pair[0]);   // Other people
 await page.waitForTimeout(100);
 await page.locator('.rb-sheet .bx-who-sel').nth(2).selectOption(pair[1]);   // Who
