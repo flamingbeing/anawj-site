@@ -10,6 +10,14 @@ Agreed queue (one PR each, in order, once he says go):
    `writes.onChange`, so the editor can say pending under a header that says Synced. Make the editor's status follow the
    queue live (Saving… → pending → Synced, or conflict / failed with its Recover link); check the Notes editor and the
    case edit page for the same snapshot; test: hold the fake server, see pending, release, see Synced in both places.
+0b. **Bug: sign-in from the installed app (Firefox Android PWA) leaves a blank tab** (owner, 15 Oct): `cloud.signIn`
+   uses `signInWithPopup`; in an installed app the popup opens as a separate browser tab without its opener, so
+   /__/auth/handler finishes sign-in (the app shares its storage, so it is signed in) but can't hand back or close
+   itself: a blank page until closed. Same cause as the Drive / Dropbox popups (NOTES.md, Oct 2026). Fix: when the app
+   runs installed (`display-mode: standalone`) or on Firefox for Android, use `signInWithRedirect` straight away
+   (authDomain is our own apmes.anawj.com, so the redirect keeps its storage); keep the popup on desktop browsers;
+   `getRedirectResult` is already called on start. Check on a real phone (owner or Firetop): Chrome and Firefox,
+   installed and in a tab.
 1. **Paeds age + paste ticks:** an age ≤ 16 ticks Paeds (EPA 9: 3 to 16 years); an age > 16 drops every Paeds guess,
    shorthand ones too (bug: "circumcision" shorthand ticked Paeds on an 18/M; suggest.js adult branch only drops
    `why: 'keyword'`); no age: trigger words still suggest. Pasted lists follow Settings → Logging → "Tick confident
