@@ -1,7 +1,7 @@
 // Masimo SedLine screen (the 'sedline' skin), part 2: data for the plots and every drawing. The real screen is 800 x 1280 (Root, portrait);
 // everything is drawn in those design pixels and the two canvases are scaled to fit. Loaded after sed-screen.js (which owns SED), before app.js.
 // Reads app.js globals (HIST, R, SIG, simT, mon, produced, FS, NB, DB_LO, DB_HI, T0, tim, psiOf ...) only when called, never at load.
-const SED_FONT='"Source Sans 3","Source Sans Pro","Segoe UI",system-ui,sans-serif';
+const SED_FONT='Hind,"Frutiger","Segoe UI",system-ui,sans-serif';
 const SC={bg:'#100f0d',sep:'#2b2a2a',yel:'#f9ca07',unit:'#f4c609',dim:'#5c5c5e',lt:'#afafae',eeg:'#131924',dot:'#f3d314',red:'#ed1c24',gold:'#f9ca07'};
 // the spectrogram's colour scale, read off the colour bar of a native screenshot (red = strongest, deep indigo = weakest), quantised to 51 steps
 const SED_STOPS=[[0,[0xed,0x1c,0x24]],[.0625,[0xef,0x31,0x20]],[.125,[0xf4,0x71,0x16]],[.1875,[0xfa,0xbf,0x09]],[.25,[0xeb,0xec,0x06]],[.3125,[0xae,0xda,0x19]],[.375,[0x80,0xcc,0x28]],[.4375,[0x63,0xc4,0x31]],[.5,[0x58,0xc0,0x34]],[.5625,[0x5c,0xc1,0x33]],[.625,[0x64,0xc6,0x55]],[.6875,[0x6c,0xcb,0x9c]],[.75,[0x78,0xd2,0xdc]],[.8125,[0x58,0xc2,0xf0]],[.875,[0x45,0x72,0xc1]],[.9375,[0x3a,0x51,0xab]],[1,[0x33,0x49,0xa5]]];
@@ -355,7 +355,7 @@ function sedDrawEeg(){const cv=SED.cvE;if(!cv)return;const L=SED.L||sedLay(),e=L
  U();names.forEach((nm,i)=>{if(!(strip&&i===0))sT(c,nm,22,ys[i]*ky+8,22,SC.dim,'left',400);});
  if(gone&&strip){U();c.fillStyle='#15171b';c.fillRect(12,0,775,68);c.fillStyle='#2b2a2a';c.fillRect(12,68,775,1);sT(c,'L1',20,40,18,SC.dim,'left',400);}
  if(!gone){
-  const cur=E.n,pos=cur%N,st=Math.max(1,Math.round(1/pxs));
+  const cur=E.n,pos=cur%N,st=1; // every sample is drawn: skipping every other one at 15 mm/s made the dim trace shimmer, as the skipped half swapped each frame
   for(const ch of [1,2,3,0]){if(ch===0&&strip){U();c.fillStyle='#15171b';c.fillRect(12,0,775,68);c.fillStyle='#2b2a2a';c.fillRect(12,68,775,1);sT(c,'L1',20,40,18,SC.dim,'left',400);}
    if(SED.sim.hiz&&ch===2)continue;const sb=E.ch[ch].buf,sq1=strip&&ch===0,yc=sq1?35:ys[ch],am=sq1?.3:1,val=idx=>sb[idx&(SED_RING-1)]*ppu*am;
    if(sq1)U();else K();
