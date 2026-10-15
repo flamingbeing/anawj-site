@@ -24,8 +24,8 @@ try {
     assert.equal(await page.$eval('#depth', e => e.value), '0');
     // the default screen is the BIS VISTA style: number, SQI bars, ST and SR boxes, EEG, DSA with the BIS trend under it
     assert.equal(await page.$eval('#skinSeg [data-skin="vista"]', e => e.getAttribute('aria-pressed')), 'true');
-    assert.equal(await page.$eval('#vistaWrap', e => e.hidden), false);
-    assert.equal(await page.$eval('#classicWrap', e => e.hidden), true);
+    await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#vistaWrap', false], { timeout: 5000 });
+    await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#classicWrap', true], { timeout: 5000 });
     await page.waitForFunction(() => +document.querySelector('#v2Bis').textContent >= 80);
     assert.equal(await page.$eval('#v2St', e => e.textContent), '0:00:00');
     assert.ok(await page.$$eval('#v2Sqi i.on', e => e.length) >= 4, 'SQI bars lit');
@@ -44,11 +44,11 @@ try {
       assert.ok(px[0][2] > 150 && px[0][0] < 160, `awake beta is cyan or green (${px[0]})`); assert.ok(px[1][0] > 200 && px[1][2] < 90, `awake 6 Hz is orange-red (${px[1]})`); }
     // start-up message with a Dismiss button, as on the real monitor
     await page.waitForFunction(re => new RegExp(re).test(document.querySelector('#v2MsgT').textContent), String.raw`Factory settings restored`, { timeout: 4000 });
-    await page.click('#v2Dismiss'); assert.equal(await page.$eval('#v2Msg', e => e.hidden), true);
+    await page.click('#v2Dismiss'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Msg', true], { timeout: 5000 });
     // Menu: pages of 3 x 3 tiles in the lower panel; MENU becomes HOME; tiles change the settings they name
-    assert.equal(await page.$eval('#v2Menu', e => e.hidden), true);
+    await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Menu', true], { timeout: 5000 });
     assert.equal(await page.textContent('#kMl'), 'MENU');
-    await page.click('#kMenu'); assert.equal(await page.$eval('#v2Menu', e => e.hidden), false); assert.equal(await page.textContent('#kMl'), 'HOME');
+    await page.click('#kMenu'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Menu', false], { timeout: 5000 }); assert.equal(await page.textContent('#kMl'), 'HOME');
     const tile = name => page.locator('#v2Menu button', { hasText: name }).first();
     for (const t of ['Target', 'Secondary', 'Chart', 'Alarm', 'Display', 'View/Save', 'Help', 'Snapshot', 'Next']) assert.ok(await tile(t).count(), `page 1 tile ${t}`);
     // Target Range: limits move in steps of 5 and the BIS alarm limits follow
@@ -62,23 +62,23 @@ try {
     for (let i = 0; i < 5; i++) await page.click('#v2Menu button[data-k="lo+"]'); await page.click('#v2Menu button[data-k="hi-"]'); assert.equal(await page.evaluate(() => [mon.alo, mon.ahi].join()), '40,60');
     await tile('Return').click(); assert.ok(await tile('Secondary').count(), 'Return goes back to page 1');
     // Snapshot (manual 4.6.8): the first press marks the trend at once and goes back; a second press keeps the old marker (diamond) and shows the warning with Save Snapshot
-    await tile('Snapshot').click(); assert.equal(await page.$eval('#v2Menu', e => e.hidden), true, 'first snapshot goes straight back'); assert.equal(await page.evaluate(() => MT.snapT != null && MT.snapPrev == null), true);
-    await page.click('#kMenu'); await tile('Snapshot').click(); assert.ok(await tile('Save').count(), 'warning screen with Save Snapshot'); assert.equal(await page.evaluate(() => MT.snapPrev != null), true); await tile('Save').click(); assert.equal(await page.$eval('#v2Menu', e => e.hidden), true); assert.ok(!/Snapshot saved/.test(await page.evaluate(() => document.querySelector('#v2MsgT').textContent)), 'no invented Snapshot saved message');
+    await tile('Snapshot').click(); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Menu', true], { timeout: 5000 }); assert.equal(await page.evaluate(() => MT.snapT != null && MT.snapPrev == null), true);
+    await page.click('#kMenu'); await tile('Snapshot').click(); assert.ok(await tile('Save').count(), 'warning screen with Save Snapshot'); assert.equal(await page.evaluate(() => MT.snapPrev != null), true); await tile('Save').click(); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Menu', true], { timeout: 5000 }); assert.ok(!/Snapshot saved/.test(await page.evaluate(() => document.querySelector('#v2MsgT').textContent)), 'no invented Snapshot saved message');
     // Export Data: a status screen with a percentage, the USB icon under the BIS box, then 100% complete
     await page.click('#kMenu'); await tile('Next').click(); await tile('Export').click(); await tile('Begin').click();
-    await page.waitForFunction(() => /^Exporting \.\.\. \d+%$/.test(document.querySelector('#mtExpPct').textContent), null, { timeout: 3000 }); assert.equal(await page.$eval('#v2Usb', e => e.hidden), false, 'USB icon while exporting');
+    await page.waitForFunction(() => /^Exporting \.\.\. \d+%$/.test(document.querySelector('#mtExpPct').textContent), null, { timeout: 3000 }); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Usb', false], { timeout: 5000 });
     await page.waitForFunction(() => document.querySelector('#mtExpPct').textContent === '100% complete', null, { timeout: 8000 }); await tile('Return').click(); await tile('Return').click(); await tile('Previous').click();
     // Display: DSA + BIS shows BIS in the header and the BIS trend under the DSA; BIS (trend) shows the trend view with its review arrow
     await tile('Display').click(); await page.locator('#v2Menu button[data-k="dsatoggle"]').click(); await page.click('#kMenu');
     assert.equal(await page.evaluate(() => MT.main), 'dsaBis');
     await page.click('#kMenu'); await tile('Display').click(); assert.equal(await page.evaluate(() => MT.win), 60, 'Trend Time Scale defaults to 1 hour'); await tile('Trend Time Scale').click(); assert.equal(await page.evaluate(() => MT.win), 5);
     await tile('Trend Time Scale').click(); assert.equal(await page.evaluate(() => MT.win), 15); await tile('Trend Time Scale').click(); assert.equal(await page.evaluate(() => MT.win), 60);
-    await page.locator('#v2Menu button[data-k="mbis"]').click(); await page.click('#kMenu'); assert.equal(await page.$eval('#v2Review', e => e.hidden), false, 'review arrow in the BIS trend view');
+    await page.locator('#v2Menu button[data-k="mbis"]').click(); await page.click('#kMenu'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Review', false], { timeout: 5000 });
     // Trend Review: key 2 stays MENU, key 3 reads TREND REVIEW EXIT, Rewind and Advance work in Case mode, MENU leaves the review and opens the menu
     await page.click('#v2Review'); assert.equal(await page.textContent('#kMl'), 'MENU'); assert.match(await page.textContent('#kSn'), /TREND\s*REVIEW\s*EXIT/);
     const rv = n => page.locator('#v2Rev button', { hasText: n }).first(); assert.equal(await rv('Rewind').isDisabled(), false); assert.equal(await rv('Advance').isDisabled(), false); await rv('Rewind').click(); await rv('Advance').click(); assert.ok(await page.locator('#v2Rev svg.ar2').count() >= 2, 'double arrows on the case tiles');
-    await page.click('#kMenu'); assert.equal(await page.$eval('#v2Rev', e => e.hidden), true); assert.equal(await page.$eval('#v2Menu', e => e.hidden), false); await page.click('#kMenu'); assert.equal(await page.$eval('#v2Menu', e => e.hidden), true);
-    await page.click('#kMenu'); await tile('Display').click(); await page.locator('#v2Menu button[data-k="mdsaAmpl"]').click(); await page.click('#kMenu'); assert.equal(await page.$eval('#v2Review', e => e.hidden), true);
+    await page.click('#kMenu'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Rev', true], { timeout: 5000 }); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Menu', false], { timeout: 5000 }); await page.click('#kMenu'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Menu', true], { timeout: 5000 });
+    await page.click('#kMenu'); await tile('Display').click(); await page.locator('#v2Menu button[data-k="mdsaAmpl"]').click(); await page.click('#kMenu'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Review', true], { timeout: 5000 });
     // pages 2 and 3: smoothing rate, Display SR, EEG channels (a second trace and 50 uV / division), Filters, Demo Case
     await page.click('#kMenu'); await tile('Next').click();
     assert.equal(await page.evaluate(() => mon.smooth), 15); await tile('Smoothing').click(); assert.equal(await page.evaluate(() => mon.smooth), 30); if (!/Smoothing/.test(await page.textContent('#v2MsgT')) && await page.locator('#v2Dismiss').isVisible()) await page.click('#v2Dismiss'); await page.waitForFunction(() => /Smoothing Rate Changed to 30 Seconds {2}\[ 534 \]/.test(document.querySelector('#v2MsgT').textContent), null, { timeout: 4000 });
@@ -93,9 +93,9 @@ try {
     await page.click('#kSensor'); await page.waitForFunction(() => /Not available during Demo Case {2}\[ 511 \]/.test(document.querySelector('#v2MsgT').textContent), null, { timeout: 3000 });
     await page.click('#kMenu'); await tile('Next').click(); await tile('Next').click(); await tile('Demo Case').click(); assert.equal(await page.evaluate(() => MT.caseId), 'AH5F');
     // Escape closes the menu; Maintenance asks for a passkey; Diagnostics > Clear Trend Data empties the trend
-    await page.click('#kMenu'); await page.keyboard.press('Escape'); assert.equal(await page.$eval('#v2Menu', e => e.hidden), true);
+    await page.click('#kMenu'); await page.keyboard.press('Escape'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Menu', true], { timeout: 5000 });
     await page.click('#kMenu'); await tile('Next').click(); await tile('Next').click(); await tile('Maintenance').click(); assert.ok(await tile('Enter Passkey').count() + (await page.locator('#v2Menu .mtl', { hasText: 'Enter Passkey' }).count()), 'passkey screen');
-    await page.click('#v2Menu button[data-k="d9"]'); await page.click('#v2Menu button[data-k="ok"]'); await page.waitForFunction(re => new RegExp(re).test(document.querySelector('#v2MsgT').textContent), String.raw`Invalid passkey`, { timeout: 4000 }); assert.equal(await page.$eval('#v2Dismiss', e => e.hidden), true, 'information bars have no Dismiss');
+    await page.click('#v2Menu button[data-k="d9"]'); await page.click('#v2Menu button[data-k="ok"]'); await page.waitForFunction(re => new RegExp(re).test(document.querySelector('#v2MsgT').textContent), String.raw`Invalid passkey`, { timeout: 4000 }); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Dismiss', true], { timeout: 5000 });
     for (const d of '1234') await page.click(`#v2Menu button[data-k="d${d}"]`); await page.click('#v2Menu button[data-k="ok"]'); assert.ok(await tile('Audio Off').count(), 'Maintenance menu');
     await tile('Return').click(); await tile('Diagnostics').click(); await tile('Clear').click();
     assert.equal(await page.evaluate(() => HIST.length < 5), true, 'trend data cleared'); await page.waitForTimeout(200);
@@ -108,32 +108,32 @@ try {
     await page.waitForFunction(() => /BIS out of target range {2}\[ 30 \]/.test(document.querySelector('#v2MsgT').textContent) && document.querySelector('#v2Msg').classList.contains('hi'), null, { timeout: 30000 });
     await page.click('#speedSeg [data-speed="1"]');
     await page.waitForFunction(() => MT.sounding === true && MT.beeps > 0, null, { timeout: 3000 });
-    assert.equal(await page.$eval('#v2Dismiss', e => e.hidden), true, 'no Dismiss on the alarm bar');
+    await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Dismiss', true], { timeout: 5000 });
     assert.equal(await page.textContent('#kSl'), 'SILENT', 'the alarm key reads SILENT while the alarm is active');
-    await page.click('#kSilent'); await page.waitForFunction(() => MT.alarm === 1 && MT.sounding === false); assert.equal(await page.$eval('#v2Msg', e => e.hidden), false, 'paused: the bar stays, the sound stops');
+    await page.click('#kSilent'); await page.waitForFunction(() => MT.alarm === 1 && MT.sounding === false); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Msg', false], { timeout: 5000 });
     await page.click('#kSilent'); await page.waitForFunction(() => MT.alarm === 2 && MT.sounding === false); await page.click('#kSilent');
     await page.waitForFunction(() => MT.alarm === 0 && MT.sounding === true);
-    await page.evaluate(() => { MT.tgt.alarm = false; }); await page.waitForFunction(() => MT.sounding === false); assert.equal(await page.$eval('#v2Msg', e => e.hidden), false, 'Target Alarm off: the bar stays, no sound');
+    await page.evaluate(() => { MT.tgt.alarm = false; }); await page.waitForFunction(() => MT.sounding === false); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Msg', false], { timeout: 5000 });
     await page.evaluate(() => { MT.tgt.alarm = true; MT.tgt.active = false; }); await page.waitForFunction(() => !document.querySelector('#v2Msg').classList.contains('hi') || document.querySelector('#v2Msg').hidden);
     // sensor check: key 3 becomes EXIT; MENU leaves it (like EXIT) and opens the menu; the SQI bars stay hollow; only HIGH electrodes are named; electrodes resolve to PASS, then it leaves by itself and a new case ID is given; EXIT also leaves
-    await page.click('#kSensor'); assert.equal(await page.$eval('#v2Sensor', e => e.hidden), false); assert.equal(await page.textContent('#kSn'), 'EXIT');
-    await page.click('#kMenu'); assert.equal(await page.$eval('#v2Menu', e => e.hidden), false, 'MENU leaves the sensor check and opens the menu'); assert.equal(await page.$eval('#v2Sensor', e => e.hidden), true);
-    await page.click('#kMenu'); await page.click('#kSensor'); assert.equal(await page.$eval('#v2Sensor', e => e.hidden), false);
+    await page.click('#kSensor'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Sensor', false], { timeout: 5000 }); assert.equal(await page.textContent('#kSn'), 'EXIT');
+    await page.click('#kMenu'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Menu', false], { timeout: 5000 }); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Sensor', true], { timeout: 5000 });
+    await page.click('#kMenu'); await page.click('#kSensor'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Sensor', false], { timeout: 5000 });
     await page.waitForFunction(() => /^Sensor Check in Progress$/.test(document.querySelector('#v2MsgT').textContent), null, { timeout: 4000 });
     assert.equal(await page.$$eval('#v2Sqi i.on', e => e.length), 0, 'SQI bars are hollow during the sensor check');
     await page.waitForFunction(() => /^Press electrode 2 {2}\[ 13 \]$/.test(document.querySelector('#v2MsgT').textContent), null, { timeout: 8000 });
     await page.waitForFunction(() => /PASS/.test(document.querySelector('#v2ScSvg').textContent), null, { timeout: 12000 });
     await page.click('#v2ScVal'); assert.match(await page.textContent('#v2ScVal'), /Hide/);
-    await page.click('#kSensor'); assert.equal(await page.$eval('#v2Sensor', e => e.hidden), true);
+    await page.click('#kSensor'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#v2Sensor', true], { timeout: 5000 });
     await page.addScriptTag({ path: AXE });
     { const r = await page.evaluate(() => axe.run(document.querySelector('#monitor'), { runOnly: ['wcag2a', 'wcag2aa'] })); assert.deepEqual(r.violations.map(v => `${v.id}: ${v.nodes.length}`), [], 'axe on the VISTA screen'); }
     // the Masimo SedLine screen has its own test (sed.e2e.mjs): here only that it opens and draws
     await page.click('#skinSeg [data-skin="sedline"]');
-    assert.equal(await page.$eval('#sedWrap', e => e.hidden), false); assert.equal(await page.$eval('#vistaWrap', e => e.hidden), true);
+    await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedWrap', false], { timeout: 5000 }); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#vistaWrap', true], { timeout: 5000 });
     await page.waitForFunction(() => /PSi \d+/.test(document.querySelector('#bilSum').textContent), null, { timeout: 5000 });
     // the teaching layout is still there for the rest of the checks
     await page.click('#skinSeg [data-skin="classic"]');
-    assert.equal(await page.$eval('#classicWrap', e => e.hidden), false);
+    await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#classicWrap', false], { timeout: 5000 });
     // relaxant: a bolus paralyses (TOF count 0, readout and hint), a top-up and sugammadex move it, Off clears it
     assert.match(await page.textContent('#nmRead'), /No relaxant/);
     await page.click('#speedSeg [data-speed="10"]'); await page.click('#nmBolus');

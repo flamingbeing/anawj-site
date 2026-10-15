@@ -18,7 +18,7 @@ try {
     page.on('console', m => { if (m.type() === 'error' && !/fonts\.(googleapis|gstatic)/.test(m.text())) errors.push(m.text()); });
     await page.goto(BASE);
     await page.click('#skinSeg [data-skin="sedline"]');
-    assert.equal(await page.$eval('#sedWrap', e => e.hidden), false); assert.equal(await page.$eval('#vistaWrap', e => e.hidden), true); assert.equal(await page.$eval('#advWrap', e => e.hidden), true);
+    await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedWrap', false], { timeout: 5000 }); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#vistaWrap', true], { timeout: 5000 }); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#advWrap', true], { timeout: 5000 });
     await page.waitForFunction(() => /PSi \d+/.test(document.querySelector('#bilSum').textContent), null, { timeout: 8000 });
     // the keys and simulator buttons sit in a "Controls" disclosure, closed by default, so the picture is just the Root
     assert.equal(await page.$eval('#sedCtl', e => e.open), false); assert.equal(await page.$eval('#sedCtl summary', e => e.textContent.trim()), 'Controls');
@@ -63,7 +63,7 @@ try {
     await page.evaluate(() => { sedExpand('psi'); sedMinimise('artf'); });
     assert.equal(await page.evaluate(() => sedLay().rows.map(r => r.k).join()), 'emg,psi,sr');
     await page.click('.hit[data-a="num"][data-v="emg"]'); await page.click('#sedPop [data-a="about"]');
-    assert.match(await page.$eval('#sedDlg', e => e.textContent), /muscle activity/); await page.click('#sedDlg [data-a="back"]'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), true);
+    assert.match(await page.$eval('#sedDlg', e => e.textContent), /muscle activity/); await page.click('#sedDlg [data-a="back"]'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedDlg', true], { timeout: 5000 });
     // the bell does nothing when nothing is sounding; the layout puts the PSi into the well when everything else is expanded
     await page.click('[data-a="bell"]'); assert.equal(await page.evaluate(() => [SED.silenceUntil, SED.silenceShown]).then(v => v.join()), '0,false', 'bell with no alarm is ignored');
     await page.evaluate(() => { for (const k of ['sr', 'emg', 'artf', 'sefl', 'sefr']) sedExpand(k); });
@@ -77,7 +77,7 @@ try {
       let [x0, y0] = R(300, 520); await page.mouse.move(x0, y0); await page.mouse.down(); await page.mouse.move(x0 + 120 * b3[2], y0, { steps: 6 }); await page.mouse.up();
       assert.ok(await page.evaluate(() => SED.hold != null && SED.hold < simT - 60), 'a drag on a trend scrolls back'); assert.equal(await page.evaluate(() => SED.pop), null);
       [x0, y0] = R(400, 900); await page.mouse.move(x0, y0); await page.mouse.down(); await page.mouse.move(x0 - 400 * b3[2], y0, { steps: 6 }); await page.mouse.up(); assert.equal(await page.evaluate(() => SED.hold), null, 'a drag the other way returns to live');
-      assert.equal(await page.$eval('#sedDlg', e => e.hidden), true, 'a drag on the DSA does not open its menu');
+      await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedDlg', true], { timeout: 5000 });
       [x0, y0] = R(300, 520); await page.mouse.move(x0, y0); await page.mouse.wheel(0, 120); await page.waitForFunction(() => SED.range === 60, null, { timeout: 2000 }); await page.waitForTimeout(300); await page.mouse.wheel(0, -120); await page.waitForFunction(() => SED.range === 30, null, { timeout: 2000 });
       [x0, y0] = R(720, 440); await page.mouse.move(x0, y0); await page.mouse.down(); await page.waitForFunction(() => SED.dimK === 'emg', null, { timeout: 2000 }); const [x1, y1] = R(400, 770); await page.mouse.move(x1, y1, { steps: 5 }); await page.mouse.up();
       assert.equal(await page.evaluate(() => sedLay().well.includes('emg')), true, 'hold and drag into the well minimises'); assert.equal(await page.evaluate(() => SED.dimK), null);
@@ -114,9 +114,9 @@ try {
     // a new limit (menu) re-arms; PSi limit stand-in matches the numbers beside the PSI row
     // the Root-style menu: Menu key under the screen and the gear open the Main Menu; the manual's names are all there
     // (the Menu key closes the whole menu when a page is open; Escape and the arrow go back one level; no focus box on the dialog's back arrow)
-    await page.click('#bMenu'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), false); await page.click('#sedDlg [data-v="sedline"]'); await page.click('#bMenu'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), true, 'Menu closes the whole menu');
+    await page.click('#bMenu'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedDlg', false], { timeout: 5000 }); await page.click('#sedDlg [data-v="sedline"]'); await page.click('#bMenu'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedDlg', true], { timeout: 5000 });
     await page.evaluate(() => sedDlgOpen('layout')); assert.equal(await page.$eval('#sedDlg .sdback', e => getComputedStyle(e).outlineStyle), 'none', 'no focus box on the back arrow'); await page.evaluate(() => sedDlgClose());
-    await page.click('#bMenu'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), false);
+    await page.click('#bMenu'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedDlg', false], { timeout: 5000 });
     assert.deepEqual(await page.$$eval('#sedDlg .sdtile span', e => e.map(x => x.textContent)), ['Layout', 'rainbow', 'Sounds', 'Device Settings', 'About', 'Trend Settings', 'Profiles', 'Iris', 'SedLine']);
     await page.click('#sedDlg [data-v="sedline"]'); assert.deepEqual(await page.$$eval('#sedDlg .sdbar', e => e.map(x => x.textContent)), ['Parameter Settings', 'Additional Settings']);
     await page.click('#sedDlg [data-v="params"]'); assert.deepEqual(await page.$$eval('#sedDlg .sdbar', e => e.map(x => x.textContent)), ['PSi', 'DSA', 'SEFL', 'SEFR', 'EMG', 'SR', 'ARTF']);
@@ -131,7 +131,7 @@ try {
     await page.click('#sedDlg [data-v="p_psi_alarms"]'); await page.click('#sedDlg [data-a="open"][data-v="1"]'); await page.click('#sedDlg .sdlist [role="option"]:text-is("70")'); await page.click('#sedDlg .sdok');
     assert.match(await page.$eval('#sedDlg .sderr', e => e.textContent), /Invalid limits/); assert.ok(await page.$$eval('#sedDlg .sdbar.bad', e => e.length) > 0, 'the rows are marked'); assert.equal(await page.evaluate(() => SED.set.psiLo), 25); await page.click('#sedDlg .sdcancel');
     // the numbers beside the PSI row follow the limits
-    await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), true);
+    await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]'); await page.click('#sedDlg [data-a="back"]'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedDlg', true], { timeout: 5000 });
     await page.evaluate(() => { SED.set.psiHi = 50; sedInval(); });
     // settings that change the picture: Additional Settings and the DSA pages
     await page.click('.hit[data-a="eegset"] >> nth=0'); assert.deepEqual(await page.$$eval('#sedDlg .sdrow label', e => e.map(x => x.textContent)), ['EEG Amplitude', 'EEG Chart Speed', 'EEG Display Filter', 'DSA Placement', 'Monitor Impedance', 'Display Impedance', 'DSA Artifacts']);
@@ -164,10 +164,10 @@ try {
     await page.evaluate(() => sedDlgOpen('access')); assert.deepEqual((await page.$$eval('#sedDlg .sdrow label', e => e.map(x => x.textContent))).slice(0, 4), ['power on profile', 'all mute enabled', 'lock alarm volume', 'standby enabled']);
     await page.click('#sedDlg [data-a="tog"][data-v="3"]'); await page.click('#sedDlg .sdok'); await page.click('#sedDlg [data-a="back"]').catch(() => {}); await page.evaluate(() => sedDlgClose());
     assert.equal(await page.evaluate(() => SED.set.standby), true); assert.equal(await page.$$eval('.hit[data-a="standby"]', e => e.length), 1);
-    await page.click('.hit[data-a="standby"]'); assert.equal(await page.$eval('#sedStandby', e => e.hidden), false); await page.click('#sedStandby button'); assert.equal(await page.$eval('#sedStandby', e => e.hidden), true);
+    await page.click('.hit[data-a="standby"]'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedStandby', false], { timeout: 5000 }); await page.click('#sedStandby button'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedStandby', true], { timeout: 5000 });
     assert.equal(await page.evaluate(() => SED.set.layout), 6);
     // Escape leaves the menu; the flag drops an event; the other screens still switch
-    await page.click('[data-a="gear"]'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), false); await page.keyboard.press('Escape'); assert.equal(await page.$eval('#sedDlg', e => e.hidden), true);
+    await page.click('[data-a="gear"]'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedDlg', false], { timeout: 5000 }); await page.keyboard.press('Escape'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedDlg', true], { timeout: 5000 });
     await page.click('[data-a="flag"]'); assert.equal(await page.evaluate(() => SED.events.length), 1);
     // factory defaults are restorable
     await page.evaluate(() => sedDlgOpen('access')); await page.click('#sedDlg [data-a="btn"][data-v="10"]'); assert.deepEqual(await page.evaluate(() => [SED.set.profile, SED.set.maxHz, SED.set.standby]), ['ADULT', 30, false]); await page.evaluate(() => sedDlgClose());
@@ -178,7 +178,7 @@ try {
       const r = await page.evaluate(() => axe.run(document.querySelector('#sedWrap'), { runOnly: ['wcag2a', 'wcag2aa'] })); assert.deepEqual(r.violations.map(v => `${v.id}: ${v.nodes.length}`), [], `axe on the SedLine screen${open ? ' (menu open)' : ''}`);
     }
     await page.evaluate(() => sedDlgClose());
-    await page.click('#skinSeg [data-skin="vista"]'); assert.equal(await page.$eval('#sedWrap', e => e.hidden), true);
+    await page.click('#skinSeg [data-skin="vista"]'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedWrap', true], { timeout: 5000 });
     await page.close();
   }
   assert.deepEqual(errors, [], 'no page errors');

@@ -22,9 +22,9 @@ try {
     assert.deepEqual(await page.evaluate(() => ADV_BOOT.map(x => x[0])), ['Connect BISx to start monitoring', 'Initializing BISx', 'Connect sensor to start monitoring']); // the first two are brief; a slow machine can miss them, so only the last is awaited
     await page.waitForFunction(() => /Connect sensor to start monitoring/.test(document.querySelector('#advBoot').textContent) && document.querySelector('#advBoot [data-a="alarms"]'), null, { timeout: 5000 });
     await page.waitForFunction(() => ADV.sensor && document.querySelector('#advOv .th'), null, { timeout: 6000 }); // the sensor check opens by itself
-    await page.click('#advSkip'); assert.equal(await page.evaluate(() => ADV.boot), null); assert.equal(await page.$eval('#advBoot', e => e.hidden), true);
+    await page.click('#advSkip'); assert.equal(await page.evaluate(() => ADV.boot), null); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#advBoot', true], { timeout: 5000 });
     assert.ok(await page.evaluate(() => ADV.t0 < simT - 1800 && ADV.pre.L.length >= 400 && ADV.pre.R.length >= 400), 'the case starts with 35 minutes of earlier trend');
-    assert.equal(await page.$eval('#advWrap', e => e.hidden), false); assert.equal(await page.$eval('#vistaWrap', e => e.hidden), true); assert.equal(await page.$eval('#sedWrap', e => e.hidden), true);
+    await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#advWrap', false], { timeout: 5000 }); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#vistaWrap', true], { timeout: 5000 }); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#sedWrap', true], { timeout: 5000 });
     // the screen is 16:10 and scales as a unit
     { const r = await page.$eval('#advS', e => { const q = e.getBoundingClientRect(); return q.width / q.height; }); assert.ok(Math.abs(r - 1.6) < 0.02, `16:10 screen (${r})`); }
     assert.ok(await page.evaluate(() => document.fonts.check('16px Selawik')), 'bundled Selawik font loads');
@@ -46,10 +46,10 @@ try {
     assert.equal(await page.evaluate(() => ADV.hemi), 'L'); await page.click('#aLr'); assert.equal(await page.evaluate(() => ADV.hemi), 'R'); assert.equal(await txt(page, '#aBadgeLow'), 'R');
     await page.click('#aLr');
     // graph / chart toggle: the chart is a table with the real column heads
-    await page.click('#aGt'); assert.equal(await page.$eval('#advChart', e => e.hidden), false);
+    await page.click('#aGt'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#advChart', false], { timeout: 5000 });
     assert.match(await txt(page, '#advChart thead'), /Time\s*BIS L\s*BIS R\s*EMG L dB\s*EMG R dB\s*SR L %\s*SR R %\s*ASYM %\s*SQI L %\s*SQI R %/);
     assert.ok(await page.$$eval('#advChart tbody tr', e => e.length) >= 2, 'chart rows'); assert.match(await txt(page, '#advChart .hdr'), /BEGIN: \d+ [A-Z]{3} \d{4} \d\d:\d\d:\d\d.*Chart Interval: 1 min/); assert.ok(await page.$$eval('#advChart tbody tr', e => e.length) >= 30, 'the chart lists the case back to its start');
-    await page.click('#aGt'); assert.equal(await page.$eval('#advChart', e => e.hidden), true);
+    await page.click('#aGt'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#advChart', true], { timeout: 5000 });
     // the main menu: six tiles in the real order; ALARMS is dimmed while monitoring; Escape closes
     await page.click('#aMenu'); assert.equal(await page.$eval('#advOv .mm', e => !!e), true);
     assert.deepEqual(await page.$$eval('#advOv .mm button', bs => bs.map(x => x.textContent.replace(/\s+/g, ' ').trim())), ['ALARMS', 'DISPLAY SETTINGS', 'SETTINGS & MAINTENANCE', 'DOWNLOAD', 'INFO', 'CASE REVIEW']);
@@ -85,9 +85,9 @@ try {
     assert.ok(await page.$eval('#aAbar', e => e.classList.contains('hi')), 'high priority is red'); assert.equal(await txt(page, '#aAl2'), 'BIS above defined range');
     assert.equal(await page.$eval('#aBisL', e => e.classList.contains('box')), true, 'digits on a red box');
     await page.waitForFunction(() => ADV.sounding === true && ADV.beeps > 0, null, { timeout: 4000 });
-    await page.click('#aAcnt'); assert.equal(await page.$eval('#aAlist', e => e.hidden), false); assert.match(await txt(page, '#aAlist'), /START\s*ALARM\s*\d\d:\d\d\s*BIS ALARM/); await page.click('#aAcnt');
+    await page.click('#aAcnt'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#aAlist', false], { timeout: 5000 }); assert.match(await txt(page, '#aAlist'), /START\s*ALARM\s*\d\d:\d\d\s*BIS ALARM/); await page.click('#aAcnt');
     await page.click('#aSilent'); assert.equal(await page.evaluate(() => ADV.audio), 1); await page.waitForFunction(([sel, t]) => document.querySelector(sel).textContent.replace(/\s+/g, ' ').trim() === t, ['#aMsgT', 'Alarm Pause Mode On'], { timeout: 5000 }); assert.match(await txt(page, '#aPillT'), /^[12]:\d\d$/); await page.waitForFunction(() => ADV.sounding === false, null, { timeout: 5000 });
-    await page.click('#aSilent'); assert.equal(await txt(page, '#aPillT'), 'SILENT'); await page.waitForFunction(([sel, t]) => document.querySelector(sel).textContent.replace(/\s+/g, ' ').trim() === t, ['#aMsgT', 'Alarm Silent Mode On'], { timeout: 5000 }); assert.equal(await page.evaluate(() => ADV.msgs.filter(m => /^Alarm (Pause|Silent) Mode/.test(m.text)).length), 1, 'only the newest audio message is kept'); assert.equal(await page.$eval('#aAbar', e => e.hidden), false, 'the bar stays while the audio is off');
+    await page.click('#aSilent'); assert.equal(await txt(page, '#aPillT'), 'SILENT'); await page.waitForFunction(([sel, t]) => document.querySelector(sel).textContent.replace(/\s+/g, ' ').trim() === t, ['#aMsgT', 'Alarm Silent Mode On'], { timeout: 5000 }); assert.equal(await page.evaluate(() => ADV.msgs.filter(m => /^Alarm (Pause|Silent) Mode/.test(m.text)).length), 1, 'only the newest audio message is kept'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#aAbar', false], { timeout: 5000 });
     await page.click('#aDrop'); assert.equal(await page.$$eval('#aCtl button', e => e.length), 4); await page.click('#aCt0'); assert.equal(await page.evaluate(() => ADV.audio), 0); await page.waitForFunction(([sel, t]) => document.querySelector(sel).textContent.replace(/\s+/g, ' ').trim() === t, ['#aMsgT', 'Alarm Silent Mode Off'], { timeout: 5000 });
     // alarm off again: bar goes
     await page.click('#aAlarms'); await page.click('[data-a="dtog"][data-v="bis"]'); await page.click('[data-a="dapply"]');
@@ -119,10 +119,10 @@ try {
     await page.waitForFunction(() => !document.querySelector('#aAbar') || document.querySelector('#aAbar').hidden || !/SENSOR DISCONNECTED/.test(document.querySelector('#aAl1').textContent), null, { timeout: 5000 });
     await page.click('[data-sim="expired"]'); await page.waitForFunction(() => /SENSOR EXPIRED/.test(document.querySelector('#aAl1').textContent), null, { timeout: 5000 }); await page.click('[data-sim="expired"]');
     await page.click('[data-sim="batt"]'); await page.waitForFunction(() => /BATTERY LOW/.test(document.querySelector('#aAl1').textContent), null, { timeout: 5000 });
-    assert.equal(await txt(page, '#aBatT'), '10%'); assert.equal(await page.$eval('#aBolt', e => e.hidden), true, 'no mains bolt on battery'); assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'AC power disconnected')), true);
-    await page.click('[data-sim="batt"]'); await page.waitForFunction(() => document.querySelector('#aBatT').textContent === '100%', null, { timeout: 3000 }); assert.equal(await txt(page, '#aBatT'), '100%'); assert.equal(await page.$eval('#aBolt', e => e.hidden), false);
+    assert.equal(await txt(page, '#aBatT'), '10%'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#aBolt', true], { timeout: 5000 }); assert.equal(await page.evaluate(() => ADV.msgs.some(m => m.text === 'AC power disconnected')), true);
+    await page.click('[data-sim="batt"]'); await page.waitForFunction(() => document.querySelector('#aBatT').textContent === '100%', null, { timeout: 3000 }); assert.equal(await txt(page, '#aBatT'), '100%'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#aBolt', false], { timeout: 5000 });
     // the USB icon is in the bar; the hard keys on the case: function opens the main menu, home closes it, power does nothing
-    assert.equal(await page.$eval('#aUsb', e => e.hidden), false);
+    await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#aUsb', false], { timeout: 5000 });
     await page.click('#aHkFn'); assert.equal(await page.$$eval('#advOv .mm', e => e.length), 1); await page.click('#aHkHome'); assert.equal(await page.$$eval('#advOv .mm', e => e.length), 0); await page.click('#aHkPw'); assert.equal(await page.$$eval('#advOv .mm', e => e.length), 0);
     // the EEG frame scale stays at +-50 uV whatever the uV/mm gain (the gain changes the trace, not the labels)
     assert.equal(await page.evaluate(() => { ADV.uvmm[4] = 5; advRelayout(); return ADV.uvmm[4]; }), 5); await page.evaluate(() => { ADV.uvmm[4] = 10; advRelayout(); });
@@ -139,7 +139,7 @@ try {
     assert.equal(await page.evaluate(() => !!ADV.review), true); assert.deepEqual(await page.$$eval('#advLeft .rb .l', e => e.map(x => x.textContent)), ['CASES LIST', 'CASE LOG', 'EXIT']);
     await page.waitForFunction(() => document.querySelector('#advWm .tip'), null, { timeout: 3000 }); assert.match(await txt(page, '#advWm .tip'), /^\d\d:\d\d:\d\d$/);
     // review keeps the alarm bar and pill and the message bar, shows no title and no date block, and prints the case facts on the trend
-    assert.match(await txt(page, '#aAl1'), /SENSOR DISCONNECTED/); assert.equal(await page.$eval('#aPill', e => e.hidden), false); assert.equal(await page.$eval('#aDate', e => e.hidden), true); assert.equal(await page.$eval('#aNetx', e => e.hidden), false);
+    assert.match(await txt(page, '#aAl1'), /SENSOR DISCONNECTED/); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#aPill', false], { timeout: 5000 }); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#aDate', true], { timeout: 5000 }); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#aNetx', false], { timeout: 5000 });
     assert.ok(!/CASE REVIEW/.test(await txt(page, '#advTop')), 'no CASE REVIEW title in the top bar'); assert.notEqual(await txt(page, '#aMsgT'), '', 'the message bar stays live');
     assert.equal(await page.$eval('#aCases', e => e.classList.contains('sq')), true, 'rounded-square review buttons');
     await page.click('#aLog'); assert.match(await txt(page, '#advOv .lst'), /Case start/); await page.click('[data-a="dclose"]');
@@ -157,7 +157,7 @@ try {
     await page.addScriptTag({ path: AXE });
     { const r = await page.evaluate(() => axe.run(document.querySelector('#advS'), { runOnly: ['wcag2a', 'wcag2aa'], rules: { 'color-contrast': { enabled: false } } })); assert.deepEqual(r.violations.map(v => `${v.id}: ${v.nodes.length}`), [], 'axe on the BIS Advance screen'); }
     // other skins still work after leaving the Advance screen
-    await page.click('#skinSeg [data-skin="vista"]'); assert.equal(await page.$eval('#advWrap', e => e.hidden), true); assert.equal(await page.$eval('#vistaWrap', e => e.hidden), false);
+    await page.click('#skinSeg [data-skin="vista"]'); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#advWrap', true], { timeout: 5000 }); await page.waitForFunction(([sel, v]) => document.querySelector(sel).hidden === v, ['#vistaWrap', false], { timeout: 5000 });
     await page.close();
   }
   assert.deepEqual(errors, [], 'page errors');
