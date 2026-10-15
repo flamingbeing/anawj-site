@@ -57,6 +57,9 @@ Agreed queue (one PR each, in order, once he says go):
    (Select all / none, Bulk edit…, Done). Bulk edit: date (set or clear), title (replace / find and replace / add in
    front), text (add to the end / find and replace), unlink from case, merge the selected notes into one (in date
    order), share or export just these, move to the bin. Same warning, 20+ second step and Undo as cases.
+9c. **Select and bulk edit in Reflections too** (owner): the same press and hold / Select and bar. Bulk edit: heading,
+   status (draft / complete), in the portfolio export (tick on / off), JR flag, date; export just these (Word portfolio
+   or Markdown); move to the bin. Same warning, 20+ second step and Undo.
 10. **Grid as a spreadsheet:** thin lines, no boxed inputs; drag to resize columns (per device, double-tap resets);
     lines per row 1 / 2 / 3 / Fit to content.
 11. **Paging by default** (owner's call, 15 Oct): 100 per page, 25 / 50 / 100 / 300 / All (per device); "‹ Page 2 of
