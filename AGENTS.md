@@ -76,7 +76,7 @@ Rules that bite:
   `<app>-`; show the rest as it is if it isn't dated; show nothing without one). Second, a link-styled button
   `Not updating? Get the latest version`: it fetches the app's `sw.js` with `cache: 'no-store'` first (no signal: say so and
   change nothing), then unregisters only this app's service worker, deletes only caches starting `<app>-` and reloads.
-  It never touches saved data (localStorage, IndexedDB, sign-in). A browser test checks both lines. The same goes for
+  It never touches saved data (localStorage, IndexedDB, sign-in). (Logbook keeps them at the bottom of More instead; owner, 15 Oct 2026.) A browser test checks both lines. The same goes for
   apps in other repos (anantf.com's `babymo/`).
 - One repo, one PR number sequence for every app: start PR titles with the app ("Logbook: …", "Prewarm: …"); a
   workflow labels each PR by the folders it touches (`.github/labeler.yml`), so filter the PR list by label. Outside
