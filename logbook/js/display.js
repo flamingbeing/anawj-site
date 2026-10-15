@@ -2,7 +2,7 @@
 // and the tab bar's arrangement. Split from ui-settings.js so the Case tab (ui-log.js, ui-notepad.js) and app.js can
 // start without loading the settings pages (they load on first use).
 
-import { S, h, toast, modal, hooks, profile, facultyRole, facultyMode, shows } from './ui-core.js';
+import { S, h, toast, modal, hooks, profile, facultyRole, shows } from './ui-core.js';
 import { DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
 import { checkCss } from './custom-css.js';
 import { applyFonts } from './fonts.js';
@@ -198,10 +198,10 @@ export const roundLevel = d => (Number.isInteger(d.round) && d.round >= 0 && d.r
 // The tab bar (Advanced display, per device): the order of its tabs and which are hidden. More always stays
 // (Settings live there), at least two and at most seven (MAX_BAR, More included) stay on the bar; hidden main tabs
 // are listed first on the More page. Every page in the More list can go on the bar too (Admin portal: admins only).
-export const BAR_TABS = [['programme', 'Totals'], ['caselogs', 'Case logs'], ['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics'], ['notes', 'Notes'],
+export const BAR_TABS = [['caselogs', 'Case logs'], ['log', 'Case'], ['logbook', 'Logbook'], ['totals', 'Totals'], ['reflect', 'Reflections'], ['progress', 'Analytics'], ['notes', 'Notes'],
   ['account', 'Account'], ['settings', 'Settings'], ['recovery', 'Recover drafts'], ['data', 'Export / Import'], ['admin', 'Admin portal'], ['more', 'More']];
-// Faculty / PCs has no Analytics tab: Totals (Programme totals) instead
-export const barTabs = () => BAR_TABS.filter(([id]) => (id !== 'admin' || S.admin) && ((id !== 'caselogs' && id !== 'programme') || facultyRole()) && (id !== 'progress' || !facultyMode()));
+// Totals: programme residents, faculty, PDs and admins, with the totals switch on (off in Personal)
+export const barTabs = () => BAR_TABS.filter(([id]) => (id !== 'admin' || S.admin) && (id !== 'caselogs' || facultyRole()) && (id !== 'totals' || ((facultyRole() || S.resident) && shows('totals'))));
 // tabs off the bar until someone puts them there (they live in More by default), and the ones each profile moves:
 // profiles.js (OFF_BAR, PROFILE_OFF, PROFILE_ON)
 export const MAX_BAR = 7;

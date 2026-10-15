@@ -8,7 +8,7 @@ export const privacyCard = () => (
       h('h2', {}, 'Privacy'),
       h('p', { class: 'hint', style: 'margin:0' },
         'Your cases are stored in your own logbook in Google Cloud Firestore. Only you can read them (and the app owner, who runs the import from the old Google Form); programme admins cannot. ',
-        'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per tag (Analytics → Compare with your intake); details are never shared. ',
+        'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per tag (the Totals tab); details are never shared. ',
         'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')));
 export const creditsCard = () => (
     h('section', { class: 'card credits' },

@@ -622,7 +622,7 @@ export function youCard() {
     h('label', { class: 'field' }, 'Name (shown on your exports; the Totals table uses the name on the programme list)',
       h('input', { value: displayName(), autocomplete: 'name', onchange: e => patchLogbook({ name: e.target.value.trim() }).then(() => toast('Saved')) })),
     r
-      ? h('p', { class: 'hint' }, `On the programme list: ${r.rid}, AY${r.intake || '?'} intake, ${myYearName()}${r.status && r.status !== 'ACTIVE' ? ', ' + r.status.toLowerCase() : ''}. Your case counts (never your case details) are shared on Totals (Analytics → Compare with your intake).`)
+      ? h('p', { class: 'hint' }, `On the programme list: ${r.rid}, AY${r.intake || '?'} intake, ${myYearName()}${r.status && r.status !== 'ACTIVE' ? ', ' + r.status.toLowerCase() : ''}. Your case counts (never your case details) are shared on the Totals tab.`)
       : h('p', { class: 'hint' }, 'Not on the programme resident list, so your logbook is private and not on Totals. If you are an APMES resident, ask the programme admins to add your email.'));
 }
 
