@@ -10,12 +10,17 @@ try { for (const width of [390, 1280]) {
   const p = await ctx.newPage(), errors = [];
   p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await p.goto(base + '?demo#progress'); await p.locator('.an-sec').first().waitFor();
-  const cards = () => p.locator('details.an-sec .an-t').allInnerTexts().then(a => a.map(t => t.replace(/ \(\d+\)$/, '')));
+  const cards = () => p.locator('details.an-sec .an-t').allInnerTexts().then(a => a.map(t => t.replace(/ \([^)]*\)$/, '')));
   const rows = () => p.locator('.an-edit-list').first().locator('.an-edit-name').allInnerTexts();
   const start = await cards();
   assert.ok(start.includes('Trends') && start.includes('Logbook'), start.join());
   await p.getByRole('button', { name: 'Edit', exact: true }).click();
   assert.deepEqual(await rows(), start);
+  // the less important cards start hidden; Show puts one on the page
+  for (const n of ['Patient ages', 'Case mix', 'Logging habits']) await p.getByRole('button', { name: 'Show ' + n }).waitFor();
+  assert.match(await p.locator('.an-editbar, .an-edit').first().innerText(), /Arrange Analytics/);
+  await p.getByRole('button', { name: 'Show Logging habits' }).click();
+  await p.getByRole('button', { name: 'Hide Logging habits' }).click();
   // arrows
   await p.getByRole('button', { name: 'Move Logbook up' }).click();
   const i = start.indexOf('Logbook'), up = [...start]; up.splice(i - 1, 0, ...up.splice(i, 1));
@@ -34,9 +39,9 @@ try { for (const width of [390, 1280]) {
   const arranged = await rows();
   await p.getByRole('button', { name: 'Done' }).click();
   assert.deepEqual(await cards(), arranged);
-  assert.match(await p.locator('.an-editbar').innerText(), /1 card hidden/);
+  assert.match(await p.locator('.an-editbar').innerText(), /4 cards hidden/, 'Trends and the three that start hidden');
   // saved for the account: still so after a reload
-  assert.deepEqual(await p.evaluate(async () => (await import('./js/ui-core.js')).settings().anLayout.hidden), ['trends']);
+  assert.deepEqual(await p.evaluate(async () => (await import('./js/ui-core.js')).settings().anLayout.hidden), ['habits', 'trends']);
   await p.reload(); await p.locator('.an-sec').first().waitFor();
   assert.deepEqual(await cards(), arranged);
   // Reset layout

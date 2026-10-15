@@ -79,10 +79,12 @@ export function reflectionTodos(cases, reflections, now = Date.now(), days = 30)
 // go in their default place; ones it names that aren't available are ignored)
 export function cleanLayout(v) {
   const ids = x => (Array.isArray(x) ? [...new Set(x.filter(s => typeof s === 'string' && /^[a-z]{1,20}$/.test(s)))].slice(0, 40) : []);
-  return v && typeof v === 'object' && !Array.isArray(v) ? { order: ids(v.order), hidden: ids(v.hidden) } : { order: [], hidden: [] };
+  return v && typeof v === 'object' && !Array.isArray(v) ? { order: ids(v.order), hidden: ids(v.hidden), show: ids(v.show) } : { order: [], hidden: [], show: [] };
 }
-export function arrangeCards(ids, layout) {
-  const { order, hidden } = cleanLayout(layout);
+// off: cards hidden until shown (5b: the less important ones start in "Hidden cards"); layout.show lists those turned on
+export function arrangeCards(ids, layout, off = []) {
+  const { order, hidden: saved, show } = cleanLayout(layout);
+  const hidden = [...new Set([...saved, ...off.filter(id => !show.includes(id))])];
   const known = order.filter(id => ids.includes(id));
   // a card not in the saved order goes after the card it follows by default
   const all = [...known];
@@ -90,15 +92,101 @@ export function arrangeCards(ids, layout) {
   return { shown: all.filter(id => !hidden.includes(id)), hidden: all.filter(id => hidden.includes(id)) };
 }
 // one card moved by n places among the shown ones -> the new layout
-export function moveCard(ids, layout, id, n) {
-  const { shown, hidden } = arrangeCards(ids, layout);
+export function moveCard(ids, layout, id, n, off = []) {
+  const l = cleanLayout(layout), { shown, hidden } = arrangeCards(ids, layout, off);
   const i = shown.indexOf(id), j = Math.max(0, Math.min(shown.length - 1, i + n));
-  if (i < 0 || i === j) return cleanLayout(layout);
+  if (i < 0 || i === j) return l;
   shown.splice(j, 0, ...shown.splice(i, 1));
-  return { order: [...shown, ...hidden], hidden };
+  return { ...l, order: [...shown, ...hidden] };
 }
-export function hideCard(ids, layout, id, hide) {
-  const { shown, hidden } = arrangeCards(ids, layout);
-  const h2 = hide ? [...new Set([...hidden, id])] : hidden.filter(x => x !== id);
-  return { order: [...shown, ...hidden], hidden: h2 };
+export function hideCard(ids, layout, id, hide, off = []) {
+  const l = cleanLayout(layout), { shown, hidden } = arrangeCards(ids, layout, off);
+  return { order: [...shown, ...hidden], hidden: hide ? [...new Set([...l.hidden, id])] : l.hidden.filter(x => x !== id),
+    show: hide ? l.show.filter(x => x !== id) : off.includes(id) ? [...new Set([...l.show, id])] : l.show };
+}
+
+// ---------- more cards (5b; owner, 15 Oct 2026) ----------
+
+const addMonths = (d, m) => { const x = new Date(d); x.setDate(x.getDate() + Math.round(m * 30.44)); return x; };
+// Finish line: per tag still to reach, the day your pace gets there vs the end of its due year. fc: paceForecast.
+// -> [{ code, eta (date or null at a pace of 0), deadline, late }] the furthest behind first
+export function finishLine(fc, today) {
+  const t = parse(today);
+  const slack = x => (x.eta ? (parse(x.eta) - parse(x.deadline)) / DAY : Infinity);
+  return Object.entries(fc || {}).map(([code, f]) => {
+    const eta = isFinite(f.monthsToGo) ? iso(addMonths(t, f.monthsToGo)) : null;
+    return { code, eta, deadline: f.deadline, late: !eta || eta > f.deadline };
+  }).sort((a, b) => slack(b) - slack(a) || a.code.localeCompare(b.code));
+}
+// This month: cases, the top tags, tags logged for the first time, and tags whose final target was reached this month.
+// target: code -> its final target (or null)
+export function monthSummary(cases, today, target = () => null) {
+  const month = String(today).slice(0, 7);
+  const dated = (cases || []).filter(c => c.date && c.date <= today);
+  const mine = dated.filter(c => c.date.startsWith(month));
+  const per = {}, before = {};
+  for (const c of dated) for (const code of new Set(c.cats || [])) { if (c.date.startsWith(month)) per[code] = (per[code] || 0) + 1; else if (c.date < month) before[code] = (before[code] || 0) + 1; }
+  const top = Object.entries(per).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 3);
+  const first = Object.keys(per).filter(code => !before[code]).sort();
+  const met = Object.keys(per).filter(code => { const n = target(code); return n != null && (before[code] || 0) < n && (before[code] || 0) + per[code] >= n; }).sort();
+  return { month, n: mine.length, top, first, met };
+}
+// Milestones, dated: your first case, round numbers of cases, and each tag's final target reached. Newest first.
+export function milestones(cases, target = () => null, rounds = [50, 100, 200, 300, 400, 500, 750, 1000, 1500, 2000]) {
+  const dated = (cases || []).filter(c => c.date).sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
+  const out = [], per = {};
+  dated.forEach((c, i) => {
+    if (i === 0) out.push({ date: c.date, kind: 'first', n: 1 });
+    if (rounds.includes(i + 1)) out.push({ date: c.date, kind: 'cases', n: i + 1 });
+    for (const code of new Set(c.cats || [])) {
+      per[code] = (per[code] || 0) + 1;
+      const n = target(code);
+      if (n != null && per[code] === n) out.push({ date: c.date, kind: 'target', code, n });
+    }
+  });
+  return out.reverse();
+}
+// Patient ages from the case text (estimated): bands, and how many cases said an age. ageOf: details -> years or null
+export function ageMix(cases, ageOf) {
+  const bands = [['Under 1', 0, 1], ['1–12', 1, 13], ['13–16', 13, 17], ['17–64', 17, 65], ['65–79', 65, 80], ['80 and over', 80, 200]];
+  const out = bands.map(([label]) => [label, 0]);
+  let known = 0;
+  for (const c of cases || []) { const y = ageOf(c.details || ''); if (y == null) continue; known++; const i = bands.findIndex(([, a, b]) => y >= a && y < b); if (i >= 0) out[i][1]++; }
+  return { bands: out, known, total: (cases || []).length };
+}
+// ASA, elective or emergency, GA or regional, from words in the case text (estimated; a case can be both GA and
+// regional). -> { asa: [[1..6, n]], emergency, elective, ga, regional, known: { asa, urgency, technique }, total }
+export function caseMix(cases) {
+  const asa = [1, 2, 3, 4, 5, 6].map(n => [n, 0]);
+  let emergency = 0, elective = 0, ga = 0, regional = 0, kA = 0, kU = 0, kT = 0;
+  for (const c of cases || []) {
+    const t = String(c.details || '');
+    const a = t.match(/\bASA\s*([1-6])\s*(E)?\b/i);
+    if (a) { asa[Number(a[1]) - 1][1]++; kA++; }
+    const em = /\b(emerg\w*|urgent|stat|after[- ]?hours|on[- ]?call|trauma call)\b/i.test(t) || (a && a[2]);
+    const el = /\b(elective|day surgery|DSU|listed)\b/i.test(t);
+    if (em) { emergency++; kU++; } else if (el) { elective++; kU++; }
+    const g = /\b(GA|general an(a)?esthe\w*|ETT|LMA|TIVA|RSI|intubat\w*)\b/i.test(t);
+    const r = /\b(spinal|epidural|CSE|block|regional|ESP|TAP|caudal|interscalene|femoral|sciatic)\b/i.test(t);
+    if (g) ga++; if (r) regional++; if (g || r) kT++;
+  }
+  return { asa, emergency, elective, ga, regional, known: { asa: kA, urgency: kU, technique: kT }, total: (cases || []).length };
+}
+// Logging habits: how many days after the case it was logged (median, and the share on the day), and streaks of days
+// in a row with a case logged. now: ms
+export function loggingHabits(cases, today) {
+  const lag = (cases || []).filter(c => c.date && c.createdAt).map(c => Math.max(0, Math.floor((c.createdAt - parse(c.date).getTime()) / DAY)));
+  lag.sort((a, b) => a - b);
+  const median = lag.length ? lag[Math.floor(lag.length / 2)] : null;
+  const sameDay = lag.length ? lag.filter(x => x === 0).length / lag.length : null;
+  const days = [...new Set((cases || []).filter(c => c.date && c.date <= today).map(c => c.date))].sort();
+  let best = 0, run = 0, prev = null;
+  for (const d of days) { run = prev && (parse(d) - parse(prev)) / DAY === 1 ? run + 1 : 1; best = Math.max(best, run); prev = d; }
+  // the current run: ends today or yesterday
+  let now = 0;
+  if (days.length) {
+    const last = days[days.length - 1], gap = (parse(today) - parse(last)) / DAY;
+    if (gap <= 1) { now = 1; for (let i = days.length - 1; i > 0 && (parse(days[i]) - parse(days[i - 1])) / DAY === 1; i--) now++; }
+  }
+  return { median, sameDay, logged: lag.length, best, now };
 }

@@ -86,7 +86,7 @@ try { for (const width of [390, 1280]) {
   assert.doesNotMatch(await p.locator('#toast').innerText(), /now \d+\/\d+/);
   // Analytics (in More): cases per tag (your own tags too), no year
   await goHash('progress');
-  await p.locator('.an-sec summary', { hasText: 'Tags' }).click();
+  await p.locator('.an-sec summary', { has: p.locator('.an-t', { hasText: /^Tags$/ }) }).click();
   await p.locator('.an-list li', { hasText: 'Lower Segment Caesarean Section' }).first().waitFor();
   assert.equal(await p.locator('.legend.tally').count(), 0);
   assert.equal(await p.getByText('Compare with your intake').count(), 0);

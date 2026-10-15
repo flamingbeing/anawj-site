@@ -2,12 +2,12 @@
 // benchmarking; counts only, never details).
 
 import { R_YEARS, BY_CODE, CATEGORIES, appYear, yearName } from './categories.js';
-import { progress, todayISO, rYearDefault, weekLead, weekdayNames, fmtDate, finalTarget, towardsMinimum, tagTotal, MINIMUM_TOTAL } from './engine.js';
+import { splitAge, splitInitials, progress, todayISO, rYearDefault, weekLead, weekdayNames, fmtDate, finalTarget, towardsMinimum, tagTotal, MINIMUM_TOTAL } from './engine.js';
 import { display, setDisplay } from './display.js';
 import { exportTotals } from './xlsxio.js';
-import { reflectionProgress, HEADING_BY_ID } from './reflections.js';
+import { reflectionProgress, HEADING_BY_ID, suggestHeadings } from './reflections.js';
 import { logbookGlance, reflectionGlance, cohortGlance } from './glance.js';
-import { paceForecast, paceText, goneQuiet, reflectionTodos, arrangeCards, moveCard, hideCard } from './analytics.js';
+import { paceForecast, paceText, goneQuiet, reflectionTodos, arrangeCards, moveCard, hideCard, finishLine, monthSummary, milestones, ageMix, caseMix, loggingHabits } from './analytics.js';
 import { reflectOnCase, openReflection } from './ui-reflect.js';
 import { S, h, ic, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName, summaryOf, basicHides } from './ui-core.js';
 
@@ -78,7 +78,9 @@ export function renderProgress() {
     h('label', { class: 'check', style: 'margin:0 0 4px' }, h('input', { type: 'checkbox', checked: !!pview.hideDone, onchange: e => { pview.hideDone = e.target.checked; hooks.render(); } }), 'Hide done'),
     progList(shown, fc));
   // everyone's counts are on their own tab, Totals (owner, 15 Oct 2026), not linked from here
-  return layoutPage(head, { urgent: urgentSec, quiet: quietSec, targets, refl: reflectionsOn() ? reflCard() : null, todo: advanced() ? todoCard() : null, trends: advanced() ? trendsCard() : null });
+  return layoutPage(head, { urgent: urgentSec, finish: advanced() ? finishCard(fc) : null, month: monthCard(true), quiet: quietSec, targets,
+    refl: reflectionsOn() ? reflCard() : null, material: reflectionsOn() ? materialCard() : null, todo: advanced() ? todoCard() : null,
+    milestones: milestonesCard(true), trends: advanced() ? trendsCard() : null, ...extraCards() });
 }
 const reflectionsOn = () => !basicHides('reflect') && !basicHides('reflHeadings');
 
@@ -96,17 +98,91 @@ function renderCounts() {
   const counts = section('counts', 'Tags', `${rows.length} tag${rows.length === 1 ? '' : 's'} used · ${S.cases.length} cases`,
     rows.length ? h('ul', { class: 'an-list' }, rows.map(([k, x]) => h('li', {}, casesLink(name(k), { tag: k }), h('small', { class: 'muted' }, ` · ${x} case${x === 1 ? '' : 's'}`))))
       : h('p', { class: 'empty' }, 'No cases yet.'));
-  return layoutPage(head, { counts, refl: reflectionsOn() ? reflCard() : null, todo: advanced() ? todoCard() : null, trends: advanced() ? trendsCard() : null });
+  return layoutPage(head, { counts, month: monthCard(false), refl: reflectionsOn() ? reflCard() : null, material: reflectionsOn() ? materialCard() : null,
+    todo: advanced() ? todoCard() : null, milestones: milestonesCard(false), trends: advanced() ? trendsCard() : null, ...extraCards() });
+}
+
+// ---------- more cards (5b; owner, 15 Oct 2026). Estimates from the case text say so, with how many cases they read ----------
+
+const monthName = iso => new Date(iso + 'T00:00').toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+const tagTarget = targetsOn => (targetsOn ? code => finalTarget(code) : () => null);
+function finishCard(fc) {
+  const rows = finishLine(fc, todayISO());
+  if (!rows.length) return null;
+  const late = rows.filter(r => r.late).length;
+  return section('finish', 'Finish line', late ? `${late} tag${late === 1 ? '' : 's'} won’t reach the next target in time at your pace` : 'Every tag reaches its next target in time at your pace ✓',
+    h('ul', { class: 'an-list' }, rows.map(r => h('li', {}, casesLink(catName(r.code), { tag: 'c:' + r.code }),
+      h('small', { class: r.late ? 'warn' : 'muted' }, ` · ${r.eta ? 'about ' + monthName(r.eta) : 'no recent cases'} · due by ${monthName(r.deadline)}`)))),
+    h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'At the pace of your last 6 months, when each tag reaches its next target, and the end of the year it is due in.'));
+}
+function monthCard(targetsOn) {
+  const m = monthSummary(S.cases, todayISO(), tagTarget(targetsOn));
+  const name = new Date(m.month + '-01T00:00').toLocaleDateString(undefined, { month: 'long' });
+  return section('month', `This month (${name})`, `${m.n} case${m.n === 1 ? '' : 's'}${m.first.length ? ` · ${m.first.length} new tag${m.first.length === 1 ? '' : 's'}` : ''}${m.met.length ? ` · ${m.met.length} target${m.met.length === 1 ? '' : 's'} met` : ''}`,
+    m.n ? h('ul', { class: 'an-list' },
+      m.top.length ? h('li', {}, 'Most logged: ', m.top.map(([code, n], i) => [i ? ', ' : '', casesLink(catName(code), { tag: 'c:' + code }), ` (${n})`])) : null,
+      m.first.length ? h('li', {}, 'First time: ', m.first.map(c => catName(c)).join(', ')) : null,
+      m.met.length ? h('li', {}, 'Final target reached: ', m.met.map(c => catName(c)).join(', '), ' ✓') : null) : h('p', { class: 'empty' }, 'No cases yet this month.'));
+}
+function materialCard() {
+  const short = new Set(reflectionProgress(S.reflections).headings.filter(x => !x.met).map(x => x.id));
+  const linked = new Set((S.reflections || []).map(r => r.caseId).filter(Boolean));
+  const by = new Map();
+  for (const c of S.cases.filter(c => c.reflectTag && !linked.has(c.id))) {
+    const hd = suggestHeadings(c, S.reflections).find(x => short.has(x.headingId));
+    if (hd) (by.get(hd.headingId) || by.set(hd.headingId, []).get(hd.headingId)).push(c);
+  }
+  const n = [...by.values()].reduce((a, l) => a + l.length, 0);
+  return section('material', 'Reflection material', n ? `${n} ☆ case${n === 1 ? '' : 's'} for ${by.size} heading${by.size === 1 ? '' : 's'} still short` : 'No ☆ Interesting cases for the headings still short',
+    by.size ? h('ul', { class: 'an-list' }, [...by].map(([id, list]) => h('li', {}, h('b', {}, HEADING_BY_ID[id].name), ': ',
+      list.slice(0, 5).map((c, i) => [i ? ', ' : '', h('a', { href: '#reflect', class: 'an-link', onclick: e => { e.preventDefault(); reflectOnCase(c); } }, `${c.initials || 'Case'} ${fmtDate(c.date)}`)]),
+      list.length > 5 ? ` and ${list.length - 5} more` : ''))) : h('p', { class: 'empty' }, 'Star cases with ☆ Interesting on the Case tab; the ones that fit a heading you still need show here.'));
+}
+function milestonesCard(targetsOn) {
+  const list = milestones(S.cases, tagTarget(targetsOn));
+  if (!list.length) return null;
+  const say = x => (x.kind === 'first' ? 'Your first case' : x.kind === 'cases' ? `${x.n} cases` : `${catName(x.code)}: final target (${x.n}) reached`);
+  return section('milestones', 'Milestones', `${list.length} so far · latest: ${say(list[0])}`,
+    h('ul', { class: 'an-list' }, list.slice(0, 15).map(x => h('li', {}, say(x), h('small', { class: 'muted' }, ` · ${fmtDate(x.date)}`)))));
+}
+// an age read from the case text as years ("72M", "5yo", "3/12", "2/52", "10 d/o"), or null
+const ageOf = t => {
+  const a = splitAge(splitInitials(t).details).age; if (!a) return null;
+  const m = a.match(/^(\d+)(mo|m\/o|\/12|\/52|d\/o)?/i); if (!m) return null;
+  const n = Number(m[1]), u = (m[2] || '').toLowerCase();
+  return ['mo', 'm/o', '/12'].includes(u) ? n / 12 : u === '/52' ? n / 52 : u === 'd/o' ? n / 365 : n;
+};
+const share = (n, of) => (of ? Math.round(100 * n / of) + '%' : '–');
+const estFrom = (n, of) => h('p', { class: 'hint help', style: 'margin:6px 0 0' }, `Estimated from the words in ${n} of ${of} cases.`);
+function extraCards() {
+  if (!S.cases.length) return {};
+  const ages = ageMix(S.cases, ageOf), mix = caseMix(S.cases), hb = loggingHabits(S.cases, todayISO());
+  const bars = rows => h('ul', { class: 'an-list' }, rows.map(([label, n, of]) => h('li', {}, label, h('small', { class: 'muted' }, ` · ${n} (${share(n, of)})`))));
+  return {
+    ages: section('ages', 'Patient ages (estimated)', `from ${ages.known} of ${ages.total} cases`, bars(ages.bands.map(([l, n]) => [l, n, ages.known])), estFrom(ages.known, ages.total)),
+    mix: section('mix', 'Case mix (estimated)', `${mix.ga} GA · ${mix.regional} regional · ${mix.emergency} emergency`,
+      h('h3', {}, 'ASA'), bars(mix.asa.filter(([, n]) => n).map(([a, n]) => [`ASA ${a}`, n, mix.known.asa])), estFrom(mix.known.asa, mix.total),
+      h('h3', {}, 'Elective or emergency'), bars([['Elective', mix.elective, mix.known.urgency], ['Emergency', mix.emergency, mix.known.urgency]]), estFrom(mix.known.urgency, mix.total),
+      h('h3', {}, 'GA or regional'), bars([['GA', mix.ga, mix.known.technique], ['Regional', mix.regional, mix.known.technique]]), estFrom(mix.known.technique, mix.total)),
+    habits: section('habits', 'Logging habits', hb.median == null ? 'Not enough cases yet' : `${share(Math.round(hb.sameDay * hb.logged), hb.logged)} logged on the day · streak ${hb.now} day${hb.now === 1 ? '' : 's'}`,
+      h('ul', { class: 'an-list' },
+        h('li', {}, `Logged on the day of the case: ${share(Math.round((hb.sameDay || 0) * hb.logged), hb.logged)}`),
+        h('li', {}, `Usually logged: ${hb.median == null ? '–' : hb.median === 0 ? 'the same day' : hb.median + ' day' + (hb.median === 1 ? '' : 's') + ' after'}`),
+        h('li', {}, `Days in a row with a case: ${hb.now} now, ${hb.best} at most`))),
+  };
 }
 
 // ---------- Edit mode (owner, 15 Oct 2026): the cards in your order, some hidden; saved for the account ----------
 
-const CARD_NAMES = { urgent: 'Needs attention', quiet: 'Gone quiet', targets: 'Logbook', counts: 'Tags', refl: 'Reflections', todo: 'Reflection to-dos', trends: 'Trends' };
+const CARD_NAMES = { urgent: 'Needs attention', finish: 'Finish line', month: 'This month', quiet: 'Gone quiet', targets: 'Logbook', counts: 'Tags', refl: 'Reflections',
+  material: 'Reflection material', todo: 'Reflection to-dos', milestones: 'Milestones', trends: 'Trends', ages: 'Patient ages', mix: 'Case mix', habits: 'Logging habits' };
+// the less important cards start hidden: Edit → Hidden cards → Show (owner, 15 Oct 2026)
+const OFF_CARDS = ['ages', 'mix', 'habits'];
 // cards: id -> its card, or null when this profile (or the data) has none; the cards a profile can't use aren't listed
 function layoutPage(head, cards) {
   const ids = Object.keys(cards).filter(k => cards[k]);
   const layout = settings().anLayout;
-  const { shown, hidden } = arrangeCards(ids, layout);
+  const { shown, hidden } = arrangeCards(ids, layout, OFF_CARDS);
   if (pview.edit) return h('div', {}, head, editCard(ids, layout));
   const edit = () => { pview.edit = true; hooks.render(); };
   return h('div', {}, head,
@@ -115,14 +191,14 @@ function layoutPage(head, cards) {
     ...shown.map(id => cards[id]));
 }
 function editCard(ids, layout) {
-  const { shown, hidden } = arrangeCards(ids, layout);
+  const { shown, hidden } = arrangeCards(ids, layout, OFF_CARDS);
   const save = l => { patchLogbook({ settings: { anLayout: l } }); hooks.render(); };
   const list = h('ul', { class: 'an-edit-list', role: 'list' }, shown.map((id, i) => h('li', { 'data-card': id },
     h('span', { class: 'an-grip', 'aria-hidden': 'true', title: 'Drag to move', onpointerdown: e => drag(e, id) }, '⠿'),
     h('span', { class: 'an-edit-name' }, CARD_NAMES[id] || id),
-    h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${CARD_NAMES[id]} up`, disabled: i === 0, onclick: () => save(moveCard(ids, layout, id, -1)) }, '↑'),
-    h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${CARD_NAMES[id]} down`, disabled: i === shown.length - 1, onclick: () => save(moveCard(ids, layout, id, 1)) }, '↓'),
-    h('button', { type: 'button', class: 'small', 'aria-label': `Hide ${CARD_NAMES[id]}`, onclick: () => save(hideCard(ids, layout, id, true)) }, 'Hide'))));
+    h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${CARD_NAMES[id]} up`, disabled: i === 0, onclick: () => save(moveCard(ids, layout, id, -1, OFF_CARDS)) }, '↑'),
+    h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${CARD_NAMES[id]} down`, disabled: i === shown.length - 1, onclick: () => save(moveCard(ids, layout, id, 1, OFF_CARDS)) }, '↓'),
+    h('button', { type: 'button', class: 'small', 'aria-label': `Hide ${CARD_NAMES[id]}`, onclick: () => save(hideCard(ids, layout, id, true, OFF_CARDS)) }, 'Hide'))));
   // drag by the grip (a finger or a mouse): the row follows, and drops where the pointer is
   function drag(e, id) {
     e.preventDefault();
@@ -134,7 +210,7 @@ function editCard(ids, layout) {
       li.classList.remove('dragging'); li.style.transform = '';
       const to = rows.filter(r => r !== li).filter(r => { const b = r.getBoundingClientRect(); return ev.clientY > b.top + b.height / 2; }).length;
       const from = rows.indexOf(li);
-      if (to !== from) save(moveCard(ids, layout, id, to - from));
+      if (to !== from) save(moveCard(ids, layout, id, to - from, OFF_CARDS));
     };
     e.target.addEventListener('pointermove', move); e.target.addEventListener('pointerup', up); e.target.addEventListener('pointercancel', up);
   }
@@ -144,7 +220,7 @@ function editCard(ids, layout) {
     list,
     hidden.length ? [h('h3', {}, 'Hidden cards'), h('ul', { class: 'an-edit-list', role: 'list' }, hidden.map(id => h('li', {},
       h('span', { class: 'an-edit-name' }, CARD_NAMES[id] || id),
-      h('button', { type: 'button', class: 'small', 'aria-label': `Show ${CARD_NAMES[id]}`, onclick: () => save(hideCard(ids, layout, id, false)) }, 'Show'))))] : null,
+      h('button', { type: 'button', class: 'small', 'aria-label': `Show ${CARD_NAMES[id]}`, onclick: () => save(hideCard(ids, layout, id, false, OFF_CARDS)) }, 'Show'))))] : null,
     h('div', { class: 'bar', style: 'margin:12px 0 0' },
       h('button', { type: 'button', class: 'linkish', onclick: () => save(null) }, 'Reset layout'),
       h('span', { style: 'flex:1' }),
