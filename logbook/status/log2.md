@@ -1,8 +1,14 @@
 # Now: Claude Code, Logbook 2 (log2)
 
 **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): **building the agreed queue** (owner said go, 15 Oct;
-he's away ~6 h): Themes first (this PR), then bugs 0, 0b, 1 and the age cap, then the plan in order. Merged today: #599–#603 (Totals tab for everyone, Analytics in More; Faculty / PCs: Totals, Admin, More;
-frozen names row, Category column ≤ ⅓ width, all-years zip, no tooltips; app version at the bottom of More).
+away ~6 h). Merged 15 Oct: #651 Themes, #652 four bugs (live sync line, PWA sign-in by redirect, Paeds by age + paste
+ticks, age cap), #654 ACGME-style, #655 initials line + lighter highlights, #656 detection settings, #659 Reset all
+settings. In flight, one PR at a time from a local stack (full `test-logbook.sh` + a11y passed on the whole stack):
+#660 Analytics (every profile, Edit mode, new cards), then More page + tab bars + More Edit + Profile page + Recover,
+then case box height, then Totals compact. If a session picks this up mid-way: the stack's commits are on the
+branch's PRs in that order; each later PR is the next commit(s) on top of main.
+Not started: 9 / 9b / 9c / 9d bulk select and edit, 9e global search, 9f reflections on the calendar, 10–14, Markdown.
+Waiting on the owner: a real-phone check of sign-in (installed app and Firefox for Android).
 
 Agreed queue (one PR each, in order, once he says go):
 0. **Bug, first (waiting on the owner's OK to build ahead of the plan):** the reflection editor's "Saved locally ·
