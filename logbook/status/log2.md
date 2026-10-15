@@ -109,7 +109,7 @@ Agreed queue (one PR each, in order, once he says go):
    category names. Compact off: the table as now.
 9i/9j. **Themes and suggested colours: built** (Themes PR, 15 Oct): Settings → Themes (Classic cards, Inspired
    searchable list, Suggest a theme), swatches, background tint, spacing, tab bar style, heading font, Top band.
-   Still to do: ACGME-style (needs the owner's screenshot); card style (raised / outlined / flat) not built (borders
+   ACGME-style added from the owner's screenshots (15 Oct). Still to do: card style (raised / outlined / flat) not built (borders
    and shadows cover it for now).
 10. **Grid as a spreadsheet:** thin lines, no boxed inputs; drag to resize columns (per device, double-tap resets);
     lines per row 1 / 2 / 3 / Fit to content.
