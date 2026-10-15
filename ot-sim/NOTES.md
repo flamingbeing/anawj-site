@@ -96,7 +96,8 @@ CI and process:
 - The shared `browser` job runs bis-dsa's e2e before ot-sim's. `bis-dsa/test/e2e.mjs:46` (median of nine DSA pixels;
   the white SEF line can cross the sample) is intermittently red with a different pixel each run; it is another
   session's test, so don't edit it. Comment once on the PR, then get a fresh run by merging a newer `main` into the
-  branch (no empty commits). It blocked #598, #608 and #650.
+  branch (no empty commits). It blocked #598, #608 and #650. Since 15 Oct 2026 the Checks run the bis-dsa and OT
+  simulator browser tests only on PRs that change that app (`AGENTS.md`), so it should no longer block ot-sim PRs.
 - After each merge: `git fetch origin main && git reset --hard origin/main` on the session branch, then the next slice.
   Merge on `mergeable_state: clean` after the check suite completes. The GitHub MCP's `list_workflow_runs` ignores
   `branch`/`head_sha` filters; use `pull_request_read` and the job logs (`get_job_logs` with `return_content`).
