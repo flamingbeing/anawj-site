@@ -81,8 +81,8 @@ function advDsa(h,tL,win,side){const cols=Math.floor(ADV_PX/ADV_CELL),spc=win/co
   if(!k||sf>=.5){for(let y=0;y<NB;y++){const p=(y*cols+c)*4;d[p]=d[p+1]=d[p+2]=0;d[p+3]=255;}pcOk=false;continue;}
   for(let j=0;j<NB;j++)w[j]=(v[Math.max(0,j-2)]+2*v[Math.max(0,j-1)]+3*v[j]+2*v[Math.min(NB-1,j+1)]+v[Math.min(NB-1,j+2)])/(9*k);
   for(let y=0;y<NB;y++){const j=NB-1-y;let L=(w[j]+tilt[j]-LO)/SPAN+advDsaShape((j+.5)*.5);if(sf>0)L=L*(1-1.5*sf)-.1*sf;L=Math.max(0,Math.min(1,L));
-   // slow smoothing in time: each column keeps 45 percent of the one before it, so the field reads as smooth blocks
-   if(pc&&pcOk){L=.55*L+.45*pc[j];}pc2[j]=L;
+   // light smoothing in time: each column keeps 25 percent of the one before it (the real field has a fine minute-to-minute grain)
+   if(pc&&pcOk){L=.75*L+.25*pc[j];}pc2[j]=L;
    const col=ADV_LUT[(L*255)|0],p=(y*cols+c)*4;d[p]=col[0];d[p+1]=col[1];d[p+2]=col[2];d[p+3]=255;}
   pc.set(pc2);pcOk=true;}
  o.cv.getContext('2d').putImageData(o.img,0,0);return {cols,nData,sef:advMovAvg(sef,2),mf:advMovAvg(mf,2)};}

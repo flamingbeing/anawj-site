@@ -597,3 +597,9 @@ checked against a photo of a Root. Look chosen: the 2017/2018 builds (ADULT pill
 - SedLine font is now Hind (Frutiger-style, footless "1"), not Source Sans 3.
 - Each monitor sits in a case like the real one: warm light-grey plastic for the Medtronic BIS, the white case around the
   blue band for BIS Advance (kept on phones, thinner), glossy black glass with a light rim for the Masimo Root.
+- SedLine raw EEG now follows the simulation's own EEG (the left engine for L1/L2, the right for R1/R2, resampled to 178 Hz,
+  scaled by 0.42, plus a small own part per electrode), so it shows the same drug and depth as the DSA; the old separate
+  generator was about three times too big and too busy beside Masimo's figures. Trace 1.7 px.
+- Medtronic BIS opens with about 35 minutes of earlier trend (an awake patient, made by adv-seed.js, kept in `MT.pre`, never in
+  HIST), so its DSA is full like the owner's photos; time labels then fall on whole clock steps. Clear Trend empties it.
+- BIS Advance DSA keeps 25 % (was 45 %) of the column before, for the finer minute-to-minute grain of the real screen.

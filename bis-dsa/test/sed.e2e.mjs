@@ -28,12 +28,13 @@ try {
     // the screen is portrait 5:8 and scales as a unit; the bundled Hind font loads
     { const r = await page.$eval('#sedS', e => { const q = e.getBoundingClientRect(); return [q.width / q.height, q.width]; }); assert.ok(Math.abs(r[0] - 0.625) < 0.01, `5:8 screen (${r[0]})`); if (phone) assert.ok(r[1] <= 390, 'fits the phone width'); }
     assert.ok(await page.evaluate(() => document.fonts.check('16px Hind')), 'bundled Hind font loads');
-    // the older, dimmed sweep does not shimmer at 15 mm/s: one new sample leaves the trace right of the cursor unchanged
-    { const d = await page.evaluate(() => { const sp = SED.set.eegSpeed; SED.set.eegSpeed = 15; const E = SED.eg || (sedEegInit(), SED.eg), cv = SED.cvE;
-        const draw = () => { E.acc = 0; E.t = performance.now(); sedDrawEeg(); }; draw(); const N = 1474, k = cv.width / 800, x0 = Math.round((50 + ((E.n + 2) % N) * 737 / N + 70) * k), x1 = Math.round(780 * k);
-        const grab = () => cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; const a = grab(); sedEegStep(); draw(); const b = grab(); SED.set.eegSpeed = sp;
-        if (x1 - x0 < 20) return 0; let n = 0, t = 0; for (let y = 0; y < cv.height; y++) for (let x = x0; x < x1; x++) { const j = (y * cv.width + x) * 4; t++; if (Math.abs(a[j] - b[j]) > 30) n++; } return n / t; });
-      assert.ok(d < 0.002, `dim EEG sweep is steady between frames (${(d * 100).toFixed(2)}% changed)`); }
+    // the older, dimmed sweep does not shimmer at 15 mm/s: right of the cursor the trace stays the same from frame to frame
+    { const d = await page.evaluate(async () => { const sp = SED.set.eegSpeed; SED.set.eegSpeed = 15; const cv = SED.cvE, N = 1474, raf = () => new Promise(r => requestAnimationFrame(r));
+        const grab = () => { sedDrawEeg(); return { pos: SED.eg.n % N, d: cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data }; };
+        let a, b; for (let tries = 0; tries < 5; tries++) { await raf(); a = grab(); await raf(); await raf(); b = grab(); if (b.pos > a.pos && b.pos < N - 200) break; }
+        SED.set.eegSpeed = sp; const k = cv.width / 800, x0 = Math.round((50 + b.pos * 737 / N + 70) * k), x1 = Math.round(780 * k);
+        if (b.pos === a.pos || x1 - x0 < 20) return -1; let n = 0, t = 0; for (let y = 0; y < cv.height; y++) for (let x = x0; x < x1; x++) { const j = (y * cv.width + x) * 4; t++; if (Math.abs(a.d[j] - b.d[j]) > 30) n++; } return n / t; });
+      assert.ok(d >= 0 && d < 0.002, `dim EEG sweep is steady between frames (${(d * 100).toFixed(2)}% changed)`); }
     // defaults are the manual's factory defaults
     const d = await page.evaluate(() => ({ s: SED.set, range: SED.range, view: SED.view, exp: Object.keys(SED.exp) }));
     assert.deepEqual([d.s.psiHi, d.s.psiLo, d.s.eegAmp, d.s.eegSpeed, d.s.dsaHi, d.s.dsaLo, d.s.maxHz, d.s.placement, d.s.silence, d.s.monImp, d.s.dispImp, d.range, d.view], [50, 25, 5, 30, 15, -40, 30, 'EEG/PSi/DSA', 120, true, true, 30, 'trend']);

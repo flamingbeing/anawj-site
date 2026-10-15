@@ -213,7 +213,7 @@ function sedTrends(c,D,N,L,A){const s=SED.set;
   // the line and its end dot (with no data the line stops at the last valid sample and there is no dot)
   const lv=k==='emg'?sedSmooth(ser,5):ser; // the EMG line is a smooth flat line with the odd small bump
   c.save();c.globalAlpha=.25;c.strokeStyle=SC.yel;c.lineWidth=2;c.beginPath();{let pn=false;for(let p=NPX-36;p<NPX;p++){const v=lv[p];if(v==null){pn=false;continue;}const x=14+p-(NPX-36),y=yv(clampv(v,m.min,m.max));pn?c.lineTo(x,y):c.moveTo(x,y);pn=true;}}c.stroke();c.restore();
-  c.strokeStyle=SC.yel;c.lineWidth=2;c.lineJoin='round';c.beginPath();let pen=false,lastp=-1;for(let p=0;p<NPX;p++){const v=lv[p];if(v==null){pen=false;continue;}const x=PX0+p+.5,y=yv(clampv(v,m.min,m.max));pen?c.lineTo(x,y):c.moveTo(x,y);pen=true;lastp=p;}c.stroke();
+  c.strokeStyle=SC.yel;c.lineWidth=1.7;c.lineJoin='round';c.beginPath();let pen=false,lastp=-1;for(let p=0;p<NPX;p++){const v=lv[p];if(v==null){pen=false;continue;}const x=PX0+p+.5,y=yv(clampv(v,m.min,m.max));pen?c.lineTo(x,y):c.moveTo(x,y);pen=true;lastp=p;}c.stroke();
   if(lastp>=0&&!nodata){c.fillStyle=SC.dot;c.beginPath();c.arc(PX1,yv(clampv(lv[lastp],m.min,m.max)),6,0,7);c.fill();}
   // the alarm: panel outline and a gradient in the alarm colour behind the number (a medium one runs to pale lemon and has no bell)
   if(alarmHere){const lv2=A.par.level,col=sedAlarmCol(lv2),g=c.createLinearGradient(530,0,787,0);g.addColorStop(0,'rgba(0,0,0,0)');if(lv2==='hi')g.addColorStop(1,'#d2202a');else{g.addColorStop(.5,'rgba(120,100,25,.6)');g.addColorStop(1,'#c3a52d');}c.fillStyle=g;c.fillRect(530,y0+1,257,h-2);c.strokeStyle=col;c.lineWidth=3;c.strokeRect(13.5,y0+1.5,772,h-3);}
@@ -310,32 +310,36 @@ function sedGauges(c,N,A){const s=SED.set;c.fillStyle=SC.bg;c.fillRect(12,410,77
  mini(510,'EMG %',N&&!N.blank?N.v.emg:null,sedFmt('emg',N));mini(678,'SR',N&&!N.blank?N.v.sr/2*2:null,sedFmt('sr',N));
  // the well is drawn by sedWell (ARTF, SEFL, SEFR)
 }
-// ----- the synthetic EEG: one stream per channel at the monitor's 178.154 samples/s, 1/f-like (a slow 1-3 Hz drift with bursts, 4-12 Hz
-// waves, 20-25% of the power above 14 Hz, and a little 30-50 Hz muscle when the EMG is up); every part is a band-limited resonator, so there
-// is no white-noise floor. Its size and speed follow the live simulation (depth of anaesthesia, suppression, EMG) -----
+// ----- the EEG: one stream per channel at the monitor's 178.154 samples/s; band-limited resonators (no white-noise floor) -----
 const SED_FS=178.154,SED_RING=4096;
 function sedRes(f,bw){const r=Math.exp(-Math.PI*bw/SED_FS),th=2*Math.PI*f/SED_FS,a1=2*r*Math.cos(th),a2=-r*r,v=(1-a2)/((1+a2)*((1-a2)*(1-a2)-a1*a1));return {a1,a2,g:1/Math.sqrt(v)};}
 const SED_RES={slow:sedRes(1.8,2.2),mid:sedRes(7.5,6),beta:sedRes(18,7),emg:sedRes(38,22),env:sedRes(.22,.3)};
 function sedRng(seed){let a=seed>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};}
+// The traces follow the simulation's own EEG (app.js's engine, 128 samples/s: the left side's signal for L1 and L2, the right side's for R1 and R2),
+// resampled to the monitor's rate, so the waves show the same drug and depth as the DSA. Each electrode adds its own small part (the resonators above:
+// a little 7.5 Hz and 18 Hz, and 38 Hz muscle when the EMG is up), so L1 and L2 are alike but not the same. SED_EEG_GAIN scales the engine's
+// signal to what the real screen shows at 5 uV/mm (general anaesthesia: waves about a third of a lane, owner's photos and Masimo's figures).
+const SED_EEG_GAIN=.42;
 function sedEegInit(){const rnd=sedRng(20261014),gs=()=>{let u=0;while(u<1e-9)u=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(6.2831853*rnd());};
- const mk=()=>({s:[0,0,0,0],p:[0,0,0,0],e:0,ep:0,buf:new Float32Array(SED_RING)});
- SED.eg={n:0,acc:0,t:performance.now(),gs,ch:[mk(),mk(),mk(),mk()],env:[[0,0],[0,0]],gain:[1,.92,1.12,.78]};
- for(let i=0;i<SED_RING;i++)sedEegStep();}
+ const mk=()=>({s:[0,0,0,0],p:[0,0,0,0],buf:new Float32Array(SED_RING)});
+ SED.eg={n:0,gs,ch:[mk(),mk(),mk(),mk()],gain:[1,.94,1.06,.9]};
+ SED.eg.n=Math.max(0,sedEegTarget()-SED_RING);}
+function sedEegTarget(){return typeof produced==='number'?Math.floor(produced*SED_FS/FS):0;}
 function sedEegPar(){const hl=HIST.length?HIST[HIST.length-1]:null,hr=R&&R.HIST&&R.HIST.length?R.HIST[R.HIST.length-1]:hl;
- return [hl,hr].map(c=>{const bis=c&&c.bis!=null?c.bis:90,d=clampv((95-bis)/60,0,1.15),sup=c?clampv((c.bsr||0)/100,0,1):0,em=c?emgPct(c):0;
-  const s1=(6+20*d)*(1-.88*sup),s2=(12-3*d)*(1-.88*sup),s3=Math.sqrt(.2*(s1*s1+s2*s2))*(1-.55*d),s4=.1*em;return {s1,s2,s3,s4};});}
-function sedEegStep(){const E=SED.eg,gs=E.gs,P=E.par||(E.par=sedEegPar()),k=SED_RES;
- // slow burst envelope, one per hemisphere: occasional large slow waves
- for(const h of [0,1]){const r=k.env,v=E.env[h],e=r.a1*v[0]+r.a2*v[1]+gs()*r.g;v[1]=v[0];v[0]=e;}
- const all=gs(),com=[gs(),gs()],mixed=h=>.55*all+.65*com[h]+.52*gs(); // the two electrodes of a side are about 0.85 correlated
- for(let c=0;c<4;c++){const h=c%2,S=E.ch[c],p=P[h],burst=1+clampv(.8*Math.max(0,E.env[h][0]-.4),0,1.2);
+ return [hl,hr].map(c=>({emg:c?emgPct(c):0}));}
+// the engine's signal at a fractional sample position (linear interpolation); 0 before it starts
+function sedSigAt(sig,prod,t){const i=t-(prod-sig.length),i0=Math.floor(i);if(i0<0||i0>=sig.length)return 0;const f=i-i0,a=sig[i0],b=i0+1<sig.length?sig[i0+1]:a;return a+(b-a)*f;}
+function sedEegStep(){const E=SED.eg,gs=E.gs,P=E.par||(E.par=sedEegPar()),k=SED_RES,t=E.n*FS/SED_FS;
+ const src=[sedSigAt(SIG,produced,t),R&&R.SIG?sedSigAt(R.SIG,R.produced,t):0];
+ for(let c=0;c<4;c++){const h=c%2,S=E.ch[c],em=P[h].emg;
   const stp=(i,r,x)=>{const y=r.a1*S.s[i]+r.a2*S.p[i]+x*r.g;S.p[i]=S.s[i];S.s[i]=y;return y;};
-  const y1=stp(0,k.slow,mixed(h)),y2=stp(1,k.mid,mixed(h)),y3=stp(2,k.beta,gs()),y4=stp(3,k.emg,gs());
-  S.buf[E.n&(SED_RING-1)]=(y1*p.s1*burst+y2*p.s2*(1+.35*(burst-1))+y3*p.s3+y4*p.s4)*E.gain[c];}
+  const own=2.2*stp(1,k.mid,gs())+2.6*stp(2,k.beta,gs())+(.06+.1*em)*stp(3,k.emg,gs());
+  S.buf[E.n&(SED_RING-1)]=(src[h]*E.gain[c]+own)*SED_EEG_GAIN;}
  E.n++;}
-function sedEegAdvance(){if(!SED.eg)sedEegInit();const E=SED.eg,now=performance.now(),dt=Math.min(.5,Math.max(0,(now-E.t)/1000));E.t=now;E.acc+=dt*SED_FS;let m=Math.floor(E.acc);E.acc-=m;
+function sedEegAdvance(){if(!SED.eg)sedEegInit();const E=SED.eg,now=performance.now(),tg=sedEegTarget();
  if(Math.floor(now/2000)!==E._pt){E._pt=Math.floor(now/2000);E.par=sedEegPar();}
- while(m-->0)sedEegStep();}
+ if(tg<E.n||tg-E.n>SED_RING)E.n=Math.max(0,tg-SED_RING); // a reset, or a long jump at high speed
+ while(E.n<tg)sedEegStep();}
 // ----- the EEG panel (its own canvas, redrawn every frame; the sweep moves, it does not scroll) -----
 function sedDrawEeg(){const cv=SED.cvE;if(!cv)return;const L=SED.L||sedLay(),e=L.eeg;
  if(!e){if(cv.style.display!=='none')cv.style.display='none';return;}
