@@ -20,6 +20,16 @@ function nmbHtml(state) {
 <p class="hint">Free rocuronium in plasma ${f(nm.roc.cpFree || 0)} mcg/mL; free sugammadex ${f(nm.sgx.free || 0)} mcg/mL; suxamethonium Ce ${f(nm.sux.ce)} mcg/mL.${b.phase2 > 0 ? ' Suxamethonium phase II block.' : ''}${b.neoFactor > 1.01 ? ` Neostigmine has raised rocuronium's Ce50 ${b.neoFactor.toFixed(1)} times.` : ''} The diaphragm needs about twice the thumb's level (it recovers first); the upper-airway muscles are more sensitive than the thumb.</p>`;
 }
 
+function hypnosisHtml(state) {
+  const p = state.pd;
+  if (!p || !Object.keys(state.pk.d).length) return '';
+  const row = (k, label) => `<tr><th scope="row">${label}</th><td>${pct(p.pNoMove[k])}</td></tr>`;
+  return `<table class="behind"><caption class="sr">Depth of anaesthesia</caption>
+<thead><tr><th scope="col">In a population at these levels</th><th scope="col">No response</th></tr></thead>
+<tbody><tr><th scope="row">To voice (asleep)</th><td>${pct(p.pAsleep)}</td></tr>${row('laryngoscopy', 'To laryngoscopy')}${row('incision', 'To skin incision')}${row('intubation', 'To intubation')}</tbody></table>
+<p class="hint">This patient: ${p.asleep ? 'asleep' : 'awake'}. BIS-like index ${Math.round(p.bisLike)} (a real monitor needs a processed-EEG module). Autonomic response to stimulation ${pct(p.auto)}.</p>`;
+}
+
 export function behindHtml(state) {
   const ids = Object.keys(state.pk.d);
   if (!ids.length) return state.pk.nm ? nmbHtml(state) : '<p class="hint">No drugs given yet.</p>';
@@ -30,5 +40,5 @@ export function behindHtml(state) {
   return `<table class="behind"><caption class="sr">Predicted and true drug levels</caption>
 <thead><tr><th scope="col">Drug</th><th scope="col">Pump Cp</th><th scope="col">Pump Ce</th><th scope="col">True Cp</th><th scope="col">True Ce</th><th scope="col">Unit</th></tr></thead>
 <tbody>${rows}</tbody></table>
-<p class="hint">Cp is the plasma level, Ce the effect site (the brain). The pump knows only its published model; this patient differs, as real patients do.</p>${nmbHtml(state)}`;
+<p class="hint">Cp is the plasma level, Ce the effect site (the brain). The pump knows only its published model; this patient differs, as real patients do.</p>${hypnosisHtml(state)}${nmbHtml(state)}`;
 }

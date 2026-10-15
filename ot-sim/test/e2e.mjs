@@ -123,6 +123,15 @@ try {
     await page.evaluate(() => otsim.step(900));
     assert.ok(await page.evaluate(() => otsim.state.pk.d.propofol.ce) > 4, `${name}: effect site rises`);
     assert.match(await page.textContent('#given'), /Propofol 140 mg/);
+    // the Patient tab: asleep after propofol; a stimulus shows in the events
+    await page.click('#tab-pt');
+    await page.click('#talk');
+    assert.match(await page.textContent('#talk-reply'), /No answer|No response/);
+    await page.click('[data-stim="incision"]');
+    assert.match(await page.textContent('#events'), /Incision/);
+    assert.match(await page.textContent('#events'), /No longer responds to voice/);
+    await axe(page, `${name} theatre, Patient tab`);
+    await page.click('#tab-drugs');
     // a custom dose
     await page.fill('#bd-fentanyl', '75');
     await page.click('[data-give="fentanyl"]');
@@ -156,6 +165,7 @@ try {
     const rows = await page.$$eval('.behind tbody tr', trs => trs.map(tr => tr.textContent));
     assert.ok(rows.some(r => /^Remifentanil3\.0/.test(r)) && rows.some(r => /^Propofol––/.test(r)), `${name}: behind rows ${rows}`);
     assert.ok(rows.some(r => /^Twitch \(T1\)/.test(r)), `${name}: neuromuscular rows in Behind the monitor`);
+    assert.ok(rows.some(r => /^To voice \(asleep\)/.test(r)), `${name}: depth rows in Behind the monitor`);
     assert.equal(await page.evaluate(() => localStorage.getItem('otsim.behind')), '1');
 
     // no horizontal scroll; axe on the paused theatre

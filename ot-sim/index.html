@@ -151,6 +151,7 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
       <div class="tabs" role="tablist" aria-label="Controls">
         <button type="button" role="tab" id="tab-drugs" aria-controls="panel-drugs" aria-selected="true">Drugs</button>
         <button type="button" role="tab" id="tab-circ" aria-controls="panel-circ" aria-selected="false" tabindex="-1">Circulation</button>
+        <button type="button" role="tab" id="tab-pt" aria-controls="panel-pt" aria-selected="false" tabindex="-1">Patient</button>
       </div>
       <div class="panel" role="tabpanel" id="panel-drugs" aria-labelledby="tab-drugs"></div>
       <div class="panel" role="tabpanel" id="panel-circ" aria-labelledby="tab-circ" hidden>
@@ -160,8 +161,22 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
         </div>
         <p class="hint">Fluids, blood and the circulation's controls come in the next updates.</p>
       </div>
+      <div class="panel" role="tabpanel" id="panel-pt" aria-labelledby="tab-pt" hidden>
+        <div class="act"><button type="button" id="talk">Talk to the patient</button></div>
+        <p class="state" id="talk-reply" aria-live="polite"></p>
+        <h3 class="sub">Stimulate</h3>
+        <p class="hint">Until the airway and the operation arrive, try a stimulus here and watch for movement.</p>
+        <div class="act">
+          <button type="button" data-stim="tetanus">Tetanic stimulus</button>
+          <button type="button" data-stim="laryngoscopy">Laryngoscopy</button>
+          <button type="button" data-stim="incision">Skin incision</button>
+          <button type="button" id="surgery" aria-pressed="false">Surgery running</button>
+        </div>
+        <h3 class="sub">Events</h3>
+        <ol class="given" id="events"><li class="none">Nothing yet</li></ol>
+      </div>
       <details id="behind-box"><summary>Behind the monitor</summary><div id="behind"></div></details>
-      <p class="foot">Free run: a healthy synthetic adult. The monitor shows the neuromuscular block (TOF); the other drug effects come next. Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
+      <p class="foot">Free run: a healthy synthetic adult. Drugs now put the patient to sleep and block the muscles (TOF on the monitor); heart rate, blood pressure and breathing respond from the next updates. Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
     </div>
   </div>
 </section>
