@@ -34,6 +34,8 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `nuhsdesign/tokens.css`: shared design tokens; `nuhsdesign/README.md` is the NUHS-style guide (`nuhsdesign/STATUS.md`
   for its status). Every subdomain serves `/nuhsdesign/` (the old `/design/` path was retired 13 Oct 2026; link `../nuhsdesign/tokens.css`). Every app's top band is four equal quarters: orange `#e57200`, red `#e4002b`, blue `#178fd7` (not cyan),
   navy `#002f6c`. Focus rings are navy on light grounds (cyan on white is only 2.7:1).
+  Web apps (PWAs) use the **app kit** (`nuhsdesign/app.css` + `app.js`, `.a-*` classes; README "App kit", demo
+  `/nuhsdesign/app.html`) so they feel native on a phone; the logbook keeps its own styles.
 
 Rules that bite:
 
