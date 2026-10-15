@@ -140,9 +140,19 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - **Writing for the owner:** plain words, short; say what changed for residents and what the owner needs to do.
 - **Keep the repo public-safe:** fake data only; never commit secrets, tokens or credentials (the owner commits
   any needed public client IDs themselves).
-  **Personal notes** (how the owner works through his own day, his own notes, thoughts, private plans) go in his private
-  repo `flamingbeing/life`, never here: write the personal version there first and keep only a plain product version in
-  this repo. Never copy anything from `life` into this repo.
+  **Private work goes in `flamingbeing/life`** (the owner's private repo; owner, 15 Oct 2026: "many things can be kept
+  private in Life"). Before writing anything here, ask whether it needs to be public for the app to work; if not, and it
+  is sensitive, put it in `life` instead (attach it with `add_repo` if the session lacks it; Codex: ask the owner). That
+  covers:
+  - personal notes: how the owner works through his day, his thoughts, private plans;
+  - real-world data and anything worked out from it: copies or extracts of department sheets and rosters, real staff
+    names, analyses of real data, findings that name people, research notes on colleagues' workflows;
+  - working files a later session will need that would expose any of the above (scripts that read real data may stay
+    here only if they contain none of it).
+
+  Keep in this repo only the plain product version: rules as general statements ("ICU juniors get a day off after post
+  call"), fake demo data, code and docs. Put real data in `life/data/<app>/` with a short README saying where it came
+  from; never copy anything from `life` into this repo, and never name `life` file contents in a PR or issue here.
 
 ## Status and decisions (before compacting)
 
