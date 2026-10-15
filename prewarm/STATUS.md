@@ -57,6 +57,8 @@ edit the same lines. Read them all before starting; edit only yours.
 
 ## Decisions
 
+- 15 Oct 2026: prewarm is highly important and must stay up, so **no breaking changes** (owner): only small, tested, reversible changes; the design session's restyle of prewarm (app kit, `index.html`, `style.css`, `sw.js` SHELL, `update.html`) is on hold until the owner says otherwise in that session.
+
 - 14 Oct 2026: export pre-warming readings past the warming as NA (Downloaded columns stay empty); keep records indefinitely and phones need not wipe their copy; build the rest of the review list as recommended, small PRs, no rules changes without approval (owner).
 
 - 13 Oct 2026: prewarm is served at prewarmstudy.anawj.com; moves happen between cases only and only for a phone with nothing waiting (owner); the PACU nurse link is tested once per patient by a non-team phone.
