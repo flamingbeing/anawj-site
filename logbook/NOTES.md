@@ -598,6 +598,13 @@ portfolio content.
   layout, Done. Saved for the account as `settings.anLayout { order, hidden }` (`analytics.js` arrangeCards: cards a
   profile lacks are left out; new cards land in their default place). A new card needs an id in `CARD_NAMES`.
 
+- **Default tab bars** (owner, 15 Oct 2026; `profiles.js` PROFILE_ON / PROFILE_OFF): logbook only Case · Logbook ·
+  Totals · More; Basic + Reflections; Advanced + Reflections · Analytics; Personal Case · Logbook · Notes · Reflections ·
+  Analytics · More; Faculty / PCs Totals · Admin · More. Devices arranged by hand keep their arrangement.
+- **More page:** two groups (More's pages with Settings last; Account and help), privacy and credits as fine print. Its
+  Edit mode (per device) drags the tab bar and More's own list (`display().moreOrder`), Pin / Take off (a full bar asks
+  which tab it replaces). The drag code is shared: `drag-list.js`.
+
 ## Data, roles and photos (`firestore.rules`)
 
 - **App owner:** `owners/{email}`, set by hand in the Firebase console. May read logbooks and cases and import

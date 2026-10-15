@@ -9,6 +9,7 @@ import { reflectionProgress, HEADING_BY_ID, suggestHeadings } from './reflection
 import { logbookGlance, reflectionGlance, cohortGlance } from './glance.js';
 import { paceForecast, paceText, goneQuiet, reflectionTodos, arrangeCards, moveCard, hideCard, finishLine, monthSummary, milestones, ageMix, caseMix, loggingHabits } from './analytics.js';
 import { reflectOnCase, openReflection } from './ui-reflect.js';
+import { gripDrag } from './drag-list.js';
 import { S, h, ic, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName, summaryOf, basicHides } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
@@ -199,21 +200,7 @@ function editCard(ids, layout) {
     h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${CARD_NAMES[id]} up`, disabled: i === 0, onclick: () => save(moveCard(ids, layout, id, -1, OFF_CARDS)) }, '↑'),
     h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${CARD_NAMES[id]} down`, disabled: i === shown.length - 1, onclick: () => save(moveCard(ids, layout, id, 1, OFF_CARDS)) }, '↓'),
     h('button', { type: 'button', class: 'small', 'aria-label': `Hide ${CARD_NAMES[id]}`, onclick: () => save(hideCard(ids, layout, id, true, OFF_CARDS)) }, 'Hide'))));
-  // drag by the grip (a finger or a mouse): the row follows, and drops where the pointer is
-  function drag(e, id) {
-    e.preventDefault();
-    const li = e.target.closest('li'), rows = [...list.children], y0 = e.clientY;
-    li.classList.add('dragging'); e.target.setPointerCapture?.(e.pointerId);
-    const move = ev => { li.style.transform = `translateY(${ev.clientY - y0}px)`; };
-    const up = ev => {
-      e.target.removeEventListener('pointermove', move); e.target.removeEventListener('pointerup', up); e.target.removeEventListener('pointercancel', up);
-      li.classList.remove('dragging'); li.style.transform = '';
-      const to = rows.filter(r => r !== li).filter(r => { const b = r.getBoundingClientRect(); return ev.clientY > b.top + b.height / 2; }).length;
-      const from = rows.indexOf(li);
-      if (to !== from) save(moveCard(ids, layout, id, to - from, OFF_CARDS));
-    };
-    e.target.addEventListener('pointermove', move); e.target.addEventListener('pointerup', up); e.target.addEventListener('pointercancel', up);
-  }
+  const drag = (e, id) => gripDrag(e, list, (from, to) => save(moveCard(ids, layout, id, to - from, OFF_CARDS)));
   return h('section', { class: 'card an-edit' },
     h('h2', {}, 'Arrange Analytics'),
     h('p', { class: 'hint help' }, 'Drag a card by ⠿, or use the arrows. Hidden cards wait below. Saved for your account.'),

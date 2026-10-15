@@ -1642,3 +1642,6 @@ html:not(.rows-short) ul.cases .c-tags > * { max-width: 100%; }
 .fine-print { margin: 14px 6px 4px; font-size: calc(12px * var(--fs, 1)); color: var(--muted); line-height: calc(1.45 * var(--lh, 1)); }
 .fine-print p { margin: 0 0 6px; }
 .fine-print b { color: var(--muted); font-weight: 600; }
+/* More: its title with Edit beside it */
+.more-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.more-head h2 { margin: 0; }

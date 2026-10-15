@@ -81,7 +81,7 @@ export function cachedCompact() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['noteToolbar', 'compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy', 'hideTabsTyping',
+export const DISPLAY_KEYS = ['moreOrder', 'noteToolbar', 'compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy', 'hideTabsTyping',
   'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
@@ -212,7 +212,7 @@ export const roundLevel = d => (Number.isInteger(d.round) && d.round >= 0 && d.r
 // The tab bar (Advanced display, per device): the order of its tabs and which are hidden. More always stays
 // (Settings live there), at least two and at most seven (MAX_BAR, More included) stay on the bar; hidden main tabs
 // are listed first on the More page. Every page in the More list can go on the bar too (Admin portal: admins only).
-export const BAR_TABS = [['caselogs', 'Case logs'], ['log', 'Case'], ['logbook', 'Logbook'], ['totals', 'Totals'], ['reflect', 'Reflections'], ['progress', 'Analytics'], ['notes', 'Notes'],
+export const BAR_TABS = [['caselogs', 'Case logs'], ['log', 'Case'], ['logbook', 'Logbook'], ['totals', 'Totals'], ['notes', 'Notes'], ['reflect', 'Reflections'], ['progress', 'Analytics'],
   ['account', 'Account'], ['settings', 'Settings'], ['recovery', 'Recover drafts'], ['data', 'Export / Import'], ['admin', 'Admin portal'], ['more', 'More']];
 // Totals: programme residents, faculty, PDs and admins, with the totals switch on (off in Personal)
 export const barTabs = () => BAR_TABS.filter(([id]) => (id !== 'admin' || S.admin) && (id !== 'caselogs' || facultyRole()) && (id !== 'totals' || ((facultyRole() || S.resident) && shows('totals'))));

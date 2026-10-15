@@ -265,6 +265,7 @@ function tabArranger() {
     const hideSet = new Set(hidden);
     const toggle = (id, show) => setTabOnBar(id, show, paint);
     fill(wrap, h('span', {}, 'Tabs on the bar'),
+      h('p', { class: 'hint', style: 'margin:2px 0 6px' }, 'Also on the More page: Edit, to drag the bar and More’s own list. ', h('a', { href: '#more' }, 'Open More')),
       h('ul', { class: 'tab-order' }, order.map((id, i) => h('li', {},
         h('label', { class: 'check', style: 'flex:1;min-height:40px' }, h('input', { type: 'checkbox', checked: !hideSet.has(id), disabled: id === 'more', 'aria-label': 'Show ' + BAR_TABS.find(([k]) => k === id)[1], onchange: e => toggle(id, e.target.checked) }), BAR_TABS.find(([k]) => k === id)[1]),
         h('button', { class: 'small icon-btn', type: 'button', disabled: i === 0, 'aria-label': 'Move up', onclick: () => move(id, -1) }, '↑'),

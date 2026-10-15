@@ -36,6 +36,7 @@ const OBJECTS = {
   // the profile switches (profiles.js): known keys, true or false
   show: v => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([k, x]) => SWITCH_KEYS.includes(k) || /^case:[a-z]{1,20}$/.test(k)).filter(([, x]) => typeof x === 'boolean')) : null),
   tabOrder: v => strs(v).slice(0, 10),
+  moreOrder: v => strs(v).slice(0, 20),
   tabHidden: v => strs(v).slice(0, 10),
   subcats: v => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).slice(0, 100).map(([k, x]) => [String(k).slice(0, 10), strs(x)])) : {}),
   savedSearches: v => (Array.isArray(v) ? v : []).filter(x => x && typeof x === 'object' && !Array.isArray(x) && typeof x.name === 'string').slice(0, 20)
