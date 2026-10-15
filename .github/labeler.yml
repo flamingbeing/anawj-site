@@ -9,6 +9,9 @@ evals:
 nuh-roster:
   - changed-files:
       - any-glob-to-any-file: 'nuh-roster/**'
+ntf-roster:
+  - changed-files:
+      - any-glob-to-any-file: 'ntf-roster/**'
 prewarm:
   - changed-files:
       - any-glob-to-any-file: 'prewarm/**'

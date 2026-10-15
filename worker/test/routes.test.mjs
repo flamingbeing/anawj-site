@@ -44,6 +44,9 @@ assert.deepEqual(resolve('prewarmstudy.anawj.com', '/prewarm/sw.js'), { file: 'p
 assert.deepEqual(resolve('prewarmstudy.anawj.com', '/prewarm'), { redirect: '/prewarm/' });
 assert.deepEqual(resolve('nuhroster.anawj.com', '/'), { file: 'nuh-roster/' });
 assert.deepEqual(resolve('NUHROSTER.anawj.com:443', '/x.js'), { file: 'nuh-roster/x.js' });
+assert.deepEqual(resolve('ntfroster.anawj.com', '/'), { file: 'ntf-roster/' });
+assert.deepEqual(resolve('ntfroster.anawj.com', '/js/app.js'), { file: 'ntf-roster/js/app.js' });
+assert.deepEqual(resolve('ntfroster.anawj.com', '/nuh-roster/'), { file: 'ntf-roster/nuh-roster/' });   // never the NUH roster's files: 404
 // ... and never another app's files (only folders under the app's own folder are reachable)
 assert.deepEqual(resolve('prewarmstudy.anawj.com', '/logbook/js/app.js'), { file: 'prewarm/logbook/js/app.js' });   // that file doesn't exist there: 404
 
