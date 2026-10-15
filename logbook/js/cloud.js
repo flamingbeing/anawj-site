@@ -175,11 +175,20 @@ export async function emulatorSignIn(email) {
   await A.signInWithCredential(auth, A.GoogleAuthProvider.credential(JSON.stringify({ sub: lc(email).replace(/\W/g, ''), email: lc(email), email_verified: true })));
 }
 
+// Sign in by redirect straight away in the installed app (display-mode standalone, or iOS's navigator.standalone)
+// and on Firefox for Android: there a popup opens as a separate tab without its opener, so Google's handler signs
+// in but can't hand back or close itself, leaving a blank tab (owner, 15 Oct 2026). authDomain is our own
+// apmes.anawj.com, so the redirect keeps its storage; getRedirectResult on start finishes it. Elsewhere, the popup.
+export const redirectFirst = ({ standalone = false, ua = '' } = {}) => standalone || (/Android/i.test(ua) && /Firefox\//i.test(ua));
+const installedApp = () => {
+  try { return !!(globalThis.matchMedia?.('(display-mode: standalone)').matches || globalThis.matchMedia?.('(display-mode: fullscreen)').matches || globalThis.navigator?.standalone); } catch { return false; }
+};
 export async function signIn() {
   if (demo) return D.signIn();
   const { auth, A } = await sdk();
   const provider = new A.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
+  if (redirectFirst({ standalone: installedApp(), ua: globalThis.navigator?.userAgent || '' })) return A.signInWithRedirect(auth, provider);
   try {
     await A.signInWithPopup(auth, provider);
   } catch (e) {
