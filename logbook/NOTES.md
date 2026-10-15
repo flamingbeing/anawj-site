@@ -841,3 +841,9 @@ Notes v1 followed in its own PR (Claude, after the handover): see **Notes** unde
 - **Drift check lesson (15 Oct 2026):** an edit or delete in a resident's account found by the drift check is the resident's own
   work until they say otherwise (a resident's (202411) deliberate duplicate clean-up was first undone as "accidental"). Ask the owner to
   ask the resident before restoring, and keep a before-snapshot of anything written back.
+
+Reliability-hour lessons (15 Oct 2026): a cloud container with 4 CPUs runs only 2 agents per workflow, so run one workflow per area
+side by side. In the multidevice harness, `SLOW=1` used to leave the page "offline" while Firestore's open connection still reached the
+server (fixed in #571): a failure that needs a state no real phone can be in is the harness's, so check that first. `writes.entries()`
+lists the newest job first. The conflict path's blind spots (a save after a conflict, an overlay frozen at the conflict) explained
+every remaining soak failure.

@@ -96,6 +96,12 @@ try {
     const clock = await page.textContent('#clock');
     assert.match(clock, /^0[5-9]:\d\d$/, `${name}: clock ${clock}`);
     assert.match(await page.textContent('#n-nibp'), /^\d{2,3}\/\d{2,3}$/);
+    // NIBP controls live on the Circulation tab (arrow keys move between tabs)
+    await page.focus('#tab-drugs');
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await page.getAttribute('#tab-circ', 'aria-selected'), 'true');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'tab-circ');
+    assert.ok(await page.isVisible('#nibp-go') && !(await page.isVisible('#panel-drugs')));
     // the button stops a running measurement and starts an idle one
     if ((await page.textContent('#nibp-go')) === 'Stop NIBP') await page.click('#nibp-go');
     assert.equal(await page.textContent('#nibp-go'), 'Start NIBP');
@@ -107,9 +113,68 @@ try {
     assert.match(await page.textContent('#n-nibp-age'), /min ago|just now/);
     assert.ok(!/cycle/.test(await page.textContent('#n-nibp-age')), 'manual mode shows no cycle');
 
+    await axe(page, `${name} theatre, Circulation tab`);
+
+    // Drugs: a propofol bolus raises the plasma level at once and the effect site over the next minute and a half
+    await page.click('#tab-drugs');
+    const map0 = await page.evaluate(() => otsim.state.cv.map);
+    await page.click('[data-bolus="propofol"][data-dose="140"]');
+    const cp0 = await page.evaluate(() => otsim.state.pk.d.propofol.a1 / otsim.state.pk.p.propofol.V1);
+    assert.ok(cp0 > 20, `${name}: propofol Cp after 140 mg: ${cp0}`);
+    await page.evaluate(() => otsim.step(900));
+    assert.ok(await page.evaluate(() => otsim.state.pk.d.propofol.ce) > 4, `${name}: effect site rises`);
+    await page.evaluate(() => otsim.step(300));
+    assert.ok(await page.evaluate(m => otsim.state.cv.map < m - 5, map0), `${name}: blood pressure falls after propofol`);
+    assert.match(await page.textContent('#given'), /Propofol 140 mg/);
+    // the Patient tab: asleep after propofol; a stimulus shows in the events
+    await page.click('#tab-pt');
+    await page.click('#talk');
+    assert.match(await page.textContent('#talk-reply'), /No answer|No response/);
+    await page.click('[data-stim="incision"]');
+    assert.match(await page.textContent('#events'), /Incision/);
+    assert.match(await page.textContent('#events'), /No longer responds to voice/);
+    await axe(page, `${name} theatre, Patient tab`);
+    await page.click('#tab-drugs');
+    // a custom dose
+    await page.fill('#bd-fentanyl', '75');
+    await page.click('[data-give="fentanyl"]');
+    assert.match(await page.textContent('#given'), /Fentanyl 75 mcg/);
+    // remifentanil TCI: the pump runs and says what it predicts
+    await page.fill('#tt-remifentanil', '3');
+    await page.click('[data-tci="remifentanil"]');
+    await page.evaluate(() => otsim.step(1200));
+    assert.ok(await page.evaluate(() => otsim.state.pump.remifentanil.rate > 0), `${name}: remifentanil pump running`);
+    assert.match(await page.textContent('#tci-state-remifentanil'), /Minto, effect site target 3 ng\/mL: pump predicts Ce 3\.0\d/);
+    // propofol infusion shows as running, and stops
+    await page.click('[data-inf="propofol"]');
+    assert.match(await page.textContent('#inf-state-propofol'), /Running 6 mg\/kg\/h/);
+    await page.click('[data-infstop="propofol"]');
+    assert.equal(await page.textContent('#inf-state-propofol'), '');
+    // neuromuscular block: rocuronium takes the TOF to 0/4, a PTC can be counted, sugammadex brings it back
+    assert.equal(await page.textContent('#n-tof'), '4/4');
+    await page.click('[data-bolus="rocuronium"]');
+    await page.evaluate(() => otsim.step(1800));
+    assert.equal(await page.textContent('#n-tof'), '0/4');
+    await page.click('[data-tof="ptc"]');
+    assert.match(await page.textContent('#n-ptc'), /^PTC \d+$/);
+    await page.click('[data-bolus="sugammadex"][data-dose="1100"]');
+    await page.evaluate(() => otsim.step(1800));
+    assert.equal(await page.textContent('#n-tof'), '4/4');
+    assert.match(await page.textContent('#n-tofr'), /^\d+%$/);
+    // Behind the monitor: closed by default, shows the pump's prediction beside the true level, remembered
+    assert.equal(await page.$eval('#behind-box', d => d.open), false);
+    await page.click('#behind-box summary');
+    await page.evaluate(() => otsim.step(1));
+    const rows = await page.$$eval('.behind tbody tr', trs => trs.map(tr => tr.textContent));
+    assert.ok(rows.some(r => /^Remifentanil3\.0/.test(r)) && rows.some(r => /^Propofol––/.test(r)), `${name}: behind rows ${rows}`);
+    assert.ok(rows.some(r => /^Twitch \(T1\)/.test(r)), `${name}: neuromuscular rows in Behind the monitor`);
+    assert.ok(rows.some(r => /^To voice \(asleep\)/.test(r)), `${name}: depth rows in Behind the monitor`);
+    assert.ok(rows.some(r => /^Cardiac output/.test(r)), `${name}: circulation rows in Behind the monitor`);
+    assert.equal(await page.evaluate(() => localStorage.getItem('otsim.behind')), '1');
+
     // no horizontal scroll; axe on the paused theatre
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${name}: no horizontal scroll`);
-    await axe(page, `${name} theatre`);
+    await axe(page, `${name} theatre, Drugs tab and Behind the monitor`);
 
     // an unknown screen falls back to the library
     await page.goto(BASE + '#nowhere');

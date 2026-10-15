@@ -1,13 +1,15 @@
 // Intravenous pharmacokinetics (MODEL.md section 2): mammillary models with up to three compartments and an effect
 // site, stepped by explicit Euler at the model's dt (the prototype matched RK4 at 0.01 s to 2-3 decimals). Rate
 // constants are per minute. Boluses enter the central compartment at once; infusions run in the drug's amount per
-// minute. M1.3 adds rocuronium, suxamethonium and sugammadex; M1.2 the pump's own predicted copy of these models.
+// minute, plus whatever the syringe pumps deliver (pump.js, read from the previous step). M1.3 adds rocuronium,
+// suxamethonium and sugammadex.
 //
 // State: pk.p[drug] (parameters, fixed for the run), pk.d[drug] = { a1, a2, a3 (amounts), ce, ceH? }, pk.inf[drug]
 // (amount/min). Others read cp and ce through cp(state, drug) and ce(state, drug).
 
 import { DRUGS, doseAmount, rateAmount } from './drugs.js';
 import { pkLbm } from './patient.js';
+import { emptyNm, stepNm } from './nmb.js';
 
 const LN2 = 0.6931471805599453;
 
@@ -94,14 +96,19 @@ export const pk = {
   name: 'pk',
   init(state) {
     const p = {};
-    for (const id in DRUGS) p[id] = rates(MODELS[DRUGS[id].model](state.patient), state.patient);
-    return { p, d: {}, inf: {} };
+    for (const id in DRUGS) if (MODELS[DRUGS[id].model]) p[id] = rates(MODELS[DRUGS[id].model](state.patient), state.patient);
+    return { p, d: {}, inf: {}, nm: null };
   },
   step(prev, ctx) {
     const s = prev.pk, w = prev.patient.weightKg, dtMin = ctx.dt / 60;
     let inf = s.inf;
     const add = {};
+    const nmAdd = {};
     for (const a of ctx.actions) {
+      if (a.type === 'bolus' && a.route === 'iv' && DRUGS[a.drug] && DRUGS[a.drug].model === 'nmb') {
+        nmAdd[a.drug] = (nmAdd[a.drug] || 0) + doseAmount(a.drug, a.dose, a.unit, w);
+        continue;
+      }
       if (!(a.drug in s.p)) continue;
       if (a.type === 'bolus' && a.route === 'iv') add[a.drug] = (add[a.drug] || 0) + doseAmount(a.drug, a.dose, a.unit, w);
       else if (a.type === 'infusion') {
@@ -109,16 +116,18 @@ export const pk = {
         if (a.rate > 0) inf[a.drug] = rateAmount(a.drug, a.rate, a.unit, w); else delete inf[a.drug];
       }
     }
-    const d = {};
+    const d = {}, pumps = prev.pump || {};
     for (const id in s.p) {
-      const cur = s.d[id];
-      if (!cur && !add[id] && !inf[id]) continue; // a drug never given costs nothing
+      const cur = s.d[id], fromPump = pumps[id] ? pumps[id].rate : 0;
+      if (!cur && !add[id] && !inf[id] && !fromPump) continue; // a drug never given costs nothing
       const k = s.p[id];
-      const nx = advance(k, cur || empty(k), inf[id] || 0, dtMin);
+      const nx = advance(k, cur || empty(k), (inf[id] || 0) + fromPump, dtMin);
       if (add[id]) nx.a1 += add[id];
       d[id] = nx;
     }
-    return { ...s, d, inf };
+    // neuromuscular drugs (nmb.js): stepped once any has been given
+    const nm = s.nm || Object.keys(nmAdd).length ? stepNm(s.nm || emptyNm(), nmAdd, prev.patient, dtMin) : null;
+    return { ...s, d, inf, nm };
   },
   trend(s) {
     const out = {};

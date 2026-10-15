@@ -230,9 +230,9 @@ function fit(c,hLogical){const dpr=Math.min(2,window.devicePixelRatio||1);const 
 
 // ===== live simulation state =====
 let eng=new Engine();
-let SIG=[],EYE=[]; const SIGMAX=16*FS; // the EEG lane can sweep 4, 8 or 16 s
+let SIG=[],EYE=[]; const SIGMAX=20*FS; // the EEG lane can sweep 4, 8 or 16 s (the BIS Advance screen, 20 s at 6.25 mm/s)
 let COLS=[]; const COLMAX=300; // one column per second, 5 min
-let HIST=[]; const HISTMAX=3600; // the same columns for the BIS VISTA screen's 5, 15 and 60 min trend windows
+let HIST=[]; const HISTMAX=14400; // the same columns for the BIS VISTA screen's 5, 15 and 60 min trend windows and a 4 h case to review
 let sup=[]; let bisS=null, lastSef=null, lastMf=null, produced=0, simT=0, speed=1, paused=false;
 let drug='propofol', depth=0; const mods={elderly:false,emg:false,diathermy:false,nmb:false,warmer:false,blink:false};
 // cumulative times this case (s): the shown SR at 5% or more (suppression present) and the shown BIS under 40; a clean second only
@@ -255,15 +255,15 @@ function nmStep(dt){ // dt: sim seconds
  const D=nmD();mods.nmbK=D;mods.nmb=D>0.5;}
 function nmRead(){const t1=100*(1-nmD()),tofc=t1<6?0:t1<12?1:t1<18?2:t1<25?3:4,
   tofr=tofc<4?null:Math.min(1,Math.pow(Math.max(0,(t1-30)/70),1.8)),ptc=tofc===0?Math.round(8*Math.pow(t1/6,1.5)):null;return {t1,tofc,tofr,ptc};}
-let artH=[],bcH=[],rawH=[],sefH=[],mfH=[];let prevSup=false,isoN=0,outN=0,sefAge=0;
+let artH=[],bcH=[],rawH=[],sefH=[],mfH=[];let prevSup=false,isoN=0,outN=0,outV=0,sefAge=0;let warming=true; // outV: out-of-target seconds for the Medtronic screen (any depth); not counted during the warm start
 // The right hemisphere (BIS Advance and SedLine): a second engine and its own copy of the per-channel state. The left channel
 // is the page's own variables; the right runs through swapCh(), which exchanges the two sets around a call to step().
 const R={eng:new Engine(),SIG:[],EYE:[],COLS:[],HIST:[],sup:[],bisS:null,lastSef:null,lastMf:null,produced:0,tim:{sup:0,low:0},
- artH:[],bcH:[],rawH:[],sefH:[],mfH:[],prevSup:false,isoN:0,outN:0,sefAge:0};
+ artH:[],bcH:[],rawH:[],sefH:[],mfH:[],prevSup:false,isoN:0,outN:0,outV:0,sefAge:0};
 function swapCh(){[eng,R.eng]=[R.eng,eng];[SIG,R.SIG]=[R.SIG,SIG];[EYE,R.EYE]=[R.EYE,EYE];[COLS,R.COLS]=[R.COLS,COLS];[HIST,R.HIST]=[R.HIST,HIST];
  [sup,R.sup]=[R.sup,sup];[bisS,R.bisS]=[R.bisS,bisS];[lastSef,R.lastSef]=[R.lastSef,lastSef];[lastMf,R.lastMf]=[R.lastMf,lastMf];[produced,R.produced]=[R.produced,produced];
  [tim,R.tim]=[R.tim,tim];[artH,R.artH]=[R.artH,artH];[bcH,R.bcH]=[R.bcH,bcH];[rawH,R.rawH]=[R.rawH,rawH];[sefH,R.sefH]=[R.sefH,sefH];[mfH,R.mfH]=[R.mfH,mfH];
- [prevSup,R.prevSup]=[R.prevSup,prevSup];[isoN,R.isoN]=[R.isoN,isoN];[outN,R.outN]=[R.outN,outN];[sefAge,R.sefAge]=[R.sefAge,sefAge];}
+ [prevSup,R.prevSup]=[R.prevSup,prevSup];[isoN,R.isoN]=[R.isoN,isoN];[outN,R.outN]=[R.outN,outN];[outV,R.outV]=[R.outV,outV];[sefAge,R.sefAge]=[R.sefAge,sefAge];}
 const modsR=Object.create(mods);modsR.side='R';mods.side='L'; // the right engine reads the page's settings, with its own side
 const stepR=n=>{swapCh();try{step(n);}finally{swapCh();}};
 const stimAll=kind=>{const k=kind??(Math.random()<0.1?'delta':'');eng.stimulus(k);R.eng.stimulus(k);};
@@ -308,18 +308,25 @@ function step(nSamples){
    // (GA-level propofol/sevo only, not sedation, dex or ketamine; once shown it clears only back inside 42-58)
    const blank=sqi<15,gaH=eng.drug==='mix'?0.155*(eng.de.propofol||0)+sevoDepth(eng.de.sevo||0):eng.drug==='propofol'||eng.drug==='sevo'?eng.de:0;
    outN=!blank&&gaH>=0.44&&(bisS<mon.alo||bisS>mon.ahi||outN>=10&&(bisS<mon.alo+2||bisS>mon.ahi-2))?outN+1:0;
+   // the Medtronic screen raises 'BIS out of target range' whenever the range is active and the shown BIS has been outside it
+   // for 10 s, at any depth (the manual); Target Alarm only decides whether it sounds
+   outV=!warming&&!blank&&(bisS<mon.alo||bisS>mon.ahi||outV>=10&&(bisS<mon.alo+2||bisS>mon.ahi-2))?outV+1:0;
    if(!art&&!blank){if(bsr>=5)tim.sup++;if(bisS<40)tim.low++;}
-   const col={n:Math.round(produced/FS),ce:ceNow(),db,sef:fresh?lastSef:null,mf:fresh?lastMf:null,bis:blank?null:bisS,bsr,emg,sqi,tp,art,
+   const col={n:Math.round(produced/FS),ce:ceNow(),db,sef:fresh?lastSef:null,mf:fresh?lastMf:null,bis:blank?null:bisS,bsr,emg,sqi,tp,art,sp:f.suppressed?1:0,amp:20*Math.log10(Math.max(1,mx)),st:tim.sup,
     bc:bcH.reduce((a,b)=>a+b,0)};COLS.push(col);if(COLS.length>COLMAX)COLS.shift();HIST.push(col);if(HIST.length>HISTMAX)HIST.shift();
    onColumn&&onColumn();
   }}
 }
 // the monitor's message region: [priority, text] or null. Wording as in the BIS Complete manual.
 function monMsg(){const c=COLS[COLS.length-1];if(!c)return null;
- if(isoN>=60)return ['hi','Isoelectric EEG Detected'];
- if(mon.teach&&outN>=10&&c.bis!=null)return ['hi','BIS Out of Target Range \u2013 '+(c.bis<50?'Low':'High')];
- if(c.sqi<15)return ['lo','Data unavailable due to poor signal quality'];
- if(c.sqi<50)return ['lo','Excessive Artifact Detected in Signal'];
+ if(isoN>=60)return ['hi','Isoelectric EEG Detected',31,'Isoelectric EEG Detected'];
+ if(typeof MT!=='undefined'&&mon.skin==='vista'){
+  const low=c.bis!=null&&c.bis<(mon.alo+mon.ahi)/2;
+  if(MT.tgt.active&&outV>=10&&c.bis!=null)return ['hi','BIS Out of Target Range \u2013 '+(low?'Low':'High'),low?29:30,'BIS out of target range'];
+ }else{ const tgtOn=mon.teach,low=c.bis!=null&&c.bis<(mon.alo+mon.ahi)/2;
+   if(tgtOn&&outN>=10&&c.bis!=null)return ['hi','BIS Out of Target Range \u2013 '+(low?'Low':'High'),low?29:30,'BIS out of target range']; }
+ if(c.sqi<15)return ['lo','Data unavailable due to poor signal quality',28,'Data unavailable due to poor signal quality'];
+ if(c.sqi<50)return ['lo','Excessive Artifact Detected in Signal',27,'Excessive Artifact Detected in Signal'];
  if(mon.infoUntil>Date.now())return ['info',mon.info];
  return null;}
 
@@ -393,137 +400,16 @@ function drawDsa(){if(view==='eeg'||mon.skin!=='classic')return;const {ctx,w,h}=
 function fitFill(c){const w=c.clientWidth,h=c.clientHeight;if(!w||!h)return null;const dpr=Math.min(2,window.devicePixelRatio||1),W=Math.round(w*dpr),H=Math.round(h*dpr);
  if(c.width!==W||c.height!==H){c.width=W;c.height=H;}const ctx=c.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);return {ctx,w,h};}
 const VSEC=()=>mon.sweep==='auto'?8:mon.sweep;
-function drawVEeg(){const f=fitFill($('c2Eeg'));if(!f)return;const {ctx,w,h}=f;ctx.clearRect(0,0,w,h);
- const secs=VSEC(),N=secs*FS,sc=(h/2)/mon.scale;
- ctx.strokeStyle='rgba(255,255,255,.14)';ctx.lineWidth=1;ctx.setLineDash([2,4]);ctx.beginPath();ctx.moveTo(0,Math.round(h/2)+.5);ctx.lineTo(w,Math.round(h/2)+.5);ctx.stroke();ctx.setLineDash([]);
- ctx.strokeStyle='rgba(255,255,255,.35)';ctx.beginPath();for(let k=1;k<secs;k++){const x=Math.round(w*k/secs)+.5;ctx.moveTo(x,h-4);ctx.lineTo(x,h);}ctx.stroke();
- if(mon.teach){ctx.fillStyle='rgba(23,143,215,.18)';ctx.fillRect(w*(secs-2)/secs,0,w*2/secs,h);}
- const n=Math.min(SIG.length,N),o=SIG.length-n,x0=N-n;ctx.save();ctx.beginPath();ctx.rect(0,0,w,h);ctx.clip();ctx.strokeStyle='#3ddc6b';ctx.lineWidth=1.2;ctx.beginPath();
- for(let i=0;i<n;i++){const x=(x0+i)/N*w,y=h/2-SIG[o+i]*sc;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();ctx.restore();
- txt('v2Mm',`${+(200/secs).toFixed(1)} mm / sec.`);txt('v2Uv',`${mon.scale/2} µV / division`);}
-const OFFS={};
-function paintDsa(slot,hist){const win=mon.trend*60;let o=OFFS[slot];if(!o||o.cv.width!==win){const cv=document.createElement('canvas');cv.width=win;cv.height=NB;o=OFFS[slot]={cv,img:cv.getContext('2d').createImageData(win,NB)};}
- const d=o.img.data,n=Math.min(hist.length,win),off=hist.length-n;
- for(let x=0;x<win;x++){const col=x<n?hist[off+x]:null;for(let y=0;y<NB;y++){const i=(y*win+x)*4;
-  if(!col){d[i]=d[i+1]=d[i+2]=0;d[i+3]=255;continue;}
-  const c=LUT[(dbToX(col.db[NB-1-y])*255)|0];d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];d[i+3]=255;}}
- o.cv.getContext('2d').putImageData(o.img,0,0);return o.cv;}
-let offV=null;
-function paintV(){offV=paintDsa('v',HIST);}
-const MON3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function drawVDsa(){const f=fitFill($('c2Dsa'));if(!f||!offV)return;const {ctx,w,h}=f;ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);
- const fs=Math.max(8,Math.min(13,w*0.034)),gx=w*0.075,gw=w*0.79,gy=h*0.125,gh=h*0.42,ty=h*0.6,th=h*0.29;
- const win=mon.trend*60,n=Math.min(HIST.length,win),o=HIST.length-n,dw=gw*n/win;
- ctx.font=`600 ${fs}px Arimo, Arial, sans-serif`;ctx.textBaseline='alphabetic';
- // header: SEF (white), MF (blue), date and time, case code
- const c=COLS[COLS.length-1],blank=!c||c.sqi<15,sT='SEF '+(blank||lastSef==null?'--':lastSef.toFixed(1)),mT='MF '+(blank||lastMf==null?'--':lastMf.toFixed(1));
- ctx.textAlign='left';ctx.fillStyle='#fff';ctx.fillText(sT,gx,fs*1.2);ctx.fillStyle='#5aa9ff';ctx.fillText(mT,gx+ctx.measureText(sT).width+fs*0.9,fs*1.2);
- const d0=new Date(T0+simT*1000),dt=`${d0.getDate()} ${MON3[d0.getMonth()]} ${String(d0.getFullYear()).slice(2)}  ${clk(simT)}`;
- ctx.textAlign='right';ctx.fillStyle='#cfd3da';ctx.fillText(dt,gx+gw,fs*1.2);
- if(mon.dbLo!==DB_LO||mon.dbHi!==DB_HI){ctx.fillStyle='#ffb454';ctx.font=`600 ${fs*0.8}px Arimo, Arial, sans-serif`;ctx.fillText(`colour ${mon.dbLo} to ${mon.dbHi} dB`,gx+gw,fs*2.2);ctx.font=`600 ${fs}px Arimo, Arial, sans-serif`;}
- // DSA image, left-aligned: data grows from the left, then scrolls
- ctx.imageSmoothingEnabled=true;if(n)ctx.drawImage(offV,0,0,n,NB,gx,gy,dw,gh);
- const Yf=hz=>gy+gh*(1-hz/30);
- ctx.setLineDash([2,3]);ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=1;ctx.beginPath();for(const hz of [4,8,13]){const y=Math.round(Yf(hz))+.5;ctx.moveTo(gx,y);ctx.lineTo(gx+gw,y);}ctx.stroke();ctx.setLineDash([]);
- ctx.strokeStyle='#8a8f98';ctx.strokeRect(gx+.5,gy+.5,gw-1,gh-1);
- const line=(k,col,lw)=>{ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.beginPath();let pen=false;for(let i=0;i<n;i++){const v=HIST[o+i][k];if(v==null){pen=false;continue;}const x=gx+(i+.5)/win*gw,y=gy+gh*(1-v/30);pen?ctx.lineTo(x,y):ctx.moveTo(x,y);pen=true;}ctx.stroke();};
- line('mf','#b48cff',1.2);line('sef','#fff',1.4);
- ctx.fillStyle='#cfd3da';ctx.textAlign='right';for(const hz of [30,13,8,4])ctx.fillText(hz,gx-fs*0.4,Math.max(gy+fs*0.8,Yf(hz)+fs*0.35));
- ctx.fillStyle='#e0b040';ctx.textAlign='left';{let lim=1e9;for(const [lo,hi,l] of [[0,4,'Delta'],[4,8,'Theta'],[8,13,'Alpha'],[13,30,'Beta']]){const y=Math.min(lim-fs*1.05,(Yf(lo)+Yf(hi))/2+fs*0.35);ctx.fillText(l,gx+gw+fs*0.4,y);lim=y;}}
- // colour bar H (high power) to L
- const bx=w-fs*0.7;for(let i=0;i<gh;i++){ctx.fillStyle=rgb(LUT[((1-i/gh)*255)|0]);ctx.fillRect(bx,gy+i,fs*0.45,1);}
- ctx.fillStyle='#cfd3da';ctx.textAlign='center';ctx.font=`600 ${fs*0.8}px Arimo, Arial, sans-serif`;ctx.fillText('H',bx+fs*0.22,gy-2);ctx.fillText('L',bx+fs*0.22,gy+gh+fs*0.75);
- ctx.font=`600 ${fs}px Arimo, Arial, sans-serif`;
- // trend
- const X=i=>gx+(i+.5)/win*gw,Yb=v=>ty+th*(1-v/100);
- if(mon.teach){ctx.fillStyle='rgba(255,255,255,.10)';ctx.fillRect(gx,Yb(60),gw,Yb(40)-Yb(60));}
- ctx.strokeStyle='#8a8f98';ctx.lineWidth=1;ctx.strokeRect(gx+.5,ty+.5,gw-1,th-1);
- ctx.setLineDash([2,3]);ctx.strokeStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.moveTo(gx,Math.round(Yb(50))+.5);ctx.lineTo(gx+gw,Math.round(Yb(50))+.5);ctx.stroke();ctx.setLineDash([]);
- ctx.fillStyle='#cfd3da';ctx.textAlign='right';for(const v of [100,50,0])ctx.fillText(v,gx-fs*0.4,Math.max(ty+fs*0.8,Math.min(ty+th,Yb(v)+fs*0.35)));
- const tr=(fn,col,lw)=>{ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.lineJoin='round';ctx.beginPath();let pen=false;for(let i=0;i<n;i++){const v=fn(HIST[o+i]);if(v==null){pen=false;continue;}pen?ctx.lineTo(X(i),Yb(v)):ctx.moveTo(X(i),Yb(v));pen=true;}ctx.stroke();};
- if(mon.bottom==='emg')tr(q=>Math.max(0,Math.min(100,(q.emg-30)*2)),'#3ddc6b',1);
- if(mon.bottom==='sr')tr(q=>q.bsr,'#b48cff',1.2);
- if(mon.teach){ctx.setLineDash([3,3]);tr(q=>100*(1-q.ce),'rgba(90,200,255,.85)',1);ctx.setLineDash([]);}
- tr(q=>q.bis,'#ffd23f',1.8);
- const bw=gw/win+.5;for(let i=0;i<n;i++){const q=HIST[o+i];if(q.sqi>=50)continue;ctx.fillStyle=q.sqi<15?'#ffe600':AMBER;ctx.fillRect(X(i)-bw/2,ty+th+1,bw,3);}
- // clock labels under the trend, spread across the window
- ctx.fillStyle='#cfd3da';ctx.textAlign='center';const t0=n?HIST[o].n:simT-win;
- for(let k=0;k<=4;k++){const x=gx+gw*k/4;ctx.textAlign=k===0?'left':k===4?'right':'center';ctx.fillText(clk(t0+win*k/4),x,h-fs*0.15);ctx.fillRect(Math.round(x)-.5,ty+th,1,3);}
- const lab=mon.bottom==='emg'?'BIS + EMG':mon.bottom==='sr'?'BIS + SR':'BIS';ctx.textAlign='left';ctx.fillStyle='#ffd23f';ctx.fillText(lab,gx+fs*0.4,ty+fs*1.2);
- if(mon.teach){ctx.fillStyle='#5ac8ff';ctx.textAlign='right';ctx.fillText('- - effect site',gx+gw-fs*0.4,ty+fs*1.2);}}
-// ===== drawing: two-sided screens (BIS Advance style and Masimo SedLine style; from published descriptions, not photos) =====
+// ===== the Masimo SedLine screen lives in sed-screen.js, sed-draw.js and sed-menu.js (the BIS Advance screen in adv-*.js) =====
 // SedLine's PSi is its own proprietary index: here a straight-line stand-in from the BIS teaching value (BIS 40-60 -> PSi 25-50).
 const psiOf=b=>b==null?null:Math.max(0,Math.min(100,Math.round(1.25*b-25)));
-function bilData(){const cl_=COLS[COLS.length-1],cr=R.COLS[R.COLS.length-1];if(!cl_||!cr)return null;
- const tail=(a,k)=>{const x=a.slice(-30);return x.reduce((m,q)=>m+q[k],0)/Math.max(1,x.length);};
- const pl=Math.pow(10,tail(HIST,'tp')/10),pr=Math.pow(10,tail(R.HIST,'tp')/10),asym=Math.round(100*Math.abs(pl-pr)/(pl+pr+1e-9));
- const bl=cl_.sqi<15?null:cl_.bis,br=cr.sqi<15?null:cr.bis,mean=bl!=null&&br!=null?(bl+br)/2:bl??br;
- const artf=a=>Math.round(100*a.reduce((m,v)=>m+v,0)/Math.max(1,a.length));
- const swapRun=fn=>{swapCh();try{return fn();}finally{swapCh();}};
- return {cl:cl_,cr,asym,bl,br,psi:psiOf(mean),emgL:Math.max(0,Math.min(100,Math.round((cl_.emg-30)*100/30))),emgR:Math.max(0,Math.min(100,Math.round((cr.emg-30)*100/30))),
-  artfL:artf(artH),artfR:artf(R.artH),msgL:monMsg(),msgR:swapRun(()=>monMsg())};}
-function drawBil(){const f=fitFill($('cBil'));if(!f)return;const {ctx,w,h}=f;const D=bilData();ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);if(!D)return;
- const sed=mon.skin==='sedline',fs=Math.max(8,Math.min(13,w*0.027)),F=(wt,sz)=>`${wt} ${sz}px Arimo, Arial, sans-serif`,GR='#8a8f98',LT='#cfd3da';
- const T=(t,x,y,sz,col,al,wt)=>{ctx.font=F(wt||600,sz||fs);ctx.fillStyle=col||'#fff';ctx.textAlign=al||'left';ctx.fillText(t,x,y);};
- const box=(x,y,bw,bh,col)=>{ctx.strokeStyle=col||GR;ctx.lineWidth=1;ctx.strokeRect(x*w+.5,y*h+.5,bw*w-1,bh*h-1);};
- const lx=0.02*w,lw=0.32*w,rx=0.37*w,rw=0.61*w;
- // left column: numbers and tiles
- const sqiBars=(x,y,sq)=>{const n=Math.ceil(sq/20);for(let i=0;i<5;i++){const bh=fs*0.25*(i+1);ctx.fillStyle=i<n?(sq<15?'#ff6b6b':sq<50?AMBER:'#3ddc6b'):'#2b3a2e';ctx.fillRect(x+i*fs*0.45,y-bh,fs*0.3,bh);}};
- const num=b=>b==null?'--':String(Math.round(b));
- if(!sed){
-  for(const [k,x0,b,c] of [['L',0.02,D.bl,D.cl],['R',0.185,D.br,D.cr]]){box(x0,0.02,0.155,0.2);T('BIS '+k,x0*w+fs*0.5,0.02*h+fs*1.5,fs*1.1,'#fff','left',700);sqiBars((x0+0.155)*w-fs*3,0.02*h+fs*1.7,c.sqi);
-   T(num(b),(x0+0.0775)*w,0.2*h,w*0.105,'#fff','center',700);}
-  for(const [k,x0,c] of [['L',0.02,D.cl],['R',0.185,D.cr]]){box(x0,0.235,0.155,0.095,'#a074e8');T('SR '+k,x0*w+fs*0.4,0.235*h+fs*1.4,fs,'#b48cff');T(String(Math.round(c.bsr))+'%',(x0+0.15)*w,0.235*h+fs*1.4,fs*1.2,'#fff','right',700);}
-  for(const [k,y0,v] of [['EMG L',0.35,D.emgL],['EMG R',0.43,D.emgR]]){T(k,lx,y0*h+fs*0.9,fs,LT);ctx.strokeStyle=GR;ctx.strokeRect(lx+fs*4,y0*h+.5,lw-fs*4,fs*0.9);ctx.fillStyle=v>60?'#ff9a1f':'#ffb454';ctx.fillRect(lx+fs*4+1,y0*h+1.5,(lw-fs*4-2)*v/100,fs*0.9-2);}
-  T('ASYM',lx,0.56*h+fs*0.9,fs,LT);T(D.asym+'%',lx+lw,0.56*h+fs*0.9,fs,'#fff','right',700);ctx.strokeStyle=GR;ctx.strokeRect(lx+.5,0.56*h+fs*1.2,lw-1,fs*0.9);ctx.fillStyle=D.asym>30?'#ff9a1f':'#5aa9ff';ctx.fillRect(lx+1,0.56*h+fs*1.2+1,(lw-2)*Math.min(100,D.asym*2)/100,fs*0.9-2);
- } else {
-  const p=D.psi,gcx=lx+lw/2,gcy=0.215*h,gr=Math.min(lw*0.36,0.155*h);
-  // gauge arc like the monitor's: white inside the 25-50 target, red dashes outside, a needle at the value
-  const ang=v=>Math.PI*(1.15-1.3*v/100);ctx.lineWidth=fs*0.5;ctx.setLineDash([]);
-  for(const [a,b,col] of [[0,25,'#e4002b'],[25,50,'#fff'],[50,100,'#e4002b']]){ctx.strokeStyle=col;ctx.beginPath();ctx.arc(gcx,gcy,gr,-ang(a),-ang(b),false);ctx.stroke();}
-  if(p!=null){const q=ang(p);ctx.strokeStyle='#f2b21e';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(gcx+Math.cos(q)*gr*0.78,gcy-Math.sin(q)*gr*0.78);ctx.lineTo(gcx+Math.cos(q)*gr*1.12,gcy-Math.sin(q)*gr*1.12);ctx.stroke();}
-  T(p==null?'--':String(p),gcx,gcy-gr*0.05,w*0.105,'#f2b21e','center',700);T('PSi',gcx,gcy+fs*0.6,fs*1.2,'#fff','center',700);T('25',gcx-gr*1.05,gcy-gr*0.45,fs*0.8,LT,'right');T('50',gcx+gr*0.35,gcy-gr*1.12,fs*0.8,LT,'left');
-  const sefL=lastSef,sefR=R.lastSef,f1=v=>v==null?'--':v.toFixed(1);
-  const tiles=[['EMG  L '+D.emgL+'%   R '+D.emgR+'%'],['SR  L '+Math.round(D.cl.bsr)+'%   R '+Math.round(D.cr.bsr)+'%'],['ARTF  L '+D.artfL+'%   R '+D.artfR+'%'],['SEF  L '+f1(sefL)+'   R '+f1(sefR)+' Hz']];
-  tiles.forEach(([t],i)=>{const y0=0.33+i*0.075;box(0.02,y0,0.32,0.065,'#3a6ea5');T(t,lx+fs*0.5,y0*h+fs*1.3,fs);});
-  const y0=0.645;T('ASYM',lx,y0*h+fs*0.9,fs,LT);T(D.asym+'%',lx+lw,y0*h+fs*0.9,fs,'#fff','right',700);ctx.strokeStyle=GR;ctx.strokeRect(lx+.5,y0*h+fs*1.2,lw-1,fs*0.9);ctx.fillStyle=D.asym>30?'#ff9a1f':'#5aa9ff';ctx.fillRect(lx+1,y0*h+fs*1.2+1,(lw-2)*Math.min(100,D.asym*2)/100,fs*0.9-2);
- }
- // message (worst of the two sides)
- const m=D.msgL||D.msgR;if(m){const y0=0.8*h,mh=0.12*h;ctx.fillStyle=m[0]==='hi'?'#d6001c':m[0]==='lo'?'#ffe600':'#3c4a63';ctx.fillRect(lx,y0,lw,mh);ctx.font=F(700,fs*0.85);ctx.fillStyle=m[0]==='lo'?'#000':'#fff';ctx.textAlign='left';
-  const words=m[1].split(' ');let line='',yy=y0+fs*1.1;for(const wd of words){const t=line?line+' '+wd:wd;if(ctx.measureText(t).width>lw-fs){ctx.fillText(line,lx+fs*0.4,yy);yy+=fs;line=wd;}else line=t;}ctx.fillText(line,lx+fs*0.4,yy);}
- // right area: EEG traces
- const secs=VSEC(),N=secs*FS,eh=0.135*h;
- [['L',SIG,0.02],['R',R.SIG,0.17]].forEach(([k,sig,y0])=>{const y=y0*h;if(sed){ctx.fillStyle='#06142c';ctx.fillRect(rx,y,rw,eh);}ctx.strokeStyle=GR;ctx.strokeRect(rx+.5,y+.5,rw-1,eh-1);ctx.save();ctx.beginPath();ctx.rect(rx,y,rw,eh);ctx.clip();
-  ctx.strokeStyle=sed?'#f2c230':'#3ddc6b';ctx.lineWidth=1.1;ctx.beginPath();const n=Math.min(sig.length,N),o=sig.length-n,x0=N-n,sc=(eh/2)/mon.scale;
-  for(let i=0;i<n;i++){const x=rx+(x0+i)/N*rw,yy=y+eh/2-sig[o+i]*sc;i?ctx.lineTo(x,yy):ctx.moveTo(x,yy);}ctx.stroke();ctx.restore();T(k,rx+fs*0.4,y+fs*1.2,fs,LT,'left',700);});
- T(`${+(200/secs).toFixed(1)} mm/s · ${mon.scale/2} µV/div`,rx+rw-fs*0.3,0.02*h+eh-fs*0.3,fs*0.8,LT,'right');
- // DSAs
- const win=mon.trend*60,gx=rx+fs*2,gw=rw-fs*2-fs*3.2;
- const dsa=(slot,hist,y0,k)=>{const cv=OFFS[slot]&&OFFS[slot].cv,n=Math.min(hist.length,win),gy=y0*h,gh=0.2*h,dw=gw*n/win;if(cv&&n)ctx.drawImage(cv,0,0,n,NB,gx,gy,dw,gh);
-  const Yf=hz=>gy+gh*(1-hz/30);ctx.setLineDash([2,3]);ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1;ctx.beginPath();for(const hz of [4,8,13]){const y=Math.round(Yf(hz))+.5;ctx.moveTo(gx,y);ctx.lineTo(gx+gw,y);}ctx.stroke();ctx.setLineDash([]);
-  ctx.strokeStyle=GR;ctx.strokeRect(gx+.5,gy+.5,gw-1,gh-1);const off=hist.length-n;
-  const ln=(key,col,lw)=>{ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.beginPath();let pen=false;for(let i=0;i<n;i++){const v=hist[off+i][key];if(v==null){pen=false;continue;}const x=gx+(i+.5)/win*gw,y=gy+gh*(1-v/30);pen?ctx.lineTo(x,y):ctx.moveTo(x,y);pen=true;}ctx.stroke();};
-  ln('mf','#b48cff',1);ln('sef','#fff',1.3);
-  T(k,gx+fs*0.4,gy+fs*1.2,fs,'#fff','left',700);for(const hz of [30,13,8,4])T(String(hz),gx-fs*0.3,Math.max(gy+fs*0.8,Yf(hz)+fs*0.35),fs*0.8,LT,'right');
-  let lim=1e9;for(const [lo,hi,l] of [[0,4,'Delta'],[4,8,'Theta'],[8,13,'Alpha'],[13,30,'Beta']]){const y=Math.min(lim-fs*0.9,(Yf(lo)+Yf(hi))/2+fs*0.3);T(l,gx+gw+fs*0.3,y,fs*0.8,'#e0b040');lim=y;}};
- dsa('bl',HIST,0.33,'L');dsa('br',R.HIST,0.545,'R');
- // trend
- const ty=0.775*h,th=0.16*h,n=Math.min(HIST.length,win),oL=HIST.length-n,oR=R.HIST.length-Math.min(R.HIST.length,win),Yb=v=>ty+th*(1-v/100),X=i=>gx+(i+.5)/win*gw;
- if(sed){ctx.fillStyle='rgba(40,110,50,.55)';ctx.fillRect(gx,Yb(50),gw,Yb(25)-Yb(50)); // the target band is always green; the line is blue under it and orange over it
-  const bw=gw/win+.6;for(let i=0;i<n;i++){const v=psiOf(HIST[oL+i].bis);if(v==null)continue;if(v>50){ctx.fillStyle='rgba(235,150,30,.7)';ctx.fillRect(X(i)-bw/2,Yb(v),bw,Yb(50)-Yb(v));}else if(v<25){ctx.fillStyle='rgba(40,70,200,.8)';ctx.fillRect(X(i)-bw/2,Yb(25),bw,Yb(v)-Yb(25));}}}
- else if(mon.teach){ctx.fillStyle='rgba(255,255,255,.10)';ctx.fillRect(gx,Yb(60),gw,Yb(40)-Yb(60));}
- ctx.strokeStyle=GR;ctx.lineWidth=1;ctx.strokeRect(gx+.5,ty+.5,gw-1,th-1);for(const v of [100,50,0])T(String(v),gx-fs*0.3,Math.max(ty+fs*0.8,Math.min(ty+th,Yb(v)+fs*0.35)),fs*0.8,LT,'right');
- const tr=(arr,off,fn,col,lw)=>{const m=Math.min(arr.length,win);ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.lineJoin='round';ctx.beginPath();let pen=false;for(let i=0;i<m;i++){const v=fn(arr[off+i]);if(v==null){pen=false;continue;}pen?ctx.lineTo(X(i),Yb(v)):ctx.moveTo(X(i),Yb(v));pen=true;}ctx.stroke();};
- if(sed){tr(HIST,oL,q=>psiOf(q.bis),'#f2c230',1.6);T('PSi',gx+fs*0.4,ty+fs*1.2,fs,'#f2c230');}
- else{tr(HIST,oL,q=>q.bis,'#ffd23f',1.6);tr(R.HIST,oR,q=>q.bis,'#5ac8ff',1.2);T('BIS L',gx+fs*0.4,ty+fs*1.2,fs,'#ffd23f');T('R',gx+fs*3.6,ty+fs*1.2,fs,'#5ac8ff');}
- const t0=n?HIST[oL].n:simT-win;for(let k=0;k<=4;k++){const x=gx+gw*k/4;T(clk(t0+win*k/4),x,h-fs*0.1,fs*0.85,LT,k===0?'left':k===4?'right':'center');}
- ctx.textAlign='left';}
 const $=id=>document.getElementById(id);
 function zoneOf(b){return b>90?'Awake':b>80?'Light/moderate sedation':b>60?'Sedation':b>=40?'General anaesthesia':b>=20?'Deep hypnotic state':'Burst suppression / flat';}
 function segs(id,n,color){const el=$(id);el.style.setProperty('--seg',color);[...el.children].forEach((x,i)=>x.classList.toggle('on',i<n));}
-let vDismissed='';
 const mmss=n=>Math.floor(n/60)+':'+String(n%60).padStart(2,'0');
 function readouts(){const c=COLS[COLS.length-1];if(!c)return;
+ if(mon.skin==='advance'){const l=c,r=R.COLS[R.COLS.length-1];if(r){const t=a=>{const x=a.slice(-30);return x.reduce((m,q)=>m+q.tp,0)/Math.max(1,x.length);},pl=Math.pow(10,t(HIST)/10),pr=Math.pow(10,t(R.HIST)/10),as=Math.round(100*Math.abs(pl-pr)/(pl+pr+1e-9)),b=q=>q.sqi<15||q.bis==null?'--':Math.round(q.bis);
+  txt('bilSum',`L: BIS ${b(l)}, SR ${Math.round(l.bsr)}%, SQI ${l.sqi}  ·  R: BIS ${b(r)}, SR ${Math.round(r.bsr)}%, SQI ${r.sqi}  ·  ASYM ${as}%`);}}
  // like the monitor: SQI under 50 shows BIS hollow; under 15 no BIS, SEF, SR, TP or BC at all
  const bl=c.sqi<15,b=$('vBis');b.textContent=bl||c.bis==null?'--':Math.round(c.bis);b.classList.toggle('hollow',!bl&&c.sqi<50);
  const sr=Math.round(c.bsr);txt('vZone',bl?'Poor signal':c.sqi<50?'Low SQI: check':sr>0?`Suppression (SR ${sr}%)`:zoneOf(c.bis));
@@ -534,15 +420,11 @@ function readouts(){const c=COLS[COLS.length-1];if(!c)return;
  $('vSr').textContent=bl?'--':sr;$('vSef').textContent=bl||lastSef==null?'--':lastSef.toFixed(1);
  $('vTp').textContent=bl?'--':Math.round(c.tp);$('vBc').textContent=c.bsr<5||c.sqi<50?'--':c.bc;
  txt('vClock',clk(simT));
- // BIS VISTA screen and the teaching strip under it
- const vb=$('v2Bis');txt('v2Bis',bl||c.bis==null?'--':String(Math.round(c.bis)));vb.classList.toggle('hollow',!bl&&c.sqi<50);
- segs('v2Sqi',Math.ceil(c.sqi/20),c.sqi<15?'#ff6b6b':c.sqi<50?AMBER:'#3ddc6b');segs('v2Emg',e<30?0:e<39?1:e<48?2:e<56?3:4,e>=48?'#ff9a1f':'#ffb454');
- txt('v2St',Math.floor(tim.sup/3600)+':'+String(Math.floor(tim.sup/60)%60).padStart(2,'0')+':'+String(tim.sup%60).padStart(2,'0'));txt('v2Sr',bl?'--':String(sr));
+ // the Medtronic screen (mt-screen.js)
+ mtReadouts(c,bl,sr,e);
  txt('s2Sqi',String(c.sqi));txt('s2Emg',String(Math.round(e)));txt('s2Sr',bl?'--':String(sr));txt('s2Sef',bl||lastSef==null?'--':lastSef.toFixed(1));txt('s2Tp',bl?'--':String(Math.round(c.tp)));txt('s2Bc',c.bsr<5||c.sqi<50?'--':String(c.bc));
  txt('s2Zone',bl?'Poor signal':c.sqi<50?'Low SQI: check':sr>0?`Suppression (SR ${sr}%)`:zoneOf(c.bis));txt('s2Sup',mmss(tim.sup));txt('s2Low',mmss(tim.low));
- { const m0=monMsg(),mt0=m0?m0[1]:'';if(!mt0)vDismissed='';const show=!!mt0&&mt0!==vDismissed,vm=$('v2Msg');vm.hidden=!show;
-   if(show){txt('v2MsgT',mt0);vm.className='vmsg '+m0[0];} }
- if(BILAT(mon.skin)){const D=bilData();if(D)txt('bilSum',`L: BIS ${D.bl==null?'--':Math.round(D.bl)}, SR ${Math.round(D.cl.bsr)}%, SQI ${D.cl.sqi}  ·  R: BIS ${D.br==null?'--':Math.round(D.br)}, SR ${Math.round(D.cr.bsr)}%, SQI ${D.cr.sqi}  ·  ASYM ${D.asym}%`+(D.psi!=null?`  ·  PSi ${D.psi}`:''));}
+
  // message region: change the text only when it changes (aria-live)
  const m=monMsg(),mt=m?m[1]:'',el=$('vMsg');if(el.textContent!==mt){el.textContent=mt;el.className='msg'+(m?' '+m[0]:'');}}
 
@@ -718,8 +600,7 @@ function scaleUI(){$('kScale').textContent=`EEG ±${mon.scale} µV`;}
 function trendUI(){$('kTrend').textContent=`Trend ${mon.trend} min`;$('kBottom').textContent='Bottom: '+(mon.bottom==='emg'?'BIS + EMG':mon.bottom==='sr'?'BIS + SR':'BIS trend');
  txt('dsaRange',(mon.dbLo===DB_LO&&mon.dbHi===DB_HI?'':`${mon.dbLo}…${mon.dbHi} dB · `)+`last ${mon.trend} min`);}
 let menuOpen=false; // the on-screen Menu (VISTA and two-sided screens)
-const BILAT=s=>s==='advance'||s==='sedline';
-function applySkin(s,reset,init){mon.skin=s;$('vistaWrap').hidden=s!=='vista';$('bilatWrap').hidden=!BILAT(s);$('classicWrap').hidden=s!=='classic';$('teachStrip').hidden=s==='classic';$('bilSum').hidden=!BILAT(s);
+function applySkin(s,reset,init){mon.skin=s;mtApply();$('vistaWrap').hidden=s!=='vista';$('sedWrap').hidden=s!=='sedline';if(s==='sedline')sedApply();$('advWrap').hidden=s!=='advance';if(s==='advance')advApply();$('classicWrap').hidden=s!=='classic';$('teachStrip').hidden=s==='classic';$('bilSum').hidden=s!=='sedline'&&s!=='advance';
  document.querySelectorAll('#skinSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.skin===s));
  $('keySeg').hidden=s!=='classic';if(s==='classic')closeMenu(true);
  if(reset){mon.scale=s==='classic'?100:50;mon.sweep=s==='classic'?'auto':8;}
@@ -736,30 +617,19 @@ const MENU=[
  ['DSA colour range',()=>`${mon.dbLo} to ${mon.dbHi} dB`+(mon.dbLo===DB_LO&&mon.dbHi===DB_HI?' (default)':''),()=>{let i=RANGES.findIndex(r=>r[0]===mon.dbLo&&r[1]===mon.dbHi);[mon.dbLo,mon.dbHi]=RANGES[(i+1)%RANGES.length];dispUI();saveDisp();}],
  ['BIS alarm low',()=>String(mon.alo),()=>{mon.alo=mon.alo>=50?20:mon.alo+5;dirty=true;}],
  ['BIS alarm high',()=>String(mon.ahi),()=>{mon.ahi=mon.ahi>=80?50:mon.ahi+5;dirty=true;}],
- ['Alarm audio',()=>silenced?'Paused':'On',()=>$('kSilent').click()],
+ ['Alarm audio',()=>MT.alarm===0?'On':MT.alarm===1?'Paused':'Silent',()=>$('kSilent').click()],
  ['Teaching labels',()=>mon.teach?'On':'Off',()=>setTeach(!mon.teach)],
  ['Suppression timers',()=>'Reset',()=>$('tReset').click()],
- ['Sensor check',()=>'Start',()=>{closeMenu();$(BILAT(mon.skin)?'bSensor':'kSensor').click();}],
+ ['Sensor check',()=>'Start',()=>{closeMenu();$(mon.skin==='sedline'?'bSensor':'kSensor').click();}],
  ['Monitor',()=>(SKINS.find(k=>k[0]===mon.skin)||SKINS[0])[1],()=>{const i=SKINS.findIndex(k=>k[0]===mon.skin);applySkin(SKINS[(i+1)%SKINS.length][0],true);}]];
 function menuRender(focusI){const ul=$('vMenuList');ul.innerHTML='';MENU.forEach(([l,v,fn],i)=>{const li=document.createElement('li'),b=document.createElement('button');b.type='button';
   b.innerHTML=`<span>${l}</span><b>${v()}</b>`;b.onclick=()=>{fn();menuRender(i);};li.appendChild(b);ul.appendChild(li);});
  if(focusI!=null)ul.children[focusI].firstChild.focus();}
-function closeMenu(quiet){if(!menuOpen)return;menuOpen=false;$('vMenu').hidden=true;document.querySelectorAll('.menukey').forEach(k=>k.setAttribute('aria-expanded','false'));if(!quiet)$(BILAT(mon.skin)?'bMenu':'kMenu').focus();}
+function closeMenu(quiet){if(!menuOpen)return;menuOpen=false;$('vMenu').hidden=true;document.querySelectorAll('.menukey').forEach(k=>k.setAttribute('aria-expanded','false'));if(!quiet)$('kMenu').focus();}
 function toggleMenu(){if(menuOpen){closeMenu();return;}menuOpen=true;$('vMenu').hidden=false;document.querySelectorAll('.menukey').forEach(k=>k.setAttribute('aria-expanded','true'));menuRender(0);}
 document.querySelectorAll('.menukey').forEach(k=>k.onclick=toggleMenu);
 $('vMenuClose').onclick=()=>closeMenu();
 $('vMenu').addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeMenu();}});
-let silenced=false;
-$('kSilent').onclick=()=>{silenced=!silenced;$('kSilent').classList.toggle('on',silenced);$('kSilent').setAttribute('aria-pressed',silenced);$('v2Msg').style.animation=silenced?'none':'';
- mon.info=silenced?'Alarm audio paused':'Alarm audio on';mon.infoUntil=Date.now()+4000;dirty=true;setTimeout(()=>dirty=true,4100);};
-let sensorT=0;
-$('kSensor').onclick=()=>{const ok=(COLS[COLS.length-1]||{sqi:100}).sqi>=50,els=[...document.querySelectorAll('#v2Sensor .vel i')];clearTimeout(sensorT);
- $('v2Sensor').hidden=false;els.forEach(e=>e.className='chk');txt('v2SensorT','Sensor check in progress');
- sensorT=setTimeout(()=>{els.forEach((e,i)=>e.className=ok||i!==2?'ok':'chk');txt('v2SensorT',ok?'Sensor check passed':'Check electrode 3');sensorT=setTimeout(()=>{$('v2Sensor').hidden=true;},2000);},1800);};
-$('bSilent').onclick=()=>$('kSilent').click();
-$('bSensor').onclick=()=>{const l=(COLS[COLS.length-1]||{sqi:100}).sqi,r=(R.COLS[R.COLS.length-1]||{sqi:100}).sqi;mon.info=`Sensor check: left ${l>=50?'OK':'check electrodes'}, right ${r>=50?'OK':'check electrodes'}`;mon.infoUntil=Date.now()+5000;dirty=true;setTimeout(()=>dirty=true,5100);};
-$('v2Sensor').onclick=()=>{clearTimeout(sensorT);$('v2Sensor').hidden=true;};
-$('v2Dismiss').onclick=()=>{vDismissed=$('v2MsgT').textContent;dirty=true;};
 $('kTrend').onclick=()=>{const v=[5,15,60];mon.trend=v[(v.indexOf(mon.trend)+1)%3];trendUI();dirty=true;};
 $('kBottom').onclick=()=>{const v=['bis','emg','sr'];mon.bottom=v[(v.indexOf(mon.bottom)+1)%3];trendUI();dirty=true;};
 $('tReset2').onclick=()=>{tim.sup=tim.low=R.tim.sup=R.tim.low=0;dirty=true;};
@@ -921,14 +791,16 @@ var onColumn=()=>{dirty=true;};
 function frame(now){requestAnimationFrame(frame);try{frameBody(now);}catch(e){const el=$('err');if(el&&el.hidden){el.hidden=false;el.textContent='Display error: '+e.message;}}}
 function frameBody(now){const dt=Math.min(0.1,(now-last)/1000);last=now;
  if(!paused){const target=simT+dt*speed;const need=Math.floor(target*FS)-Math.floor(simT*FS);simT=target;nmStep(dt*speed);step(need);stepR(need);runStory();}
- if(dirty){paintOff();drawTrend();drawDsa();if(mon.skin==='vista'){paintV();drawVDsa();}if(BILAT(mon.skin)){paintDsa('bl',HIST);paintDsa('br',R.HIST);}readouts();stimUI();dirty=false;}
- drawEeg();if(mon.skin==='vista')drawVEeg();if(BILAT(mon.skin))drawBil();
+ if(mon.skin==='advance')advTick(dirty);
+ if(mon.skin==='sedline')sedTick(dirty);
+ if(dirty){paintOff();drawTrend();drawDsa();if(mon.skin==='vista'){paintV();drawVDsa();}readouts();stimUI();dirty=false;}
+ drawEeg();if(mon.skin==='vista')drawVEeg();
  if(exPlaying){exT+=dt;if(exT>=T[6]){exT=0;snapshotEx();}}
  if(!ex)snapshotEx();
  drawEx();exUI();
  if(now-lastUI>250){lastUI=now;slideUI();describe();nmUI();}}
 // warm start: the patient is awake (owner, 14 Oct 2026); 5 min of awake EEG so the screen opens full
-setDrug('propofol');snapAll();step(300*FS);stepR(300*FS);simT=300;snapshotEx();
+setDrug('propofol');snapAll();step(300*FS);stepR(300*FS);simT=300;warming=false;snapshotEx();
 if(reduced){exT=T[5]-0.01;}
 addEventListener('resize',()=>{dirty=true;LIB.forEach(x=>x.cols&&drawStrip($('lib-'+x.id),x.cols));qa&&drawStrip($('cQuiz'),qa.cols);});
 requestAnimationFrame(frame);
