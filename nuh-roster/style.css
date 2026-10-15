@@ -57,7 +57,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--a-tint); width
 .top h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.01em; color: var(--a-ink); }
 .privacy { margin: 0; color: var(--muted); font-size: 12px; }
 .team { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.datebar { flex: 1 1 100%; display: grid; gap: 2px; justify-items: stretch; }
+.datebar { flex: 1 1 100%; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; justify-items: stretch; }   /* minmax(0): never wider than the phone, the date shrinks instead */
 @media (min-width: 900px) {
   .top-row {
     display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 16px;
@@ -101,7 +101,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--a-tint); width
 .save-state .unsaved { color: var(--a-danger); font-weight: 600; }
 @media (max-width: 899px) {
   .date-row { justify-content: space-between; }
-  .date-pick { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+  .date-pick { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .date-row > * { flex-shrink: 0; }
+  .date-row > .date-pick { flex-shrink: 1; }
   .date-row button[data-go] { padding: 0 10px; }
 }
 @media (min-width: 601px) and (max-width: 899px) { .date-row { justify-content: flex-start; } .date-pick { flex: 0 1 auto; } }
@@ -121,8 +123,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--a-tint); width
 @media (hover: hover) { .demo-bar :is(button, .btn):not(.primary):hover { background: var(--a-surface-2); } }
 .demo-tools > summary { cursor: pointer; font-size: 14px; font-weight: 500; color: var(--a-tint); min-height: 32px; display: flex; align-items: center; }
 .demo-tools[open] > summary { display: none; }
-.demo-actions { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.demo-actions select { min-height: 30px; padding-top: 0; padding-bottom: 0; background-color: var(--a-surface); }
+.demo-bar > * { min-width: 0; max-width: 100%; }   /* phones: the Practice tools never push the page wider than the screen */
+.demo-actions { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; max-width: 100%; }
+.demo-actions select { max-width: 100%; min-height: 30px; padding-top: 0; padding-bottom: 0; background-color: var(--a-surface); }
 @media (max-width: 600px) {
   .demo-bar .demo-text { display: none; }
   .demo-tools[open] > summary { display: flex; margin-bottom: 4px; }

@@ -160,6 +160,10 @@ await page.context().close();
 // ---- phone ----
 page = await newPage({ width: 390, height: 844 }, { hasTouch: true, isMobile: true });
 await page.goto(BASE + '?demo'); await page.waitForSelector('#demo-bar');
+// the header and an opened Practice tools box fit the phone: wider content would zoom the page out and put the
+// Next step bar over the tab bar (a wide fallback font did that once)
+await page.evaluate(() => { const d = document.querySelector('#demo-bar details'); if (d) d.open = true; });
+ok(!(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)), 'no sideways scroll on a phone with Practice tools open');
 await tab(page, 'Roster');
 const g2 = await page.$('button:has-text("Generate roster")'); if (g2) { await g2.tap(); await page.waitForTimeout(600); }
 ok(!(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)), 'no sideways scroll on a phone');
