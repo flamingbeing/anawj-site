@@ -612,6 +612,16 @@ portfolio content.
   resets); Grow as I type (`boxGrow`, on by default) grows it to two thirds of the screen.
 - **Totals Compact** (this device, on by default): initials across the top (`analytics.js` shortNames; a tap names the
   person), short category names, a key under the table; Show targets at the bottom. Excel keeps full names.
+- **Select and Bulk edit** (Logbook List and the calendar's day list; log2 9 / 9d): press and hold a row (with
+  Accessibility → Press and hold on, the hold opens the row menu, which has Select), or the Select button. A tap then
+  ticks a row; the bar at the bottom has Select all (the whole search, not only the rows drawn), Select none, Bulk edit…
+  and Done. Bulk edit… (`ui-bulk.js`, the rules in `bulk-change.js`): Change has a row per field, each "Unchanged"
+  until chosen (date, initials, case summary replace / add to the end / find and replace with exact capitals, tags
+  add / remove / replace, Interesting); Actions has Copy, Share, Send to and Move to the bin for just these. Review
+  changes lists the changes, warns when something is replaced, shows up to three before → after; from 20 cases an
+  overwriting change's button says how many. Save goes through `updateMany` (a case changed elsewhere keeps that
+  version); Undo in the toast puts back only cases nobody has changed since. The old "Tag N cases…" is now "Edit N
+  cases…" (Filter → More): every case in the search, selected, into Bulk edit. Not in the grid (it has its own editing).
 
 ## Data, roles and photos (`firestore.rules`)
 
