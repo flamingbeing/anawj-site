@@ -52,7 +52,8 @@ header p{color:var(--muted)}
 .apptitle{font-family:var(--f-display);font-weight:800;font-size:20px;line-height:1.2;margin:0;letter-spacing:0}
 .apptitle span{color:var(--muted);font-weight:600}
 .monhead{display:grid;gap:10px}
-.monswitch{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.monswitch{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+@media (max-width:600px){.monswitch{gap:4px}.monswitch button{font-size:11.5px;padding:5px 2px}}
 .monswitch button{min-height:44px;padding:6px 4px;font:600 13px/1.15 var(--f-body);color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:10px;cursor:pointer}
 .monswitch button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .monswitch button:focus-visible{outline:3px solid #fff;outline-offset:2px}
@@ -314,13 +315,14 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 </style>
 <link rel="stylesheet" href="adv.css">
 <link rel="stylesheet" href="sed.css">
+<link rel="stylesheet" href="pv.css">
 </head>
 <body>
 <div class="band" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 <div class="wrap">
 <section id="monitor" aria-labelledby="h-mon">
   <div class="monhead"><h1 class="apptitle" id="h-mon">BIS to DSA <span>simulator</span></h1>
-  <div class="monswitch" id="monSwitch" role="group" aria-label="Choose the monitor"><button type="button" data-skin="vista" aria-pressed="true">Medtronic BIS</button><button type="button" data-skin="advance" aria-pressed="false">BIS Advance</button><button type="button" data-skin="sedline" aria-pressed="false">SedLine</button><button type="button" data-skin="classic" aria-pressed="false">Teaching</button></div></div>
+  <div class="monswitch" id="monSwitch" role="group" aria-label="Choose the monitor"><button type="button" data-skin="vista" aria-pressed="true">Medtronic BIS</button><button type="button" data-skin="advance" aria-pressed="false">BIS Advance</button><button type="button" data-skin="sedline" aria-pressed="false">SedLine</button><button type="button" data-skin="philips" aria-pressed="false">IntelliVue</button><button type="button" data-skin="classic" aria-pressed="false">Teaching</button></div></div>
   <div class="sim">
     <div class="screens">
     <div class="screen vwrap" id="vistaWrap"><div class="vista" id="vista" role="group" aria-label="Monitor screen in the style of the owner's Medtronic BIS monitor">
@@ -347,6 +349,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
     </div></div>
     <div class="advwrap" id="advWrap" hidden></div>
     <div class="sedwrap" id="sedWrap" hidden></div>
+    <div class="pvwrap" id="pvWrap" hidden></div>
     <div class="vmenu" id="vMenu" role="dialog" aria-label="Monitor menu" hidden><div class="vmenuh"><b>Menu</b><button type="button" id="vMenuClose">Close</button></div><ul id="vMenuList"></ul></div>
     <div class="screen mon" id="classicWrap" hidden><div class="glass">
       <div class="statusbar"><span><b>BIS</b> · Case AH5F</span><div id="vMsg" class="msg" role="status" aria-live="polite"></div><span id="vClock">--:--</span></div>
@@ -427,7 +430,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
         <label class="chk"><input type="checkbox" id="mBlink"> Blinks and eye movement</label>
         <div class="row"><button class="btn" id="stimBtn" aria-pressed="false">Surgical stimulus</button></div></div>
       <div class="ctl"><span class="t">Display</span>
-        <div class="seg" id="skinSeg" role="group" aria-label="Screen layout"><button data-skin="vista" aria-pressed="true">Medtronic BIS</button><button data-skin="advance" aria-pressed="false">BIS Advance</button><button data-skin="sedline" aria-pressed="false">Masimo SedLine</button><button data-skin="classic" aria-pressed="false">Teaching layout</button></div>
+        <div class="seg" id="skinSeg" role="group" aria-label="Screen layout"><button data-skin="vista" aria-pressed="true">Medtronic BIS</button><button data-skin="advance" aria-pressed="false">BIS Advance</button><button data-skin="sedline" aria-pressed="false">Masimo SedLine</button><button data-skin="philips" aria-pressed="false">Philips IntelliVue</button><button data-skin="classic" aria-pressed="false">Teaching layout</button></div>
         <label class="chk"><input type="checkbox" id="mTeach" checked> Teaching labels (zone, newest epoch, colour key, target band)</label>
         <div class="rngbox"><span class="rngt">DSA colour range (power → blue … red)</span>
           <label class="rng" for="dbLo"><span>Floor (blue)</span><output id="oLo" for="dbLo">-3 dB</output></label><input type="range" id="dbLo" min="-30" max="20" step="1" value="-3">
@@ -533,6 +536,7 @@ footer{font-size:13px;color:var(--muted);max-width:80ch;border-top:1px solid var
 <script src="sed-screen.js"></script>
 <script src="sed-draw.js"></script>
 <script src="sed-menu.js"></script>
+<script src="pv-screen.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
