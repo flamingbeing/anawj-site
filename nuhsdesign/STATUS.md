@@ -7,8 +7,10 @@ Last updated: 2026-10-13 by Claude Code, design session (branch `claude/inspirin
 
 ## Now
 
-- Design session (branch `claude/inspiring-dijkstra-pctmrf`): the app kit (`app.css`, `app.js`, `app.html`), then moving
-  each NUHS-style app onto it, one PR per app (not the logbook). Progress: see Next.
+- Design session (branch `claude/inspiring-dijkstra-pctmrf`): the app kit is PR #592 (phone, tablet and computer
+  layouts). It waits only for `main`'s red **browser** check (`bis-dsa/test/e2e.mjs` "awake beta is cyan or green", red
+  on main since #591, not this PR's). Then one PR per app, each already built and tested locally on this session's
+  helper branches (not pushed): hand log + hand assessment, NUH roster, evals + People.
 
 ## Waiting on the owner
 
@@ -23,9 +25,10 @@ Owner, 15 Oct 2026: a web-app design indistinguishable from a native app (from t
 every app using the NUHS style moves onto it, except the logbook. One PR per app, each with screenshots and preview links:
 
 1. App kit (`app.css`, `app.js`, `app.html`, README "App kit").
-2. Hand log, People, Evals, NUH roster, Prewarm (+ `prewarm/update.html`, `prewarm-update/`). Prewarm is vital (live
-   study data): full `tools/test-prewarm.sh`, preview links, coordinate with the prewarm webapp session, and never merge
-   while a case is being collected.
+2. Hand log + hand assessment, NUH roster, Evals + People (built; ship after #592).
+3. NTF roster: suggest the kit to its own session (it was just built by another session).
+- **Not prewarm** (owner, 15 Oct, via the prewarm session): "highly important app must stay up, skip breaking
+  changes". Prewarm keeps its look unless the owner says otherwise in the design session's own chat.
 
 ## Recently done
 
@@ -39,6 +42,8 @@ every app using the NUHS style moves onto it, except the logbook. One PR per app
 
 ## Decisions log
 
+- 2026-10-15: The kit adapts to computers (sidebar, list and detail side by side, hover) as well as phones. Prewarm stays
+  out of the restyle (live study). Apps that already have a dark theme (evals) keep it, on the kit's dark colours.
 - 2026-10-15: Apps use the app kit: the phone's own font (brand from colour and the band), inset grouped lists, bottom
   sheets, switches, translucent bars, light only until each app is checked in dark. The logbook keeps its own styles.
 - 2026-10-13: The design folder is `nuhsdesign/` (owner), so every subdomain can serve it. Changes to the design,
