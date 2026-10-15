@@ -238,6 +238,89 @@ try { for (const width of [390, 1280]) {
   await p.locator('textarea.details').fill('');
   await p.evaluate(async () => { const { setDisplay, applyDisplay } = await import('./js/ui-settings.js'); applyDisplay(setDisplay({ firstField: null })); });
 
+  // ======== round 3 (audit, 14 Oct 2026) ========
+  const core = fn => p.evaluate(fn);
+  // ---- restore while the logbook is still loading (a new phone looks empty): it waits for the server's copy ----
+  await goHash('data');
+  for (const sm of await p.locator('details:not([open]) > summary').all()) await sm.click().catch(() => {});
+  const backupJson = await core(async () => JSON.stringify(await (await import('./js/backup.js')).makeBackup()));
+  const editedId = await core(async () => {
+    const { S, cloud, setCases } = await import('./js/ui-core.js');
+    const c = S.cases[0];
+    await cloud.saveCase(S.user.email, { ...c, details: c.details + ' EDITED ON THE LAPTOP' });   // after the backup
+    S.casesSynced = false; setCases([]);   // still loading
+    return c.id;
+  });
+  const restoreInput = p.locator('input[type=file][accept*=".gz"]');
+  const restoreFile = { name: 'logbook-backup.json', mimeType: 'application/json', buffer: Buffer.from(backupJson) };
+  await restoreInput.setInputFiles(restoreFile);
+  await p.locator('#toast', { hasText: 'Loading your logbook first' }).waitFor();
+  await p.waitForTimeout(600);
+  assert.equal(await p.locator('dialog[open]').count(), 0, 'no restore dialog while loading');
+  await core(async () => { const { S, cloud, setCases } = await import('./js/ui-core.js'); setCases(await cloud.listCases(S.user.email)); S.casesSynced = true; });
+  await p.locator('dialog[open]').filter({ hasText: 'Everything in this backup is already in your logbook.' }).waitFor();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Close' }).click();
+  // a list that misses a case the server has: the restore never writes over it (only what the server lacks goes)
+  await core(async () => { const { S, setCases } = await import('./js/ui-core.js'); setCases(S.cases.slice(1)); });
+  await restoreInput.setInputFiles(restoreFile);
+  await p.locator('dialog[open]').filter({ hasText: 'Add 1 case' }).waitFor();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Restore', exact: true }).click();
+  await p.locator('#toast', { hasText: 'Restored 0 cases, 0 reflections' }).waitFor();
+  const serverCase = await p.evaluate(async id => { const { S, cloud } = await import('./js/ui-core.js'); return (await cloud.listCases(S.user.email)).find(c => c.id === id); }, editedId);
+  assert.match(serverCase.details, /EDITED ON THE LAPTOP/, 'the newer copy kept');
+  await core(async () => { const { S, cloud, setCases } = await import('./js/ui-core.js'); setCases(await cloud.listCases(S.user.email)); });
+
+  // ---- Download backup waits for the server's copy; with no signal it saves this device's and says so ----
+  await core(async () => { (await import('./js/ui-core.js')).S.reflectionsSynced = false; });
+  let dl = p.waitForEvent('download');
+  await p.getByRole('button', { name: 'Download backup' }).click();
+  await p.locator('#toast', { hasText: 'Loading your logbook first' }).waitFor();
+  await p.waitForTimeout(500);
+  await core(async () => { (await import('./js/ui-core.js')).S.reflectionsSynced = true; });
+  await dl;
+  await p.locator('#toast', { hasText: /^Backup saved: \d+ cases/ }).waitFor();
+  assert.doesNotMatch(await p.locator('#toast').innerText(), /this device’s copy/);
+  if (width < 600) {
+    await core(async () => { (await import('./js/ui-core.js')).S.casesSynced = false; });
+    dl = p.waitForEvent('download', { timeout: 20000 });
+    await p.getByRole('button', { name: 'Download as one spreadsheet' }).click();
+    await dl;
+    await p.locator('#toast', { hasText: 'this device’s copy: it may miss recent changes' }).waitFor();
+    await core(async () => { (await import('./js/ui-core.js')).S.casesSynced = true; });
+  }
+
+  // ---- a reflection deleted in the editor with unsaved typing: it goes (no false "changed elsewhere"), and the bin
+  // keeps what was on screen ----
+  const reflId = await core(async () => {
+    const { S, cloud } = await import('./js/ui-core.js');
+    const r = await cloud.saveReflection(S.user.email, { id: 'fake-refl-del', headingId: 'thyroid', initials: 'ZZ', title: 'Fake to delete', summary: 'saved text', status: 'draft' });
+    (await import('./js/ui-reflect.js')).openReflection(r);
+    return r.id;
+  });
+  await p.waitForSelector('.refl-editor input[placeholder="Title"]');
+  await p.locator('.refl-editor input[placeholder="Title"]').fill('Fake to delete, typed');
+  await p.locator('.refl-editor button.danger', { hasText: 'Delete' }).click();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Move to bin' }).click();
+  await p.locator('#toast', { hasText: 'Reflection moved to the recycle bin' }).waitFor();
+  const afterDel = await p.evaluate(async id => {
+    const { S, cloud, writes } = await import('./js/ui-core.js');
+    const D = await import('./js/demo-backend.js');
+    return { server: D.reflectionsOf(S.user.email.toLowerCase()).some(r => r.id === id), shown: S.reflections.some(r => r.id === id),
+      bin: (await cloud.listBin(S.user.email)).find(e => e.data.id === id)?.data.title, stuck: writes.entries().filter(x => x.record.id === id && x.state !== 'synced' && x.state !== 'archived').length };
+  }, reflId);
+  assert.deepEqual(afterDel, { server: false, shown: false, bin: 'Fake to delete, typed', stuck: 0 });
+  // ---- one changed on another device since this one last saw it: the delete is refused and the newer one stays ----
+  const refused = await core(async () => {
+    const { S, cloud } = await import('./js/ui-core.js'), { moveToBin } = await import('./js/bin.js');
+    const old = await cloud.saveReflection(S.user.email, { id: 'fake-refl-stale', headingId: 'thyroid', initials: 'ZZ', title: 'Fake stale', summary: 'outline', status: 'draft' });
+    await cloud.saveReflection(S.user.email, { ...old, summary: '900 finished words' });   // the laptop
+    try { await moveToBin('reflection', old); return 'moved'; } catch (err) { return err.message; }
+  });
+  assert.match(refused, /changed elsewhere/);
+  await p.locator('#toast', { hasText: 'was changed on another device, so it was kept' }).waitFor();
+  await poll(() => p.evaluate(async () => (await import('./js/ui-core.js')).S.reflections.some(r => r.id === 'fake-refl-stale' && r.summary === '900 finished words')), 'the newer reflection shows');
+  assert.equal(await p.evaluate(async () => { const { S, cloud } = await import('./js/ui-core.js'); return (await cloud.listBin(S.user.email)).filter(e => e.data.id === 'fake-refl-stale').length; }), 0, 'no copy left in the bin');
+
   assert.deepEqual(errors, [], 'console errors');
   await ctx.close();
   console.log(`PASS bug fixes ${width < 600 ? 'phone' : 'desktop'}`);

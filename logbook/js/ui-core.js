@@ -494,6 +494,15 @@ export async function restoreCase(c, base = S.cases.find(x => x.id === c.id) || 
   applyLocal(list => [saved, ...list.filter(x => x.id !== c.id)]);
 }
 
+// Restore from a backup: only the cases the server doesn't have (cloud.addMissing: one already there is never
+// replaced by the backup's older copy). -> the cases added
+export async function addMissingCases(cases) {
+  const owner = mine();
+  const added = await cloud.addMissing(owner, 'case', cases);
+  if (added.length && S.user?.email === owner) applyLocal(list => { const have = new Set(list.map(c => c.id)); return [...list, ...added.filter(c => !have.has(c.id))]; });
+  return added;
+}
+
 // Many logged cases changed at once (bulk tag, tag merge, a spreadsheet's changed rows): each through the write queue
 // with the version the change was made from, as a single edit is, so a case changed on another device meanwhile keeps
 // that version (both are in Recent changes); a blind batch overwrote it (audit, 14 Oct 2026). A case already stopped by
