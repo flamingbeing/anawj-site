@@ -578,6 +578,12 @@ portfolio content.
   and its setup: `form-script/` (never turn off Firebase Auth "Enable create (sign-up)": it would block new Google sign-ins).
   Owner, 14 Oct 2026: no "Google sign-ins only" rule (`sign_in_provider`) for now: a small single-hospital Form with no
   patient identifiers. Password accounts already get nothing (every rule needs a verified email or `formBots`).
+  15 Oct 2026 (audit): a response can come back at any time (edits stay on; the backfill), so a deleted Form case is
+  kept for good in `formGone/{caseId}` (the bin lasts only 30 days), the pick-up stops if the bin or that list can't be
+  read from the server, and the key notes the response's newest submit (a re-import knows an edited row). FormApp
+  gives no first-submit time, so an old imported response edited in the Form is matched by day, initials and
+  categories (not added, with a toast); a match like that against a case in the bin is added (with a toast), never
+  dropped quietly. A `Code.gs` change reaches the Form only when the owner pastes it: list it in `form-script/CHANGES-PENDING.md`.
 - **Test data paths against the real rules (14 Oct 2026 lesson):** the e2e tests run in demo mode, which skips the
   server-side checks (`commitRecord`'s base comparison, the rules), so a delete that never reached the server passed every
   test for a day (#519). Any change to saving, deleting, sync or the bin also needs the emulator tests:

@@ -235,26 +235,28 @@ const scenarios = {
   },
   // a Form response picked up on one device, then edited there; a second device that read the inbox before the pick-up
   // tries it too: it must not put the Form's version back over the edit (the rules refuse deleting an entry that is
-  // gone, so the second pick-up's batch fails whole)
+  // gone, so the second pick-up's batch fails whole). Through form-inbox.js pickUp, as the app does it: it reads the
+  // recycle bin and formGone from the server through the real rules
   async formTwice(A, B) {
     await put('formInbox/2_FakeTwice', { id: '2_FakeTwice', email: E, date: '2026-10-14', details: 'GH fake Form case twice', labels: ['16) Lower Segment Caesarean Section (10 | 20)'], submittedAt: Date.now() });
     const pick = d => d.p.evaluate(async () => {
-      const cloud = await import('./js/cloud.js'), { S } = await import('./js/ui-core.js'), { mergeFormEntries, formCaseId } = await import('./js/form-inbox.js');
-      const entries = await cloud.listFormEntries(S.user.email);
-      return { formCaseId: formCaseId('2_FakeTwice'), r: mergeFormEntries(entries, new Map(S.cases.map(c => [c.id, c])), Date.now()) };
-    });
-    const [pa, pb] = await Promise.all([pick(A), pick(B)]);   // both read the inbox before either picks up
-    const commit = (d, r) => d.p.evaluate(async r => {
       const cloud = await import('./js/cloud.js'), { S } = await import('./js/ui-core.js'), { formCaseId } = await import('./js/form-inbox.js');
-      const byCase = new Map(r.save.map(c => [c.id, c]));
-      return cloud.commitFormPickup(S.user.email, r.done.map(id => ({ id, case: byCase.get(formCaseId(id)) || null })));
-    }, r);
-    assert.deepEqual(await commit(A, pa.r), ['2_FakeTwice'], 'device A picks it up');
+      // what this device knows now (the inbox, its cases), kept for its pick-up below
+      window.__formTwice = { entries: await cloud.listFormEntries(S.user.email), cases: S.cases.slice() };
+      return formCaseId('2_FakeTwice');
+    });
+    const [id] = await Promise.all([pick(A), pick(B)]);   // both read the inbox before either picks up
+    const commit = d => d.p.evaluate(async () => {
+      const cloud = await import('./js/cloud.js'), { S } = await import('./js/ui-core.js'), { pickUp } = await import('./js/form-inbox.js');
+      const { entries, cases } = window.__formTwice;
+      return (await pickUp(cloud, S.user.email, entries, { cases: () => cases })).done;
+    });
+    assert.deepEqual(await commit(A), ['2_FakeTwice'], 'device A picks it up');
     await settle(A); await reopen(A);
-    must(await act(A, { kind: 'edit', id: pa.formCaseId, text: 'fake Form case, edited in the app' })); await settle(A);
-    assert.deepEqual(await commit(B, pb.r), [], 'device B finds it already picked up');
+    must(await act(A, { kind: 'edit', id, text: 'fake Form case, edited in the app' })); await settle(A);
+    assert.deepEqual(await commit(B), [], 'device B finds it already picked up');
     await settle(B);
-    assert.equal((await serverCases()).get(pa.formCaseId), 'fake Form case, edited in the app', 'the app edit stays');
+    assert.equal((await serverCases()).get(id), 'fake Form case, edited in the app', 'the app edit stays');
     return 'picked up once; the edit stays';
   },
   // a case logged offline reaches the server half an hour later: a device that synced meanwhile must still get it (it
