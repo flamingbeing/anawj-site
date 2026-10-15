@@ -349,6 +349,23 @@ lower MAP about 5–12 mmHg; ephedrine 6 mg +11 then less with each repeat [D].
   `research/cardio.md`), with Fridericia QT and PR shortening with rate. Not the ECGSYN model (needs fast integration,
   PR and QT scale wrongly, GPL code).
 
+As built in M2.7 (`rhythm.js`, `test/rhythm.test.mjs`, the ECG templates in `ui/synth.js`): an atrial clock, an AV node
+and a ventricular clock drive the beats cardio turns into stroke volumes. Sinus follows the baroreflex heart period
+(unchanged, output 1); every other rhythm runs at its own rate and carries a mechanical effectiveness `rh.output` the
+circulation multiplies into cardiac output. The catalogue (default rates [V], output mapping [D]): sinus, sinus brady
+45 and tachy 120; junctional 50; first-degree block (long PR); second-degree Wenckebach (4:3 of an atrial 75 ≈ 56) and
+Mobitz II (3:2 ≈ 50); complete block (ventricular escape ~38, independent of the atrial 75); AF (irregularly irregular,
+mean ~130, fibrillatory baseline); flutter (2:1 of an atrial 300 ≈ 150, sawtooth); SVT 180; bigeminy; VT 180 (wide,
+output 0.35 — a weak pulse); torsades, VF and asystole (output 0, no pulse); PEA (organised electrical activity, a rate
+on the monitor but output 0); paced 70 (a spike then a wide QRS); hyperkalaemia stages (peaked T → wide QRS → sine
+wave). VF, torsades and asystole draw a continuous baseline and emit no complexes (the monitor shows no HR, or 0 for
+asystole); the others draw per-beat morphologies plus, where needed, marching P waves. In a non-perfusing rhythm the
+arteriolar tone is kept, so the arterial pressure decays slowly towards the mean filling pressure — about 29 mmHg at 13 s
+in the model (Schipke 2003: ~24 mmHg), then both pressures converge on ~10–17 mmHg; the decay is a little faster and the
+plateau a little higher than Schipke's (a known miss) [D]. SpO2 does not yet fall during an arrest (no output–oxygenation
+coupling; comes with resuscitation, M2.8) [known miss]. Impose a rhythm with `{ type: 'rhythm', to }` (the Patient tab;
+the scenarios drive it the same way).
+
 ## 7. Breathing: mechanics, ventilator, drive
 
 - **Mechanics:** total respiratory compliance under GA 60 mL/cmH2O by default (band 50–80; Pelosi 1996 lung 107 and

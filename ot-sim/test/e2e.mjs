@@ -181,6 +181,25 @@ try {
     assert.match(await page.textContent('#events'), /Incision/);
     assert.match(await page.textContent('#events'), /No longer responds to voice/);
     await axe(page, `${name} theatre, Patient tab`);
+    // Rhythms: impose each from the Patient tab. The ECG keeps drawing and the circulation responds.
+    await page.selectOption('#rhythm', 'vt');
+    await page.evaluate(() => otsim.step(400));
+    assert.equal(await page.evaluate(() => otsim.state.rh.rhythm), 'vt', `${name}: VT set`);
+    assert.ok((await lit(page, '#c-ecg')) > 500, `${name}: VT draws`);
+    await page.selectOption('#rhythm', 'vf');
+    await page.evaluate(() => otsim.step(400));
+    assert.ok(await page.evaluate(() => otsim.state.cv.co < 0.3), `${name}: VF makes no output`);
+    assert.ok((await lit(page, '#c-ecg')) > 500, `${name}: VF draws`);
+    assert.equal(await page.textContent('#n-hr'), '--', `${name}: VF has no readable HR`);
+    assert.match(await page.textContent('#n-rhythm'), /fibrillation/i, `${name}: rhythm labelled`);
+    await page.selectOption('#rhythm', 'asystole');
+    await page.evaluate(() => otsim.step(300));
+    assert.equal(await page.textContent('#n-hr'), '0', `${name}: asystole HR 0`);
+    await page.selectOption('#rhythm', 'flutter');
+    await page.evaluate(() => otsim.step(400));
+    assert.ok((await lit(page, '#c-ecg')) > 500, `${name}: flutter draws`);
+    await page.selectOption('#rhythm', 'sinus'); // back to sinus for the rest of the run
+    await page.evaluate(() => otsim.step(400));
     await page.click('#tab-drugs');
     // a custom dose
     await page.fill('#bd-fentanyl', '75');

@@ -15,19 +15,48 @@ function upper(arr, t) {
   return lo;
 }
 
-// ECG lead II in mV around a beat at time 0 (the R peak); intervals stretch a little with the beat-to-beat interval
-function ecgBeat(x, rr) {
+// ECG lead II in mV around a beat at time 0 (the R peak), by morphology (rhythm.js sets morph on each beat); the T
+// and QT stretch a little with the beat-to-beat interval. These are our own simple templates [D]: a normal P-QRS-T,
+// a P-less narrow complex, a broad ventricular complex with a discordant T, a paced spike, and the hyperkalaemia
+// shapes (peaked T, broad QRS). No diagnostic detail.
+function ecgBeat(x, rr, morph) {
   const s = Math.sqrt(Math.min(1.5, Math.max(0.3, rr)));
-  return 0.12 * g(x, -0.16, 0.022)            // P
-    - 0.08 * g(x, -0.028, 0.007)              // Q
-    + 1.05 * g(x, 0, 0.0095)                  // R
-    - 0.22 * g(x, 0.026, 0.009)               // S
-    + 0.28 * g(x, 0.24 * s, 0.05 * s);        // T
+  const P = (c, ctr) => c * g(x, ctr, 0.022);
+  const narrow = -0.08 * g(x, -0.028, 0.007) + 1.05 * g(x, 0, 0.0095) - 0.22 * g(x, 0.026, 0.009);
+  const broad = -0.10 * g(x, -0.02, 0.02) + 0.95 * g(x, 0.012, 0.028) - 0.35 * g(x, 0.065, 0.03);
+  const T = (c, w, ctr) => c * g(x, ctr * s, w * s);
+  switch (morph) {
+    case 'sinus-pr':   return P(0.12, -0.27) + narrow + T(0.28, 0.05, 0.24);   // long PR (first-degree block)
+    case 'narrow-nop': return narrow + T(0.28, 0.05, 0.24);                     // no P (junctional, AF, flutter, SVT, PEA)
+    case 'wide':       return broad + T(-0.45, 0.07, 0.15);                     // ventricular: broad, discordant T
+    case 'wide-nop':   return broad + T(0.40, 0.08, 0.17);                      // hyperkalaemia: broad QRS into the T
+    case 'paced':      return 1.10 * g(x, -0.02, 0.0025) + broad + T(-0.45, 0.07, 0.15); // pacing spike then broad QRS
+    case 'peakedt':    return P(0.12, -0.16) + narrow + T(0.60, 0.028, 0.22);   // hyperkalaemia: tall, peaked T
+    default:           return P(0.12, -0.16) + narrow + T(0.28, 0.05, 0.24);    // sinus
+  }
 }
+
+// the continuous baseline for the disorganised rhythms and the independent P waves (rhythm.js rh.base); drawn under
+// the beats. b = { type, since, atrialRate, now } (now and since are model time, for the VF coarse->fine envelope)
+function ecgBase(b, t) {
+  const TAU = (n, hz, ph = 0) => n * Math.sin(2 * Math.PI * hz * t + ph);
+  switch (b.type) {
+    case 'af':       return TAU(0.04, 6.3) + TAU(0.025, 9.7, 1.1);               // fine fibrillatory waves
+    case 'flutter': { const f = (t * b.atrialRate) / 60; return -0.16 * (2 * (f - Math.floor(f)) - 1); } // sawtooth
+    case 'vf': { const env = 0.12 + 0.4 * Math.exp(-Math.max(0, b.now - b.since) / 240); // coarse, fining over minutes
+      return env * (Math.sin(2 * Math.PI * 4.3 * t) + 0.7 * Math.sin(2 * Math.PI * 6.9 * t + 0.7) + 0.5 * Math.sin(2 * Math.PI * 9.1 * t + 2)); }
+    case 'torsades': return 0.45 * Math.abs(Math.sin(2 * Math.PI * 0.3 * t)) * Math.sin(2 * Math.PI * 4 * t); // twisting
+    case 'asystole': return 0.015 * Math.sin(0.5 * t) + 0.01 * Math.sin(0.13 * t); // a faint wander
+    case 'sine':     return 0.18 * Math.sin(2 * Math.PI * 0.8 * t);              // hyperkalaemia undulation
+    case 'pwave': { const f = (t * b.atrialRate) / 60, frac = f - Math.floor(f); return 0.14 * g(frac < 0.5 ? frac : frac - 1, 0, 0.05); }
+    default:         return 0;
+  }
+}
+
 export function ecg(src, t) {
+  let v = src.base ? ecgBase(src.base, t) : 0;
   const b = src.beats, i = upper(b, t + 0.3);
-  let v = 0;
-  for (let k = Math.max(0, i - 3); k < i; k++) v += ecgBeat(t - b[k].t, b[k].rr);
+  for (let k = Math.max(0, i - 3); k < i; k++) if (b[k].t < 1e6) v += ecgBeat(t - b[k].t, b[k].rr, b[k].morph);
   return v;
 }
 
@@ -69,11 +98,17 @@ export function co2(src, t) {
 export function modelSource(state) {
   const beats = [], breaths = [];
   for (const e of state.ev.ring) (e.kind === 'beat' ? beats : e.kind === 'breath' ? breaths : []).push(e);
-  const c = state.cv;
-  beats.push({ t: state.rh.next, rr: c.hp, sbp: c.sbp, dbp: c.dbp });
+  const c = state.cv, rh = state.rh;
+  beats.push({ t: rh.next, rr: c.hp, morph: rh.qrs, sbp: c.sbp, dbp: c.dbp });
   const r = state.resp;
   if (r.rr > 0) breaths.push({ t: r.nextBreath, cycle: r.cycle, ti: r.mech ? r.mech.ti : r.cycle / 3, etco2: state.gas.etco2 });
-  return { beats, breaths };
+  return { beats, breaths, base: rhythmBase(state) };
+}
+
+// the continuous-baseline descriptor for the renderer (rhythm.js rh.base), or null when the rhythm has none
+function rhythmBase(state) {
+  const rh = state.rh;
+  return rh && rh.base ? { type: rh.base, since: rh.since, atrialRate: rh.atrialRate, now: state.t } : null;
 }
 
 // small seeded generator for the fast-mode beat jitter (UI only)
@@ -87,16 +122,22 @@ export class FastSource {
     const m = modelSource(state);
     this.beats = m.beats.filter(e => e.t <= t0);
     this.breaths = m.breaths.filter(e => e.t <= t0);
+    this.base = m.base;
     this.rand = mulberry32(seed);
     this.nextBeat = Math.max(t0, m.beats[m.beats.length - 1].t);
     this.nextBreath = Math.max(t0, m.breaths[m.breaths.length - 1].t);
   }
-  // make events up to display time t + lookahead, from the model's current values
+  // make events up to display time t + lookahead, from the model's current values and rhythm
   advance(state, t) {
-    const c = state.cv, until = t + 0.4;
-    while (this.nextBeat <= until) {
-      const rr = c.hp * (1 + 0.02 * (this.rand() - 0.5));
-      this.beats.push({ t: this.nextBeat, rr, sbp: c.sbp, dbp: c.dbp });
+    const c = state.cv, rh = state.rh, until = t + 0.4;
+    this.base = rhythmBase(state);
+    const none = rh && rh.clock === 'none';        // VF, torsades, asystole: no discrete beats
+    const morph = rh ? rh.qrs : 'sinus';
+    const period = () => (rh && rh.rate && rh.clock !== 'sinus' ? 60 / rh.rate : c.hp);
+    if (none) this.nextBeat = Math.max(this.nextBeat, until);
+    while (!none && this.nextBeat <= until) {
+      const rr = period() * (1 + 0.02 * (this.rand() - 0.5));
+      this.beats.push({ t: this.nextBeat, rr, morph, sbp: c.sbp, dbp: c.dbp });
       this.nextBeat += rr;
     }
     const r = state.resp;
