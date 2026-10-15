@@ -43,7 +43,7 @@ try {
     assert.ok(await page.$$eval('#sedHits .hit', e => e.length) > 15, 'hit regions are in place');
     assert.equal(await page.evaluate(() => sedLay().rows.map(r => r.k).join()), 'emg,psi,sr'); assert.equal(await page.evaluate(() => sedLay().well.join()), 'artf,sefl,sefr');
     // action menu: TREND and ANALOG
-    await page.click('[data-a="actiontab"]'); assert.equal(await page.evaluate(() => SED.pop && SED.pop.kind), 'action'); assert.equal(await page.$$eval('#sedPop .act button', e => e.length), 2); assert.equal(await page.$$eval('#sedPop .spopclose', e => e.length), 1, 'the blue close tab is in the popup layer');
+    await page.click('[data-a="actiontab"]'); assert.equal(await page.evaluate(() => SED.pop && SED.pop.kind), 'action'); await page.waitForFunction(() => document.querySelectorAll('#sedPop .act button').length === 2, null, { timeout: 5000 }); assert.equal(await page.$$eval('#sedPop .act button', e => e.length), 2); assert.equal(await page.$$eval('#sedPop .spopclose', e => e.length), 1, 'the blue close tab is in the popup layer');
     await page.click('#sedPop [data-v="analog"]'); assert.equal(await page.evaluate(() => SED.view), 'analog'); await page.waitForTimeout(300);
     assert.equal(await page.evaluate(() => SED.pop), null);
     await page.click('[data-a="actiontab"]'); await page.click('#sedPop [data-v="trend"]'); assert.equal(await page.evaluate(() => SED.view), 'trend');
