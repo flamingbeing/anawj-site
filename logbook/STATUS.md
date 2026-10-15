@@ -6,7 +6,7 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-15 (00:50 UTC) by Claude Code, Logbook 2 (log2): reliability hour paused; resume from `status/wip/README.md`.
+Last updated: 2026-10-15 (07:20 UTC) by Claude Code, Logbook 2 (log2): reliability fixes merged (#583–#589); follow-ups in `status/wip/README.md`.
 
 ## Now
 
@@ -17,8 +17,10 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 - **Don't re-import the old Form workbook from Admin for now** (15 Oct): three verified bugs only bite on a re-import (deleted Form
   cases come back, redated or edited ones double). Fixes are queued in `status/wip/README.md`.
-- After the paused fix branches merge (log2 will say): paste the new `form-script/Outbox.gs` into the response sheet's Apps Script and,
-  later, `form-script/Code.gs` into the Form's (each PR says exactly what). Read the sheet's Apps Script **Executions** for
+- **Paste the new `form-script/Outbox.gs`** into the response sheet's Apps Script (`LogbookOutbox` file; #589). First search that
+  project for `getScriptLock`: the outbox now holds the script lock for each run. Steps: `form-script/OUTBOX-README.md`.
+- Later, before the Form backfill is next run: paste the new `form-script/Code.gs` into the Form's Apps Script (#587;
+  `form-script/CHANGES-PENDING.md`). Read the sheet's Apps Script **Executions** for
   `logbookOutboxRun`, `logbookOutboxTotalsCheck` and `onFormSubmit` (Firetop can't reach them).
 - **Nightly Totals check:** the owner installed it (15 Oct). Confirm the Script property `LOGBOOK_TOTALS_FIX` is `on` (until then it
   only reports) and that `logbookOutboxTotalsSetup` added the 03:00 trigger. Matters because "Allow response editing" stays ON
@@ -84,6 +86,10 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Recently done
 
+- #583 #584 #586 #587 #589 Logbook reliability fixes from the 15 Oct audit: saves after a conflict sync or say so and devices show
+  the server's copy; bulk tag/merge/re-import through the queue; backup restore never overwrites newer work; reflection bin deletes
+  check the version; deleted Form cases stay deleted (rules `formGone`); fewer doubled edited Form responses; the sheet outbox never
+  stalls on skipped entries, runs one at a time, and re-queues restored cases (rules: late outbox delete). Both rules deploys ✓.
 - #569 Logbook: an admin re-import never overwrites a case already in the logbook (it used to for cases written by another route, e.g.
   the 72 rows re-imported on 14 Oct). #571, #574 multidevice harness fixes (real offline under a slow network, partial multi-delete,
   edits that conflict after reconnecting). Reliability hour (15 Oct): 10-area audit, ~25 verified findings, 5 fix branches paused
