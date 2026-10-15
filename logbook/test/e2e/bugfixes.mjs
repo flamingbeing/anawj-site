@@ -46,6 +46,36 @@ try { for (const width of [390, 1280]) {
   const jobs = await p.evaluate(async id => (await import('./js/ui-core.js')).writes.entries().filter(x => x.record.id === id).map(x => [x.state, !!x.record._deleted]), ids[1]);
   assert.deepEqual(jobs[0], ['synced', false]); assert.ok(jobs.some(([s, del]) => s === 'archived' && del), JSON.stringify(jobs));
 
+  // ---- the response sheet's outbox: a new case deleted and brought back is queued again ----
+  // (a programme resident's new cases; the demo keeps the outbox in memory)
+  const outboxEntry = id => p.evaluate(async id => (await import('./js/demo-backend.js')).sheetOutbox().find(e => e.id === id) || null, id);
+  const newId = await p.evaluate(async () => {
+    const { S, createCase } = await import('./js/ui-core.js');
+    S.resident = { rid: '209901', name: 'Fake Resident', email: S.user.email }; S.logbook = { ...S.logbook, rid: '209901' };
+    return (await createCase({ details: 'QR 33F fake LSCS spinal', cats: ['16', '28'] })).id;
+  });
+  assert.ok(await outboxEntry(newId), 'queued when logged');
+  // deleted as the edit dialog's Delete does, then Undo on the toast
+  await p.evaluate(async id => { const { S } = await import('./js/ui-core.js'), { moveToBin } = await import('./js/bin.js'); await moveToBin('case', S.cases.find(c => c.id === id), { toast: true }); }, newId);
+  assert.equal(await outboxEntry(newId), null, 'taken out with the delete');
+  await p.locator('#toast button', { hasText: 'Undo' }).click();
+  await poll(async () => await hasCase(newId) && !!(await outboxEntry(newId)), 'Undo put the case and its outbox entry back');
+  // a delete that loses to an edit made on another device: that version is kept, and goes back into the outbox
+  const keptId = await p.evaluate(async () => {
+    const { S, createCase, writes, cloud } = await import('./js/ui-core.js'), { moveToBin } = await import('./js/bin.js');
+    const c = await createCase({ details: 'ST 50M fake hernia repair', cats: ['13'] });
+    writes.configure({ backend: async (email, kind, rec, bs) => {
+      if (!rec._deleted) return cloud.commitRecord(email, kind, rec, bs);
+      await new Promise(r => setTimeout(r, 600));
+      const remote = await cloud.saveCase(email, { ...c, details: 'fake hernia repair, edited on another device', updatedAt: Date.now() });
+      throw Object.assign(new Error('This record changed elsewhere. Both versions are kept in Recent changes'), { code: 'write-conflict', remote });
+    } });
+    await moveToBin('case', S.cases.find(x => x.id === c.id));
+    return c.id;
+  });
+  assert.equal(await outboxEntry(keptId), null, 'taken out once the delete was accepted');
+  await poll(async () => /edited on another device/.test((await outboxEntry(keptId))?.details || ''), 'the kept version went back into the outbox');
+  await p.evaluate(async () => { const { writes, cloud, S } = await import('./js/ui-core.js'); writes.configure({ backend: cloud.commitRecord }); S.resident = null; });
   // ---- Tag N cases, a tag merge and a spreadsheet's changed rows keep a case changed on another device (audit, 14 Oct
   // 2026: they put this device's stale copy over it). The other device's edit goes straight into the demo store, so
   // this page doesn't hear of it, as a phone offline in theatre wouldn't. ----
@@ -238,6 +268,23 @@ try { for (const width of [390, 1280]) {
   await p.locator('textarea.details').fill('');
   await p.evaluate(async () => { const { setDisplay, applyDisplay } = await import('./js/ui-settings.js'); applyDisplay(setDisplay({ firstField: null })); });
 
+  // ---- someone put on the programme list after using the app: the logbook takes their rid in that same session ----
+  // (this device remembers "not on the list" and opens from that; before, only the next start saved the rid, so that
+  // session's new cases never reached the response sheet's outbox)
+  const DEMO = 'apmes-logbook-demo-v1', WHO = 'apmes-logbook-who:demo:demo@example.com';
+  await p.evaluate(([DEMO, WHO]) => {
+    const s = JSON.parse(localStorage.getItem(DEMO));
+    s.offList = s.residents.DEMO01; delete s.residents.DEMO01; s.logbooks['demo@example.com'].doc.rid = null;
+    localStorage.setItem(DEMO, JSON.stringify(s)); localStorage.removeItem(WHO);
+  }, [DEMO, WHO]);
+  await p.reload(); await p.waitForSelector('textarea.details');
+  await poll(() => p.evaluate(WHO => JSON.parse(localStorage.getItem(WHO) || '{}').resident === null, WHO), 'this device remembers: not on the list');
+  await p.evaluate(DEMO => { const s = JSON.parse(localStorage.getItem(DEMO)); s.residents.DEMO01 = s.offList; delete s.offList; localStorage.setItem(DEMO, JSON.stringify(s)); }, DEMO);   // an admin adds them
+  await p.reload(); await p.waitForSelector('textarea.details');
+  const rids = () => p.evaluate(async DEMO => { const { S } = await import('./js/ui-core.js'); return [S.resident?.rid, S.logbook?.rid, JSON.parse(localStorage.getItem(DEMO)).logbooks['demo@example.com'].doc.rid]; }, DEMO);
+  await poll(async () => (await rids()).every(x => x === 'DEMO01'), 'the rid set here and saved, in this session');
+  const lateId = await p.evaluate(async () => (await (await import('./js/ui-core.js')).createCase({ details: 'UV 45M fake lap chole', cats: ['08'] })).id);
+  assert.ok(await outboxEntry(lateId), "this session's new case is queued for the sheet");
   // ======== round 3 (audit, 14 Oct 2026) ========
   const core = fn => p.evaluate(fn);
   // ---- restore while the logbook is still loading (a new phone looks empty): it waits for the server's copy ----
