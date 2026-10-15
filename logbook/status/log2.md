@@ -36,7 +36,7 @@ Agreed queue (one PR each, in order, once he says go):
    dark and high-contrast themes (a11y.mjs).
 3. **Built (Reset PR).** **Reset all settings** at the bottom of Settings: This device / My account too (tag list kept unless ticked); never
    cases, reflections, notes or drafts; asks, offers a settings-file backup, Undo.
-4. **Full Analytics for every profile:** the `analytics` switch on by default everywhere. Exceptions kept (owner):
+4. **Built (Analytics PR).** **Full Analytics for every profile:** the `analytics` switch on by default everywhere. Exceptions kept (owner):
    Personal stays without the APMES parts; Basic: logbook only stays without the Reflections card.
 5. **Analytics Edit mode:** Edit at the top; cards fold to rows; drag handle (plus Move up / down) to reorder; eye to
    hide, a "Hidden cards" list to bring back; Reset layout; Done. Saved for the account. Cards a profile can't use

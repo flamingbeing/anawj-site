@@ -40,9 +40,11 @@ const APMES = SWITCHES.filter(s => s[2] === 'apmes').map(([k]) => k);
 
 // what each profile turns off (everything else is on). Basic: the extras and the optional Case tab parts;
 // logbook only: Basic without reflections; Personal: the APMES parts, with the extras on.
+// Full Analytics in every profile (owner, 15 Oct 2026): Personal still leaves out the APMES parts, and Basic: logbook
+// only the reflection parts, as their own switches.
 const PRESET_OFF = {
-  logbook: EXTRAS,
-  basic: EXTRAS.filter(k => k !== 'reflect'),
+  logbook: EXTRAS.filter(k => k !== 'analytics'),
+  basic: EXTRAS.filter(k => k !== 'reflect' && k !== 'analytics'),
   advanced: [],
   personal: APMES,
   faculty: [],

@@ -179,7 +179,8 @@ try { for (const width of [390, 1280]) {
   await goHash('log'); await goHash('showhide');
   await p.locator('.profile-now', { hasText: 'Now: Custom (based on Basic)' }).waitFor();
   assert.equal(await group('extras').getByRole('switch', { name: 'The Logbook grid view' }).isChecked(), true);
-  assert.equal(await group('extras').getByRole('switch', { name: /^Analytics trends/ }).isChecked(), false);
+  assert.equal(await group('extras').getByRole('switch', { name: /^Analytics trends/ }).isChecked(), true, 'full Analytics in every profile');
+  assert.equal(await group('extras').getByRole('switch', { name: 'Figures and references in reflections' }).isChecked(), false);
   assert.equal(await group('case').getByRole('switch', { name: /^Quick picks/ }).isChecked(), true);
   assert.equal(await group('case').getByRole('switch', { name: 'Suggested tags as you type' }).isChecked(), true, 'an older quick turns both halves on');
   assert.equal(await group('case').getByRole('switch', { name: 'Plan for later' }).isChecked(), false);
