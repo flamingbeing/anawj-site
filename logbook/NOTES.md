@@ -881,3 +881,9 @@ side by side. In the multidevice harness, `SLOW=1` used to leave the page "offli
 server (fixed in #571): a failure that needs a state no real phone can be in is the harness's, so check that first. `writes.entries()`
 lists the newest job first. The conflict path's blind spots (a save after a conflict, an overlay frozen at the conflict) explained
 every remaining soak failure.
+
+Merging parallel fix branches (15 Oct 2026): after one is squash-merged, merging main into the next branch brings back the same
+conflicts; when that branch already holds the combined code, take its side (`git checkout --ours`), then check `git diff
+origin/main` shows only its own change. Never let emulator leftovers (`firebase-debug.log`, `firestore-debug.log`,
+`node_modules`) into a commit. GitHub's slow `browser` job can be run locally (`.github/workflows/checks.yml` lists the steps);
+`feedback/test/e2e.mjs` needs the real Worker and may time out from a cloud container.

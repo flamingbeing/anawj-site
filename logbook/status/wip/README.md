@@ -22,5 +22,7 @@ corrections) stay in `findings/*.json` for the follow-ups below. Delete this fol
 
 ## Soak runs (Firetop, local emulator)
 
-On #583 every previously failing seed passed (Firefox 358733102, 76113342, 835480189 and fresh 561493112; Chromium 419136196,
-46813064, 76113342). Firefox 642390865 stalled once in round 7 (a restore said "not in the bin any more"); Firetop is rerunning it.
+On #583 every previously failing seed passes: Firefox 358733102, 76113342, 835480189 and fresh 561493112; Chromium SLOW=1
+419136196, 46813064, 76113342, 440929881, 457040346. Still queued on Firetop (it messages when done): Firefox 642390865 (stalled
+once in round 7, killed at 17 min, rerun), the two main-baseline failures 119100182 (Firefox) and 131229630 (Chromium) on the
+fix, and 2 fresh Chromium seeds. Results: `jobs/2026-10-15-reliability/` on Firetop.
