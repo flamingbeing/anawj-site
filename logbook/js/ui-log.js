@@ -711,10 +711,14 @@ function paintParsed(typed) {
   // Labelled parts on: which parts the box has ("Parts Learning point · Plan"), so you see a label was read
   const lab = labels();
   const names = lab ? [...new Set(parseParts(details, lab).parts.filter(p => p.text.trim()).map(p => p.name.replace(/ \d+$/, '')))] : [];
-  const key = age + '|' + names.join('|');
+  // the initials as they'll be saved, only when read from the box (not typed in their own field); in the colour of
+  // their highlight in the box, as the age is (owner, 15 Oct 2026)
+  const ini = initials && !draft.initials ? initials : '';
+  const key = ini + '|' + age + '|' + names.join('|');
   if (ui.parsed.dataset.key !== key) {
     ui.parsed.dataset.key = key; ui.parsed.dataset.age = age;
-    fill(ui.parsed, age ? h('span', { class: 'pi' }, h('b', {}, age), ` = ${humanAge(age)}`) : null,
+    fill(ui.parsed, ini ? h('span', { class: 'pi pi-ini' }, h('b', {}, ini), ' = initials') : null,
+      age ? h('span', { class: 'pi pi-age' }, h('b', {}, age), ` = ${humanAge(age)}`) : null,
       names.length ? h('span', { class: 'pi parts-read' }, h('small', {}, 'Parts '), names.join(' · ')) : null);
   }
   if (ui.tooLong) {

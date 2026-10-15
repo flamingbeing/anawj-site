@@ -10,7 +10,10 @@ try { for (const width of [390,1280]) {
  const tags=p.getByRole('combobox',{name:'Search tags'});await tags.focus();await tags.press('ArrowDown');await tags.press('Enter');
  assert.equal(await p.locator('.picker [data-code="01"]').getAttribute('aria-selected'),'true');assert.equal(await p.getByRole('listbox',{name:'Tags'}).getAttribute('aria-multiselectable'),'true');
  await tags.press('Tab');assert.equal(await p.evaluate(()=>document.activeElement.getAttribute('role')),'option');await p.keyboard.press('Space');assert.equal(await p.locator('.picker [data-code="01"]').getAttribute('aria-selected'),'false');await p.keyboard.press('ArrowDown');assert.equal(await p.evaluate(()=>document.activeElement.dataset.code),'02');
- await p.locator('textarea.details').fill('AB 6m lap chole');assert.match(await p.locator('.parsed').innerText(),/6 years · male/);assert.equal(await p.locator('textarea.details').inputValue(),'AB 6m lap chole');
+ await p.locator('textarea.details').fill('AB 6m lap chole');assert.match(await p.locator('.parsed').innerText(),/6 years · male/);assert.equal(await p.locator('.parsed .pi-ini').innerText(),'AB = initials');
+ await p.locator('textarea.details').fill('qz 40f fake lap chole');await p.locator('.parsed .pi-ini b',{hasText:'QZ'}).waitFor();
+ await p.locator('textarea.details').fill('fake lap chole');await p.waitForFunction(()=>!document.querySelector('.parsed .pi-ini'));
+ await p.locator('textarea.details').fill('AB 6m lap chole');assert.equal(await p.locator('textarea.details').inputValue(),'AB 6m lap chole');
  await p.locator('.savebar button.primary').click();assert.match(await p.locator('.enter-suggestion-hint').innerText(),/Enter again.*lap/i);
  await p.locator('.datebar [data-date]').first().click();assert.equal(await p.locator('.enter-suggestion-hint').isVisible(),false);
  await p.locator('textarea.details').fill('AB 6mo hernia');assert.equal(await p.locator('.enter-suggestion-hint').isVisible(),false);assert.match(await p.locator('.parsed').innerText(),/6 months/);
