@@ -29,7 +29,11 @@
     let io;
     const large = () => {
       io?.disconnect();
-      const t = document.querySelector('.a-main .a-title:not([hidden])');
+      // the first large title that is actually showing (screens are often switched with hidden)
+      const t = [...document.querySelectorAll('.a-main .a-title')].find(el => el.getClientRects().length);
+      // a screen change: snap the small title to its new state instead of fading (no flicker)
+      bar.classList.add('no-fade');
+      requestAnimationFrame(() => requestAnimationFrame(() => bar.classList.remove('no-fade')));
       if (!t || !('IntersectionObserver' in window)) { delete bar.dataset.large; return; }
       bar.dataset.large = '';
       io = new IntersectionObserver(([e]) => bar.classList.toggle('is-scrolled', !e.isIntersecting || scrollY > 2),

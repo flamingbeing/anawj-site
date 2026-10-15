@@ -137,16 +137,17 @@ html:has(> .a-app) { overscroll-behavior-y: none; background: var(--a-bg); }
 /* the band sits above the safe area on notched phones too: the bar's top padding is below it */
 .a-bar > .a-band:first-child { margin-top: calc(-1 * var(--a-safe-t)); margin-bottom: var(--a-safe-t); }
 .a-bar-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px;
+  display: grid; grid-template-columns: 1fr minmax(0, auto) 1fr; align-items: center; gap: 8px;   /* side buttons keep their width; the title shrinks */
   min-height: var(--a-bar-h); padding: 0 8px; max-width: 980px; margin: 0 auto;
 }
 .a-bar-row > :first-child { justify-self: start; }
 .a-bar-row > :last-child { justify-self: end; }
 .a-bar-title {
   grid-column: 2; font-size: var(--a-text); font-weight: 600; text-align: center;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%;
   opacity: 1; transition: opacity .2s;
 }
+.a-bar.no-fade .a-bar-title { transition: none; }   /* app.js: on a screen change the title snaps, no flicker */
 .a-bar[data-large] .a-bar-title { opacity: 0; }            /* large title showing: keep the small one hidden */
 .a-bar[data-large].is-scrolled .a-bar-title { opacity: 1; }
 .a-bar-btn {
@@ -175,7 +176,7 @@ html:has(> .a-app) { overscroll-behavior-y: none; background: var(--a-bg); }
   flex: 1 1 0; min-width: 0; height: var(--a-tab-h); position: relative;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   border: 0; background: none; padding: 6px 2px 4px; cursor: pointer;
-  color: var(--a-ink-3); font-size: 11px; font-weight: 500; letter-spacing: 0;
+  color: var(--a-ink-2); font-size: 11px; font-weight: 500; letter-spacing: 0;   /* ink-2: 11px labels need 4.5:1 */
 }
 .a-tabbar > * > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .a-tabbar svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -313,6 +314,37 @@ a.a-row:active, button.a-row:active, label.a-row:active { background: var(--a-su
 .a-switch:checked::after { transform: translateX(20px); }
 .a-switch:disabled { opacity: .45; }
 
+/* segmented choice made of radio inputs (ratings, yes/no), touch-sized:
+   <div class="a-seg a-seg--choice"><label><input type="radio" name="r" value="1"><span>1</span></label>…</div> */
+.a-seg--choice > label { position: relative; display: grid; place-items: center; min-height: 44px; padding: 0; border-radius: 7px; cursor: pointer; }
+.a-seg--choice input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.a-seg--choice > label:has(input:checked) { background: var(--a-surface); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .12), 0 0 0 .5px rgba(0, 0, 0, .04); }
+.a-seg--choice > label:has(input:focus-visible) { outline: 3px solid var(--a-focus); outline-offset: 1px; }
+:root[data-theme="dark"] .a-seg--choice > label:has(input:checked) { background: #636366; }
+
+/* row with the label above its field (long values: procedure, assessor):
+   <li><label class="a-row a-row--stack"><span>Procedure</span><input class="a-field"></label></li> */
+.a-row--stack { flex-direction: column; align-items: stretch; gap: 2px; }
+.a-row--stack > span:first-child { color: var(--a-ink-2); font-size: var(--a-text-xs); }
+.a-row--stack .a-field { text-align: left; }
+
+/* expandable row: <details class="a-disclosure"><summary class="a-row">Title<span class="a-chev"></span></summary>…</details> */
+.a-disclosure > summary { list-style: none; cursor: pointer; }
+.a-disclosure > summary::-webkit-details-marker { display: none; }
+.a-disclosure > summary .a-chev { margin-left: auto; transform: rotate(135deg); transition: transform .2s var(--a-ease); }
+.a-disclosure[open] > summary .a-chev { transform: rotate(-45deg); }
+.a-disclosure > :not(summary) { padding: 0 16px 14px; }
+
+/* the screen's main action pinned to the bottom (above the tab bar) while a long form scrolls:
+   <div class="a-sticky-actions"><button class="a-btn a-btn--block">Save</button></div> */
+.a-sticky-actions {
+  position: sticky; bottom: calc(var(--a-safe-b)); z-index: 5; margin: 16px calc(-1 * var(--a-gutter)) 0;
+  padding: 10px var(--a-gutter); background: var(--a-bar); border-top: .5px solid var(--a-sep);
+  -webkit-backdrop-filter: saturate(1.8) blur(20px); backdrop-filter: saturate(1.8) blur(20px);
+}
+.a-app:has(.a-tabbar) .a-sticky-actions { bottom: calc(var(--a-tab-h) + var(--a-safe-b)); }
+@media (min-width: 1000px) { .a-app:has(.a-tabbar) .a-sticky-actions { bottom: 0; } }
+
 /* checkmark rows (pick one or several from a list): <label class="a-row"><span class="a-row-text">…</span>
    <input type="radio" class="a-check" name="x"></label> */
 .a-check { -webkit-appearance: none; appearance: none; flex: none; margin: 0; width: 22px; height: 22px; cursor: pointer; position: relative; }
@@ -347,10 +379,10 @@ select.a-field { padding-right: 32px; background-image: linear-gradient(45deg, t
 }
 
 /* chips: filters and quick picks. <button class="a-chip" aria-pressed="true">Cardiac</button> */
-.a-chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 8px; scrollbar-width: none; scroll-snap-type: x proximity; }
+.a-chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 8px; scrollbar-width: none; }
 .a-chips::-webkit-scrollbar { display: none; }
 .a-chip {
-  flex: none; scroll-snap-align: start; min-height: 34px; padding: 0 14px; border: 0; border-radius: 17px; cursor: pointer;
+  flex: none; min-height: 34px; padding: 0 14px; border: 0; border-radius: 17px; cursor: pointer;
   background: var(--a-surface); color: var(--a-ink); font-size: var(--a-text-sm); font-weight: 500;
   box-shadow: inset 0 0 0 .5px var(--a-sep);
 }
