@@ -61,15 +61,25 @@ async function device(n) {
   });
   const p = await ctx.newPage();
   p.on('pageerror', e => errors.push(`device ${n}: ${e.message}`));
+  let cdp = null;
   if (SLOW && BROWSER === 'chromium') {
-    const cdp = await ctx.newCDPSession(p);
-    await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 400, downloadThroughput: 50000, uploadThroughput: 25000 });
+    cdp = await ctx.newCDPSession(p);
+    await cdp.send('Network.emulateNetworkConditions', SLOW_NET(false));
   }
   await p.goto(BASE + '#logbook');
   await p.getByRole('button', { name: 'Sign in with Google' }).waitFor({ timeout: 30000 });
   await p.evaluate(async e => (await import('./js/cloud.js')).emulatorSignIn(e), E);
   await synced(p);
-  return { n, p, ctx, offline: false, held: new Set() };
+  return { n, p, ctx, cdp, offline: false, held: new Set() };
+}
+// the slow network's own DevTools session keeps its conditions (offline: false) after ctx.setOffline(true): the page
+// then reads navigator.onLine false (the save queue waits) while Firestore's open connection still reaches the server,
+// a state no real phone is in (seed 419136196). Going offline therefore cuts that session too.
+const SLOW_NET = offline => ({ offline, latency: 400, downloadThroughput: 50000, uploadThroughput: 25000 });
+async function setOffline(d, offline) {
+  await d.ctx.setOffline(offline);
+  if (d.cdp) await d.cdp.send('Network.emulateNetworkConditions', SLOW_NET(offline));
+  d.offline = offline;
 }
 async function synced(p, timeout = 60000) {
   for (const t = Date.now(); !(await p.evaluate(async () => (await import('./js/ui-core.js')).S.casesSynced).catch(() => false)); await p.waitForTimeout(150))
@@ -158,20 +168,29 @@ try {
       else record(x.r);
     }
   }
+  // an edit on a device just back online can be accepted (saved here) and only meet the change made elsewhere when it
+  // drains: a conflict, kept in Recent changes, as for an offline device (seed 419136196). On a device that was already
+  // up to date it would be a real fault.
+  async function conflictedOnline(d, r) {
+    const st = (await latest(d)).get(r.id);
+    if (!st || st[0] !== 'conflict') return;
+    if (d.stale) { conflicts++; ledger.delete(r.id); }
+    else errors.push(`round ${r.round}: device ${d.n} edit ${r.id} met a conflict on a device that was up to date`);
+  }
   // an online device's delete can be undone the same way, once it lands (a change made elsewhere reached the server first)
   async function undoneOnline(d, r) {
     const states = await latest(d);
     for (const id of (r.ids || [r.id]).filter(id => isUndone(states.get(id)))) { conflicts++; ledger.delete(id); if (binned.includes(id)) binned.splice(binned.indexOf(id), 1); }
   }
   async function reconnect(d) {
-    await d.ctx.setOffline(false); d.offline = false; d.stale = true;
+    await setOffline(d, false); d.stale = true;
     await d.p.evaluate(async () => { await (await import('./js/writes.js')).writes.flush(8000); await (await import('./js/cloud.js')).syncFlush(); }).catch(() => {});
   }
   for (let round = 1; round <= ROUNDS; round++) {
     // devices drop off or come back (never all offline: device 1 stays online as the reference)
     const back = [];
     if (OFFLINE) for (const d of devs.slice(1)) {
-      if (!d.offline && rnd() < 0.25) { await d.ctx.setOffline(true); d.offline = true; }
+      if (!d.offline && rnd() < 0.25) await setOffline(d, true);
       else if (d.offline && rnd() < 0.5) { await reconnect(d); back.push(d); }
     }
     const live = (await ids(devs[0].p)).map(([id]) => id);
@@ -192,8 +211,15 @@ try {
     }));
     const results = await Promise.all(devs.map((d, i) => act(d.p, plan[i])));
     results.forEach((r, i) => history.push([round, devs[i].n, devs[i].offline, r.kind, (r.ids || [r.id]).join('+'), r.ok, r.error || '']));
+    // a delete of several cases where one met a change made elsewhere (entries() lists the newest job first): that one is kept (and the action says so), the
+    // others were deleted (moved to the bin) all the same (seed 76343995)
+    const doneIds = await Promise.all(results.map((r, i) => !r.ok && r.kind === 'deleteMany' && /changed elsewhere/.test(r.error)
+      ? devs[i].p.evaluate(async ids => { const w = (await import('./js/writes.js')).writes.entries();
+        return ids.filter(id => { const j = w.find(x => x.record.id === id); return j && j.record._deleted && j.state === 'synced'; }); }, r.ids).catch(() => [])
+      : []));
     results.forEach((r, i) => {
       const d = devs[i];
+      for (const id of doneIds[i]) { if (d.offline) d.held.add(id); else { ledger.set(id, { gone: true }); binned.push(id); } }
       // a device that was offline may act on a case changed elsewhere before its copy caught up: the app refuses and keeps
       // both versions (Recent changes). That's the right outcome, as long as it says so (it did: r.ok is false).
       if (!r.ok && /changed elsewhere/.test(r.error) && (d.offline || d.stale)) { conflicts++; return; }
@@ -209,6 +235,7 @@ try {
     await Promise.all(online.map(d => d.p.evaluate(async () => (await import('./js/cloud.js')).syncFlush()).catch(() => {})));
     await Promise.all(online.map(d => d.p.evaluate(async () => (await import('./js/writes.js')).writes.flush(8000)).catch(() => {})));
     for (const [i, r] of results.entries()) if (r.ok && /^delete/.test(r.kind) && !devs[i].offline) await undoneOnline(devs[i], r);
+    for (const [i, r] of results.entries()) if (r.ok && r.kind === 'edit' && !devs[i].offline) await conflictedOnline(devs[i], { ...r, round });
     await new Promise(r => setTimeout(r, 2000));
     await Promise.all(online.map(async d => { await d.p.reload(); await synced(d.p); }));
     for (const d of back) d.held.clear();

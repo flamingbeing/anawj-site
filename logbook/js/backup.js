@@ -99,10 +99,12 @@ async function restoreBackup(file) {
           if (cases.length) await saveMany(cases);
           if (S.resident) for (const img of images) await cloud.saveImage(mine(), img);   // photos: programme residents only (rules)
           for (const r of refl) await cloud.saveReflection(mine(), r);
-          for (const n of notes) await writes.save('note', mine(), n, null);
+          // a note with a change made elsewhere still to choose is kept in Recent changes; the rest of the restore goes on
+          let held = 0;
+          for (const n of notes) await writes.save('note', mine(), n, null).catch(err => { if (writes.status('note', n.id) !== 'conflict') throw err; held++; });
           if (newTpl.length) await patchLogbook({ templates: [...((S.logbook && S.logbook.templates) || []), ...newTpl] });
           if (extra.length) await patchLogbook({ ...(profile ? { profile } : {}), ...(name ? { name } : {}), ...(Object.keys(newSettings).length ? { settings: newSettings } : {}) });
-          toast(`Restored ${cases.length} cases, ${refl.length} reflections${notes.length ? `, ${notes.length} notes` : ''}`);
+          toast(`Restored ${cases.length} cases, ${refl.length} reflections${notes.length - held ? `, ${notes.length - held} notes` : ''}${held ? ` (${held} changed elsewhere: see Recent changes)` : ''}`);
         } catch (err) { toast('Restore stopped: ' + err.message); }
       } }, 'Restore')),
   ]);

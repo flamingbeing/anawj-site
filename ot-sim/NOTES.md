@@ -57,7 +57,113 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
   `playwright install`).
 - Phone screenshots (390 px) of every UI change go in the PR (AGENTS.md "Show it").
 
+## Stubs in place (replaced by their PR, DESIGN.md "PR order")
+
+- `js/model/vitals.js` (M0.1): steady awake SpO2, breathing, EtCO2 and temperature with seeded noise, and breaths.
+  Heart rate and blood pressure moved to `rhythm.js` and `cardio.js` (M2.1); the rest moves to `gas.js` and `resp.js`
+  (M2.4) and `temp.js` (M2.6). `synth.js` and `monitor.js` read `state.vit` for those until then.
+- The Patient tab's stimuli and "Talk" (M1.4): replaced by the airway (M3.1) and the case flow with Examine (M3.2).
+- MAC fraction reads `vol.mac` (0 until M2.5), so the volatile terms in `pd.js`, `resp.js`, `gas.js` and `cardio.js`
+  stay off until then; the GA tests set `vol.mac` by hand. The airway (`aw.obstruction`) arrives in M3.1; until then
+  `resp.open` is true and the Patient tab's obstruction is only reachable in tests.
+
 ## Decisions log
+
+- 15 Oct 2026 (M2.6): `temp.js` (two compartments, core and periphery, energy balance in kcal). Anaesthesia opens the
+  core-peripheral conductance (K 23 awake, 37 asleep), which redistributes heat and gives the early fall (about -0.8 C
+  in hour 1, then slower); heat production falls 30% asleep; the periphery loses to a 21 C theatre; cold fluids cool
+  the core (1 L about -0.28 C mean, by specific heat); the forced-air warmer adds 55 W. The system is named `temp`
+  because `t` is the reserved clock field; `vitals.js` is gone (temperature was its last job). The monitor temperature
+  reads the core through the usual averaging. UI: a forced-air warmer on the Patient tab. No vasoconstriction-threshold
+  plateau yet, so a very long unwarmed case keeps drifting down slowly (recorded).
+
+- 15 Oct 2026 (M2.5): `volatile.js` (the circle circuit, three Gas Man tissue groups, agent effect sites, age-adjusted
+  MAC, the N2O concentration effect) owns `vol.fi/ce/pv/mac`. `pd.js` now reads the whole volatile MAC fraction as one
+  sevoflurane-equivalent, so every agent counts and the sevoflurane-written formulas hold (sevoflurane alone is
+  unchanged). The volatile circulation effect was strengthened (1 MAC about -21% MAP, 1.5 MAC about -28%, heart rate
+  about unchanged). Wash-in and washout match Yasuda. `patient.macStub` is a test-only hook for a steady volatile depth
+  without running the vaporiser to steady state (the fluids and vaso GA tests use it, in place of the old `vol` stub
+  that a live volatile system would overwrite). UI: a vaporiser and fresh-gas control on the Breathing tab, agent
+  Fi/Et/MAC on the monitor. Known miss, as in the prototype: low-flow Et/dial reads a little low; desflurane washout.
+
+- 15 Oct 2026 (M2.4): `gas.js` (one lung store that collapses when obstructed, two blood O2 pools so SaO2 falls at a
+  realistic rate, a CO2 body store) and `resp.js` (Bouillon drive with the slope flattened, the ventilator closed-form,
+  pleural pressure to the circulation). Apnoea: healthy preox about 8.6 min, air about 1 min, obese 130 kg about 3.5
+  min; CO2 about 3-3.4 mmHg/min. Known misses, recorded in MODEL.md: no first-minute CO2 venous-equilibration jump
+  (first minute about 3, not 8-12); open-airway apnoeic oxygenation lasts over 20 min (no CO2 feedback into the
+  alveolar gas equation yet). VO2 scales with a metabolic weight (IBW plus 0.3 of the excess). The monitor's SpO2 has
+  a probe transport delay (25 s, longer at low output) so the displayed fall lags the arterial one. UI: a Breathing
+  tab (O2, ventilator), Paw/PEEP/MV on the monitor. `vitals.js` is now only temperature.
+
+- 15 Oct 2026 (M2.3): `vaso.js` holds receptor activations (Emax/EC50 per drug, combined as independent fractions)
+  and their mapping to SVR, venous capacity, heart period and contractility; `cardio.js` applies them through the
+  existing reflex. PK in `pk.js` MODELS, short and [D] except the cited clearances and half-lives; phenylephrine keeps
+  the prototype's 5 L front end and a 20 s transit delay. Ephedrine releases noradrenaline from a store that runs down
+  (tachyphylaxis). Vasopressin is dosed in units (`mU` internally). Metaraminol is in the catalogue but hidden (not on
+  the HSA register; owner question). Known gaps: a noradrenaline infusion takes about 5 min, not 1-2, to wear off
+  (its level sits near the EC50); esmolol slows a resting heart only about 4/min, because resting HR here is mostly
+  vagal (it does blunt a stimulated rise, tested). Vasoactive rows sit on the Circulation tab with ISO 26825 colours
+  (vasopressors violet, hypotensive agents violet stripes, anticholinergics green).
+
+- 15 Oct 2026 (M2.2): `fluids.js` is called by `cardio.js` (state `cv.fl`), so volume stays in one slice; everything
+  enters or leaves through the veins. Crystalloid excess `cx` leaves to the interstitium and urine at Hahn's
+  MAP-dependent rates (k21 taken as 0); colloid leaves with t½ 2.5 h; red cells add 280 mL and 56 g of Hb; bleeding
+  removes whole blood (Hb, crystalloid and colloid in proportion). Bags run at 50 mL/min, a red-cell unit over about
+  10 min [D]. Haemorrhage reproduces the prototype awake; the GA haemorrhage test sets `vol.mac` 1.6 by hand until
+  M2.5 (sevoflurane's own drives get tuned there). Stub until scenarios (M4): surgical bleeding on the Patient tab.
+
+- 15 Oct 2026 (M2.1): `cardio.js` as in MODEL.md section 5 (as-built notes there): the prototype's structure and
+  numbers reproduce (steady state exact, propofol 2 mg/kg SBP −17.9 at 2 min, steady Ce 1 −10.5%). `pd.auto` became a
+  graded response, because a probability could not give the laryngoscopy rise; brief stimuli now last 60 s. Beat
+  events now come from `cardio.js` (with stroke volume and pressures); `rhythm.js` keeps exact beat times with 1.5%
+  beat-to-beat variation. `createSim` takes `dt` for tests. Cost about 13 µs a step with two pumps running (2.6 ms of
+  CPU a second at 20x).
+
+- 15 Oct 2026 (M1.4): `pd.js` holds hypnosis (asleep when P(no response to voice) > the patient's q), the stimulus
+  surface (movement at stimulus onset when P(no response) < q and the thumb twitch is over 10%), the BIS-like index
+  (arousal adds up to 8) and `pd.auto` (a second surface at 1.6 x with the opioid C50 0.5 ng/mL, from the MAC-BAR
+  ratios; rises with a 20 s and fades with a 90 s time constant; brief stimuli last 30 s, surgery runs until stopped,
+  intensity 0.6-1.0, default 0.8). The volatile term reads `vol.ce.sevoflurane` once M2.5 exists (MAC40 1.80%). Stub
+  until M3.1/M3.2: the Patient tab (talk, stimuli, events); "Talk" reads the state and logs nothing. Midazolam and
+  ketamine have no hypnotic effect yet: MODEL.md section 4 gives no surface for them (a research step before the
+  case flow, M3.2).
+
+- 15 Oct 2026 (M1.3): neuromuscular drugs live in `nmb.js` (state `pk.nm`), the readout in `pd.js` (`pd.nmb`), the TOF
+  module in `monitor.js` (every 15 s; PTC on request, once per 2 min). The TOF readout is fitted to acceleromyography,
+  because every reversal trial used it; that forced a retune: rocuronium ke0 0.2 on / 0.9 off (onset: 80% block at
+  0.92 min; sugammadex 2 mg/kg at T2 1.36 min, 4 mg/kg at PTC 1 2.2, 16 mg/kg 1.5), neostigmine max x 2, EC50 20.
+  Known misses, recorded in MODEL.md: spontaneous T2 to TOFR 0.9 50 vs 21 min (Sorgenfrei 2006, small placebo arm),
+  neostigmine from a deep block 32 vs 50 min (Jones 2008). Suxamethonium: cholinesterase as `patient.che` (profile
+  `che`: 0.5 heterozygous, 0.01 homozygous); phase II fades from 3 mg/kg total. Glycopyrrolate and atropine (with
+  neostigmine) come with the vasoactive drugs (M2.3); suxamethonium's potassium rise comes with `gas.js` (M2.4).
+
+- 14 Oct 2026 (M1.2): the pump's effect-site TCI runs in two phases. While loading it targets the predicted
+  effect-site peak (Shafer & Gregg style); once the prediction reaches the target it holds plasma at the target.
+  Peak-targeting alone switched between bursts and zero every 10 s. A running pump keeps its model. Syringes are
+  propofol 10 mg/mL and remifentanil 50 mcg/mL, maximum 1200 mL/h (to confirm with NUH pumps). Drug rows carry the
+  ISO 26825 class colour as a stripe, with the class written beside the name. The Drugs and Circulation tabs follow
+  the ARIA tabs pattern (arrow keys, Home, End). "Behind the monitor" is closed by default and remembered per device
+  (`otsim.behind`). The monitor does not respond to drugs until M1.4 and M2.1.
+
+- 14 Oct 2026 (M1.1): `pk.js` steps only drugs that have been given. Amounts are in mg (propofol, ketamine) or mcg
+  (opioids, midazolam), so concentrations read in the papers' units. The patient's PK multipliers act on V1 and the
+  metabolic clearance only (inter-compartment clearances stay). Context-sensitive half-times are tested as Hughes
+  1992 defines them (plasma held constant, then stopped); a constant-rate infusion gives a shorter 8 h value.
+  Alfentanil (Maitre PK, ke0 0.77) peaks at about 2.6 min, not Miller's 1.4 (Scott PK): recorded, not tuned, like
+  midazolam; on the clinical read-through list.
+
+- 14 Oct 2026 (M0.2): the default seed is 1 when the URL has no `?seed`, so first frames (and PR screenshots) repeat;
+  free runs with a new patient each time can come with the library (M3.2). The warm start keeps its last events with
+  negative times, so the lanes have a full sweep of history at t = 0. The lanes draw at device-pixel resolution and
+  keep the extreme value within each pixel (otherwise R waves vary in height on phones). The ResizeObserver refills a
+  lane only when its canvas size changes (numbers changing must not wipe the sweep). Pause is an icon button (the
+  phone top bar fits on one line). NIBP: 5-minute cycle by default, a reading takes 30 s, a manual start restarts the
+  cycle timer. In browser tests, wipe and count a canvas inside one `page.evaluate`: Chrome can repaint a GPU canvas
+  between evaluations.
+
+- 14 Oct 2026 (M0.1): the owner said go. Blood volume indexing starts above BMI 25 (not 22) so the default patient is
+  4.9 L. `vitals.js` is a placeholder (steady values plus noise, beats and breaths) that later PRs replace system by
+  system. `tools/test-ot-sim.sh` runs every `test/*.test.mjs`, so new model tests need no wiring.
 
 - 14 Oct 2026: folder `ot-sim/`, address `anaes.anawj.com/ot/`, plain ES modules with no build step, model separate
   from UI so Node tests can run it. Environment prepared (routes, labels, checks, test runner, build brief).
