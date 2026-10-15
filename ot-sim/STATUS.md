@@ -2,7 +2,8 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-15 by Claude Code (build session: M2.7-M3.2 + M3.3 slices 1-2 merged; M3.3 slice 3 Log tab — alarms+Log core done).
+Last updated: 2026-10-15 by Claude Code (build session `status/build.md`: M2.7–M3.3 built; owner paused new scenarios;
+usability pass next).
 
 ## Now
 
@@ -16,17 +17,31 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 - Clinical read-through of drug parameters, thresholds and crisis management steps as each milestone lands
   (`MODEL.md` tags every number: checked, secondary, unverified or our design choice; `SCENARIOS.md` tags the doses
   and windows that are not checked, and `research/crises.md` holds each dose's source).
+- Review the alarm default limits and priorities (`MODEL.md` §14, all our design choice) and the Elective GA case text
+  (`js/ui/preop.js`: a fit ASA I adult for day-case surgery, written to match what the model simulates).
+- Say when to resume scenario work (paused 15 Oct 2026, below).
 
 ## Next
 
-1. **M3.3 core (alarms + Log) is done.** Optional M3.3 polish left: trainee-set alarm limits (a per-device Alarms
-   settings area) and a ventilator-disconnection technical alarm (needs a circuit-disconnect state, likely with the
-   scenario engine). **Recommended next: M4.1** — the crisis engine (`conditions.js`, `events.js`, scenario format,
-   expected-action matching) + scenario 1 (hypotension after induction). This is the owner's "diverse use cases" goal.
+**New scenarios are paused (owner, 15 Oct 2026).** Do not start M4 until the owner says so. Current focus: make what
+exists usable for a resident (a usability pass on the library, theatre and tabs). The original plan, in order, for when
+building resumes (`DESIGN.md` "PR order" has each row's tests):
+
+1. Finish M3.3 (optional polish): trainee-set alarm limits — limits must live in sim state and change by an action
+   (`{type:'alarmLimit', param, lo, hi}`) so replays stay exact, with per-device overrides from localStorage applied as
+   actions at boot; and a ventilator-disconnection technical alarm (needs a circuit-disconnect state).
+2. M4.0: scenario drugs and products (`MODEL.md` §12: glucagon, salbutamol, magnesium, calcium, insulin/glucose,
+   bicarbonate, TXA, blood products, dantrolene, lipid emulsion…).
+3. M4.1: the crisis engine — `conditions.js` (what a crisis switches on, `MODEL.md` §11), `events.js` (triggers, timed
+   changes, expected-action matching), the scenario format (`SCENARIOS.md`), scenario 1 (hypotension after induction);
+   scenarios start from `presets.js` states. Tests: the scenario's three courses (untreated, correct, wrong).
+4. M4.2–M4.7: scenarios 2–12, two per PR, in the `PLAN.md` order unless the owner reorders.
+5. M5.1: debrief (timeline from `sim.log`/`ui/log.js`, actions vs expected, time to treatment, teaching points).
+6. M5.2: hints (off by default), rewind to a snapshot, share a run as a relative link.
 
 ## Recently done
 
-- M3.3 slice 3 (15 Oct 2026, #645→next): the Log tab (`ui/log.js`) — a readable, timestamped, newest-first record of
+- M3.3 slice 3 (15 Oct 2026, #650, open: CI blocked only by the bis-dsa flake — see NOTES "Lessons"): the Log tab (`ui/log.js`) — a readable, timestamped, newest-first record of
   everything in `sim.log` (drugs, airway/vent, fluids, rhythm/resus, operation, NIBP, alarms, responses); the same
   record the M5 debrief will replay. `test/log.test.mjs` + e2e.
 - M3.3 slice 2 (15 Oct 2026, #645): technical alarms (`monitor.js`) — "No CO₂ — check the tube and circuit"
@@ -56,35 +71,6 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
   sedation/paralysis relieved by manoeuvres or a device; mask seal and pre-oxygenation entrainment; tube placement
   (tracheal/oesophageal → no CO2/endobronchial one-lung). An Airway tab. resp/gas calibration unchanged (a patent
   airway delivers fully).
-- M2.8 (15 Oct 2026, #604): resuscitation (`resus.js`): chest compressions (output + EtCO2 + DBP by quality),
-  defibrillation (time-in-VF success curve → ROSC), transcutaneous pacing (per-patient capture threshold); SpO2 now
-  falls in an untreated arrest and recovers with CPR (CO coupled into gas exchange). Resuscitation controls on the
-  Patient tab.
-- M2.7 (15 Oct 2026, #598): rhythms and the ECG (`rhythm.js`, cardio output gate, `ui/synth.js` morphologies/baselines): the
-  blocks, AF, flutter, SVT, VT, torsades, VF, asystole, PEA, bigeminy, paced and hyperkalaemia; a rhythm picker and
-  label on the Patient tab. Non-perfusing rhythms decay on the Schipke curve; sinus unchanged (calibration intact).
-- M2.2-M2.6 (15 Oct 2026, #582): fluids and bleeding, vasoactive drugs, gas exchange and breathing, volatile agents,
-  temperature — the full closed-loop patient model.
-- M2.1 (15 Oct 2026): circulation (`cardio.js`, `rhythm.js`): three compartments, beat-latched stroke volumes, the
-  baroreflex, empty-ventricle decompensation, propofol, opioid and stimulus drives. Heart rate, blood pressure and the
-  waveforms now follow the model; "Behind the monitor" shows output, SVR, CVP and the reflex.
-- M1.4 (15 Oct 2026, #577): hypnosis (asleep by one rule for everyone, the patient's own sensitivity), the stimulus response
-  (movement unless paralysed), the BIS-like index and the autonomic drive; a Patient tab (talk, stimuli, events).
-- M1.3 (15 Oct 2026, #576): neuromuscular block: rocuronium, suxamethonium, sugammadex, neostigmine; TOF on the monitor
-  every 15 s, PTC on request; the block by muscle in "Behind the monitor". Tuned to the trials' acceleromyography;
-  known misses in MODEL.md.
-- M1.2 (15 Oct 2026, #575): syringe pumps with their own predicted model (Schnider, Marsh, Minto), plasma and effect-site
-  TCI; the Drugs tab (boluses for the patient's weight, custom doses, infusions, TCI), the Circulation tab (NIBP) and
-  "Behind the monitor" (the pump's prediction beside the true level).
-- M1.1 (14 Oct 2026, #573): `pk.js` and `drugs.js`: propofol (Schnider, haemodynamic effect site), remifentanil (Minto),
-  fentanyl, alfentanil, midazolam, ketamine, Marsh for the pump; boluses and infusions as actions; between-patient
-  PK variation. Model only (the Drugs tab comes with M1.2).
-- M0.2 (14 Oct 2026, #572): first monitor at `#theatre`: library screen, sweeping ECG, pleth and capnogram lanes (real pace
-  at 5x and 20x), HR, SpO2, EtCO2, RR, NIBP (cycle, start/stop) and temperature, speed keys and pause, fonts, the
-  old-address forward, `?seed` and `?test`.
-- M0.1 (14 Oct 2026, #570): `js/model/` loop (`sim.js`, fixed 0.1 s Jacobi step, snapshot, replay, event ring, trends,
-  300 s warm start), `rng.js` (sfc32, named streams), `fmath.js` (exact exp, log, pow, sin, cos), `patient.js`
-  (covariates and variation), a placeholder `vitals.js`; tests for maths, determinism, purity and the patient.
-- Build plan (14 Oct 2026): `DESIGN.md`, `MODEL.md`, `SCENARIOS.md`, `research/`; brief corrected (Marsh example);
-  revised after two reviews, prototypes of the riskiest models and a source check (`research/prototypes.md`).
-- Environment prepared: folder, address, labels, CI hooks, test runner, smoke test, build brief (14 Oct 2026).
+- Earlier (14–15 Oct 2026, #570–#604): the plan (`DESIGN.md`, `MODEL.md`, `SCENARIOS.md`, `research/`), the model loop
+  and maths (M0), drugs, pumps/TCI, neuromuscular block, hypnosis (M1), circulation, fluids, vasoactives, gas exchange,
+  breathing, volatiles, temperature, rhythms/ECG and resuscitation (M2). Details in `git log -- ot-sim` and `NOTES.md`.
