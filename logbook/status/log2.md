@@ -131,7 +131,9 @@ Agreed queue (one PR each, in order, once he says go):
    Also Pixel-style (owner: Material You look: soft tinted surfaces, large rounded corners, pill buttons and pill tab
    indicator, Roboto-like sans; the accent follows the chosen colour) and Apple-style (owner: iOS look: grouped
    inset lists on light grey, hairline separators, system blue accent, the device's system font, translucent
-   header and tab bar).
+   header and tab bar), Instagram-style (owner: white or black ground, a pink-to-orange gradient accent on the
+   active tab, buttons and the header band, thin borders, rounded cards; text stays solid for contrast) and TikTok-style
+   (owner: black ground, cyan and pink-red accents, bold sans, high contrast, dark only).
    A theme sets the Advanced display settings too (owner, 15 Oct): fonts, line spacing and width, corners, borders,
    shadows, compact, icons on buttons, icons-only tab bar, page titles in the header, plain calendar, shorter rows;
    every one stays editable afterwards (the card then says "Custom (based on …)"), and a theme never touches layout
