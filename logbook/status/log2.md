@@ -18,6 +18,11 @@ Agreed queue (one PR each, in order, once he says go):
 2. **Detection settings** (Settings → Logging → Detection): highlight what was detected (initials, age, BMI) in the
    review and tap to undo (Todoist-style); a list of starts to skip before initials (`===`, `Pt:`); "Allow one-letter
    initials" (I and A still need an age, "/" or "(" after them); detection off switch. Later, maybe, a typed template.
+2b. **The line under the Case box shows the initials too** (owner): "ABM = initials · 72M = 72 years · male", the
+   initials as they'll be saved (capitals), in the same blue as their highlight in the box; only when they were read
+   from the box (not typed in the Initials field). Tap one to undo it (with item 2). Bug found alongside: the age reading
+   takes any 1–3 digits ("544y = 544 years"); `splitAge` / `humanAge` (engine.js) should only take ages up to ~120 years
+   (and sane months / weeks / days), as `parseAge` in suggest.js already caps at 110.
 3. **Reset all settings** at the bottom of Settings: This device / My account too (tag list kept unless ticked); never
    cases, reflections, notes or drafts; asks, offers a settings-file backup, Undo.
 4. **Full Analytics for every profile:** the `analytics` switch on by default everywhere. Exceptions kept (owner):
