@@ -1647,3 +1647,8 @@ html:not(.rows-short) ul.cases .c-tags > * { max-width: 100%; }
 .more-head h2 { margin: 0; }
 /* a page's section heading outside the cards (Profile → Show or hide) */
 h2.set-heading { margin: 18px 6px 4px; }
+/* the grab bar under the case box: drag to set its height (a phone can't use the browser's corner handle) */
+.box-grab { height: 28px; margin: -2px 0 2px; display: flex; align-items: center; justify-content: center; cursor: ns-resize; touch-action: none; user-select: none; }
+.box-grab::before { content: ''; width: 44px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 22%, transparent); }
+.box-grab.dragging::before, .box-grab:hover::before { background: var(--accent); }
+.box-grab:focus-visible { outline: 3px solid var(--heading); outline-offset: -2px; border-radius: 6px; }

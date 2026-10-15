@@ -505,6 +505,11 @@ export function renderLoggingAdvanced() {
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Case tab',
         h('select', { onchange: e => save({ boxLines: Number(e.target.value) }) },
           Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
+      // the height dragged with the grab bar under the box (this device), and Grow as I type (on by default)
+      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Dragged height (this device): ', h('b', {}, display().boxHeight ? `${Math.round(display().boxHeight)} px` : 'none'),
+        display().boxHeight ? [' · ', h('button', { type: 'button', class: 'linkish', onclick: () => { setDisplay({ boxHeight: null }); hooks.render(); } }, 'Reset')] : null),
+      toggle('Grow as I type (this device)', display().boxGrow !== false, v => { setDisplay({ boxGrow: v ? null : false }); },
+        'On by default: the box grows with the text, up to two thirds of the screen.', 'Drag the bar under the box to set its starting height; double-tap the bar to reset it.'),
       // a separate Initials box above the case box, where the Case tab starts (device; was "First field for a new case")
       toggle(['Separate initials box (this device)', 'Separate initials box'], display().firstField === 'initials', v => { setDisplay({ firstField: v ? 'initials' : null }); toast('Saved on this device'); },
         'An Initials box above the case box.', 'The Case tab starts there and Enter moves on to the case. Off: type the initials at the start of the case, e.g. “AB 72M lap chole”.'),

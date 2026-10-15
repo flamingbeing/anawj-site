@@ -95,7 +95,7 @@ Agreed queue (one PR each, in order, once he says go):
 9f. **Reflections on the Logbook calendar** (owner; off by default): a "Show reflections" toggle on the Calendar view
    itself (per device). Days with a reflection get a small reflection mark beside the notes mark; the day's list shows
    each reflection under its case (or on its own when not linked to a case), tap opens it.
-9g. **Case box height that stays** (owner): a dragged height is remembered per device (after Save, tab switches,
+9g. **Built (Box height PR).** **Case box height that stays** (owner): a dragged height is remembered per device (after Save, tab switches,
    reloads); Settings → Advanced logging → Box height shows it and its reset undoes it. Phones can't drag the
    browser's own corner handle, so add a grab bar under the box (a 44 px touch target, pointer events, works with a
    mouse too; double-tap resets). "Grow as I type" switch, ON by default (owner, 15 Oct): the box grows from the set height as text is added, up to

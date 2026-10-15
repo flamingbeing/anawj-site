@@ -8,7 +8,7 @@ import { apmesShorthand, shorthandTags } from './tags.js';
 import {
   S, h, ic, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagName, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills, basicHides, basicMode, caseShown, shows } from './ui-core.js';
-import { display } from './display.js';
+import { display, setDisplay } from './display.js';
 import { moveToBin } from './bin.js';
 import { caseHasNotes, openNotes, dayNoteBox, addNotes, notesRoom } from './ui-notepad.js';
 import { createDraftSlot, listDrafts } from './drafts.js';
@@ -242,6 +242,38 @@ function keepPlace(anchor, fn) {
 // On phones, focusing the details box pops the keyboard and scrolls back up: only do it with a mouse.
 // how tall the case box starts (Settings → Logging: 2 to 20 lines)
 const boxLines = () => Math.min(20, Math.max(2, Math.round(Number(settings().boxLines) || 3)));
+// The case box's height (owner, 15 Oct 2026; per device): a dragged height is kept (display().boxHeight, px), and
+// "Grow as I type" (on unless display().boxGrow is false) grows it from there up to two thirds of the screen
+const boxHeight = () => { const v = Math.round(Number(display().boxHeight)); return v >= 60 && v <= 2000 ? v : null; };
+const boxGrows = () => display().boxGrow !== false;
+function fitBox(ta) {
+  if (!ta || !ta.isConnected) return;
+  const base = boxHeight();
+  ta.style.height = base ? base + 'px' : '';
+  if (!boxGrows()) return;
+  const want = Math.min(Math.round(innerHeight * 0.66), ta.scrollHeight + 2);
+  if (want > ta.offsetHeight) ta.style.height = want + 'px';
+}
+// the grab bar under the box: drag (finger or mouse) to set the height; double-tap resets; ↑ ↓ on a keyboard
+function boxGrab(ta) {
+  const set = px => { const v = Math.max(60, Math.min(Math.round(innerHeight * 0.85), Math.round(px))); ta.style.height = v + 'px'; return v; };
+  const save = v => { setDisplay({ boxHeight: v }); fitBox(ta); };
+  let lastTap = 0;
+  return h('div', { class: 'box-grab', role: 'separator', tabindex: '0', 'aria-orientation': 'horizontal', 'aria-label': 'Case box height: drag to change, double-tap to reset',
+    onpointerdown: e => {
+      const now = Date.now();
+      if (now - lastTap < 350) { lastTap = 0; setDisplay({ boxHeight: null }); fitBox(ta); return; }
+      lastTap = now;
+      e.preventDefault();
+      const grab = e.currentTarget, y0 = e.clientY, h0 = ta.offsetHeight;
+      grab.setPointerCapture?.(e.pointerId); grab.classList.add('dragging');
+      let v = h0;
+      const move = ev => { v = set(h0 + ev.clientY - y0); };
+      const up = () => { grab.classList.remove('dragging'); for (const [k, f] of [['pointermove', move], ['pointerup', up], ['pointercancel', up]]) grab.removeEventListener(k, f); if (v !== h0) save(v); };
+      grab.addEventListener('pointermove', move); grab.addEventListener('pointerup', up); grab.addEventListener('pointercancel', up);
+    },
+    onkeydown: e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); save(set(ta.offsetHeight + (e.key === 'ArrowDown' ? 24 : -24))); } } });
+}
 // Paste: the clipboard into a box (filled when empty, else on a new line). Browsers that can't read
 // the clipboard (or a refused permission) get a hint to long-press and paste instead.
 async function pasteInto(ta, after) {
@@ -570,7 +602,10 @@ function renderOne(card) {
     autocapitalize: htmlHas('box-caps-off') ? 'off' : 'sentences', autocorrect: htmlHas('box-correct') ? 'on' : 'off', spellcheck: htmlHas('box-spell-off') ? 'false' : 'true',
     placeholder: placeholderRows().map(([a, b]) => `${a}  ← ${b}`).join('\n'),
     value: draft.details,
-    oninput: e => { suggestedSave = null; draft.details = e.target.value; saveDraftSoon(); suggestSoon(); paintParsed(true); },
+    oninput: e => { suggestedSave = null; draft.details = e.target.value; saveDraftSoon(); suggestSoon(); paintParsed(true); fitBox(e.target); },
+    // the browser's own corner handle (a mouse): the height it leaves is kept, as the grab bar's is
+    onmousedown: e => { e.target._h0 = e.target.offsetHeight; },
+    onmouseup: e => { const ta = e.target; if (ta._h0 && Math.abs(ta.offsetHeight - ta._h0) > 4) setDisplay({ boxHeight: ta.offsetHeight }); ta._h0 = 0; },
     // Settings → Advanced logging → Case template (off by default)
     onfocus: e => putTemplate(e.target), onblur: e => dropTemplate(e.target),
     // Settings → Logging → Enter key: 'newline' (default; Ctrl/Cmd+Enter saves), 'double' (Enter on an empty
@@ -668,7 +703,7 @@ function renderOne(card) {
   add(card,
     h('div', { class: 'lp-left' },
       initialsInput ? h('label', { class: 'field log-initials' }, 'Initials', initialsInput) : null,
-      h('div', { class: 'box-wrap' }, boxMarks, textarea, pasteBtn(textarea), clearBtn), tooLong, parsed, tagRow,
+      h('div', { class: 'box-wrap' }, boxMarks, textarea, pasteBtn(textarea), clearBtn), boxGrab(textarea), tooLong, parsed, tagRow,
       // suggestions first, then the last case and your own templates
       h('div', { class: 'chiplabel quick-label' }, 'Quick picks'), sugg, templates,
       // Settings → Notes → Show the daily note on the Case tab (off by default)
@@ -692,6 +727,7 @@ function renderOne(card) {
     if (t.closest('.chip, .picker li, label.check, [role=button], button, a.btn')) e.preventDefault();
   });
   Object.assign(ui, { initials: initialsInput, draftNote, textarea, parsed, tooLong, boxMarks, sugg, selected, selExtra, groupSave, tip, enterHint, templates, picker, paintCommon });
+  requestAnimationFrame(() => fitBox(textarea));   // the kept height, grown to the draft's text
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   watchMarks(textarea);
   requestAnimationFrame(() => alignPlaceholder(textarea));
