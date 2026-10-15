@@ -1,12 +1,11 @@
 # Now: Claude Code, Logbook 2 (log2)
 
-**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): **building the agreed queue** (owner said go, 15 Oct;
+**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): **the 15 Oct batch is done** (owner said go, 15 Oct;
 away ~6 h). Merged 15 Oct: #651 Themes, #652 four bugs (live sync line, PWA sign-in by redirect, Paeds by age + paste
 ticks, age cap), #654 ACGME-style, #655 initials line + lighter highlights, #656 detection settings, #659 Reset all
-settings. In flight, one PR at a time from a local stack (full `test-logbook.sh` + a11y passed on the whole stack):
-#660 Analytics (every profile, Edit mode, new cards), then More page + tab bars + More Edit + Profile page + Recover,
-then case box height, then Totals compact, then reflections on the calendar. If a session picks this up mid-way: the stack's commits are on the
-branch's PRs in that order; each later PR is the next commit(s) on top of main.
+settings, #660 Analytics (every profile, Edit mode, new cards), #661 More page groups + tab bars + More Edit + Profile
+page + one Recover page, #662 case box grab bar + Grow as I type, #663 Totals Compact + Show targets (and the grab
+bar's screen-reader value), #664 reflections on the Logbook calendar + this note. Nothing half-done.
 Not started: 9 / 9b / 9c / 9d bulk select and edit, 9e global search, 10–14, Markdown.
 Waiting on the owner: a real-phone check of sign-in (installed app and Firefox for Android).
 
