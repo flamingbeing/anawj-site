@@ -69,6 +69,16 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Decisions log
 
+- 15 Oct 2026 (M3.2, slice 1): start presets (`js/model/presets.js`, `test/presets.test.mjs`). `PRESETS` holds a
+  reference action list (and a target time) per named state — awake, preoxygenated, sedation, induced, maintenance,
+  emergence — parameterised by opts; `applyPreset(sim, name, opts)` replays them on an awake sim and fast-forwards, so
+  a start state is built from the same actions a trainee would take (no stored snapshots, deterministic). The M4
+  scenarios will start from these. Deep links in `main.js`: `?preset=<name>` or `?case=electiveGA` boot the theatre
+  from a preset, `?at=<s>` fast-forwards further; a new "Elective GA" library card uses `?case=electiveGA#theatre`
+  (starts just induced and intubated). M3.2 is being delivered in slices to keep each PR finished: slice 1 is presets +
+  deep links + the guided start; still to come — the pre-op screen (patient summary + sign-in checklist), the
+  surgical-stimulus timeline with "skip to next event", and the Examine and Help tabs.
+
 - 15 Oct 2026 (M3.1): the airway (`airway.js`, a new subsystem after pd, before resp). It owns `aw` and decides
   `aw.toLungs` (fraction of the breath reaching the alveoli), which resp.js multiplies into the alveolar ventilation;
   a patent airway is 1, so resp/gas calibration is untouched (the airway only ever reduces delivery). Per-patient

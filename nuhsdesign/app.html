@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="robots" content="noindex, nofollow">
+<title>App kit</title>
+<meta name="description" content="The NUHS-style app kit: how the site's web apps look and behave like native phone apps.">
+<meta name="theme-color" content="#f9f9fb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161618" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+<script src="app.js" defer></script>
+<style>
+  /* only for this showcase */
+  .demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  .demo-swatch { border-radius: 10px; padding: 10px; font-size: 12px; color: #fff; min-height: 64px; display: flex; align-items: flex-end; }
+</style>
+</head>
+<body class="a-app">
+
+<header class="a-bar">
+  <div class="a-band"><i></i><i></i><i></i><i></i></div>
+  <div class="a-bar-row">
+    <button class="a-bar-btn" id="back" hidden><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Back</button>
+    <h1 class="a-bar-title" id="barTitle">Home</h1>
+    <button class="a-bar-btn" id="themeBtn" aria-label="Light, dark or follow the phone">Theme</button>
+  </div>
+</header>
+
+<nav class="a-tabbar" role="tablist" aria-label="Screens">
+  <button role="tab" data-screen="home" aria-selected="true">
+    <svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Home</span></button>
+  <button role="tab" data-screen="form" aria-selected="false">
+    <svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><span>New</span></button>
+  <button role="tab" data-screen="list" aria-selected="false">
+    <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Requests</span>
+    <span class="a-badge">3</span></button>
+  <button role="tab" data-screen="kit" aria-selected="false">
+    <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>More</span></button>
+</nav>
+
+<main class="a-main" id="main">
+
+  <!-- Home -->
+  <section data-screen="home">
+    <h1 class="a-title">Home</h1>
+    <p class="a-subtitle">Wednesday 15 October</p>
+    <div class="a-banner a-banner--warn"><span>Demo: made-up data, kept on this phone.</span><button class="a-btn a-btn--plain a-btn--sm">Leave</button></div>
+    <div class="a-actions">
+      <button class="a-btn a-btn--block" data-open="newSheet"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Request evaluation</button>
+      <button class="a-btn a-btn--tinted a-btn--block">Repeat last: DOPS · Dr Demo Faculty</button>
+    </div>
+    <div class="a-section-row"><p class="a-section">Needs action</p><a href="#" data-go="list">See all</a></div>
+    <ul class="a-list">
+      <li><a class="a-row" href="#" data-go="detail"><span class="a-avatar">JM</span>
+        <span class="a-row-text">Cardiovascular crisis during GA<small>EBD · EPA 2 · Dr Demo One</small></span>
+        <span class="a-pill a-pill--danger">Declined</span><span class="a-chev"></span></a></li>
+      <li><a class="a-row" href="#" data-go="detail"><span class="a-avatar">DF</span>
+        <span class="a-row-text">Preoperative assessment<small>Mini-CEX · EPA 1 · sent 26 h ago</small></span>
+        <span class="a-pill a-pill--warn">Overdue</span><span class="a-chev"></span></a></li>
+      <li><a class="a-row" href="#" data-go="detail"><span class="a-avatar">HL</span>
+        <span class="a-row-text">Pre-existing respiratory disease<small>EBD · EPA 1 · submitted 5 d ago</small></span>
+        <span class="a-pill a-pill--ok">Done</span><span class="a-chev"></span></a></li>
+    </ul>
+    <p class="a-footnote">Rows are inset with hairlines, like the phone's own Settings.</p>
+  </section>
+
+  <!-- New (a form) -->
+  <section data-screen="form" hidden>
+    <h1 class="a-title">New case</h1>
+    <div class="a-seg" role="tablist" aria-label="Type">
+      <button role="tab" aria-selected="true">DOPS</button><button role="tab" aria-selected="false">Mini-CEX</button><button role="tab" aria-selected="false">CbD</button>
+    </div>
+    <p class="a-section">Case</p>
+    <ul class="a-list">
+      <li><label class="a-row"><span>Initials</span><input class="a-field" placeholder="AB" autocomplete="off"></label></li>
+      <li><label class="a-row"><span>Age</span><input class="a-field" inputmode="numeric" placeholder="72"></label></li>
+      <li><label class="a-row"><span>Date</span><input class="a-field" type="date" value="2026-10-15"></label></li>
+      <li><button class="a-row" data-open="pickSheet"><span class="a-row-text">Procedure</span><span class="a-row-value" id="procValue">Lap chole</span><span class="a-chev"></span></button></li>
+    </ul>
+    <p class="a-section">Quick tags</p>
+    <div class="a-chips">
+      <button class="a-chip" aria-pressed="true">Cardiac</button><button class="a-chip" aria-pressed="false">Thoracic</button>
+      <button class="a-chip" aria-pressed="false">Head and neck</button><button class="a-chip" aria-pressed="false">Upper GI</button>
+      <button class="a-chip" aria-pressed="false">Obstetric</button><button class="a-chip" aria-pressed="false">Paediatric</button>
+    </div>
+    <p class="a-section">Options</p>
+    <ul class="a-list">
+      <li><label class="a-row"><span class="a-row-text">Supervised</span><input type="checkbox" class="a-switch" role="switch" checked></label></li>
+      <li><label class="a-row"><span class="a-row-text">Emergency<small>Counts towards the emergency target</small></span><input type="checkbox" class="a-switch" role="switch"></label></li>
+    </ul>
+    <p class="a-section">Notes</p>
+    <textarea class="a-field" placeholder="GA ETT, uneventful"></textarea>
+    <div class="a-actions"><button class="a-btn a-btn--block" id="saveBtn">Save</button></div>
+  </section>
+
+  <!-- Requests (a long list with search) -->
+  <section data-screen="list" hidden>
+    <h1 class="a-title">Requests</h1>
+    <div class="a-split" id="reqSplit">
+    <div class="a-split-list">
+    <div class="a-search"><input class="a-field" type="search" placeholder="Search" aria-label="Search requests"></div>
+    <p class="a-section">This week</p>
+    <ul class="a-list" id="longList"></ul>
+    <p class="a-section">Earlier</p>
+    <div class="a-empty"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H5.2L4 17.2z"/></svg><h2>Nothing earlier</h2><p>Requests older than a week show here.</p></div>
+    </div>
+    <div class="a-split-detail" id="reqDetail">
+      <div class="a-empty a-split-empty"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><h2>No request open</h2><p>Pick one from the list.</p></div>
+      <div id="reqPane" hidden></div>
+    </div>
+    </div>
+  </section>
+
+  <!-- A pushed detail screen -->
+  <section data-screen="detail" hidden>
+    <h1 class="a-title">Preoperative assessment</h1>
+    <p class="a-subtitle">Mini-CEX · EPA 1</p>
+    <div class="a-card"><h2>Waiting for Dr Demo Faculty</h2><p>Sent 26 hours ago. Faculty usually answer within two days.</p></div>
+    <p class="a-section">Details</p>
+    <ul class="a-list">
+      <li><div class="a-row"><span class="a-row-text">Assessor</span><span class="a-row-value">Dr Demo Faculty</span></div></li>
+      <li><div class="a-row"><span class="a-row-text">Date</span><span class="a-row-value">14 Oct 2026</span></div></li>
+      <li><div class="a-row"><span class="a-row-text">Setting</span><span class="a-row-value">Pre-op clinic</span></div></li>
+    </ul>
+    <ul class="a-list" style="margin-top:24px">
+      <li><button class="a-row a-row--center" id="remind">Send a reminder</button></li>
+      <li><button class="a-row a-row--center a-row--danger" data-open="cancelAlert">Cancel request</button></li>
+    </ul>
+  </section>
+
+  <!-- More: the kit itself -->
+  <section data-screen="kit" hidden>
+    <h1 class="a-title">More</h1>
+    <ul class="a-list">
+      <li><a class="a-row" href="#"><span class="a-row-icon" style="background:var(--n-orange)"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span><span class="a-row-text">Profile</span><span class="a-chev"></span></a></li>
+      <li><a class="a-row" href="#"><span class="a-row-icon" style="background:var(--n-red)"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/></svg></span><span class="a-row-text">Notifications</span><span class="a-row-value">On</span><span class="a-chev"></span></a></li>
+      <li><a class="a-row" href="#"><span class="a-row-icon" style="background:var(--n-stripe-blue)"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></span><span class="a-row-text">Export</span><span class="a-chev"></span></a></li>
+      <li><a class="a-row" href="#"><span class="a-row-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-1.8-.3 1.6 1.6 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.6 1.6 0 00-1-1.5 1.6 1.6 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.6 1.6 0 00.3-1.8 1.6 1.6 0 00-1.5-1H3a2 2 0 010-4h.1a1.6 1.6 0 001.5-1 1.6 1.6 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.6 1.6 0 001.8.3H9a1.6 1.6 0 001-1.5V3a2 2 0 014 0v.1a1.6 1.6 0 001 1.5 1.6 1.6 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00-.3 1.8V9a1.6 1.6 0 001.5 1H21a2 2 0 010 4h-.1a1.6 1.6 0 00-1.5 1z"/></svg></span><span class="a-row-text">Settings</span><span class="a-chev"></span></a></li>
+    </ul>
+
+    <p class="a-section">Buttons</p>
+    <div class="a-card a-stack">
+      <button class="a-btn a-btn--block">Filled</button>
+      <button class="a-btn a-btn--tinted a-btn--block">Tinted</button>
+      <button class="a-btn a-btn--danger a-btn--block">Delete</button>
+      <div class="a-hstack"><button class="a-btn a-btn--sm">Small</button><button class="a-btn a-btn--sm a-btn--tinted">Small tinted</button><button class="a-btn a-btn--plain">Plain</button></div>
+    </div>
+
+    <p class="a-section">Pills and badges</p>
+    <div class="a-card a-hstack" style="flex-wrap:wrap">
+      <span class="a-pill">Draft</span><span class="a-pill a-pill--tint">Sent</span><span class="a-pill a-pill--ok">Done</span>
+      <span class="a-pill a-pill--warn">Due</span><span class="a-pill a-pill--danger">Overdue</span><span class="a-badge">12</span>
+    </div>
+
+    <p class="a-section">Sheets, alerts and toasts</p>
+    <ul class="a-list">
+      <li><button class="a-row" data-open="newSheet"><span class="a-row-text">Bottom sheet</span><span class="a-chev"></span></button></li>
+      <li><button class="a-row" data-open="cancelAlert"><span class="a-row-text">Alert</span><span class="a-chev"></span></button></li>
+      <li><button class="a-row" id="toastBtn"><span class="a-row-text">Toast with Undo</span><span class="a-chev"></span></button></li>
+    </ul>
+
+    <p class="a-section">Colours</p>
+    <div class="demo-grid">
+      <div class="demo-swatch" style="background:var(--n-navy)">Navy #002F6C<br>tint, filled buttons</div>
+      <div class="demo-swatch" style="background:var(--n-stripe-blue)">Blue #178FD7</div>
+      <div class="demo-swatch" style="background:var(--n-orange)">Orange #E57200</div>
+      <div class="demo-swatch" style="background:var(--n-red)">Red #E4002B<br>badges</div>
+    </div>
+    <p class="a-footnote">How to use the kit in an app: <a href="README.md">README.md</a>, "App kit".</p>
+  </section>
+</main>
+
+<!-- a bottom sheet -->
+<dialog class="a-sheet" id="newSheet" aria-labelledby="newSheetTitle">
+  <div class="a-sheet-head">
+    <button class="a-bar-btn" value="cancel">Cancel</button>
+    <h2 id="newSheetTitle">Request evaluation</h2>
+    <button class="a-bar-btn a-bar-btn--strong" id="sheetDone">Send</button>
+  </div>
+  <div class="a-sheet-body">
+    <p class="a-section">Form</p>
+    <ul class="a-list">
+      <li><label class="a-row"><span class="a-row-text">DOPS</span><input type="radio" class="a-check" name="form" checked></label></li>
+      <li><label class="a-row"><span class="a-row-text">Mini-CEX</span><input type="radio" class="a-check" name="form"></label></li>
+      <li><label class="a-row"><span class="a-row-text">Case-based discussion</span><input type="radio" class="a-check" name="form"></label></li>
+    </ul>
+    <p class="a-section">Assessor</p>
+    <input class="a-field" placeholder="Search faculty" aria-label="Assessor">
+    <p class="a-footnote">Drag the sheet down, tap outside it or press Cancel to close.</p>
+  </div>
+</dialog>
+
+<dialog class="a-sheet" id="pickSheet" aria-labelledby="pickTitle">
+  <div class="a-sheet-head"><span></span><h2 id="pickTitle">Procedure</h2><button class="a-bar-btn a-bar-btn--strong" value="cancel">Done</button></div>
+  <div class="a-sheet-body">
+    <ul class="a-list" id="procList"></ul>
+  </div>
+</dialog>
+
+<!-- an alert -->
+<dialog class="a-alert" id="cancelAlert" aria-labelledby="cancelTitle">
+  <h2 id="cancelTitle">Cancel this request?</h2>
+  <p>Dr Demo Faculty won't be asked again. You can send a new request later.</p>
+  <div class="a-alert-actions"><button value="cancel" class="is-default">Keep</button><button class="is-danger" id="confirmCancel">Cancel request</button></div>
+</dialog>
+
+<script>
+  // showcase wiring: screens, sheets and a theme switch
+  const screens = [...document.querySelectorAll('main > section')];
+  const tabs = [...document.querySelectorAll('.a-tabbar [role="tab"]')];
+  const titles = { home: 'Home', form: 'New case', list: 'Requests', detail: 'Request', kit: 'More' };
+  const stack = [];
+  const wide = matchMedia('(min-width: 1000px)');
+  function show(name) {
+    screens.forEach(s => { s.hidden = s.dataset.screen !== name; });
+    const tabName = name === 'detail' ? stack[stack.length - 1] || 'home' : name;
+    tabs.forEach(t => t.setAttribute('aria-selected', String(t.dataset.screen === tabName)));
+    document.getElementById('barTitle').textContent = titles[name];
+    document.getElementById('back').hidden = name !== 'detail';
+  }
+  let current = 'home';
+  tabs.forEach(t => t.addEventListener('click', () => { stack.length = 0; current = t.dataset.screen; aGo(() => show(current)); }));
+  document.addEventListener('click', e => {
+    const go = e.target.closest('[data-go]');
+    if (go && go.closest('#longList') && wide.matches) {
+      // computer: open the request beside the list instead of on a new screen
+      e.preventDefault();
+      document.querySelectorAll('#longList .a-row').forEach(r => r.removeAttribute('aria-current'));
+      go.setAttribute('aria-current', 'true');
+      const pane = document.getElementById('reqPane');
+      pane.innerHTML = document.querySelector('section[data-screen="detail"]').innerHTML.replace('Preoperative assessment', go.querySelector('.a-row-text').firstChild.textContent);
+      pane.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+      pane.hidden = false;
+      document.getElementById('reqSplit').dataset.show = 'detail';
+      return;
+    }
+    if (go) { e.preventDefault(); if (go.dataset.go === 'detail') stack.push(current); current = go.dataset.go; aGo(() => show(current)); }
+    const op = e.target.closest('[data-open]');
+    if (op) { e.preventDefault(); aSheet.open(document.getElementById(op.dataset.open)); }
+    const chip = e.target.closest('.a-chip');
+    if (chip) chip.setAttribute('aria-pressed', String(chip.getAttribute('aria-pressed') !== 'true'));
+    const seg = e.target.closest('.a-seg [role="tab"]');
+    if (seg) seg.parentElement.querySelectorAll('[role="tab"]').forEach(b => b.setAttribute('aria-selected', String(b === seg)));
+  });
+  document.getElementById('back').onclick = () => { current = stack.pop() || 'home'; aGo(() => show(current), { back: true }); };
+  document.getElementById('sheetDone').onclick = () => { aSheet.close(document.getElementById('newSheet')); aToast('Request sent'); };
+  document.getElementById('saveBtn').onclick = () => aToast('Case saved', { action: 'Undo', onAction: () => aToast('Undone') });
+  document.getElementById('toastBtn').onclick = () => aToast('Case deleted', { action: 'Undo', onAction: () => aToast('Restored') });
+  document.getElementById('remind').onclick = () => aToast('Reminder sent');
+  document.getElementById('confirmCancel').onclick = () => { aSheet.close(document.getElementById('cancelAlert')); aToast('Request cancelled'); };
+
+  const names = ['Anna', 'Ben', 'Chen', 'Dev', 'Eli', 'Farah', 'Gita', 'Hui', 'Ivan', 'Jun'];
+  document.getElementById('longList').innerHTML = names.map((n, i) =>
+    `<li><a class="a-row" href="#" data-go="detail"><span class="a-avatar">${n[0]}D</span><span class="a-row-text">${['DOPS', 'Mini-CEX', 'CbD'][i % 3]} for Dr ${n} Demo<small>${i + 1} day${i ? 's' : ''} ago</small></span><span class="a-chev"></span></a></li>`).join('');
+  const procs = ['Lap chole', 'Total knee replacement', 'Caesarean section', 'CABG', 'Thyroidectomy', 'Appendicectomy'];
+  const pl = document.getElementById('procList');
+  pl.innerHTML = procs.map((p, i) => `<li><label class="a-row"><span class="a-row-text">${p}</span><input type="radio" class="a-check" name="proc" value="${p}" ${i ? '' : 'checked'}></label></li>`).join('');
+  pl.addEventListener('change', e => { document.getElementById('procValue').textContent = e.target.value; setTimeout(() => aSheet.close(document.getElementById('pickSheet')), 180); });
+
+  // theme: light → follow the phone → dark
+  const order = ['light', 'auto', 'dark'];
+  const label = { light: 'Light', auto: 'Auto', dark: 'Dark' };
+  const themeBtn = document.getElementById('themeBtn');
+  let theme = 'light';
+  try { theme = localStorage.getItem('a-kit-theme') || 'light'; } catch {}
+  const applyTheme = () => { document.documentElement.dataset.theme = theme; themeBtn.textContent = label[theme]; };
+  themeBtn.onclick = () => { theme = order[(order.indexOf(theme) + 1) % 3]; try { localStorage.setItem('a-kit-theme', theme); } catch {} applyTheme(); };
+  applyTheme();
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-15 by Claude Code (build session: M2.7 rhythms #598, M2.8 resuscitation #604, then M3.1 airway).
+Last updated: 2026-10-15 by Claude Code (build session: M2.7, M2.8, M3.1 airway merged; M3.2 slice 1 presets).
 
 ## Now
 
@@ -19,13 +19,14 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next
 
-1. M3.2 (case flow: `presets.js`, the elective GA from pre-oxygenation to extubation, surgical-stimulus timeline,
-   Examine/Help tabs), then M3.3 alarms, then M4.x scenarios, one PR at a time, each merged before the next
-   (`DESIGN.md` order).
+1. M3.2 slice 2: the pre-op screen (patient summary + sign-in checklist), the surgical-stimulus timeline with "skip to
+   next event", the Examine and Help tabs. Then M3.3 alarms, then M4.x scenarios (`DESIGN.md` order).
 
 ## Recently done
 
-- M3.1 (15 Oct 2026): the airway (`airway.js`): per-patient Cormack-Lehane/mask difficulty; obstruction under
+- M3.2 slice 1 (15 Oct 2026): start presets (`presets.js`: awake/preoxygenated/sedation/induced/maintenance/emergence,
+  replayed from awake), `?preset=`/`?case=electiveGA`/`?at=` deep links, an Elective GA library card.
+- M3.1 (15 Oct 2026, #607): the airway (`airway.js`): per-patient Cormack-Lehane/mask difficulty; obstruction under
   sedation/paralysis relieved by manoeuvres or a device; mask seal and pre-oxygenation entrainment; tube placement
   (tracheal/oesophageal → no CO2/endobronchial one-lung). An Airway tab. resp/gas calibration unchanged (a patent
   airway delivers fully).
