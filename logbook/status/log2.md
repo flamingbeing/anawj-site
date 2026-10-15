@@ -82,7 +82,8 @@ Agreed queue (one PR each, in order, once he says go):
 9g. **Case box height that stays** (owner): a dragged height is remembered per device (after Save, tab switches,
    reloads); Settings → Advanced logging → Box height shows it and its reset undoes it. Phones can't drag the
    browser's own corner handle, so add a grab bar under the box (a 44 px touch target, pointer events, works with a
-   mouse too; double-tap resets). Optional "Grow as I type" switch (off by default).
+   mouse too; double-tap resets). "Grow as I type" switch, ON by default (owner, 15 Oct): the box grows from the set height as text is added, up to
+   about two thirds of the screen, then scrolls; a dragged height is the starting size.
 10. **Grid as a spreadsheet:** thin lines, no boxed inputs; drag to resize columns (per device, double-tap resets);
     lines per row 1 / 2 / 3 / Fit to content.
 11. **Paging by default** (owner's call, 15 Oct): 100 per page, 25 / 50 / 100 / 300 / All (per device); "‹ Page 2 of
