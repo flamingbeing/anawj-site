@@ -37,5 +37,13 @@
   stimulus over time, for the guided case and free run. `test/timeline.test.mjs` (script well-formed, `phaseAt`, a
   real sim driven through it, determinism); e2e drives Start → Skip through every step → ends. `tools/test-ot-sim.sh`,
   check and proofread green.
-- M3.2 still to come (slice 4): the Examine and Help tabs. Then M3.3 alarms, then M4.x (scenario drugs + the crisis
-  scenarios — the "diverse use cases").
+- M3.2 slice 4 built on this branch (from main after #614 merged): the Examine and Help tabs (`ui/examine.js`,
+  `ui/help.js`), finishing M3.2. **Examine** is a read-only clinical read of the model (chest movement, breath sounds,
+  skin colour/temperature/sweat, pupils, movement/tone) derived from `gas`/`aw`/`pd`/`temp`/`resp`, refreshed live in
+  `panels()` so it always agrees with the monitor. **Help** has the four actions (call for help, tell the surgeon, get
+  the difficult-airway trolley, major haemorrhage protocol) as logged `{type:'help',do}` actions — they confirm, show
+  in the events feed (eventsHtml extended) and are there for the M5 debrief; no physiological effect in M3.2 (the
+  scenarios give them meaning in M4). Two new tabs; `test/examine.test.mjs`; e2e covers both tabs + axe. Footer and a
+  stale comment updated. `tools/test-ot-sim.sh`, check, proofread green.
+- **M3.2 is complete.** Next: M3.3 alarms (monitor limits, three priorities, silence, technical alarms, a Log tab),
+  then M4.x (`conditions.js`/`events.js` scenario engine + the crisis scenarios — the "diverse use cases" goal).

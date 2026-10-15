@@ -212,6 +212,25 @@ try {
     assert.ok(await page.evaluate(() => !otsim.state.pd.stim || !otsim.state.pd.stim.ongoing), `${name}: the operation ends the surgery stimulus`);
     assert.match(await page.textContent('#surg-state'), /complete/i, `${name}: timeline shows complete`);
     assert.ok(await page.evaluate(() => document.getElementById('surg-skip').disabled), `${name}: skip is disabled at the end`);
+    // Examine: findings read from the model (the patient is asleep under TCI here), refreshed live
+    await page.click('#tab-exam');
+    await page.evaluate(() => otsim.step(1));
+    const exam = await page.textContent('#exam-list');
+    assert.match(exam, /Chest movement|Breath sounds/, `${name}: examine shows the chest/breath findings`);
+    assert.match(exam, /Pupils/, `${name}: examine shows pupils`);
+    assert.match(exam, /sluggishly|anaesthetised/, `${name}: an asleep patient's pupils`);
+    await axe(page, `${name} theatre, Examine tab`);
+    // Help: each button is a logged action that confirms and lands in the events feed
+    await page.click('#tab-help');
+    assert.ok((await page.$$('#help-acts [data-help]')).length >= 4, `${name}: help actions present`);
+    await page.click('[data-help="callHelp"]');
+    assert.match(await page.textContent('#help-ack'), /help is on the way/i, `${name}: help confirms`);
+    await page.click('[data-help="majorHaemorrhage"]');
+    await page.evaluate(() => otsim.step(2));
+    await axe(page, `${name} theatre, Help tab`);
+    await page.click('#tab-pt');
+    await page.evaluate(() => otsim.step(2));
+    assert.match(await page.textContent('#events'), /Called for help|major haemorrhage/i, `${name}: help actions show in the events feed`);
     // Rhythms: impose each from the Patient tab. The ECG keeps drawing and the circulation responds.
     await page.selectOption('#rhythm', 'vt');
     await page.evaluate(() => otsim.step(400));

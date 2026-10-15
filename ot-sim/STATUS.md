@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-15 by Claude Code (build session: M2.7, M2.8, M3.1, M3.2 slices 1-2 merged; M3.2 slice 3 operation timeline).
+Last updated: 2026-10-15 by Claude Code (build session: M2.7, M2.8, M3.1, M3.2 slices 1-3 merged; M3.2 slice 4 Examine/Help — M3.2 complete).
 
 ## Now
 
@@ -19,11 +19,17 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next
 
-1. M3.2 slice 4: the Examine and Help tabs. Then M3.3 alarms, then M4.x scenarios (`DESIGN.md` order).
+1. **M3.2 is complete** (library → pre-op → theatre with the operation timeline, Examine and Help). Next milestone:
+   M3.3 alarms (monitor limits per parameter, three IEC priorities, 2-min silence, technical alarms, a Log tab). Then
+   M4.x: `conditions.js`/`events.js` scenario engine + crisis scenarios (the "diverse use cases" goal).
 
 ## Recently done
 
-- M3.2 slice 3 (15 Oct 2026, #612→next): the operation timeline (`ui/timeline.js`). The Patient tab's manual "Surgery
+- M3.2 slice 4 (15 Oct 2026, #614→next): the Examine and Help tabs (`ui/examine.js`, `ui/help.js`). Examine is a
+  read-only clinical read of the model (chest/breath sounds/skin/pupils/movement) that matches the monitor; Help has
+  the four team actions as logged events (call for help, tell the surgeon, airway trolley, major haemorrhage). Finishes
+  M3.2. `test/examine.test.mjs` + e2e.
+- M3.2 slice 3 (15 Oct 2026, #614): the operation timeline (`ui/timeline.js`). The Patient tab's manual "Surgery
   running" toggle is replaced by an Operation block — Start operation, Skip to next step, live now/next readout —
   driving a scripted surgical-stimulus sequence (incision → steady → deep dissection → closing → finished) through
   `sim.act()` (deterministic). Auto-advances while running; Skip fast-forwards. Not the M4 scenario engine.
