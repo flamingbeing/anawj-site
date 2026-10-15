@@ -289,7 +289,9 @@ try {
     assert.ok(rows.some(r => /^Twitch \(T1\)/.test(r)), `${name}: neuromuscular rows in Behind the monitor`);
     assert.ok(rows.some(r => /^To voice \(asleep\)/.test(r)), `${name}: depth rows in Behind the monitor`);
     assert.ok(rows.some(r => /^Cardiac output/.test(r)), `${name}: circulation rows in Behind the monitor`);
-    assert.equal(await page.evaluate(() => localStorage.getItem('otsim.behind')), '1');
+    // the open state is persisted on the details' `toggle` event, which fires asynchronously after the click, so wait
+    // for it rather than reading localStorage straight away (that race flaked on a loaded CI runner)
+    await page.waitForFunction(() => { try { return localStorage.getItem('otsim.behind') === '1'; } catch { return false; } }, null, { timeout: 3000 });
 
     // no horizontal scroll; axe on the paused theatre
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${name}: no horizontal scroll`);
