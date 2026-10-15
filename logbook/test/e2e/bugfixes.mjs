@@ -66,7 +66,7 @@ try { for (const width of [390, 1280]) {
   await p.locator('dialog[open] select').nth(1).selectOption('u:fakeone');
   await p.locator('dialog[open]').getByRole('button', { name: 'Apply' }).click();
   await p.locator('dialog[open]').getByRole('button', { name: 'Add', exact: true }).click();
-  await toastSays(/4 cases updated\. 1 kept as it was changed on another device/);
+  await toastSays(/4 cases updated\. 1 kept as it was changed on another device \(keep that version in Recent changes, then tag them again\)/);
   assert.equal((await onServer('a')).details, 'Fakebulk changed elsewhere', 'Tag N cases: the edit made elsewhere stays');
   assert.equal((await onServer('a')).tags, undefined); assert.deepEqual((await onServer('b')).tags, ['u:fakeone']);
   const fakeTags = () => p.evaluate(async () => (await import('./js/ui-core.js')).tagSet().filter(x => /^u:fake/.test(x.k)).map(x => x.k));
@@ -85,7 +85,7 @@ try { for (const width of [390, 1280]) {
   // one changed elsewhere: kept, and the old tag stays on the list (that case still has it)
   await elsewhere('c');
   await merge('u:faketwo', 'u:fakethree');
-  await toastSays(/Merged into Fake three: 3 of 4 cases; “Fake two” stays on your list\. 1 kept/);
+  await toastSays(/Merged into Fake three: 3 of 4 cases; “Fake two” stays on your list\. 1 kept .*then merge again/);
   assert.deepEqual(await fakeTags(), ['u:faketwo', 'u:fakethree']);
   assert.equal((await onServer('c')).details, 'Fakebulk changed elsewhere', 'merge: the edit made elsewhere stays');
   assert.deepEqual((await onServer('c')).tags, ['u:faketwo']); assert.deepEqual((await onServer('b')).tags, ['u:fakethree']);
@@ -98,7 +98,7 @@ try { for (const width of [390, 1280]) {
   const rev = p.locator('dialog[open]', { hasText: 'Review changes' });
   assert.match(await rev.locator('p').first().innerText(), /^2 changed, 0 new, 0 deleted/);
   await rev.getByRole('button', { name: 'Apply' }).click();
-  await toastSays(/Applied: 1 changed, 0 new, 0 deleted\. 1 kept as it was changed on another device/);
+  await toastSays(/Applied: 1 changed, 0 new, 0 deleted\. 1 kept as it was changed on another device(?! \()/);   // (no "tag again": a row is no transform)
   assert.equal((await onServer('d')).details, 'Fakebulk case d from the sheet');
   assert.equal((await onServer('e')).details, 'Fakebulk changed elsewhere', 'import: the edit made elsewhere stays');
   await p.evaluate(async () => { const { writes } = await import('./js/ui-core.js'); for (const j of writes.entries().filter(x => x.state === 'conflict')) await writes.archive(j.key); });

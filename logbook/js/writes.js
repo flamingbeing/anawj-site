@@ -9,7 +9,13 @@ export function createWriteQueue({ store, backend, getOwner = () => null, normal
   const running = new Map(), listeners = new Set(), waits = new Map();
   const notify = () => { for (const fn of listeners) fn(); };
   const current = (email, gen) => owner === email && generation === gen && getOwner() === email;
-  const ordered = () => [...jobs].sort((a, b) => a.at - b.at || a.key.localeCompare(b.key));
+  // sorted again only when the list changes (a job's at and key never do; callers never change it in place): overlay
+  // asks once per record, and a change to 300 cases spent seconds sorting (14 Oct 2026)
+  let sorted = [], sortedFrom = null, sortedLength = 0;
+  const ordered = () => {
+    if (sortedFrom !== jobs || sortedLength !== jobs.length) { sorted = [...jobs].sort((a, b) => a.at - b.at || a.key.localeCompare(b.key)); sortedFrom = jobs; sortedLength = jobs.length; }
+    return sorted;
+  };
   async function persist(job) { await store.put(copy(job)); }
   async function drain(id) {
     if (running.has(id)) return running.get(id);
@@ -115,8 +121,20 @@ export function createWriteQueue({ store, backend, getOwner = () => null, normal
   return { activate, save, overlay, retry, archive, forget, kick,
     configure(config) { if (config.backend) backend = config.backend; if (config.getOwner) getOwner = config.getOwner; if (config.normalize) normalize = config.normalize; },
     onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
-    entries: () => copy(ordered().reverse()),
+    entries: () => copy(ordered()).reverse(),
     pending: () => jobs.filter(x => !terminal.has(x.state)).length,
+    // a save needs the resident (failed, or met a change made elsewhere), without copying every entry as entries() does
+    attention: kind => jobs.some(x => (!kind || x.kind === kind) && (x.state === 'failed' || x.state === 'conflict')),
+    // a change made elsewhere stopped this record's saves: nothing more of it is sent until the resident chooses
+    conflicted: (kind, id) => jobs.some(x => x.kind === kind && x.record.id === id && x.state === 'conflict'),
+    // -> true once none of these records is being sent (false after ms): what became of each save is known then
+    // (synced, conflict, failed, or pending: offline or waiting to retry), not only that it was stored, which is all
+    // save() waits for after 180 ms; a slow connection finds a change made elsewhere later than that
+    async settle(kind, ids, ms = 10000) {
+      const keys = ids.map(id => kind + ':' + id), busy = () => keys.map(k => running.get(k)).filter(Boolean);
+      const idle = async () => { for (let now; (now = busy()).length;) await Promise.allSettled(now); return true; };
+      return Promise.race([idle(), delay(ms).then(() => false)]);
+    },
     async flush(ms = 4000) {
       kick(); await Promise.race([Promise.all([...running.values()]), delay(ms)]);
       if (jobs.some(x => !terminal.has(x.state))) return false;

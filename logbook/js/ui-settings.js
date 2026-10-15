@@ -1059,18 +1059,19 @@ function mergeTag(n) {
         // what the target counts towards: an APMES tag itself, or a personal tag's links (as choosing it does)
         const adds = code ? [code] : tagLinksIn(set, to);
         // each case through the write queue with the version it was made from: one changed on another device meanwhile
-        // is kept, not overwritten
-        const pairs = cases.map(c => {
+        // is kept, not overwritten. The cases as this device has them now, not when the dialog opened (a newer copy that
+        // arrived since is no conflict)
+        const pairs = (S.cases || []).filter(c => (c.tags || []).includes(from)).map(c => {
           const tags = (c.tags || []).filter(k => k !== from);
           const out = { ...c, tags: code ? tags : [...new Set([...tags, to])], updatedAt: Date.now() };
           if (adds.length) out.cats = sortCodes(withParents([...(c.cats || []), ...adds]));
           if (!out.tags.length) delete out.tags;
           return { base: c, next: out };
         });
-        const owner = S.user?.email, r = await updateMany(pairs), into = code ? catShort(code) : (set.find(x => x.k === to) || {}).n;
-        if (S.user?.email !== owner) return;   // (signed out or switched meanwhile: never this list onto the next account)
+        const r = await updateMany(pairs), into = code ? catShort(code) : (set.find(x => x.k === to) || {}).n;
+        if (r.stopped) return;   // (signed out or switched meanwhile: never this list onto the next account)
         // the old tag comes off the list only once no case carries it (a kept one still would: merge again later)
-        if (r.saved < pairs.length) return updatedToast(`Merged into ${into}: ${r.saved} of ${pairs.length} case${pairs.length === 1 ? '' : 's'}; “${n.e.n}” stays on your list`, r);
+        if (r.saved < pairs.length) return updatedToast(`Merged into ${into}: ${r.saved} of ${pairs.length} case${pairs.length === 1 ? '' : 's'}; “${n.e.n}” stays on your list`, r, 'merge again');
         await saveTags(removeTag(set, from));
         toast(`Merged into ${into}: ${r.saved} case${r.saved === 1 ? '' : 's'} updated`);
       } }, 'Merge'))]);

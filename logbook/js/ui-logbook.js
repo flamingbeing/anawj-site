@@ -316,8 +316,10 @@ function bulkTag(rows) {
       h('button', { class: 'primary', onclick: async () => {
         const k = sel.value; if (!k) return toast('Choose a tag');
         const add = act.value === 'add', code = k.startsWith('c:') ? k.slice(2) : null;
-        // each with the case it was made from (its base: a case changed elsewhere meanwhile is kept, not overwritten)
-        const pairs = rows.filter(c => hasTag(c, k) !== add).map(c => {
+        // each with the case it was made from (its base: a case changed elsewhere meanwhile is kept, not overwritten),
+        // as this device has it now (not as it was when Tag was tapped: a newer copy that arrived since is no conflict)
+        const now = new Map(S.cases.map(c => [c.id, c]));
+        const pairs = rows.map(c => now.get(c.id)).filter(c => c && hasTag(c, k) !== add).map(c => {
           const out = { ...c, updatedAt: Date.now() };
           if (code) {
             out.cats = add ? sortCodes(withParents([...(c.cats || []), code])) : (c.cats || []).filter(x => x !== code && cat(x).parent !== code);
@@ -334,7 +336,8 @@ function bulkTag(rows) {
         if (!pairs.length) return toast(add ? 'They all have it already' : 'None of them have it');
         if (!(await confirmBox('Change cases?', `${add ? 'Add' : 'Remove'} “${keyName(k)}” ${add ? 'to' : 'from'} ${pairs.length} case${pairs.length === 1 ? '' : 's'}?`, add ? 'Add' : 'Remove', !add))) return;
         const r = await updateMany(pairs);
-        updatedToast(`${r.saved} case${r.saved === 1 ? '' : 's'} updated`, r);
+        if (r.stopped) return;   // (signed out or switched meanwhile)
+        updatedToast(`${r.saved} case${r.saved === 1 ? '' : 's'} updated`, r, 'tag them again');
       } }, 'Apply'))]);
 }
 
@@ -837,8 +840,8 @@ function previewDiff(d, after) {
         try {
           // changed rows: each through the write queue with the case as it was here (a case changed on another device
           // since is kept, not overwritten); new ones in one batch
-          const owner = S.user?.email, r = await updateMany(changed.map(x => ({ base: x.before, next: x.after })));
-          if (S.user?.email !== owner) return;   // (signed out or switched meanwhile)
+          const r = await updateMany(changed.map(x => ({ base: x.before, next: x.after })));
+          if (r.stopped) return;   // (signed out or switched meanwhile)
           if (added.length) await saveMany(added);
           if (deleted.length) await moveToBin('case', deleted);   // recycle bin (bin agent): restorable for 30 days
           updatedToast(`Applied: ${r.saved} changed, ${added.length} new, ${deleted.length} deleted${deleted.length ? ' (in the recycle bin for 30 days)' : ''}`, r);
