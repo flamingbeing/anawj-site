@@ -112,6 +112,13 @@ Agreed queue (one PR each, in order, once he says go):
    slate) and a last "Custom…" swatch that opens the device's own picker as now; a tick on the one in use (a custom
    colour shows in the Custom swatch). The same light / dark readability adjustment as today; each suggested colour
    checked for contrast in light, dark and OLED.
+9j. **Themes page above Display** (owner; with 9i): Settings → Themes holds the look: ready-made themes as preview
+   cards (NUHS, the default as today; Flat; Soft; Paper; Dark navy; OLED; High contrast), each a bundle of light /
+   dark, colour, Colourful, corners, borders / shadows and font; picking one sets those, and changing any of them
+   after shows "Custom (based on …)" as profiles do. Below the cards, the parts themselves moved out of Display and
+   Advanced display: Light or dark, Colour (the swatches and Custom), Colourful, corners, borders, shadows, fonts and
+   line spacing. Display keeps the layout: compact, start tab, header and tab bar, Logbook rows, Case tab layout,
+   Plain calendar, icons on buttons. Per device, as now. Reset this page on each.
 10. **Grid as a spreadsheet:** thin lines, no boxed inputs; drag to resize columns (per device, double-tap resets);
     lines per row 1 / 2 / 3 / Fit to content.
 11. **Paging by default** (owner's call, 15 Oct): 100 per page, 25 / 50 / 100 / 300 / All (per device); "‹ Page 2 of
