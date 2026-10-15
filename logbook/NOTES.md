@@ -574,6 +574,22 @@ portfolio content.
   line break or space, `splitOverflow`) and puts the rest in a note linked to it ("Rest of the case · AB", Notes'
   100-note limit checked first). "Plan for later" refuses a long row (planned cases can't carry a note).
 
+### Themes (Settings → Themes; `themes.js`; owner, 15 Oct 2026)
+
+- A theme is a bundle of this device's look settings (`THEME_KEYS`); picking one sets them all (Undo in the toast),
+  and changing any afterwards shows "Custom (based on …)". Classic themes are cards; Inspired ones ("Obsidian-style",
+  colours, corners and type only, never logos, paid fonts or brand names beyond "-style") are a searchable list.
+  No celebrity or brand palettes (owner). New ideas come in through "Suggest a theme" (private feedback).
+- Display keeps layout (compact, start tab, header and tab bar, rows); Themes holds looks: light or dark, colour
+  swatches (NUH, muted, pastel, Custom), Colourful, background tint, Top band, borders, corners, shadows, spacing, tab
+  bar style, heading font, fonts, line spacing.
+- **Top band: only the NUHS theme keeps the NUH stripe; other themes bring their own four colours** (owner, 15 Oct
+  2026; an exception to AGENTS.md's four-quarter band, for the logbook only). The Top band setting overrides it: the
+  theme's colours (default), shades of my colour, the NUH stripe, or none.
+- The CSS for the settings that aren't classes comes from `lookCss` into `<style id="look-css">`, cached as
+  `apmes-logbook-look-css` for the first paint. A new look key goes in `THEME_KEYS`, `DISPLAY_KEYS` and settings-file
+  `PLAIN`; `themes.test.mjs` round-trips every theme.
+
 ## Data, roles and photos (`firestore.rules`)
 
 - **App owner:** `owners/{email}`, set by hand in the Firebase console. May read logbooks and cases and import

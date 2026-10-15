@@ -1,0 +1,111 @@
+// Themes (Settings → Themes; owner, 15 Oct 2026): a theme is a bundle of this device's look settings (display.js),
+// set in one tap; every setting stays editable afterwards, and the page then says "Custom (based on …)". Classic
+// themes are cards; Inspired ones (the look of other apps: colours, corners and type only, never their logos or
+// fonts) sit in a searchable list. Pure, unit-tested; the CSS for the new look settings (background tint, spacing,
+// tab bar style, heading font, the top band) is made here too, cached for the first paint (index.html).
+
+import { STACKS } from './fonts.js';
+
+// the display keys a theme sets; anything a theme doesn't list goes back to its default (null), unless it keeps it
+export const THEME_KEYS = ['accent', 'colourful', 'borders', 'flat', 'round', 'shadows', 'fontUi', 'fontLog', 'headFont', 'lineHeight',
+  'compact', 'btnStyle', 'iconBtns', 'tabIcons', 'pageTitles', 'calPlain', 'rowShort', 'contrast', 'bgTint', 'spacing', 'tabStyle', 'band'];
+
+// Background tints: the page ground (and for some the cards and text) in light and dark
+export const TINTS = {
+  auto: { label: 'From the colour (default)' },
+  white: { label: 'White', light: { bg: '#ffffff', line: '#e3e3e3' }, dark: { bg: '#111111', panel: '#191919' } },
+  grey: { label: 'Light grey', light: { bg: '#f3f2f1' }, dark: { bg: '#161616', panel: '#202020' } },
+  cream: { label: 'Cream', light: { bg: '#f7f3ec', panel: '#fffdf9', line: '#e6dfd3' }, dark: { bg: '#1b1916', panel: '#24211d', line: '#3a352e' } },
+  sepia: { label: 'Sepia (eye comfort)', light: { bg: '#efe6d2', panel: '#faf4e6', ink: '#3b352c', muted: '#6b6152', line: '#ddd1b8' }, dark: { bg: '#1d1915', panel: '#26211b', ink: '#e8dfcf', muted: '#b5a993', line: '#3d362c' } },
+  beige: { label: 'Beige', light: { bg: '#efeae2', line: '#ddd6cb' }, dark: { bg: '#0b141a', panel: '#111b21', line: '#26343d' } },
+  bluegrey: { label: 'Blue-grey', light: { bg: '#e7ebf0', line: '#d5dce4' }, dark: { bg: '#0e1621', panel: '#17212b', line: '#2b3846' } },
+  iosgrey: { label: 'Grouped grey', light: { bg: '#f2f2f7', line: '#d8d8dc' }, dark: { bg: '#000000', panel: '#1c1c1e', line: '#38383a' } },
+  graphite: { label: 'Graphite', light: { bg: '#f2f2f2' }, dark: { bg: '#1e1e1e', panel: '#262626', line: '#363636' } },
+  navy: { label: 'Navy night', light: { bg: '#eef2f8' }, dark: { bg: '#0a1628', panel: '#10223b', line: '#22385a' } },
+  black: { label: 'Black', light: { bg: '#f4f4f4' }, dark: { bg: '#000000', panel: '#121212', line: '#2a2a2a' } },
+};
+export const SPACINGS = [['tight', 'Tight'], ['normal', 'Normal (default)'], ['roomy', 'Roomy']];
+export const TAB_STYLES = [['underline', 'Underline (default)'], ['pill', 'Pill'], ['plain', 'Plain (colour only)']];
+export const BANDS = [['theme', 'The theme’s colours (default)'], ['shades', 'Shades of my colour'], ['nuh', 'The NUH stripe'], ['none', 'None']];
+export const HEAD_FONTS = [['same', 'Same as the interface (default)'], ['serif', 'Serif'], ['system', 'This device’s font'], ['inter', 'Inter'], ['lexend', 'Lexend'], ['atkinson', 'Atkinson Hyperlegible'], ['mono', 'Monospace']];
+export const NUH_BAND = ['#e57200', '#e4002b', '#178fd7', '#002f6c'];
+
+// round is a Corners level (0 square … 3 very round; 2, the default, is left out). group: classic | inspired. look: the keys it sets (the rest go back to their defaults). keep: keys it leaves as
+// they are (Pixel-style follows your colour). mode: dark-only themes switch to dark or OLED; band: four colours for
+// the top band (none: the usual behaviour, NUH with the default colour, shades of another)
+export const THEMES = [
+  { id: 'nuhs', name: 'NUHS', group: 'classic', desc: 'The default: navy, the NUH stripe, soft cards', look: {} },
+  { id: 'flat', name: 'Flat', group: 'classic', desc: 'No lines, no cards, tinted buttons', look: { flat: true, borders: 0, shadows: false, round: 1, btnStyle: 'tinted' } },
+  { id: 'soft', name: 'Soft', group: 'classic', desc: 'Very round, roomy, gentle grey', look: { round: 3, bgTint: 'grey', btnStyle: 'tinted', spacing: 'roomy', tabStyle: 'pill' } },
+  { id: 'paper', name: 'Paper', group: 'classic', desc: 'Cream pages, serif headings, fine lines', look: { bgTint: 'cream', shadows: false, borders: 2, round: 1, headFont: 'serif', accent: '#5b4636' }, band: ['#d9c7a7', '#b89d74', '#8c6f4c', '#5b4636'] },
+  { id: 'darknavy', name: 'Dark navy', group: 'classic', desc: 'Deep navy at night', mode: 'dark', look: { bgTint: 'navy', accent: '#4a7fd0', shadows: false, borders: 3 } },
+  { id: 'oled', name: 'OLED', group: 'classic', desc: 'Pure black, saves battery', mode: 'oled', look: { shadows: false, borders: 2 } },
+  { id: 'contrast', name: 'High contrast', group: 'classic', desc: 'Strong lines, clear type', look: { contrast: 'high', shadows: false, fontUi: 'atkinson', btnStyle: 'filled' } },
+  { id: 'eye', name: 'Eye comfort', group: 'classic', desc: 'Warm sepia, soft text, less blue', look: { bgTint: 'sepia', accent: '#8a6a4a', lineHeight: '1.15', shadows: false, borders: 3 }, band: ['#e3cfa8', '#c9a77a', '#a7845b', '#8a6a4a'] },
+  { id: 'obsidian', name: 'Obsidian-style', group: 'inspired', desc: 'Dark grey, violet, compact', mode: 'dark', look: { accent: '#8b6cef', bgTint: 'graphite', compact: true, shadows: false, borders: 2, round: 1, fontUi: 'inter' }, band: ['#3a3a3a', '#4c3a8f', '#6f55d8', '#a08cf0'] },
+  { id: 'bear', name: 'Bear-style', group: 'inspired', desc: 'Warm off-white, red, roomy, serif headings', look: { accent: '#d9534f', bgTint: 'cream', headFont: 'serif', spacing: 'roomy', shadows: false, borders: 2 }, band: ['#f1c6c3', '#e58d88', '#d9534f', '#a8322e'] },
+  { id: 'evernote', name: 'Evernote-style', group: 'inspired', desc: 'White, green, clean', look: { accent: '#00a82d', bgTint: 'white', fontUi: 'system', shadows: false, borders: 3, round: 1 }, band: ['#c7efd3', '#5fd17f', '#00a82d', '#00632a'] },
+  { id: 'notion', name: 'Notion-style', group: 'inspired', desc: 'White, near-black, grey hairlines', look: { accent: '#37352f', bgTint: 'white', headFont: 'serif', shadows: false, borders: 2, round: 1, btnStyle: 'plain', tabStyle: 'plain' }, band: ['#e9e9e7', '#c7c6c3', '#9b9a97', '#37352f'] },
+  { id: 'telegram', name: 'Telegram-style', group: 'inspired', desc: 'Blue, rounded, pale blue-grey', look: { accent: '#2481cc', bgTint: 'bluegrey', round: 3, tabStyle: 'pill' }, band: ['#8fd0f7', '#54a9eb', '#2481cc', '#1c5f96'] },
+  { id: 'office', name: 'Office-style', group: 'inspired', desc: 'Square, outlined, a dark blue band', look: { accent: '#185abd', bgTint: 'grey', round: 0, shadows: false, borders: 3, fontUi: 'system' }, band: ['#185abd', '#107c41', '#c43e1c', '#7719aa'] },
+  { id: 'whatsapp', name: 'WhatsApp-style', group: 'inspired', desc: 'Teal-green on beige, rounded', look: { accent: '#008069', bgTint: 'beige', shadows: false, borders: 2 }, band: ['#25d366', '#00a884', '#008069', '#075e54'] },
+  { id: 'pixel', name: 'Pixel-style', group: 'inspired', desc: 'Material You: soft, round, pill tabs; follows your colour', keep: ['accent'], look: { round: 3, tabStyle: 'pill', btnStyle: 'tinted', shadows: false, borders: 1, spacing: 'roomy', fontUi: 'system', band: 'shades' } },
+  { id: 'apple', name: 'Apple-style', group: 'inspired', desc: 'Grouped grey lists, iOS blue, no band', look: { accent: '#007aff', bgTint: 'iosgrey', shadows: false, borders: 1, fontUi: 'system', tabStyle: 'plain', btnStyle: 'plain', band: 'none' } },
+  { id: 'material', name: 'Material-style', group: 'inspired', desc: 'Bold colour, raised cards', look: { accent: '#3f51b5', round: 1, fontUi: 'system', btnStyle: 'filled', band: 'shades' } },
+  { id: 'instagram', name: 'Instagram-style', group: 'inspired', desc: 'Pink to orange, white, rounded', look: { accent: '#d62976', bgTint: 'white', shadows: false, borders: 2 }, band: ['#833ab4', '#c13584', '#fd1d1d', '#fcaf45'] },
+  { id: 'tiktok', name: 'TikTok-style', group: 'inspired', desc: 'Black with cyan and pink-red', mode: 'oled', look: { accent: '#25f4ee', bgTint: 'black', shadows: false, borders: 2, fontUi: 'inter' }, band: ['#25f4ee', '#ffffff', '#fe2c55', '#25f4ee'] },
+];
+export const themeById = id => THEMES.find(t => t.id === id) || THEMES[0];
+
+// the look keys to save when a theme is picked: its own values, the defaults (null) for the rest, kept keys as now
+export function themePatch(theme, current = {}) {
+  const patch = { theme: theme.id === 'nuhs' ? null : theme.id };
+  for (const k of THEME_KEYS) patch[k] = (theme.keep || []).includes(k) ? current[k] ?? null : theme.look[k] ?? null;
+  return patch;
+}
+// does the device's look still match its theme? -> { theme, custom }
+export function themeState(d = {}) {
+  const theme = themeById(d.theme || 'nuhs');
+  // off switches save as false or null alike (Soft shadows aside: false there means off, null on)
+  const val = (o, k) => (o[k] === false && k !== 'shadows' ? null : o[k] ?? null);
+  const custom = THEME_KEYS.some(k => !(theme.keep || []).includes(k) && val(d, k) !== val(theme.look, k)
+    && !(k === 'borders' && d.flat && theme.look.flat));
+  return { theme, custom };
+}
+export const themeLabel = d => { const { theme, custom } = themeState(d); return custom ? `Custom (based on ${theme.name})` : theme.name; };
+
+// the four top-band colours, or null for the usual behaviour (NUH stripe with the default colour, else shades),
+// or 'none' for no band
+export function bandColours(d = {}) {
+  const b = d.band || 'theme';
+  if (b === 'none') return 'none';
+  if (b === 'nuh') return NUH_BAND;
+  if (b === 'shades') return 'shades';
+  const t = themeById(d.theme || 'nuhs');
+  return t.band || null;
+}
+
+// The CSS for the look settings that aren't classes: the tint, the band, the heading font, spacing and tab style.
+// shades: the four band colours worked out from the accent (colors.js lightPalette), used when the band says so.
+export function lookCss(d = {}, shades = null) {
+  const out = [];
+  const tint = TINTS[d.bgTint] && d.bgTint !== 'auto' ? TINTS[d.bgTint] : null;
+  const vars = o => Object.entries(o).map(([k, v]) => `--${k}: ${v};`).join(' ');
+  if (tint) {
+    if (tint.light) out.push(`:root:root:not([data-theme="dark"]) { ${vars(tint.light)} }`);
+    if (tint.dark) {
+      out.push(`:root:root[data-theme="dark"] { ${vars(tint.dark)} }`);
+      out.push(`@media (prefers-color-scheme: dark) { :root:root[data-theme="auto"] { ${vars(tint.dark)} } }`);
+    }
+  }
+  const band = bandColours(d);
+  const four = band === 'shades' ? shades : Array.isArray(band) ? band : null;
+  if (band === 'none') out.push('.top { background: var(--panel); } .top, .top[class] { padding-top: max(12px, env(safe-area-inset-top, 0px)); }');
+  else if (four && four.length === 4) out.push(`:root:root, :root:root[data-theme="dark"] { --s1: ${four[0]}; --s2: ${four[1]}; --s3: ${four[2]}; --s4: ${four[3]}; }`);
+  if (d.headFont && d.headFont !== 'same' && STACKS[d.headFont]) out.push(`:root { --font-head: ${STACKS[d.headFont]}; }`);
+  if (d.spacing === 'roomy') out.push('section.card { padding: 20px; margin-bottom: 16px; } ul.cases li { padding-top: 12px; padding-bottom: 12px; } .chips { gap: 8px; }');
+  if (d.spacing === 'tight') out.push('section.card { padding: 11px; margin-bottom: 8px; } ul.cases li { padding-top: 6px; padding-bottom: 6px; } .chips { gap: 4px; }');
+  if (d.tabStyle === 'pill') out.push('.tabs button[aria-selected="true"], html.tabs-top .tabs button[aria-selected="true"], html.tabs-bottom .tabs button[aria-selected="true"] { border-color: transparent; background: var(--accent-soft); color: var(--accent); border-radius: 999px; }');
+  if (d.tabStyle === 'plain') out.push('.tabs button[aria-selected="true"], html.tabs-top .tabs button[aria-selected="true"], html.tabs-bottom .tabs button[aria-selected="true"] { border-color: transparent; color: var(--accent); }');
+  return out.join('\n');
+}

@@ -66,7 +66,7 @@ async function run(label, ctxOpts) {
   const sub = () => p.evaluate(() => document.getElementById('sub').textContent);
   const nCases = async () => parseInt(await p.evaluate(() => document.body.dataset.cases), 10);
   // Account, Settings, Export / Import, Admin and Analytics live under More; Settings is a menu of pages
-  const SETTINGS_PAGES = ['display', 'access', 'logging', 'tags', 'reflset', 'sharefmt', 'bin'];
+  const SETTINGS_PAGES = ['themes', 'display', 'access', 'logging', 'tags', 'reflset', 'sharefmt', 'bin'];
   const tab = async t => {
     // a settings page's Advanced page: open the page, then its Advanced link
     if (t === 'displayadv' || t === 'loggingadv') { await tab(t.replace('adv', '')); await p.locator(`a[data-go="${t}"]`).click(); await nap(350); return; }
@@ -1703,7 +1703,7 @@ async function run(label, ctxOpts) {
     await hit.click();
     await p.waitForURL(/#loggingadv$/);
     await p.locator('fieldset.pick.flash', { hasText: 'Undo window' }).waitFor();
-    await tab('display');
+    await tab('themes');
     assert(await p.locator('.display-preview .row-btn').count() >= 1, 'no Display preview');
     await p.locator('input[type=range][aria-label="Borders"]').fill('1'); await nap(150);
     await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
@@ -1712,7 +1712,7 @@ async function run(label, ctxOpts) {
   });
 
   await step('display: corners, shadows, bigger tap targets; tab bar order and hidden tabs (listed on More)', async () => {
-    await tab('display');
+    await tab('themes');
     await p.locator('input[type=range][aria-label="Corners"]').fill('0');
     await p.getByLabel('Soft shadows instead of lines around cards (default)').uncheck(); await nap(150);
     assert(await p.evaluate(() => !document.documentElement.classList.contains('shadows')), 'shadows not off');
@@ -1728,7 +1728,7 @@ async function run(label, ctxOpts) {
     await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
     await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);
     assert(await p.locator('.tabs button').count() === 5, 'reset did not bring the tab back');
-    await tab('display');
+    await tab('themes');
     await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
     await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);
     assert(await p.evaluate(() => !document.documentElement.style.getPropertyValue('--round') && document.documentElement.classList.contains('shadows')), 'display reset left corners or turned the default shadows off');
@@ -1837,7 +1837,7 @@ async function run(label, ctxOpts) {
   await step('clean looks: Flat, button style, icons, plain calendar, page titles, shorter rows, press and hold', async () => {
     const eq = (x, y, m) => assert(x === y, `${m}: ${x}`);
     const cls = k => p.evaluate(k => document.documentElement.classList.contains(k), k);
-    await tab('display');
+    await tab('themes');
     await p.locator('input[type=range][aria-label="Borders"]').fill('0'); await nap(150);
     assert(await cls('flat') && await cls('edges-fill'), 'Flat not applied');
     await tab('displayadv');
@@ -1873,7 +1873,7 @@ async function run(label, ctxOpts) {
       for (let i = 0; i < 3 && await p.locator('dialog[open]').count(); i++) { await p.keyboard.press('Escape'); await nap(200); }
       await tab('access'); await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click(); await nap(200);
       await tab('displayadv'); await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click(); await nap(200);
-      await tab('display'); await p.locator('input[type=range][aria-label="Borders"]').fill('5'); await nap(150);
+      await tab('themes'); await p.locator('input[type=range][aria-label="Borders"]').fill('5'); await nap(150);
     }
     for (const k of ['flat', 'btn-tinted', 'icon-btns', 'cal-plain', 'page-titles', 'rows-short', 'row-hold']) assert(!(await cls(k)), k + ' not reset');
     eq(await p.locator('.top h1').textContent(), 'APMES Logbook', 'app name not back');
@@ -1881,7 +1881,7 @@ async function run(label, ctxOpts) {
 
   await step('theme: light by default; dark and auto in Settings → Display', async () => {
     assert(await p.evaluate(() => document.documentElement.dataset.theme) === 'light', 'default theme not light');
-    await tab('display');
+    await tab('themes');
     await choose('Light or dark', 'dark');
     await nap(500);
     const bg = await p.evaluate(() => getComputedStyle(document.body).backgroundColor);
@@ -1890,12 +1890,44 @@ async function run(label, ctxOpts) {
     await p.waitForSelector('.tabs button[data-tab="log"]');
     await nap(500);
     assert(await p.evaluate(() => document.documentElement.dataset.theme) === 'dark', 'dark lost after reload');
-    await tab('display');
+    await tab('themes');
     await choose('Light or dark', 'auto');
     await nap(300);
     assert(await p.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(243, 243, 243)', 'auto should be light when the phone is light');
     await choose('Light or dark', 'light');
     await nap(300);
+  });
+
+  await step('themes: pick one, change it (Custom), Undo, reset', async () => {
+    const eq = (x, y, m) => assert(x === y, `${m}: ${x}`);
+    await tab('themes');
+    const s1 = () => p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--s1').trim().toLowerCase());
+    const nuh = await s1();
+    eq(await p.locator('.theme-now b').textContent(), 'NUHS', 'default theme');
+    await p.locator('.theme-find').fill('whats');
+    eq(await p.locator('.theme-list .theme-row').count(), 1, 'search did not narrow the list');
+    await p.locator('.theme-row', { hasText: 'WhatsApp-style' }).click(); await nap(300);
+    eq(await s1(), '#25d366', 'the theme did not bring its own top band');
+    eq(await p.locator('.theme-now b').textContent(), 'WhatsApp-style', 'theme name');
+    assert(await p.evaluate(() => (localStorage.getItem('apmes-logbook-look-css') || '').includes('#25d366')), 'look not cached for the first paint');
+    await p.reload({ waitUntil: 'networkidle' }); await nap(300);
+    eq(await s1(), '#25d366', 'band lost after reload');
+    await tab('themes');
+    await choose('Top band', 'nuh'); await nap(200);
+    eq(await s1(), nuh, 'Top band: the NUH stripe not applied');
+    eq(await p.locator('.theme-now b').textContent(), 'Custom (based on WhatsApp-style)', 'a change did not make it custom');
+    await p.locator('.swatch[aria-label="Lavender"]').click(); await nap(200);
+    eq(await p.locator('.swatch[aria-label="Lavender"]').getAttribute('aria-pressed'), 'true', 'swatch not marked');
+    await p.locator('.theme-card', { hasText: 'OLED' }).click(); await nap(300);
+    eq(await p.evaluate(() => document.documentElement.dataset.theme), 'dark', 'OLED theme did not switch to dark');
+    await p.locator('#toast button', { hasText: 'Undo' }).click(); await nap(300);
+    eq(await p.evaluate(() => document.documentElement.dataset.theme), 'light', 'Undo did not bring light back');
+    eq(await p.locator('.theme-now b').textContent(), 'Custom (based on WhatsApp-style)', 'Undo did not bring the theme back');
+    await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
+    await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);
+    eq(await s1(), nuh, 'reset left the band');
+    eq(await p.locator('.theme-now b').textContent(), 'NUHS', 'reset left the theme');
+    eq(await p.evaluate(() => document.getElementById('look-css')?.textContent || ''), '', 'reset left look CSS');
   });
 
   await step('compact mode is per device and persists after reload', async () => {
@@ -1932,7 +1964,7 @@ async function run(label, ctxOpts) {
     await tab('displayadv');
     await check('Pin the case box').check(); await check('Pin the search box').check(); await nap(200);
     // Borders all the way down: lines gone, fields filled
-    await tab('display');
+    await tab('themes');
     await p.locator('input[type=range][aria-label="Borders"]').fill('0'); await nap(200);
     try {
       await tab('logbook');
@@ -1960,7 +1992,7 @@ async function run(label, ctxOpts) {
       await check('Suggested tags as you type').check(); await check('Quick picks').check(); await check('Autocorrect').uncheck(); await nap(300);
       await tab('displayadv');
       await check('Pin the case box').uncheck(); await check('Pin the search box').uncheck(); await nap(200);
-      await tab('display');
+      await tab('themes');
       await p.locator('input[type=range][aria-label="Borders"]').fill('4'); await nap(200);
     }
   });

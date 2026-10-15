@@ -8,7 +8,8 @@ import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, short
 import { pickDialog, CASE_PARTS, AFTER_SAVE, RECENT_COUNTS } from './ui-log.js';
 import { recentCount as snapRecent } from './logging.js';
 import { OPERATOR_HELP } from './search-ops.js';
-import { DEFAULT_ACCENT, cleanAccent } from './colors.js';
+import { DEFAULT_ACCENT, cleanAccent, SWATCHES } from './colors.js';
+import { THEMES, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, SPACINGS, TAB_STYLES, BANDS, HEAD_FONTS } from './themes.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS } from './markdown.js';
 import { checkCss } from './custom-css.js';
 import { FONTS, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont } from './fonts.js';
@@ -69,7 +70,7 @@ function pick(label, opts, cur, set, line, ...more) {
 const lookPick = (k, label, opts, dflt, line, ...more) =>
   pick(label, opts, display()[k] ?? dflt, v => applyDisplay(setDisplay({ [k]: v === dflt ? null : v })), line, ...more);
 const DEVICE_NOTE = () => h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.');
-const THEMES = [['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED (pure black)'], ['auto', 'Auto (match the phone)']];
+const THEME_MODES = [['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED (pure black)'], ['auto', 'Auto (match the phone)']];
 const slider = (label, names, level, dflt, onLevel) => {
   const note = h('span', { class: 'hint', style: 'margin:0' }, names[level]);
   return h('div', { class: 'field', style: 'margin-top:10px' }, h('label', { class: 'field', style: 'margin:0' }, label,
@@ -83,24 +84,104 @@ export function renderDisplay() {
     displayPreview(),
     h('section', { class: 'card' },
       h('h2', {}, 'Display'),
-      pick('Light or dark', THEMES, cachedTheme(), v => applyTheme(v)),
-      h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
-      help('Tap to pick any colour. Light and dark versions stay easy to read.'),
-      pick('Colourful', COLOURFUL, st.colourful === true ? 'tabs' : st.colourful || 'off', v => applyDisplay(setDisplay({ colourful: v === 'off' ? null : v })),
-        'A colour for each tab.', 'With the default colour, the tabs follow the NUH stripe at the top: Case orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.'),
+      h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Colours, light or dark, corners, fonts and ready-made looks are in ', h('a', { href: '#themes' }, 'Themes'), '.'),
       toggle('Compact mode', st.compact, v => { applyCompact(v); setDisplay({ compact: v }); }, 'Smaller chips, rows and spacing, so more tags fit.'),
+      // the tab the app opens on (a link or shortcut to a tab still opens that tab)
+      pick('Open the app on', START_TABS, st.startTab || 'log', v => { setDisplay({ startTab: v }); toast('Saved'); }),
+      DEVICE_NOTE()),
+    resetLink('compact mode and the start tab on this device', () => { applyDisplay(setDisplay({ compact: null, startTab: null })); }),
+    advancedLink('displayadv', 'Advanced display settings', 'The header and tab bar, Logbook rows, page width, the Case tab layout, custom CSS'));
+}
+
+// Settings → Themes (#themes; owner, 15 Oct 2026): ready-made looks (themes.js) and the look settings themselves,
+// moved here from Display. Picking a theme sets its bundle of settings at once (Undo in the toast); changing any
+// of them afterwards makes it "Custom (based on …)". Everything on this device only.
+const themeSwatch = t => {
+  const band = t.band || (t.look.band === 'none' ? null : ['#e57200', '#e4002b', '#178fd7', '#002f6c']);
+  const tint = TINTS[t.look.bgTint] || {};
+  const dark = !!t.mode;
+  const bg = (dark ? tint.dark?.bg : tint.light?.bg) || (dark ? '#121417' : '#f3f3f3');
+  const panel = (dark ? tint.dark?.panel : tint.light?.panel) || (dark ? '#1b1e23' : '#ffffff');
+  return h('span', { class: 'theme-sw', 'aria-hidden': 'true', style: `--tb:${bg};--tp:${panel};--ta:${t.look.accent || (t.keep ? cleanAccent(display().accent) || DEFAULT_ACCENT : DEFAULT_ACCENT)}` },
+    h('span', { class: 'theme-band' }, (band || [panel, panel, panel, panel]).map(c => h('i', { style: `background:${c}` }))),
+    h('span', { class: 'theme-card-in' }, h('i', { class: 'theme-dot' }), h('i', { class: 'theme-line' })));
+};
+function pickTheme(t) {
+  const before = display(), beforeMode = cachedTheme();
+  const patch = themePatch(t, before);
+  if (t.mode) { applyTheme(t.mode); patch.themeMode = true; } else if (before.themeMode) { applyTheme('light'); patch.themeMode = null; }
+  applyDisplay(setDisplay(patch));
+  hooks.render();
+  toast(`Theme: ${t.name}`, { action: 'Undo', onaction: () => {
+    applyTheme(beforeMode);
+    applyDisplay(setDisplay(Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode'].map(k => [k, before[k] ?? null]))));
+    hooks.render();
+  } });
+}
+let themeQuery = '';
+resetters.push(() => { themeQuery = ''; });
+function inspiredList() {
+  const st = display(), { theme, custom } = themeState(st);
+  const list = h('ul', { class: 'theme-list', role: 'list' });
+  const paint = () => {
+    const q = themeQuery.trim().toLowerCase();
+    const found = THEMES.filter(t => t.group === 'inspired' && (!q || (t.name + ' ' + t.desc).toLowerCase().includes(q)));
+    fill(list, found.length ? found.map(t => h('li', {}, h('button', { type: 'button', class: 'theme-row', 'aria-pressed': String(t.id === theme.id && !custom), onclick: () => pickTheme(t) },
+      themeSwatch(t), h('span', { class: 'mt' }, h('b', {}, t.name), h('small', {}, t.desc))))) : h('li', { class: 'empty' }, 'No theme matches. Suggest one below.'));
+  };
+  paint();
+  return h('div', { class: 'theme-inspired' },
+    h('input', { type: 'search', class: 'theme-find', placeholder: 'Find a theme (WhatsApp, Notion, dark…)', 'aria-label': 'Find a theme', value: themeQuery, oninput: e => { themeQuery = e.target.value; paint(); } }),
+    list);
+}
+export function renderThemes() {
+  const st = display(), { theme, custom } = themeState(st);
+  const look = (k, label, opts, dflt, line) => pick(label, opts, st[k] ?? dflt, v => applyDisplay(setDisplay({ [k]: v === dflt ? null : v })) || hooks.render(), line);
+  return h('div', { class: 'set-page themes-page' },
+    displayPreview(),
+    h('section', { class: 'card' },
+      h('h2', {}, 'Themes'),
+      h('p', { class: 'theme-now' }, 'Now: ', h('b', {}, themeLabel(st))),
+      help('A theme sets the colours, light or dark, corners, lines, fonts and spacing in one go. Change anything below afterwards; your changes stay.'),
+      h('h3', {}, 'Classic'),
+      h('div', { class: 'theme-grid' }, THEMES.filter(t => t.group === 'classic').map(t => h('button', { type: 'button', class: 'theme-card', 'aria-pressed': String(t.id === theme.id && !custom), onclick: () => pickTheme(t) },
+        themeSwatch(t), h('b', {}, t.name), h('small', {}, t.desc)))),
+      h('h3', {}, 'Inspired'),
+      help('In the style of other apps: their colours, corners and type, never their logos.'),
+      inspiredList(),
+      h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('button', { type: 'button', class: 'small', onclick: async () => {
+        const m = await import('./ui-feedback.js'); m.setFeedbackDraft?.('Theme suggestion: '); location.hash = '#feedback';
+      } }, 'Suggest a theme'))),
+    h('section', { class: 'card' },
+      h('h2', {}, 'Colour and light'),
+      pick('Light or dark', THEME_MODES, cachedTheme(), v => { applyTheme(v); setDisplay({ themeMode: null }); hooks.render(); }),
+      h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
+      help('Pastels show as a soft tint, with a deeper shade for text and buttons so everything stays easy to read.'),
+      pick('Colourful', COLOURFUL, st.colourful === true ? 'tabs' : st.colourful || 'off', v => { applyDisplay(setDisplay({ colourful: v === 'off' ? null : v })); hooks.render(); },
+        'A colour for each tab.', 'With the default colour, the tabs follow the NUH stripe at the top: Case orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.'),
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Background',
+        h('select', { 'aria-label': 'Background', onchange: e => { applyDisplay(setDisplay({ bgTint: e.target.value === 'auto' ? null : e.target.value })); hooks.render(); } },
+          Object.entries(TINTS).map(([k, t]) => h('option', { value: k, selected: (st.bgTint || 'auto') === k }, t.label)))),
+      look('band', 'Top band', BANDS, 'theme', 'The four-colour strip along the top. NUHS keeps the NUH stripe; other themes bring their own.')),
+    h('section', { class: 'card' },
+      h('h2', {}, 'Shape and type'),
       // Flat first: no lines and no page cards (its own key, so the saved border levels keep their meaning)
       slider('Borders', ['Flat (no lines, no cards)', ...BORDERS], st.flat ? 0 : borderLevel(st) + 1, BORDERS.length,
         n => applyDisplay(setDisplay(n === 0 ? { flat: true, borders: 0 } : { flat: null, borders: n === null ? null : n - 1 }))),
       slider('Corners', ROUNDS.map(([n]) => n), roundLevel(st), 2, n => applyDisplay(setDisplay({ round: n }))),
       toggle('Soft shadows instead of lines around cards (default)', st.shadows !== false, v => applyDisplay(setDisplay({ shadows: v ? null : false }))),
-      // the tab the app opens on (a link or shortcut to a tab still opens that tab)
-      pick('Open the app on', START_TABS, st.startTab || 'log', v => { setDisplay({ startTab: v }); toast('Saved'); }),
+      look('spacing', 'Spacing', SPACINGS, 'normal'),
+      look('tabStyle', 'Tab bar style', TAB_STYLES, 'underline', 'How the tab you’re on is marked.'),
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Heading font',
+        h('select', { 'aria-label': 'Heading font', onchange: e => { applyDisplay(setDisplay({ headFont: e.target.value === 'same' ? null : e.target.value })); hooks.render(); } },
+          HEAD_FONTS.map(([k, t]) => h('option', { value: k, selected: (st.headFont || 'same') === k }, t)))),
+      fontPicker('ui'),
+      fontPicker('log'),
+      lookPick('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
       DEVICE_NOTE()),
-    resetLink('light or dark, colour, Colourful, compact, borders, corners, shadows and the start tab on this device', () => {
-      applyTheme('light'); applyDisplay(setDisplay({ accent: null, colourful: null, compact: null, borders: null, flat: null, round: null, shadows: null, startTab: null }));
-    }),
-    advancedLink('displayadv', 'Advanced display settings', 'The header and tab bar, Logbook rows, fonts and spacing, the Case tab layout, custom CSS'));
+    resetLink('the theme and every look setting on this page (light, the NUHS colours, lines, corners, fonts and spacing) on this device', () => {
+      applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'fontUiName', 'fontLogName'].map(k => [k, null])) }));
+    }));
 }
 // Settings → Display → Advanced display settings (#displayadv), under headings (owner, 13 Oct 2026): the header and
 // tab bar, Logbook rows, text, the Case tab layout, then custom CSS
@@ -131,10 +212,8 @@ export function renderDisplayAdvanced() {
       toggle('Shorter Logbook rows', st.rowShort, set('rowShort'), 'One line for the case, one grey line of tags, no buttons.', 'The initials and case in bold, the short date at the right. Tap a row to open it; press and hold (Accessibility) for Copy and Reflect.'),
       toggle('Copy button on each Logbook row', st.rowCopy, set('rowCopy'), 'Off unless you switch it on.', 'The ⋯ menu, if you use it, still copies one case.'),
       toggle('Copy button for each day', st.dayCopy, set('dayCopy'), 'Beside Share when you pick a day in the calendar.', 'Off unless you switch it on. Share already sends the whole day (or copies it, where sharing isn’t possible).'),
-      h('h3', {}, 'Text'),
-      fontPicker('ui'),
-      fontPicker('log'),
-      lookPick('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
+      h('h3', {}, 'Page'),
+      help('Fonts and line spacing are in Themes.'),
       lookPick('lineWidth', 'Page width', LINE_WIDTHS, 'normal', 'How wide the app gets on a computer or tablet.', 'Was “Line width”. Phones always use the full screen. The Case tab keeps its two panes.'),
       h('h3', {}, 'Case tab layout'),
       toggle('Case tab upside down (phones)', st.caseInverted, v => applyDisplay(setDisplay({ caseInverted: v })),
@@ -143,8 +222,8 @@ export function renderDisplayAdvanced() {
       toggle('Pin the search box at the top of the Logbook and Reflections', st.pinSearch, set('pinSearch'), 'They stay in view while the list scrolls under them.'),
       DEVICE_NOTE()),
     customCssCard(),
-    resetLink('the name in the header, fonts, line spacing and width, the tab bar (order and hidden tabs) and header options, the Logbook row buttons, upside down, pinning and custom CSS (switched off; your CSS is kept), and the button style, icons, plain calendar, page titles and shorter rows on this device', () =>
-      applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, tabOrder: null, tabHidden: null, rowMenu: null, rowCopy: null, dayCopy: null, btnStyle: null, iconBtns: null, calPlain: null, pageTitles: null, rowShort: null }))));
+    resetLink('the name in the header, the page width, the tab bar (order and hidden tabs) and header options, the Logbook row buttons, upside down, pinning and custom CSS (switched off; your CSS is kept), and the button style, icons, plain calendar, page titles and shorter rows on this device', () =>
+      applyDisplay(setDisplay({ appTitle: null, lineWidth: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, tabOrder: null, tabHidden: null, rowMenu: null, rowCopy: null, dayCopy: null, btnStyle: null, iconBtns: null, calPlain: null, pageTitles: null, rowShort: null }))));
 }
 export function renderAccessibility() {
   const st = display();
@@ -263,17 +342,16 @@ function customCssCard() {
 // any colour, straight from the device's own colour picker (owner, 13 Oct 2026: no preset swatches); Default goes
 // back to the app's navy
 function accentPicker() {
-  const cur = () => cleanAccent(display().accent) || DEFAULT_ACCENT;
-  const wrap = h('div', { class: 'accent-pick' });
-  const pick = c => { applyDisplay(setDisplay({ accent: c === DEFAULT_ACCENT ? null : c })); paint(); };   // (also redoes the Colourful shades)
-  const paint = () => {
-    const c = cur();
-    fill(wrap,
-      h('input', { type: 'color', class: 'accent-input', value: c, 'aria-label': 'Colour', oninput: e => applyAccent(e.target.value), onchange: e => pick(e.target.value) }),
-      c === DEFAULT_ACCENT ? null : h('button', { type: 'button', class: 'small linkish', onclick: () => pick(DEFAULT_ACCENT) }, 'Default colour'));
-  };
-  paint();
-  return wrap;
+  const cur = cleanAccent(display().accent) || DEFAULT_ACCENT;
+  const set = c => { applyDisplay(setDisplay({ accent: c === DEFAULT_ACCENT ? null : c })); hooks.render(); };   // (also redoes the Colourful shades)
+  const known = SWATCHES.some(([, list]) => list.some(([c]) => c === cur));
+  return h('div', { class: 'swatches' },
+    SWATCHES.map(([group, list]) => h('div', { class: 'swatch-row', role: 'group', 'aria-label': group }, h('span', { class: 'swatch-group' }, group),
+      list.map(([c, name]) => h('button', { type: 'button', class: 'swatch', style: `--sw:${c}`, title: name, 'aria-label': name, 'aria-pressed': String(c === cur), onclick: () => set(c) })))),
+    h('div', { class: 'swatch-row' }, h('span', { class: 'swatch-group' }, 'Your own'),
+      h('label', { class: 'swatch custom' + (known ? '' : ' on'), style: known ? '' : `--sw:${cur}`, title: 'Any colour' },
+        h('input', { type: 'color', class: 'accent-input', value: cur, 'aria-label': 'Custom colour', oninput: e => applyAccent(e.target.value), onchange: e => set(e.target.value) })),
+      h('span', { class: 'hint', style: 'margin:0' }, 'Custom…')));
 }
 
 // ---------- Markdown (Logbook: Copy on a case or a day, Share day; the notes export) ----------
