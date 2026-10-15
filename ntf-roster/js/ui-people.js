@@ -316,6 +316,7 @@ export function mount(el, app) {
   // =============== Duty codes ===============
   function renderCodes() {
     const st = app.store.get();
+    app.onboard?.('codes');   // Getting started: the duty codes were looked at
     const use = codeUsage(st);
     body.append(h('div', { class: 'pv-bar' },
       h('p', { class: 'bx-help pv-grow' }, 'Codes are case-sensitive here (Excel import matches any case). Colours show on the grid; auto-fill only assigns shifts marked auto.'),

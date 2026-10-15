@@ -31,7 +31,7 @@ export function mount(el, app) {
         h('h2', { class: 'bx-h' }, 'Check'),
         h('p', { class: 'bx-sub' }, `${M.fmtMonth(app.month)} against ${rulesOn} ${rulesOn === 1 ? 'rule' : 'rules'} that are on. `,
           h('a', { href: '#rules' }, 'Change the rules')))),
-      h('div', { class: 'cv-sum' },
+      h('div', { class: 'cv-sum', 'data-tour': 'check' },   // (data-tour: the first-time tour, tour.js)
         stat(ev.hard, 'must fix', 'Hard rules broken', ev.hard ? 'bad' : 'ok'),
         stat(ev.soft, 'to improve', 'Preferences not met', ev.soft ? 'warn' : 'ok'),
         stat(fmtScore(ev.score), 'penalty · lower is better', 'Each must-fix problem counts 1000, each thing to improve its weight', 'plain')));
@@ -43,7 +43,7 @@ export function mount(el, app) {
         ? 'The rule check failed, so problems may be missing. Check the rules (a rule imported from a file may be damaged), or reload.'
         : `${nFailed} ${nFailed === 1 ? 'rule' : 'rules'} can't be checked and ${nFailed === 1 ? 'is' : 'are'} left out: ${names.join('; ') || 'unknown rule type'}. Edit or delete ${nFailed === 1 ? 'it' : 'them'} under Rules.`));
     }
-    const tabs = h('div', { class: 'bx-tabs', role: 'tablist', 'aria-label': 'Check sections' },
+    const tabs = h('div', { class: 'bx-tabs', role: 'tablist', 'aria-label': 'Check sections', 'data-tour': 'check' },
       [['problems', 'Problems'], ['fairness', 'Fairness'], ['coverage', 'Coverage']].map(([k, l]) => h('button', {
         type: 'button', role: 'tab', class: 'bx-tab', id: `cv-tab-${k}`, 'aria-selected': String(view === k), onclick: () => { view = k; render(); },
       }, l)));

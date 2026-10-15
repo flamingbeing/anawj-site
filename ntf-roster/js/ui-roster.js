@@ -146,12 +146,13 @@ export function mount(el, app) {
   const groupSel = h('select', { class: 'input r-sel', 'aria-label': 'Show group' });
   const tagSel = h('select', { class: 'input r-sel', 'aria-label': 'Show tag' });
   const hiSel = h('select', { class: 'input r-sel', 'aria-label': 'Highlight a code' });
-  const reqBtn = h('button', { type: 'button', class: 'tbtn', 'aria-pressed': String(ui.showReq), title: 'Show or hide requests (Cr, Nc, Wr…)' });
-  const paintBtn = h('button', { type: 'button', class: 'tbtn', 'aria-pressed': 'false', title: 'Paint mode: pick a code, then tap or drag across cells' });
+  // (data-tour: what the first-time tour lights, tour.js)
+  const reqBtn = h('button', { type: 'button', class: 'tbtn', 'aria-pressed': String(ui.showReq), title: 'Show or hide requests (Cr, Nc, Wr…)', 'data-tour': 'layers' });
+  const paintBtn = h('button', { type: 'button', class: 'tbtn', 'aria-pressed': 'false', title: 'Paint mode: pick a code, then tap or drag across cells', 'data-tour': 'paint' });
   reqBtn.innerHTML = `${icon('eye')}<span>Requests</span>`;
   paintBtn.innerHTML = `${icon('brush')}<span>Paint</span>`;
   // the grid's marks explained (they are small and otherwise unexplained)
-  const keyBtn = h('button', { type: 'button', class: 'tbtn', title: 'What the marks in the grid mean', onclick: showKey }, 'Key');
+  const keyBtn = h('button', { type: 'button', class: 'tbtn', title: 'What the marks in the grid mean', onclick: showKey, 'data-tour': 'layers' }, 'Key');
   tb.append(paintBtn, searchWrap, groupSel, tagSel, hiSel, reqBtn, keyBtn);
   function showKey() {
     const row = (mark, text) => h('li', { class: 'gk-row' }, h('span', { class: 'gk-mark', html: mark }), h('span', null, text));
@@ -175,7 +176,7 @@ export function mount(el, app) {
 
   const paintBar = h('div', { class: 'r-paintbar', hidden: true, role: 'group', 'aria-label': 'Paint with code' });
   const banner = h('div', { class: 'r-banner', hidden: true });
-  const body = h('div', { class: 'r-body' });
+  const body = h('div', { class: 'r-body', 'data-tour': 'grid' });
   const scroll = h('div', { class: 'r-scroll', tabindex: '-1' });
   const styleEl = h('style');
   body.append(scroll);
@@ -634,7 +635,8 @@ export function mount(el, app) {
       for (const sid in day) if ((day[sid].a || []).some(code => c.autoCodes.includes(code))) { any = true; break; }
       if (any) break;
     }
-    banner.hidden = any || !(state.staff || []).length;
+    // (not while Getting started is showing: its next step says the same)
+    banner.hidden = any || !(state.staff || []).length || !!document.querySelector('.guide-slot:not([hidden]) .gs');
     if (banner.hidden) return;
     banner.innerHTML = '';
     banner.append(
@@ -1007,7 +1009,7 @@ export function mount(el, app) {
       h('div', { class: 'pop-body' }, wrap));
     document.body.append(pop);
     const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closeEditor(true); } };
-    const onDown = (e) => { if (!pop.contains(e.target) && !e.target.closest?.('.cell') && !e.target.closest?.('.sheet-back') && !e.target.closest?.('.toast')) closeEditor(false); };
+    const onDown = (e) => { if (!pop.contains(e.target) && !e.target.closest?.('.cell') && !e.target.closest?.('.sheet-back') && !e.target.closest?.('.toast') && !e.target.closest?.('.task-card')) closeEditor(false); };
     pop.addEventListener('keydown', onKey);
     setTimeout(() => document.addEventListener('mousedown', onDown), 0);
     editor = {

@@ -60,7 +60,10 @@ const TEMPLATES = [
 const COMBO_KINDS = [
   { type: 'sameDay', icon: '🚫', label: 'On the same day', sub: 'Two codes that can\'t go together on one day (Call and Clinic), or one that needs another' },
   { type: 'sequence', icon: '⏭️', label: 'On following days', sub: 'What may not (or must) come the day after, or the day before (no call before leave)' },
-  { type: 'together', icon: '🤝', label: 'Between two people', sub: 'Two people never on together, or someone who needs another person on with them' },
+  { type: 'together', icon: '🤝', label: 'Between two people', sub: 'Two people never on together, or someone who needs another person on with them',
+    // starts as "never on call together" (the usual one); Then changes it to "needs someone"
+    pick: 'Choose one person under Other people and the other under Who.',
+    make: s => (has(s, 'C') ? { type: 'together', name: '', hard: true, params: { codes: ['C'], otherCodes: ['C'], mode: 'never', min: 1 } } : null) },
 ];
 const has = (s, c) => (s.duties || []).some(d => d.code === c);
 const COMBO_TEMPLATES = [
@@ -87,7 +90,7 @@ export function mount(el, app) {
       h('h2', { class: 'bx-h' }, 'Rules'),
       h('p', { class: 'bx-sub' }, 'Hard rules must hold; preferences are weighed. Every change is checked straight away and can be undone.')),
     h('div', { class: 'bx-head-acts' },
-      h('button', { type: 'button', class: 'btn btn-primary rv-add', onclick: () => openPicker(), html: `${app.icon('plus')}<span>Add rule</span>` })));
+      h('button', { type: 'button', class: 'btn btn-primary rv-add', 'data-tour': 'addrule', onclick: () => openPicker(), html: `${app.icon('plus')}<span>Add rule</span>` })));
   const search = h('input', { type: 'search', class: 'bx-search', placeholder: 'Search rules', 'aria-label': 'Search rules',
     oninput: () => { q = search.value.trim().toLowerCase(); renderList(); } });
   const filters = seg(h, {
@@ -257,7 +260,7 @@ export function mount(el, app) {
     };
     const combo = h('ul', { class: 'rp-tpls rp-combo' },
       COMBO_KINDS.filter(k => RULE_TYPES[k.type]).map(k => h('li', null,
-        h('button', { type: 'button', class: 'rp-tpl', onclick: () => pick(newRule(k.type, state)) },
+        h('button', { type: 'button', class: 'rp-tpl', 'data-kind': k.type, onclick: () => (k.make && k.make(state) ? fromTemplate(k, k.make(state)) : pick(newRule(k.type, state))) },
           h('span', { class: 'rp-ic', 'aria-hidden': 'true' }, k.icon),
           h('span', { class: 'rp-txt' }, h('strong', null, k.label), h('span', null, k.sub))))),
       COMBO_TEMPLATES.filter(tp => tp.ok(state)).map(tp => h('li', null,
@@ -293,6 +296,7 @@ export function mount(el, app) {
     if (t.soft_only) draft.hard = false;
     if (!(Number(draft.weight) >= 1)) draft.weight = 10;
     const startJSON = JSON.stringify(draft);   // closing with changes asks first (Back, Esc, X, tap outside)
+    app.onboard?.('rules');   // Getting started: a rule was opened
 
     // the live check runs at most once a frame, straight after a change (it takes a few milliseconds), instead of
     // waiting for a pause in typing (speed: it used to wait 120 ms)

@@ -158,6 +158,7 @@ export function mount(el, app) {
       const blob = await io.exportDeptWorkbook(store.get(), months);
       const name = months.length === 1 ? `ntf-roster-${io.fileStamp(months[0])}.xlsx` : `ntf-roster-${io.fileStamp(months[0])}-to-${io.fileStamp(months[months.length - 1])}.xlsx`;
       io.download(blob, name);
+      app.onboard?.('shared');   // Getting started: something was exported
       app.toast(`Downloaded ${name}`);
     });
   }
@@ -171,6 +172,7 @@ export function mount(el, app) {
   });
 
   function printRoster() {
+    app.onboard?.('shared');
     if (app.tab !== 'roster') app.go('roster', { m: app.month });
     let tries = 0;
     const wait = () => {
@@ -191,6 +193,7 @@ export function mount(el, app) {
     h('h3', { class: 'more-sub' }, 'CSV'),
     h('div', { class: 'more-row' }, btn('Download CSV of this month', () => {
       io.download(new Blob([io.csvForMonth(store.get(), app.month)], { type: 'text/csv;charset=utf-8' }), `ntf-roster-${io.fileStamp(app.month)}.csv`);
+      app.onboard?.('shared');
     })),
     h('h3', { class: 'more-sub' }, 'Calendar for one person'),
     h('p', { class: 'more-p' }, 'Their shifts this month as all-day events (.ics). Open the file on a phone to add it to the calendar.'),
@@ -200,6 +203,7 @@ export function mount(el, app) {
         if (!id) return;
         const p = store.get().staff.find(s => s.id === id);
         io.download(new Blob([io.icsForPerson(store.get(), id, app.month)], { type: 'text/calendar;charset=utf-8' }), `ntf-roster-${slug(p && (p.short || p.name))}-${io.fileStamp(app.month)}.ics`);
+        app.onboard?.('shared');
       })));
 
   // ---------- Backup ----------
@@ -208,8 +212,10 @@ export function mount(el, app) {
     h('div', { class: 'more-row' },
       iconBtn('Download backup', () => {
         io.download(new Blob([io.backupJSON(store.get())], { type: 'application/json' }), `ntf-roster-backup-${M.iso(new Date())}.json`);
+        app.onboard?.('shared');
       }, 'note'),
       fileButton('Restore from a backup', '.json,application/json', onRestore)));
+  backupSec.dataset.tour = 'backup';   // (the first-time tour lights it)
 
   async function onRestore(file) {
     let next;
@@ -298,6 +304,16 @@ export function mount(el, app) {
     });
   }
 
+  // ---------- Help: the walkthrough again ----------
+  const guide = () => import('./guide.js');
+  const walk = iconBtn('Show the walkthrough', async () => (await guide()).takeTour(app), 'tour');
+  walk.dataset.tourReturn = 'walkthrough';   // (focus comes back here when the tour ends)
+  const helpSec = section('more-help', 'Help', 'A one-minute tour of the main controls, three short practice tasks, and the Getting started checklist.',
+    h('div', { class: 'more-row' }, walk,
+      store.isDemo ? iconBtn('Try it yourself', async () => (await guide()).startTasks(app), 'task')
+        : h('a', { class: 'btn btn-ghost', href: './?demo&try', target: '_blank', rel: 'noopener', html: `${icon('task')}<span>Try it yourself</span><span class="sr-only"> (practice department, a new tab)</span>` }),
+      store.isDemo ? null : iconBtn('Getting started checklist', async () => (await guide()).showChecklist(app), 'flag')));
+
   // ---------- Start again ----------
   const startSec = section('more-start', store.isDemo ? 'Practice department' : 'Start again', null,
     h('p', { class: 'more-p' }, store.isDemo
@@ -343,7 +359,7 @@ export function mount(el, app) {
     if (out instanceof Node && !out.parentNode) foot.append(out);
   }).catch(() => { /* version helper not there yet: show nothing */ });
 
-  root.append(importSec, exportSec, backupSec, settingsSec, teamSec, startSec, foot);
+  root.append(importSec, exportSec, backupSec, settingsSec, teamSec, helpSec, startSec, foot);
 
   return {
     update(state) {
