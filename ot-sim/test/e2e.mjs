@@ -138,12 +138,24 @@ try {
     assert.match(await page.textContent('#inf-state-propofol'), /Running 6 mg\/kg\/h/);
     await page.click('[data-infstop="propofol"]');
     assert.equal(await page.textContent('#inf-state-propofol'), '');
+    // neuromuscular block: rocuronium takes the TOF to 0/4, a PTC can be counted, sugammadex brings it back
+    assert.equal(await page.textContent('#n-tof'), '4/4');
+    await page.click('[data-bolus="rocuronium"]');
+    await page.evaluate(() => otsim.step(1800));
+    assert.equal(await page.textContent('#n-tof'), '0/4');
+    await page.click('[data-tof="ptc"]');
+    assert.match(await page.textContent('#n-ptc'), /^PTC \d+$/);
+    await page.click('[data-bolus="sugammadex"][data-dose="1100"]');
+    await page.evaluate(() => otsim.step(1800));
+    assert.equal(await page.textContent('#n-tof'), '4/4');
+    assert.match(await page.textContent('#n-tofr'), /^\d+%$/);
     // Behind the monitor: closed by default, shows the pump's prediction beside the true level, remembered
     assert.equal(await page.$eval('#behind-box', d => d.open), false);
     await page.click('#behind-box summary');
     await page.evaluate(() => otsim.step(1));
     const rows = await page.$$eval('.behind tbody tr', trs => trs.map(tr => tr.textContent));
     assert.ok(rows.some(r => /^Remifentanil3\.0/.test(r)) && rows.some(r => /^Propofol––/.test(r)), `${name}: behind rows ${rows}`);
+    assert.ok(rows.some(r => /^Twitch \(T1\)/.test(r)), `${name}: neuromuscular rows in Behind the monitor`);
     assert.equal(await page.evaluate(() => localStorage.getItem('otsim.behind')), '1');
 
     // no horizontal scroll; axe on the paused theatre
