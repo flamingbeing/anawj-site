@@ -616,4 +616,13 @@ trainee change them per device):
 | Systolic BP (last NIBP) | < 85 → medium | > 180 → medium |
 | Temperature (core) | < 35 °C → medium | > 38.5 → low |
 
-Still to come in M3.3: trainee-set limits, technical alarms (probe off, disconnection, no CO₂ detected) and the Log tab.
+**Technical alarms** (M3.3 slice 2) are sensor/airway conditions rather than numeric breaches, read from the other
+subsystems' previous step:
+
+| Alarm | Priority | Fires when | Teaches |
+|---|---|---|---|
+| No CO₂ — check the tube and circuit | high | the ventilator is delivering breaths but EtCO₂ ≈ 0 | oesophageal tube, disconnection, or no pulmonary flow in arrest |
+| SpO₂ — no pulse detected | medium | the rhythm is non-perfusing (VF, torsades, asystole, PEA) | the oximeter cannot read without a pulse; it replaces the numeric SpO₂ alarm |
+
+Still to come in M3.3: trainee-set limits, a ventilator-disconnection technical alarm (needs a circuit-disconnect state),
+and the Log tab.

@@ -37,14 +37,38 @@ export const ALARM_LIMITS = {
 };
 const alarmKey = a => a.param + a.dir;
 
-// evaluate the alarms against the freshly-computed displayed values; mutates out.{breach,alarms,silencedUntil}
-function evalAlarms(out, m, ctx, t) {
+// Technical alarms (M3.3 slice 2): not a numeric breach but a sensor/airway condition, from the other slices' previous
+// step. "No CO₂" fires when the ventilator is delivering breaths but almost no CO₂ comes back (an oesophageal tube, a
+// disconnection, or no pulmonary blood flow in an arrest) — the key teaching signal. "SpO₂ no pulse" fires in a
+// non-perfusing rhythm, when a pulse oximeter cannot read; it then replaces the SpO₂ numeric alarm. [D]
+const NON_PERFUSING = new Set(['vf', 'torsades', 'asystole', 'pea']);
+const TECHNICAL = [
+  { key: 'noco2', priority: 'high', dir: 't', msg: 'No CO₂ — check the tube and circuit',
+    test: (out, prev) => prev.resp && prev.resp.mode !== 'spont' && out.etco2 < 2 },
+  { key: 'spo2sig', priority: 'medium', dir: 't', msg: 'SpO₂ — no pulse detected',
+    test: (out, prev) => !!(prev.rh && NON_PERFUSING.has(prev.rh.base)) },
+];
+
+// evaluate the alarms against the freshly-computed displayed values and the previous step; mutates
+// out.{breach,alarms,silencedUntil}
+function evalAlarms(out, prev, ctx, t) {
+  const m = prev.mon;
   let silencedUntil = m.silencedUntil || 0;
   for (const a of ctx.actions) if (a.type === 'alarmSilence') silencedUntil = a.off ? 0 : t + SILENCE;
 
   const vals = { spo2: out.spo2, hr: out.hr, etco2: out.etco2, rr: out.rr, nibpSys: out.nibp.last ? out.nibp.last.sys : null, temp: out.temp };
   const breach = { ...(m.breach || {}) }, active = [];
+  // technical alarms first, so an active one can suppress a numeric alarm that cannot be trusted
+  const techOn = {};
+  for (const T of TECHNICAL) {
+    const on = T.test(out, prev);
+    if (!on) { delete breach[T.key]; continue; }
+    const was = breach[T.key], since = was ? was.since : t;
+    breach[T.key] = { dir: T.dir, since };
+    if (t - since >= ONSET[T.priority]) { active.push({ param: T.key, dir: T.dir, priority: T.priority, msg: T.msg, since, tech: true }); techOn[T.key] = true; }
+  }
   for (const p in ALARM_LIMITS) {
+    if (p === 'spo2' && techOn.spo2sig) { delete breach[p]; continue; } // no numeric SpO₂ alarm with no pulse to read
     const L = ALARM_LIMITS[p], v = vals[p];
     let dir = null, pr = null, msg = null;
     if (v == null || Number.isNaN(v)) { delete breach[p]; continue; }
@@ -56,8 +80,8 @@ function evalAlarms(out, m, ctx, t) {
     if (t - since >= ONSET[pr]) active.push({ param: p, dir, priority: pr, msg, since });
   }
   const prevKeys = new Set((m.alarms || []).map(alarmKey)), nowKeys = new Set(active.map(alarmKey));
-  for (const a of active) if (!prevKeys.has(alarmKey(a))) ctx.log({ kind: 'alarm', param: a.param, dir: a.dir, priority: a.priority, msg: a.msg, state: 'on' });
-  for (const a of (m.alarms || [])) if (!nowKeys.has(alarmKey(a))) ctx.log({ kind: 'alarm', param: a.param, dir: a.dir, priority: a.priority, msg: a.msg, state: 'off' });
+  for (const a of active) if (!prevKeys.has(alarmKey(a))) ctx.log({ kind: 'alarm', param: a.param, dir: a.dir, priority: a.priority, msg: a.msg, tech: !!a.tech, state: 'on' });
+  for (const a of (m.alarms || [])) if (!nowKeys.has(alarmKey(a))) ctx.log({ kind: 'alarm', param: a.param, dir: a.dir, priority: a.priority, msg: a.msg, tech: !!a.tech, state: 'off' });
   out.breach = breach; out.alarms = active; out.silencedUntil = silencedUntil;
 }
 
@@ -141,7 +165,7 @@ export const monitor = {
       }
       if (tof !== m.tof) out.tof = tof;
     }
-    evalAlarms(out, m, ctx, t);
+    evalAlarms(out, prev, ctx, t);
     return out;
   },
   rebase(m, off) {

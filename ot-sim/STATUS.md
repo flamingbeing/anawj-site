@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-15 by Claude Code (build session: M2.7-M3.2 merged, M3.2 complete; M3.3 slice 1 alarm engine + bar).
+Last updated: 2026-10-15 by Claude Code (build session: M2.7-M3.2 merged; M3.3 slice 1 alarm engine+bar merged; slice 2 technical alarms).
 
 ## Now
 
@@ -19,13 +19,17 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next
 
-1. M3.3 slice 2: trainee-set alarm limits (an Alarms settings area/menu) and technical alarms (probe off,
-   disconnection, no CO₂ detected). Then slice 3: the Log tab. Then M4.x: `conditions.js`/`events.js` scenario engine +
-   crisis scenarios (the "diverse use cases" goal).
+1. M3.3 slice 3: trainee-set alarm limits (an Alarms settings area/menu, per device). Then the Log tab. (A
+   ventilator-disconnection technical alarm likely rides with the scenario engine's circuit state.) Then M4.x:
+   `conditions.js`/`events.js` scenario engine + crisis scenarios (the "diverse use cases" goal).
 
 ## Recently done
 
-- M3.3 slice 1 (15 Oct 2026, #622→next): the alarm engine (`monitor.js`) — per-parameter limits (defaults in
+- M3.3 slice 2 (15 Oct 2026, #628→next): technical alarms (`monitor.js`) — "No CO₂ — check the tube and circuit"
+  (high; ventilating but EtCO₂≈0: oesophageal tube/disconnection/arrest) and "SpO₂ — no pulse detected" (medium;
+  non-perfusing rhythm, replaces the numeric SpO₂ alarm). Same engine/bar; logged `tech:true`. MODEL.md §14 +
+  `test/alarms.test.mjs` + e2e.
+- M3.3 slice 1 (15 Oct 2026, #628): the alarm engine (`monitor.js`) — per-parameter limits (defaults in
   MODEL.md §14), three IEC priorities, onset debounce, 2-min silence, logged in simulated time (onset identical at any
   speed); the alarm bar at the top of the monitor (top alarm, colour/flash, aria-live, +N more, Silence). Physiological
   alarms only; technical alarms and trainee-set limits are slice 2. `test/alarms.test.mjs` + e2e.

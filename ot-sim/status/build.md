@@ -54,6 +54,13 @@
   count, and the Silence button/countdown. `test/alarms.test.mjs` (limits well-formed, SpO2 high alarm on apnoea,
   onset-time identical bulk vs one-by-one, silence); e2e drives hypoxia and checks the bar + silence + axe.
   `tools/test-ot-sim.sh`, check, proofread green.
-- M3.3 still to come (slice 2+): trainee-set limits and technical alarms (probe off, disconnection, no CO₂ detected);
-  then the Log tab (slice 3). Then M4.x (`conditions.js`/`events.js` scenario engine + the crisis scenarios — the
-  "diverse use cases" goal).
+- M3.3 slice 2 built on this branch (from main after #628 merged): technical alarms in `monitor.js` — sensor/airway
+  conditions rather than numeric breaches, read from the other slices' previous step, through the same engine/bar.
+  **"No CO₂ — check the tube and circuit"** (high) fires when the ventilator delivers breaths but EtCO₂ ≈ 0
+  (oesophageal tube, disconnection, arrest — the headline teaching signal); **"SpO₂ — no pulse detected"** (medium)
+  fires in a non-perfusing rhythm (VF/torsades/asystole/PEA) and replaces the numeric SpO₂ alarm (no pulse to read).
+  Logged with `tech:true`. MODEL.md §14 table updated. `test/alarms.test.mjs` + e2e cover both. Green under
+  `tools/test-ot-sim.sh`, check, proofread.
+- M3.3 still to come: trainee-set limits (slice 3) and a ventilator-disconnection technical alarm (needs a
+  circuit-disconnect state — likely with the scenario engine); then the Log tab. Then M4.x (`conditions.js`/`events.js`
+  scenario engine + the crisis scenarios — the "diverse use cases" goal).
