@@ -848,7 +848,7 @@ function paintWho() {
     : flags ? h('span', { class: 'who-flag' }, flags) : null;
   // sync: cases saved on this phone but not yet on the server (no signal), or all synced
   const sync = !S.user ? null : writes.pending()
-    ? h('a', { href: '#recovery', class: 'sync wait' }, writes.entries().some(x => x.state === 'failed' || x.state === 'conflict') ? 'Save needs attention' : 'Saved locally · pending sync')
+    ? h('a', { href: '#recovery', class: 'sync wait' }, writes.attention() ? 'Save needs attention' : 'Saved locally · pending sync')
     : cloud.demo ? null : S.pending
     ? h('span', { class: 'sync wait', title: navigator.onLine ? 'Saving to the server…' : 'Saved on this phone; will sync when there is signal' }, navigator.onLine ? '⟳ Saving' : '⏳ Will sync')
     : S.casesSynced ? h('span', { class: 'sync ok', title: 'All your cases are saved to the server' }, '✓ Synced') : null;

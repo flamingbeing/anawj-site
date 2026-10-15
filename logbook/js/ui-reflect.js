@@ -280,13 +280,15 @@ function subView() {
 }
 const openView = v => { rv.view = v; rv.editMode = false; rv.sel.clear(); hooks.render(); };
 
-// Move reflections to the recycle bin (restorable for 30 days). Returns how many moved.
-async function binReflections(list) {
+// Move reflections to the recycle bin (restorable for 30 days). Returns how many moved. extra: moveToBin's ({ base }
+// from the editor)
+async function binReflections(list, extra = {}) {
   const m = await loadMod('./bin.js');
   if (!m || !m.moveToBin) { toast('The recycle bin isn’t available yet, so nothing was deleted.'); return 0; }
   let n = 0;
   for (const r of list) {
-    try { await m.moveToBin('reflection', r); n++; } catch (err) { toast('Could not delete: ' + err.message); break; }
+    // (changed elsewhere: the bin has already said it was kept, more clearly)
+    try { await m.moveToBin('reflection', r, extra); n++; } catch (err) { if (!/changed elsewhere/.test(err.message)) toast('Could not delete: ' + err.message); break; }
   }
   return n;
 }
@@ -1126,7 +1128,11 @@ function editor() {
       if (!current()) return;
       autosave.cancel();
       if (!r.id && !await persist()) return;   // images saved but the reflection never was: save it so the bin keeps both
-      const n = await binReflections([JSON.parse(JSON.stringify(r))]);
+      if (session.saving) await session.saving;   // a save on its way: the delete checks the version it saved
+      if (!current()) return;
+      // the bin keeps what is on screen (unsaved typing too); the delete checks the version last saved here, so one
+      // changed on another device since is kept
+      const n = await binReflections([JSON.parse(JSON.stringify(r))], { base: session.base });
       if (!n || !current()) return;
       await editorTransient.close(); if (S.user?.email !== owner) return;
       toast('Reflection moved to the recycle bin', { action: 'Recycle bin', onaction: () => openView('bin') });

@@ -318,3 +318,13 @@ test('opening the other copy and saving it unchanged changes nothing, compared a
   await q.save('case', 'a', { ...shown }, shown);
   assert.deepEqual(states(q, 'N'), ['conflict:Fake mine'], 'the conflict is still there to choose');
 });
+test('one job followed by its key while a later save of the same record waits behind it', async () => {
+  // a delete waiting for signal, then a restore of the same record: status() is the restore's, stateOf(key) the delete's
+  const f=fixture();f.remote.set('1',{id:'1',details:'kept'});f.online(false);
+  await f.queue.save('case','a',{id:'1',_deleted:true},{id:'1',details:'kept'});const key=f.queue.jobKey('case','1');
+  f.remote.set('1',{id:'1',details:'changed elsewhere'});await f.queue.save('case','a',{id:'1',details:'kept'});
+  assert.notEqual(f.queue.jobKey('case','1'),key);f.online(true);f.queue.kick();
+  for(let i=0;i<40&&f.queue.stateOf(key)==='pending';i++)await new Promise(r=>setTimeout(r,20));
+  assert.equal(f.queue.stateOf(key),'conflict');assert.equal(f.queue.status('case','1'),'pending','the restore waits behind it');
+  assert.equal(f.queue.stateOf('nope'),'');assert.equal(f.queue.jobKey('case','none'),'');
+});

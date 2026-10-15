@@ -41,6 +41,18 @@ portfolio content.
 - More → **Export / Import** (`#data`): **Export** = the Word portfolio only (it holds everything APMES needs);
   **Import** = reflections from Word (`#reflimport`) and the logbook from Excel/CSV; **Backup** = backup file and
   restore, Excel spreadsheet. Keep that wording. The Logbook and Reflections tabs have no More tools cards.
+- **Backup file and restore** (`backup.js`; unit `test/backup.test.mjs`, e2e `bugfixes.mjs`; audit, 14 Oct 2026): both
+  wait for the server's copy first (`S.casesSynced && S.reflectionsSynced`, then `notesFromServer`). A new phone, or
+  one signed in again (sign-out wipes the device copy), shows an empty list until it comes, and a restore then counted
+  every case and reflection as missing and wrote the backup's older copies over newer ones with blind sets. Restore
+  waits up to 30 s ("Your logbook is still loading (no signal?), try again"), works out what's missing again when
+  Restore is tapped (`restorePlan`; toast "Restoring…"), and writes cases and reflections only where the server has no
+  document with that id (`cloud.addMissing`: ids looked up on the server 30 at a time with `documentId() in`, four
+  lookups at once, a read per one found, then batches; it needs signal); notes go through the write queue with base
+  null. Save to Google Drive / Dropbox takes
+  everything as the server has it (`makeBackup({ fromServer: true })`, "Not saved" after 30 s; the notes zip then
+  reads the same notes). Download backup and the spreadsheet wait 10 s, then save this device's copy and say so in
+  the toast (a backup made offline still helps), or stop if the device has nothing yet.
 - **Excel backup** (`export-opts.js`, tested; dialog in `ui-logbook.js` `downloadExcel`): logbook + reflections
   (or one), date range, columns ticked and ordered, tag/date style, Summary sheet; saved as
   `settings.excelExport`. The Cases sheet keeps a hidden id column and a veryHidden "Export info" sheet
@@ -459,7 +471,8 @@ portfolio content.
   Enter in the title moves to the note text): # headings, **bold**, - / 1. lists, - [ ] to-dos that tick in
   Preview, http(s)/mailto links only. No images. Delete → recycle bin (kind `note`, 30 days; restore refuses past 100).
   Firebase cost: notes are not read at sign-in; `ensureNotes()` starts the listener on first need (the page, a day
-  with notes in the Logbook, the Markdown export, a backup) and keeps it for the visit. Typing saves after 3 s of
+  with notes in the Logbook, the Markdown export, a backup) and keeps it for the visit. Sync, the backups and a
+  restore wait for the server's list (`notesFromServer`): this device's copy may be weeks old. Typing saves after 3 s of
   quiet, on blur, on leaving (Back, another tab) and on pagehide / hidden, through `writes.save('note')` →
   `cloud.commitRecord` (offline queue, conflict check). The note index { days, cases, n } (`logbooks/{email}/meta/
   noteIndex`, owner only; updated only from the server's copy of the notes) lets the Logbook show a bar on days with
@@ -641,7 +654,11 @@ portfolio content.
 - Deletions: the recycle bin is a feed of tombstones (`deletedAt > syncAt - 10 min`): a binned record goes only if it
   is still the version that was binned (the entry's `data.updatedAt`; restored or edited elsewhere since, it stays, so
   a bin entry whose delete was refused as a conflict removes nothing). Deletes on this device (`commitRecord`
-  `_deleted`, `deleteCases`, `deleteReflection`) drop the record from the local copy and remember its id (`gone`,
+  `_deleted`: every move to the bin, cases, reflections and notes alike, checked against the version being deleted;
+  a restore from the bin goes through the write queue too, base null, so it waits behind a delete still waiting for
+  signal and lands after it, and `watchDeletes` follows each delete's own job (`writes.jobKey` / `stateOf`), not the
+  record's latest, so a refused delete is still rolled back with a restore queued behind it; `deleteCases`,
+  `deleteReflection`) drop the record from the local copy and remember its id (`gone`,
   8 days), so a stale copy arriving later is ignored. A removal the server confirms goes at once; one seen only in the
   cache, or after this device's own pending write (a refused write), is checked with one read. Delete account stops
   the listeners first.
@@ -649,7 +666,7 @@ portfolio content.
   case, plan "done" / pasted-list Undo, Recent changes restoring a deletion) while another device was closed stays on
   that device until then, as does a write stamped by a clock more than 10 minutes slow. A bin-entry tombstone for
   these was considered and not used: older app versions would show it in the recycle bin as an empty case to restore.
-- Late writes: direct writes (pasted lists, bulk tag, reflections saved outside the editor, bin entries) that reach the
+- Late writes: direct writes (pasted lists, reflections saved outside the editor, bin entries) that reach the
   server more than 5 minutes after they were made (offline) are stamped again once the server has them
   (`restampIfLate` in `cloud.js`, one small write per record so one deleted since doesn't block the rest; ids listed in
   `apmes-logbook-late:<email>` from the moment they're queued until the server has them, so a page closed first
@@ -823,6 +840,8 @@ restore elsewhere is a newer one), or its delete took the record off. Windows th
 home-screen app and a browser tab) read a save's stored state again just before sending it, on Retry and when a
 failed save is reused, so one another window already sent or set aside is not sent again (nor one it has since
 dropped from the history: gone, with 100 newer finished saves in the store).
+
+Changes to many logged cases at once (Tag N cases, Settings → tag Merge, a spreadsheet's Changed rows) also go through the queue, case by case with the version each change was made from (`updateMany` in `ui-core.js`; audit, 14 Oct 2026): a blind batch overwrote a case changed on another device meanwhile, with no conflict and no copy. Now that case keeps the other device's version, both are in Recent changes, and the toast says how many were kept (with a Recent changes button). A case whose saves already met such a change (an unresolved conflict) is left alone and counted as kept: a save queued behind it never synced, and either choice in Recent changes then set it aside. The safe way on for a kept case is **Keep version from elsewhere**, then the same tag change or merge again (the toast says so); "Restore my version" puts this device's older copy back over the other device's edit. Ten at a time, each batch waiting (10 s at most) until its saves are done, so the counts say what happened: on a connection slower than the 180 ms `save()` waits, a conflict was found only after the case had counted as saved, and a merge took the old tag off the list. A merge takes the old tag off the list only when every case saved; offline saves, and any still on their way after a batch's 10 s (a connection that only looks online; the batches after it then don't wait), count as saved, and one that meets a change later shows as "Save needs attention", as for one edit. The list repaints once a batch, not on each save's state change (that sorted, overlaid and counted every case about three times a case: 300 cases took over half a minute on a 1,500-case logbook; now about 9 s online in the demo, under a second offline), with "Saving N cases… n done" meanwhile; it stops if the account changes. Each case costs a read and a write, and a big change pushes older entries out of the 100-version history. Only brand-new cases (pasted lists, plans, a backup's missing cases) still go in one batch (`saveMany`). Lesson: anything that saves many records through the queue should hold the per-save repaint (`holding` in `ui-core.js`; multi-delete in `bin.js` doesn't yet), and code run on every queue change uses `writes.attention()` / `conflicted()` / `status()` rather than `writes.entries()` (a deep copy of every entry).
 
 Case and reflection drafts use separate document slots, including when session storage is cloned into a duplicated tab. Case input writes synchronously and flushes on pagehide/hidden; draft status reports storage failures. Recovering a draft preserves the currently open draft in its previous slot.
 

@@ -83,7 +83,8 @@ function healDayNotes() {
     s.saving = mergeDaySave(n, s, me).then(ok => { if (ok) s.status?.(s.dirty ? 'Not saved yet' : 'Saved'); return !!ok; },
       err => { s.dirty = true; s.status?.('Not saved: ' + err.message); return false; }).finally(() => { s.saving = null; });
   }
-  if (!me) return;
+  // (every save of anything comes through here: entries() copies them all, so only when a note's save needs attention)
+  if (!me || !writes.attention('note')) return;
   for (const job of writes.entries()) {
     const id = job.record && job.record.id;
     if (job.kind !== 'note' || job.state !== 'conflict' || job.owner !== me || !isDayNote(job.record) || open.has(id) || healing.has(id)) continue;
@@ -100,13 +101,18 @@ async function healClosed(job, me) {
   await writes.archive((group[0] || job).key);   // (the newest: archive sets aside that one and older)
   await writes.save('note', me, mergeDayNote(local, base, job.remote), job.remote || null);
 }
-// the notes as the server has them (not a possibly stale offline copy), for anything that must not miss one (Sync)
-export async function notesFromServer(ms = 30e3) {
+// the notes as the server has them (not a possibly stale offline copy), for anything that must not miss one (Sync,
+// the backups and a restore); again: the button the error tells to tap
+export async function notesFromServer(ms = 30e3, again = 'Sync') {
   const me = mine();
   if (!me) return [];
-  await ensureNotes();
-  for (const t0 = Date.now(); !(synced && owner === me); await new Promise(r => setTimeout(r, 250)))
-    if (Date.now() - t0 > ms || mine() !== me) throw new Error('your notes didn’t finish loading (no signal?). Tap Sync again.');
+  const t0 = Date.now(), fail = () => new Error(`your notes didn’t finish loading (no signal?). Tap ${again} again.`);
+  // the first answer counts in the time too (a new device with a stalled connection can wait long for it)
+  let timer;
+  try { await Promise.race([ensureNotes(), new Promise((_, no) => { timer = setTimeout(() => no(fail()), ms); })]); }
+  finally { clearTimeout(timer); }
+  for (; !(synced && owner === me); await new Promise(r => setTimeout(r, 250)))
+    if (Date.now() - t0 > ms || mine() !== me) throw fail();
   return S.notes || [];
 }
 
