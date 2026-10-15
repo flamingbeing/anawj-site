@@ -134,8 +134,16 @@ has('2/12 herniotomy', ['20', '20i']);
 has('18mo hypospadias', ['20', '20ii']);
 lacks('18mo hypospadias', ['20i', '20iii'], 0);
 lacks('QRS 45F lap chole', ['20', '20iii', '21'], 0);
-lacks('QRS 14/M appendicectomy', ['20'], 0.5);
-has('QRS 14/M appendicectomy', ['20'], 0.4);
+// EPA 9 is to 16 years: 13 to 16 ticks Paeds (no band); over 16 drops every Paeds guess, shorthand ones too
+has('QRS 14/M appendicectomy', ['20'], 0.5);
+lacks('QRS 14/M appendicectomy', ['20i', '20ii', '20iii'], 0);
+has('QRS 16F tonsillectomy', ['20'], 0.5);
+lacks('QRS 17F tonsillectomy', ['20'], 0);
+for (const t of ['ZZ 18/M circumcision', 'ZZ 18M circumcision penile block', 'ZZ 40yo circumcision']) {
+  assert.ok(!suggest(t, { limit: 10 }).some(s => /^20/.test(s.code)), 'an adult is not Paeds: ' + t);
+}
+assert.ok(suggest('circumcision', { limit: 10 }).some(s => s.code === '20'), 'no age: the word still suggests Paeds');
+assert.ok(suggest('ZZ 5yo circumcision', { limit: 10 }).some(s => s.code === '20' && s.score >= 0.5));
 has('sleeve gastrectomy BMI 45', ['22']);
 lacks('BMI 30 TKR', ['22'], 0);
 assert.equal(suggest('QRS 78M BMI 42 TKR').find(s => s.code === '21').why, 'age');

@@ -1067,11 +1067,12 @@ function renderBulk(card) {
   if (bulkRows) paintBulk(out);
 }
 
-// A pasted list read into rows: the confident suggestions ticked, and your own tags whose shorthand a row uses
-// (Tag editor) with what they count towards, as a single case would offer them.
+// A pasted list read into rows: the confident suggestions ticked only with Settings → Logging → "Tick confident
+// suggestions automatically" (as a single case; owner, 15 Oct 2026), else offered as chips with "Tick all
+// suggestions"; and your own tags whose shorthand a row uses (Tag editor) with what they count towards.
 function reviewRows(text) {
   const on = settings().suggestions !== false;
-  return parseBulk(text, on ? t => suggest(t) : null, undefined, { labels: labels() }).map(r => {
+  return parseBulk(text, on && settings().autoTick ? t => suggest(t) : null, undefined, { labels: labels() }).map(r => {
     const tags = on && r.details ? shorthandTags(tagSet(), forTags(r.details)) : [];
     return { ...r, tags, cats: tags.length ? sortCodes(withParents([...r.cats, ...tags.flatMap(tagLinks)])) : r.cats };
   });
@@ -1108,8 +1109,15 @@ function paintBulk(out) {
           sugg.map(s => catChip(s.code, { cls: `sugg ${s.score >= STRONG ? 'strong' : ''}`, title: 'Suggested: ' + catFull(s.code), onclick: () => { r.cats = addCat(r.cats, s.code); paintBulk(out); } }))) : null),
       h('td', {}, h('button', { class: 'small danger icon-btn', title: 'Drop this case', 'aria-label': 'Drop this case', onclick: () => { bulkRows.splice(i, 1); paintBulk(out); } }, '×')));
   }));
+  // the confident suggestions of every row, ticked in one tap (the bold chips)
+  const strong = r => (on && r.details.trim() ? suggest(r.details).filter(s => s.score >= STRONG && !r.cats.includes(s.code)).map(s => s.code) : []);
+  const anyStrong = bulkRows.some(r => strong(r).length);
   fill(out, 
     h('h3', {}, `${bulkRows.length} case${bulkRows.length === 1 ? '' : 's'}`),
+    anyStrong ? h('div', { class: 'bar', style: 'margin:0 0 8px' }, h('button', { class: 'small', onclick: () => {
+      for (const r of bulkRows) { const add = strong(r); if (add.length) r.cats = sortCodes(withParents([...r.cats, ...add])); }
+      paintBulk(out);
+    } }, 'Tick all suggestions'), h('span', { class: 'hint', style: 'margin:0 0 0 8px' }, 'The confident ones, in bold.')) : null,
     missing ? h('p', { class: 'tip' }, `${missing} case${missing === 1 ? ' has' : 's have'} no tag yet.`) : null,
     h('div', { class: 'scroll' }, h('table', { class: 'bulk' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Details'), h('th', {}, 'Tags'), h('th', {}))), tbody)),
     h('div', { class: 'actions' }, h('button', { class: 'primary big', onclick: saveBulk }, `Save all ${bulkRows.length}`),
