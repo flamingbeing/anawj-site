@@ -37,18 +37,18 @@ const uid = (() => { let n = 0; return p => `${p}-${++n}`; })();
 export async function renderForm(id) {
   injectCss();
   descPool();
-  if (!id) return empty('No evaluation chosen', null, h('a', { class: 'n-btn', href: '#pending' }, 'Evaluations'));
+  if (!id) return empty('No evaluation chosen', null, h('a', { class: 'a-btn', href: '#pending' }, 'Evaluations'));
   let ev = findLocal(id);
   if (!ev) {
     try { ev = await cloud.getEvaluation(id); } catch (err) { console.warn(err); }
   }
   if (!ev) {
-    if (!navigator.onLine) return empty('Evaluation not found', 'Opens when you have signal.', h('a', { class: 'n-btn', href: '#pending' }, 'Evaluations'));
+    if (!navigator.onLine) return empty('Evaluation not found', 'Opens when you have signal.', h('a', { class: 'a-btn', href: '#pending' }, 'Evaluations'));
     const as = linkAccount();
     if (as && as !== S.user?.email) return h('div', { class: 'e-stack' }, wrongAccountCard());
     return empty('Evaluation not found', ['It may have been withdrawn, or it was sent to a different account. You’re signed in as ', h('b', {}, S.user?.email || ''), '.'],
-      h('div', { class: 'e-actions' }, h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#pending' }, 'Evaluations'),
-        cloud.demo ? null : h('button', { class: 'n-btn', type: 'button', onclick: switchAccount }, 'Switch account')));
+      h('div', { class: 'e-actions' }, h('a', { class: 'a-btn a-btn--tinted e-btn-quiet', href: '#pending' }, 'Evaluations'),
+        cloud.demo ? null : h('button', { class: 'a-btn', type: 'button', onclick: switchAccount }, 'Switch account')));
   }
   if (ev.residentEmail === S.user?.email && ev.assessorEmail !== S.user?.email) {
     history.replaceState(null, '', location.pathname + location.search + '#r/' + encodeURIComponent(ev.id));
@@ -326,8 +326,8 @@ class FormScreen {
         h('p', {}, err.code === 'permission-denied' ? 'The request is no longer open, or the 15-minute edit window has passed.' : 'Couldn’t send. Check your signal and try again.'),
         h('p', { class: 'e-small' }, err.code === 'permission-denied' ? 'Copy your answers now if you want to keep them.' : 'Your answers are kept on this device.'),
         h('div', { class: 'e-actions' },
-          h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => copyAnswers(this.form, this.cleanAnswers()) }, 'Copy my answers'),
-          h('button', { class: 'n-btn', onclick: () => m.close() }, 'OK')),
+          h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', onclick: () => copyAnswers(this.form, this.cleanAnswers()) }, 'Copy my answers'),
+          h('button', { class: 'a-btn', onclick: () => m.close() }, 'OK')),
       ]);
     }
   }
@@ -341,7 +341,7 @@ class FormScreen {
         code = r.code; other.hidden = code !== 'other'; err.hidden = true;
         if (code === 'other') other.focus();
       } }), h('span', { class: 'e-radio__text' }, r.label))));
-    const ok = h('button', { class: 'n-btn n-btn--alert', onclick: async () => {
+    const ok = h('button', { class: 'a-btn a-btn--danger', onclick: async () => {
       const text = other.value.trim();
       if (!code || (code === 'other' && !text)) { err.textContent = !code ? 'Choose a reason' : 'Say why in a few words'; err.hidden = false; return; }
       ok.disabled = true;
@@ -364,7 +364,7 @@ class FormScreen {
     const m = modal('I can’t assess this', [
       h('p', { class: 'e-small' }, 'The resident is told you couldn’t assess this case and can send it to another assessor.'),
       radios, other, err,
-      h('div', { class: 'e-actions' }, h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => m.close() }, 'Cancel'), ok),
+      h('div', { class: 'e-actions' }, h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', onclick: () => m.close() }, 'Cancel'), ok),
     ]);
   }
 
@@ -386,22 +386,23 @@ class FormScreen {
     add(root, this.header(), this.subject(), this.notice(), this.mode === 'fill' ? howTo() : null);
     // others see answers only once submitted (the resident's result screen is #r/{id})
     const hideAnswers = this.mode === 'view' && !this.isAssessor && ev.status !== 'submitted';
-    if (hideAnswers) root.append(h('div', { class: 'e-q e-center' }, h('a', { class: 'n-btn', href: '#r/' + encodeURIComponent(ev.id) }, 'Request details')));
+    if (hideAnswers) root.append(h('div', { class: 'e-q e-center' }, h('a', { class: 'a-btn', href: '#r/' + encodeURIComponent(ev.id) }, 'Request details')));
+    // each section is one inset group (the app kit's grouped list), its title the caption above it
     for (const sec of hideAnswers ? [] : form.sections) {
       if (sec.title) root.append(h('h2', { class: 'e-section' }, sec.title));
-      for (const q of sec.questions) root.append(this.question(q));
+      root.append(h('div', { class: 'e-qgroup' }, sec.questions.map(q => this.question(q))));
     }
     if (this.editable) {
       this.gapsEl = h('p', { class: 'e-alert e-form__gaps', role: 'alert', hidden: true });
       this.liveEl = h('span', { class: 'e-sr', 'aria-live': 'polite' });
       this.countEl = h('button', { type: 'button', class: 'e-submitbar__count', onclick: () => this.jumpToGap(false) });
-      const btn = h('button', { type: 'button', class: 'n-btn e-go', onclick: () => this.submit(btn) }, this.mode === 'edit' ? 'Save changes' : 'Submit');
+      const btn = h('button', { type: 'button', class: 'a-btn e-go', onclick: () => this.submit(btn) }, this.mode === 'edit' ? 'Save changes' : 'Submit');
       this.barEl = h('div', { class: 'e-submitbar' }, this.countEl, btn, this.liveEl);
       add(root, this.gapsEl,
         h('p', { class: 'e-attest' }, `By submitting you confirm you directly observed${form.id === 'ebd' ? ' and co-managed' : ''} this case.`),
         this.barEl);
     } else {
-      root.append(h('div', { class: 'e-q e-center' }, h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#pending' }, 'Back to Evaluations')));
+      root.append(h('div', { class: 'e-q e-center' }, h('a', { class: 'a-btn a-btn--tinted e-btn-quiet', href: '#pending' }, 'Back to Evaluations')));
     }
     this.paintState();
     if (this.restored) setTimeout(() => toast('Restored answers saved on this device'), 300);
@@ -443,7 +444,7 @@ class FormScreen {
     if (ev.status === 'submitted') {
       return h('div', { class: 'e-ok-note e-form__notice' },
         h('span', {}, `Submitted ${fmtDate(ev.submittedAt, { time: true })}${ev.assessorName ? ' by ' + ev.assessorName : ''}.`),
-        this.inWindow ? h('button', { class: 'n-btn e-btn-small', onclick: () => {
+        this.inWindow ? h('button', { class: 'a-btn a-btn--sm e-btn-small', onclick: () => {
           const s = new FormScreen(this.ev, this.form, 'edit');
           this.root.replaceWith(s.render());
         } }, `Edit answers (${Math.max(1, Math.ceil(((toMs(ev.submittedAt) + EDIT_MS) - Date.now()) / 60e3))} min left)`) : null);
@@ -524,7 +525,7 @@ class FormScreen {
     const body = h('div', { class: 'e-form__info-body' },
       h('dl', { class: 'e-kv' }, sc.options.map(o => [h('dt', {}, h('b', {}, o.value)), h('dd', {}, o.descriptor)])),
       q.na ? h('p', { class: 'e-small' }, `${sc.naLabel}: the item was not part of this case.`) : null);
-    const m = modal(q.label.length > 80 ? `Q${q.n}` : q.label, [body, h('div', { class: 'e-actions' }, h('button', { class: 'n-btn', onclick: () => m.close() }, 'Close'))]);
+    const m = modal(q.label.length > 80 ? `Q${q.n}` : q.label, [body, h('div', { class: 'e-actions' }, h('button', { class: 'a-btn', onclick: () => m.close() }, 'Close'))]);
     if (this.form.id !== 'dops') return;
     const exp = await dopsExpectations(this.ev.itemId, q.n).catch(() => null);
     if (!exp) return;
@@ -575,7 +576,7 @@ class FormScreen {
     const body = h('div', { class: 'e-form__info-body' },
       h('dl', { class: 'e-kv' }, rows.map(([k, v]) => [h('dt', {}, k), h('dd', {}, v)])),
       h('p', { class: 'e-small' }, 'Even numbers sit between two levels.'));
-    const m = modal(q.label.length > 80 ? `Q${q.n}` : q.label, [body, h('div', { class: 'e-actions' }, h('button', { class: 'n-btn', onclick: () => m.close() }, 'Close'))]);
+    const m = modal(q.label.length > 80 ? `Q${q.n}` : q.label, [body, h('div', { class: 'e-actions' }, h('button', { class: 'a-btn', onclick: () => m.close() }, 'Close'))]);
   }
 
   supervision(q, ro) {
@@ -749,10 +750,10 @@ function sentScreen(ev, edited, unsent = false) {
       h('p', {}, `${toolLabel(ev.tool)} for ${ev.residentName || ev.residentEmail}`),
       h('p', { class: 'e-small' }, ev.itemText || ''),
       h('p', { class: 'e-small' }, 'You can change your answers for 15 minutes from Evaluations › History.')),
-    h('button', { class: 'n-btn e-btn-big', onclick: tell }, icon('share'), ' Tell resident'),
-    next.length ? h('a', { class: 'n-btn n-btn--secondary e-btn-big', href: '#e/' + encodeURIComponent(next[0].id) },
+    h('button', { class: 'a-btn a-btn--block e-btn-big', onclick: tell }, icon('share'), ' Tell resident'),
+    next.length ? h('a', { class: 'a-btn a-btn--tinted a-btn--block e-btn-big', href: '#e/' + encodeURIComponent(next[0].id) },
       sameRes ? `Next for ${ev.residentName || 'this resident'} (${sameRes} left)` : `Next pending (${next.length})`) : null,
-    h('a', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', href: '#pending' }, 'Back to Evaluations'));
+    h('a', { class: 'a-btn a-btn--tinted a-btn--block e-btn-quiet e-btn-big', href: '#pending' }, 'Back to Evaluations'));
 }
 
 function resultLink(id) {
@@ -811,28 +812,27 @@ function injectCss() {
   document.head.append(h('style', { id: 'e-form-css' }, `
 .e-form__head { padding-bottom: 12px; }
 .e-form__headrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: -8px 0 4px; }
-.e-form__cant { min-height: var(--e-touch, 48px); font-size: var(--n-text-sm); color: var(--n-alert-ink); }
-.e-form__title { margin: 4px 0 2px; }
-.e-form__item { margin: 0 0 4px; font-weight: var(--n-semibold); }
+.e-form__cant { min-height: 44px; font-size: var(--a-text-sm); color: var(--a-danger); margin-right: -4px; }
+.e-form__title { margin: 4px 0 4px; font-size: 22px; font-weight: 700; line-height: 1.2; letter-spacing: -.02em; }
+.e-form__item { margin: 0 0 4px; font-weight: 600; }
 .e-form__date { margin: 0; }
-.e-form__case { padding: 0 16px 14px 84px; background: var(--n-bg); border-bottom: 1px solid var(--n-line); }
+.e-form__case { padding: 0 16px 14px 80px; }
 .e-form__subject .e-subject { border-bottom: 0; }
 .e-form__notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.e-form__howto summary { cursor: pointer; display: flex; align-items: center; gap: 6px; min-height: var(--e-touch, 48px); font-weight: var(--n-semibold); color: var(--n-navy); }
-.e-form__howto ul { margin: 8px 0 0; padding-left: 20px; font-size: var(--n-text-sm); }
+.e-form__howto summary { cursor: pointer; display: flex; align-items: center; gap: 6px; min-height: 44px; font-weight: 600; color: var(--a-tint); }
+.e-form__howto ul { margin: 4px 0 4px; padding-left: 20px; font-size: var(--a-text-sm); }
 .e-form__howto li { margin-bottom: 4px; }
-.e-form__howto { background: var(--e-info-bg); }
-.e-form__info { min-height: var(--e-touch, 48px); font-size: var(--n-text-sm); text-decoration: none; }
+.e-form > .e-form__howto { background: var(--a-tint-soft); padding-top: 4px; padding-bottom: 4px; }
+.e-form__info { min-height: 44px; font-size: var(--a-text-sm); text-decoration: none; }
 .e-form__info .e-ico { width: 20px; height: 20px; }
-.e-scale9__na { align-items: center; padding: 0 8px; }
 .e-form__change { min-height: var(--e-touch, 48px); font-size: var(--n-text-sm); margin-top: 4px; }
-.e-entrust { margin: 0 0 10px; padding: 10px 12px; background: var(--n-bg-blue); border-left: 3px solid var(--n-navy); }
-.e-entrust__title { margin: 0 0 6px; font-weight: 600; color: var(--n-navy); font-size: var(--n-text-sm); }
-.e-entrust__list { margin: 0; padding-left: 1.4em; font-size: var(--n-text-sm); color: var(--n-ink); }
+.e-entrust { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: var(--a-tint-soft); }
+.e-entrust__title { margin: 0 0 6px; font-weight: 600; color: var(--a-tint); font-size: var(--a-text-sm); }
+.e-entrust__list { margin: 0; padding-left: 1.4em; font-size: var(--a-text-sm); color: var(--a-ink); }
 .e-entrust__list li { margin: 0 0 6px; white-space: pre-line; }
 .e-form__idwarn { margin: 8px 0 0; padding: 8px 12px; }
 .e-form__gaps { margin: 0; }
-.e-form__jump { font-weight: var(--n-regular); color: var(--n-muted); }
+.e-form__jump { font-weight: 400; color: var(--a-ink-2); }
 .e-q > .e-q__more { margin: -4px 0 8px; }
 .e-submitbar__count.is-done { display: inline-flex; align-items: center; gap: 6px; }
 .e-form__exp { margin-top: 16px; }
@@ -840,10 +840,10 @@ function injectCss() {
 .e-form__exprow p { margin: 0 0 4px; }
 .e-form__info-body .e-kv { font-size: var(--n-text-sm); }
 .e-form__info-body ol { padding-left: 20px; font-size: var(--n-text-sm); }
-.e-form__sent { padding: 16px; }
-.e-form__senticon { display: grid; place-items: center; width: 64px; height: 64px; margin: 0 auto 8px; border-radius: 50%; background: var(--e-ok-bg); color: var(--e-go); }
+.e-form__sent { padding: 8px 0 0; }
+.e-form__senticon { display: grid; place-items: center; width: 64px; height: 64px; margin: 0 auto 8px; border-radius: 50%; background: var(--a-ok-bg); color: var(--a-ok); }
 .e-form__senticon .e-ico { width: 36px; height: 36px; stroke-width: 3; }
-.e-form__sent .n-btn { gap: 8px; text-decoration: none; }
+.e-form__sent .a-btn { gap: 8px; text-decoration: none; }
 .e-pending__age--late { color: var(--n-alert-ink); font-weight: var(--n-semibold); }
 fieldset.e-q:disabled .e-cell, fieldset.e-q:disabled .e-choice, fieldset.e-q:disabled .e-radio, fieldset.e-q:disabled .e-milestone__opt { cursor: default; }
 `));

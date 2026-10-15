@@ -89,7 +89,7 @@ export function applyTheme(pref = themePref()) {
   if (typeof document === 'undefined') return;
   const dark = pref === 'dark' || (pref === 'auto' && !!darkQuery?.matches);
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#1c1f24' : '#002f6c');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#161618' : '#f9f9fb');
 }
 export function setTheme(pref) {
   try { pref === 'light' ? localStorage.removeItem(THEME_KEY) : localStorage.setItem(THEME_KEY, pref); } catch { /* storage blocked */ }
@@ -128,13 +128,15 @@ export function debounce(fn, ms) {
 }
 
 // toast('Saved', { action: 'Undo', onaction }) — one at a time, the newest wins.
+// The app kit's toast (nuhsdesign/app.js aToast) once it has loaded, else the page's own #toast.
 export function toast(msg, { action, onaction, ms = 4500 } = {}) {
+  if (typeof window !== 'undefined' && window.aToast) { window.aToast(msg, { action, onAction: onaction, ms }); return; }
   const t = document.getElementById('toast');
   if (!t) return;
-  fill(t, h('span', {}, msg), action ? h('button', { onclick: () => { t.classList.remove('show'); onaction(); } }, action) : null);
-  t.classList.add('show');
+  fill(t, h('span', {}, msg), action ? h('button', { onclick: () => { t.classList.remove('show', 'is-shown'); onaction(); } }, action) : null);
+  t.classList.add('show', 'is-shown');
   clearTimeout(toast.t);
-  toast.t = setTimeout(() => t.classList.remove('show'), ms);
+  toast.t = setTimeout(() => t.classList.remove('show', 'is-shown'), ms);
 }
 
 export function download(name, blob) {
@@ -143,15 +145,20 @@ export function download(name, blob) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-// A modal dialog (a bottom sheet on phones); returns { el, close }. Closes on backdrop tap / Esc.
+// A modal dialog: the app kit's bottom sheet (nuhsdesign/app.js aSheet: slides up; drag down, tap outside or
+// Esc closes it; a centred card on wide screens). Returns { el, close }.
+const kitSheet = () => (typeof window !== 'undefined' && window.aSheet) || null;
 export function modal(title, body, { onclose, cls = '' } = {}) {
   // the title takes the initial focus, so phones don't pop a keyboard on open
-  const el = h('dialog', { class: `e-dialog ${cls}` }, h('h2', { tabindex: '-1', autofocus: true }, title), body);
+  const el = h('dialog', { class: `a-sheet e-dialog ${cls}` },
+    h('div', { class: 'a-sheet-head' }, h('span'), h('h2', { tabindex: '-1', autofocus: true }, title), h('span')),
+    h('div', { class: 'a-sheet-body e-dialog__body' }, body));
   el.addEventListener('close', () => { el.remove(); onclose && onclose(); });
-  el.addEventListener('click', e => { if (e.target === el) el.close(); });
   document.body.append(el);
-  el.showModal();
-  return { el, close: () => el.close() };
+  const kit = kitSheet();
+  if (kit) kit.open(el);
+  else { el.addEventListener('click', e => { if (e.target === el) el.close(); }); el.showModal(); }
+  return { el, close: () => (kit ? kit.close(el) : el.close()) };
 }
 
 // The phone's Back button closes any open sheet or full-screen overlay (rather than leaving it over
@@ -161,15 +168,21 @@ if (typeof window !== 'undefined') window.addEventListener('popstate', () => {
   for (const o of document.querySelectorAll('.e-qr--full')) o.remove();
 });
 
+// A yes/no question: the app kit's centred alert (Cancel, then the answer; red when it destroys something).
 export function confirmBox(title, text, okLabel = 'OK', danger = false) {
   return new Promise(resolve => {
     let ok = false;
-    const m = modal(title, [
+    const kit = kitSheet();
+    const close = () => (kit ? kit.close(el) : el.close());
+    const el = h('dialog', { class: 'a-alert e-confirm', 'aria-labelledby': 'e-confirm-title' },
+      h('h2', { id: 'e-confirm-title', tabindex: '-1', autofocus: true }, title),
       h('p', {}, text),
-      h('div', { class: 'e-actions' },
-        h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => m.close() }, 'Cancel'),
-        h('button', { class: danger ? 'n-btn n-btn--alert' : 'n-btn', onclick: () => { ok = true; m.close(); } }, okLabel)),
-    ], { onclose: () => resolve(ok) });
+      h('div', { class: 'a-alert-actions' },
+        h('button', { type: 'button', onclick: () => close() }, 'Cancel'),
+        h('button', { type: 'button', class: danger ? 'is-default is-danger' : 'is-default', onclick: () => { ok = true; close(); } }, okLabel)));
+    el.addEventListener('close', () => { el.remove(); resolve(ok); });
+    document.body.append(el);
+    if (kit) kit.open(el); else el.showModal();
   });
 }
 
@@ -196,8 +209,8 @@ export function openInBrowserCard() {
     h('p', {}, 'Google doesn’t allow signing in inside WhatsApp’s (or Facebook’s, Instagram’s…) own browser. ',
       android ? 'Tap Open in Chrome, or ' : 'Tap ⋯ or the share button and choose “Open in Safari”, or ', 'copy the link and paste it into your browser.'),
     h('div', { class: 'e-actions' },
-      android ? h('a', { class: 'n-btn', href: chrome }, 'Open in Chrome') : null,
-      h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: copy }, 'Copy link')));
+      android ? h('a', { class: 'a-btn', href: chrome }, 'Open in Chrome') : null,
+      h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: copy }, 'Copy link')));
 }
 
 // Signed in with an account that isn't the one an assessor link was sent to (often a personal Gmail
@@ -208,7 +221,7 @@ export function wrongAccountCard() {
     h('h2', { class: 'e-h3' }, 'This evaluation was sent to another account'),
     h('p', {}, 'You’re signed in as ', h('b', {}, S.user?.email || ''), '.',
       as ? [' The request went to ', h('b', {}, as), '.'] : ' Sign in with the account the resident chose.'),
-    h('div', { class: 'e-actions' }, h('button', { class: 'n-btn e-btn-big', type: 'button', onclick: switchAccount }, 'Switch account')));
+    h('div', { class: 'e-actions' }, h('button', { class: 'a-btn a-btn--block e-btn-big', type: 'button', onclick: switchAccount }, 'Switch account')));
 }
 export async function switchAccount() {
   try { await cloud.signOut(); await cloud.signIn(linkAccount() || undefined); }
@@ -288,14 +301,16 @@ export function initials(name) {
 // Status chip for an evaluation: <span class="e-chip e-chip--overdue">Overdue</span>
 export function statusChip(ev, now = Date.now()) {
   const s = statusOf(ev, now);
-  return h('span', { class: `e-chip e-chip--${s.key}` }, s.label);
+  return h('span', { class: `a-pill ${PILL[s.key] || ''} e-chip e-chip--${s.key}` }, s.label);
 }
+// the app kit's pill colour for each status (engine.statusOf keys); grey for the rest
+export const PILL = { submitted: 'a-pill--ok', declined: 'a-pill--danger', overdue: 'a-pill--danger', sent: 'a-pill--tint', opened: 'a-pill--tint', 'in-progress': 'a-pill--warn', info: 'a-pill--tint' };
 
 export const toolLabel = t => ({ DOPS: 'DOPS', MiniCEX: 'Mini-CEX', EBD: 'EBD' }[t] || t || '');
 
 // ---------- small building blocks (optional, keep the screens consistent) ----------
 
-export const avatar = (name, cls = '') => h('span', { class: `e-avatar ${cls}`, 'aria-hidden': 'true' }, initials(name));
+export const avatar = (name, cls = '') => h('span', { class: `a-avatar e-avatar ${cls}`, 'aria-hidden': 'true' }, initials(name));
 
 // A list row: row({ name, title, meta, chip, dot, href | onclick })
 // stacked: the chip goes under the title (full-width titles on phones), meta may wrap to 2 lines
@@ -308,20 +323,22 @@ export function row({ name, title, meta, chip, dot, href, onclick, cls = '', sta
       stacked && chip ? h('span', { class: 'e-row__chips' }, chip) : null),
     dot ? h('span', { class: 'e-dot', title: 'Partly complete' }) : null,
     stacked ? null : chip || null,
-    icon('chevron', 'e-row__chev'),
+    chev(),
   ];
   if (stacked) cls += ' e-row--stacked';
-  return href ? h('a', { class: `e-row ${cls}`, href }, kids) : h('button', { type: 'button', class: `e-row ${cls}`, onclick }, kids);
+  return href ? h('a', { class: `a-row e-row ${cls}`, href }, kids) : h('button', { type: 'button', class: `a-row e-row ${cls}`, onclick }, kids);
 }
+// the app kit's chevron at the end of a row that opens something
+export const chev = () => h('span', { class: 'a-chev e-row__chev', 'aria-hidden': 'true' });
 
-export const empty = (title, text, action) => h('div', { class: 'e-empty' },
+export const empty = (title, text, action) => h('div', { class: 'a-empty e-empty' },
   icon('clipboard', 'e-empty__icon'), h('p', { class: 'e-empty__title' }, title), text ? h('p', {}, text) : null, action || null);
 
 // Segment control: segment([{ id, label, count }], current, onpick)
 export function segment(items, current, onpick) {
-  return h('div', { class: 'e-segment', role: 'tablist' }, items.map(it => h('button', {
+  return h('div', { class: 'a-seg e-segment', role: 'tablist' }, items.map(it => h('button', {
     type: 'button', role: 'tab', 'aria-selected': String(it.id === current), onclick: () => onpick(it.id),
-  }, it.label, it.count ? h('span', { class: 'e-badge' }, it.count) : null)));
+  }, it.label, it.count ? h('span', { class: 'a-badge e-badge' }, it.count) : null)));
 }
 
 // ---------- icons (inline SVG, 24x24, stroked) ----------

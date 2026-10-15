@@ -40,8 +40,8 @@ export function renderPending(sub) {
     if (!pend.length) {
       root.append(empty('Nothing waiting', 'When a resident sends you a DOPS, Mini-CEX or EBD it appears here. Their link opens it too.',
         h('div', { class: 'e-actions' },
-          hist.length ? h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#pending/history' }, 'See history') : null,
-          h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#how' }, 'How evals work'))));
+          hist.length ? h('a', { class: 'a-btn a-btn--tinted e-btn-quiet', href: '#pending/history' }, 'See history') : null,
+          h('a', { class: 'a-btn a-btn--tinted e-btn-quiet', href: '#how' }, 'How evals work'))));
     } else {
       root.append(h('p', { class: 'e-listhead' }, h('span', {}, `${pend.length} to complete`), h('span', {}, 'oldest first')),
         h('div', { class: 'e-list' }, pend.map(pendingRow)));

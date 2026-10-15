@@ -67,11 +67,12 @@ function paintTabs() {
   const tabs = visibleTabs();
   fill(tabsEl, tabs.map(t => {
     const n = t.badge ? t.badge() : 0;
+    // the app kit's tab bar: icon, short label, red count badge
     return h('a', {
       href: '#' + t.id, class: 'e-tab', 'aria-current': sel === t.id ? 'page' : null,
       'aria-label': n ? `${t.label}, ${n} need${n === 1 ? 's' : ''} action` : null,
-    }, h('span', { class: 'e-tab__icon' }, icon(t.icon), n ? h('span', { class: 'e-badge' }, n > 99 ? '99+' : n) : null),
-      h('span', { class: 'e-tab__label' }, t.label));
+    }, icon(t.icon), h('span', { class: 'e-tab__label' }, t.label),
+      n ? h('span', { class: 'a-badge e-badge' }, n > 99 ? '99+' : n) : null);
   }));
   tabsEl.hidden = !S.user || !hasRole() || tabs.length < 2;
   // the home-screen icon's badge (installed app, where supported): what needs you, as on the tabs
@@ -93,9 +94,15 @@ function paintHeader(title) {
   if (!navigator.onLine) bits.push('Offline');
   subEl.textContent = bits.join(' · ');
   subEl.hidden = !bits.length;
+  syncSub();
   backEl.hidden = !(S.user && ROUTES[S.route] && (ROUTES[S.route].back || ROUTES[S.route].bare));
-  if (S.user) fill(meEl, h('a', { href: '#more', class: 'e-appbar__me', title: S.user.email, 'aria-label': 'Account and settings' }, initials(S.user.name || S.user.email)));
+  if (S.user) fill(meEl, h('a', { href: '#more', class: 'a-bar-btn e-appbar__me', title: S.user.email, 'aria-label': 'Account and settings' }, h('span', { class: 'a-avatar', 'aria-hidden': 'true' }, initials(S.user.name || S.user.email))));
   else fill(meEl);
+}
+// Offline under the screen's large title too (the demo has its banner)
+function syncSub() {
+  const big = app.querySelector(':scope > .e-titlebox .a-subtitle');
+  if (big) { big.textContent = 'Offline'; big.hidden = navigator.onLine !== false; }
 }
 // Back: the previous in-app screen, or the role's default screen when the link was opened directly.
 let navCount = 0;
@@ -122,7 +129,7 @@ async function render() {
     // signed in with no role yet: apply as resident or faculty (More stays reachable for sign-out)
     S.route = id === 'more' ? 'more' : 'apply'; S.arg = null;
     paintTabs();
-    if (S.route === 'apply') { paintHeader('Welcome'); fill(app, renderApply()); return; }
+    if (S.route === 'apply') { paintHeader('Welcome'); fill(app, titleBox('Welcome'), renderApply()); window.aRefreshBar?.(); return; }
   } else if (!ROUTES[id] || !allowed(id)) {
     id = defaultRoute();
     history.replaceState(history.state, '', location.pathname + location.search + '#' + id);
@@ -147,15 +154,39 @@ async function render() {
   if (seq !== renderSeq) return;
   const wasKey = lastKey;
   lastKey = key;
-  fill(app, node);
-  if (sameScreen) window.scrollTo(0, y); else window.scrollTo(0, 0);
-  // a new screen: move focus to its heading (or the title), so keyboard and screen-reader users
-  // start there rather than at the top of the page
-  if (!sameScreen && wasKey) {
-    const t = app.querySelector('h1, .e-h1, .e-h2') || titleEl;
-    if (!t.hasAttribute('tabindex')) t.setAttribute('tabindex', '-1');
-    t.focus({ preventScroll: true });
+  // the app kit's large title starts each screen (the form has its own heading)
+  const big = S.route === 'e' ? null : titleBox(r.title);
+  const paint = () => {
+    if (seq !== renderSeq) return;   // a newer screen was asked for while this one slid in
+    fill(app, big, node);
+    syncSub();
+    if (sameScreen) window.scrollTo(0, y); else window.scrollTo(0, 0);
+    // a new screen: move focus to its heading (or the title), so keyboard and screen-reader users
+    // start there rather than at the top of the page
+    if (!sameScreen && wasKey) {
+      const t = app.querySelector('h1, .e-h1, .e-h2') || titleEl;
+      if (!t.hasAttribute('tabindex')) t.setAttribute('tabindex', '-1');
+      t.focus({ preventScroll: true });
+    }
+  };
+  // screens opened from a list slide in from the right, and back from the left (a native navigation stack);
+  // tab changes and repaints don't move. A CSS animation on the new content rather than the kit's aGo() (a view
+  // transition), which leaves the page deaf to taps while it runs.
+  const pushed = !!(r.back || r.bare);
+  const slide = !sameScreen && wasKey && pushed !== lastPushed;
+  lastPushed = pushed;
+  paint();
+  window.aRefreshBar?.();
+  if (slide) {
+    app.classList.remove('e-push', 'e-pop');
+    void app.offsetWidth;   // restart the animation
+    app.classList.add(pushed ? 'e-push' : 'e-pop');
   }
+}
+app.addEventListener('animationend', e => { if (e.target === app) app.classList.remove('e-push', 'e-pop'); });
+let lastPushed = false;
+function titleBox(title) {
+  return h('div', { class: 'e-titlebox' }, h('h1', { class: 'a-title' }, title || 'APMES Evals'), h('p', { class: 'a-subtitle', hidden: true }));
 }
 hooks.render = () => { pendingRender = false; return render(); };
 
@@ -164,7 +195,7 @@ function placeholder(title, err) {
     icon('info', 'e-empty__icon'),
     h('p', { class: 'e-empty__title' }, `${title} is not ready yet`),
     h('p', {}, navigator.onLine ? 'This part of the app is still being built.' : 'Opens when you have signal.'),
-    h('button', { class: 'n-btn', onclick: () => render() }, 'Try again'),
+    h('button', { class: 'a-btn', onclick: () => render() }, 'Try again'),
     err && /Failed to fetch|import/i.test(String(err.message)) ? null : h('p', { class: 'e-small' }, String(err && err.message || '')));
 }
 
@@ -205,7 +236,7 @@ function renderLanding(error) {
       h('p', { class: 'e-lead' }, 'Sign in to open the form. It takes a few minutes and saves as you go.'),
       inAppBrowser() ? openInBrowserCard() : null,
       error ? h('p', { class: 'e-alert', role: 'alert' }, error) : null,
-      cloud.enabled ? h('button', { class: 'n-btn e-btn-big', onclick: signIn }, googleMark(), 'Sign in with Google')
+      cloud.enabled ? h('button', { class: 'a-btn a-btn--block e-btn-big', onclick: signIn }, googleMark(), 'Sign in with Google')
         : h('p', { class: 'e-alert' }, 'Sign-in is not configured.'),
       h('p', { class: 'e-small e-center' }, as ? ['Use the Google account ', h('b', {}, as), ': the request was sent there.']
         : 'Use the Google account your programme has on file for you.'),
@@ -222,16 +253,16 @@ function renderLanding(error) {
       h('li', {}, icon('check'), 'Faculty fill the official form in a few taps, saved as they go.'),
       h('li', {}, icon('check'), 'Progress against the APMES EPA requirements.')),
     error ? h('p', { class: 'e-alert', role: 'alert' }, error) : null,
-    cloud.enabled && !cloud.demo ? h('button', { class: 'n-btn e-btn-big', onclick: signIn }, googleMark(), 'Sign in with Google')
-      : cloud.demo ? h('button', { class: 'n-btn e-btn-big', onclick: signIn }, 'Sign in to the demo')
+    cloud.enabled && !cloud.demo ? h('button', { class: 'a-btn a-btn--block e-btn-big', onclick: signIn }, googleMark(), 'Sign in with Google')
+      : cloud.demo ? h('button', { class: 'a-btn a-btn--block e-btn-big', onclick: signIn }, 'Sign in to the demo')
       : h('p', { class: 'e-alert' }, 'Sign-in is not configured.'),
     h('section', { class: 'e-card e-landing__demo' },
       h('h2', { class: 'e-h3' }, 'Try the demo'),
       h('p', { class: 'e-small' }, 'Made-up people and data, kept only in this browser.'),
       h('div', { class: 'e-demo-links' },
-        h('a', { class: 'n-btn n-btn--secondary', href: base + '?demo' }, 'As a resident'),
-        h('a', { class: 'n-btn n-btn--secondary', href: base + '?demo=assessor' }, 'As an assessor'),
-        h('a', { class: 'n-btn n-btn--secondary', href: base + '?demo=admin' }, 'As an admin'))),
+        h('a', { class: 'a-btn a-btn--tinted', href: base + '?demo' }, 'As a resident'),
+        h('a', { class: 'a-btn a-btn--tinted', href: base + '?demo=assessor' }, 'As an assessor'),
+        h('a', { class: 'a-btn a-btn--tinted', href: base + '?demo=admin' }, 'As an admin'))),
     h('p', { class: 'e-small e-center' }, 'Unofficial tool for the APMES programme. Please don’t enter patient identifiers.')));
 }
 
@@ -257,8 +288,8 @@ function renderApply() {
         h('p', {}, `You asked to join as ${appl.role === 'faculty' ? 'faculty' : 'a resident'}. An admin or programme director will approve it; this page updates when they do.`),
         h('p', { class: 'e-small' }, `Signed in as ${S.user.email}`),
         h('div', { class: 'e-actions' },
-          h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => fill(wrap, applyForm(appl)) }, 'Change'),
-          h('button', { class: 'n-btn', onclick: () => refreshRoles() }, 'Check again'))),
+          h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', onclick: () => fill(wrap, applyForm(appl)) }, 'Change'),
+          h('button', { class: 'a-btn', onclick: () => refreshRoles() }, 'Check again'))),
       signOutCard());
     return wrap;
   }
@@ -277,7 +308,7 @@ function applyForm(prev) {
   const radios = h('div', { class: 'e-radios', role: 'radiogroup' }, [['resident', 'Resident', 'Request evaluations and track progress'], ['faculty', 'Faculty', 'Assess residents']].map(([v, l, d]) =>
     h('label', { class: 'e-radio' }, h('input', { type: 'radio', name: 'apply-role', value: v, checked: v === role, onchange: () => { role = v; } }),
       h('span', { class: 'e-radio__text' }, h('b', {}, l), h('span', { class: 'e-small' }, d)))));
-  const btn = h('button', { class: 'n-btn e-go e-btn-big', type: 'submit' }, 'Apply');
+  const btn = h('button', { class: 'a-btn a-btn--block e-go e-btn-big', type: 'submit' }, 'Apply');
   return h('form', { class: 'e-card', onsubmit: async e => {
     e.preventDefault();
     if (!name.value.trim()) { name.focus(); return; }
@@ -296,7 +327,7 @@ function applyForm(prev) {
   h('div', { class: 'e-actions' }, btn));
 }
 
-const signOutCard = () => h('p', { class: 'e-center' }, h('button', { class: 'n-btn n-btn--outline e-btn-quiet', onclick: () => signOutSafely() }, 'Sign out'));
+const signOutCard = () => h('p', { class: 'e-center' }, h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', onclick: () => signOutSafely() }, 'Sign out'));
 
 // ---------- signed in ----------
 
@@ -310,7 +341,7 @@ async function refreshRoles() {
   try { roles = await cloud.getRoles(user.email); }
   catch (err) {
     fill(app, h('div', { class: 'e-empty' }, h('p', { class: 'e-empty__title' }, 'Couldn’t load your account'), h('p', {}, errText(err)),
-      h('button', { class: 'n-btn', onclick: () => refreshRoles() }, 'Try again')));
+      h('button', { class: 'a-btn', onclick: () => refreshRoles() }, 'Try again')));
     return;
   }
   if (S.user !== user) return;   // signed out meanwhile
@@ -414,8 +445,8 @@ function registerSW() {
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading || !hadController) return; reloading = true; location.reload(); });
   navigator.serviceWorker.register('sw.js').then(reg => {
     const offer = w => {
-      const b = h('div', { class: 'e-banner e-banner--info' }, h('span', {}, 'Update available'),
-        h('button', { class: 'n-btn e-btn-small', onclick: () => { b.remove(); w.postMessage('skipWaiting'); } }, 'Reload'));
+      const b = h('div', { class: 'a-banner e-banner e-banner--info' }, h('span', {}, 'Update available'),
+        h('button', { class: 'a-btn a-btn--sm e-btn-small', onclick: () => { b.remove(); w.postMessage('skipWaiting'); } }, 'Reload'));
       banner.append(b);
       banner.hidden = false;
     };
@@ -444,10 +475,10 @@ if (cloud.onSyncError) cloud.onSyncError(err => toast('A change didn’t reach t
 
 if (cloud.demo) {
   S.demoRole = cloud.demoRole ? cloud.demoRole() : 'resident';
-  banner.append(h('div', { class: 'e-banner e-banner--warn' },
+  banner.append(h('div', { class: 'a-banner a-banner--warn e-banner e-banner--warn' },
     h('span', {}, 'Demo: made-up data, kept in this browser.'),
-    h('button', { type: 'button', class: 'n-btn n-btn--outline e-btn-small', onclick: resetDemoData }, 'Reset'),
-    h('a', { href: location.pathname, class: 'n-btn n-btn--outline e-btn-small' }, 'Leave demo')));
+    h('button', { type: 'button', class: 'a-btn a-btn--plain a-btn--sm e-btn-small', onclick: resetDemoData }, 'Reset'),
+    h('a', { href: location.pathname, class: 'a-btn a-btn--plain a-btn--sm e-btn-small' }, 'Leave demo')));
   banner.hidden = false;
 }
 paintHeader('APMES Evals');
