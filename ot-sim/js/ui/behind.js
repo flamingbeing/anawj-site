@@ -41,7 +41,10 @@ function circHtml(state) {
 <tr><th scope="row">Arterial pressure (mmHg)</th><td>${r(c.sbp)}/${r(c.dbp)} (${r(c.map)})</td></tr>
 <tr><th scope="row">CVP / LAP (mmHg)</th><td>${c.cvp.toFixed(1)} / ${c.lap.toFixed(1)}</td></tr>
 <tr><th scope="row">SVR (Wood units)</th><td>${c.svr.toFixed(1)}</td></tr>
-<tr><th scope="row">Baroreflex sympathetic drive</th><td>${pct(c.s)}</td></tr></tbody></table>
+<tr><th scope="row">Baroreflex sympathetic drive</th><td>${pct(c.s)}</td></tr>
+<tr><th scope="row">Blood volume (mL)</th><td>${r(c.bloodVol)}</td></tr>
+<tr><th scope="row">Haemoglobin (g/L)</th><td>${r(c.hb)}</td></tr>
+<tr><th scope="row">Blood lost (mL)</th><td>${r(c.fl.bled)}</td></tr></tbody></table>
 <p class="hint">The monitor shows only heart rate and the cuff pressure. Underneath, pressure is output times resistance, and the baroreflex pushes heart rate, vessel tone and venous capacity to hold it.</p>`;
 }
 

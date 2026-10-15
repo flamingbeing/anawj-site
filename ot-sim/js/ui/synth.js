@@ -69,9 +69,10 @@ export function co2(src, t) {
 export function modelSource(state) {
   const beats = [], breaths = [];
   for (const e of state.ev.ring) (e.kind === 'beat' ? beats : e.kind === 'breath' ? breaths : []).push(e);
-  const v = state.vit, c = state.cv;
+  const c = state.cv;
   beats.push({ t: state.rh.next, rr: c.hp, sbp: c.sbp, dbp: c.dbp });
-  breaths.push({ t: v.nextBreath, cycle: 60 / v.rr, ti: 20 / v.rr, etco2: v.etco2 });
+  const r = state.resp;
+  if (r.rr > 0) breaths.push({ t: r.nextBreath, cycle: r.cycle, ti: r.mech ? r.mech.ti : r.cycle / 3, etco2: state.gas.etco2 });
   return { beats, breaths };
 }
 
@@ -92,15 +93,17 @@ export class FastSource {
   }
   // make events up to display time t + lookahead, from the model's current values
   advance(state, t) {
-    const v = state.vit, c = state.cv, until = t + 0.4;
+    const c = state.cv, until = t + 0.4;
     while (this.nextBeat <= until) {
       const rr = c.hp * (1 + 0.02 * (this.rand() - 0.5));
       this.beats.push({ t: this.nextBeat, rr, sbp: c.sbp, dbp: c.dbp });
       this.nextBeat += rr;
     }
-    while (this.nextBreath <= until) {
-      const cycle = 60 / v.rr;
-      this.breaths.push({ t: this.nextBreath, cycle, ti: cycle / 3, etco2: v.etco2 });
+    const r = state.resp;
+    if (!(r.rr > 0)) this.nextBreath = Math.max(this.nextBreath, until); // apnoea: no breaths
+    while (r.rr > 0 && this.nextBreath <= until) {
+      const cycle = 60 / r.rr;
+      this.breaths.push({ t: this.nextBreath, cycle, ti: r.mech ? r.mech.ti : cycle / 3, etco2: state.gas.etco2 });
       this.nextBreath += cycle;
     }
     // keep about a minute of history (more than any lane shows)

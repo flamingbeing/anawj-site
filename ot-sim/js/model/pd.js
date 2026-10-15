@@ -89,11 +89,13 @@ export function bisLike({ ceP, ceS = 0, ceR = 0 }) {
   return u > 0 ? 97.4 / (1 + pow(u, 1.43)) : 97.4;
 }
 
-// the drug levels pd reads from the previous step (sevoflurane once volatile.js exists, M2.5)
+// the drug levels pd reads from the previous step. The volatile agents enter as one sevoflurane-equivalent
+// concentration (their summed MAC fraction x sevoflurane's age MAC), so every agent counts and the formulas below,
+// written for sevoflurane, hold unchanged (sevoflurane alone gives exactly its own effect-site level).
 function levels(prev) {
-  const d = prev.pk.d, ce = id => (d[id] ? d[id].ce : 0);
-  const ceS = prev.vol && prev.vol.ce ? prev.vol.ce.sevoflurane || 0 : 0;
-  return { ceP: ce('propofol'), ceR: ceREq(ce('remifentanil'), ce('fentanyl')), ceS, age: prev.patient.age };
+  const d = prev.pk.d, ce = id => (d[id] ? d[id].ce : 0), age = prev.patient.age;
+  const ceS = prev.vol ? prev.vol.mac * macAt(SEVO_MAC40, age) : 0;
+  return { ceP: ce('propofol'), ceR: ceREq(ce('remifentanil'), ce('fentanyl')), ceS, age };
 }
 
 export const pd = {
