@@ -2,8 +2,8 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-15 by Claude Code (build session `status/build.md`: M2.7–M3.3 built; owner paused new scenarios;
-usability pass next).
+Last updated: 2026-10-15 by Claude Code (build session ended: M2.7–M3.3 and a usability pass merged; new scenarios
+paused; nothing in flight).
 
 ## Now
 
@@ -23,8 +23,8 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next
 
-**New scenarios are paused (owner, 15 Oct 2026).** Do not start M4 until the owner says so. The usability pass is in
-#650; further usability ideas: split the long Patient tab (rhythm/resuscitation), alarm-limit settings. The original plan, in order, for when
+**New scenarios are paused (owner, 15 Oct 2026).** Do not start M4 until the owner says so. The usability pass is merged (#650);
+further usability ideas: split the long Patient tab (rhythm/resuscitation), alarm-limit settings. The original plan, in order, for when
 building resumes (`DESIGN.md` "PR order" has each row's tests):
 
 1. Finish M3.3 (optional polish): trainee-set alarm limits — limits must live in sim state and change by an action
@@ -41,12 +41,12 @@ building resumes (`DESIGN.md` "PR order" has each row's tests):
 
 ## Recently done
 
-- Usability pass (15 Oct 2026, in #650): fixed the empty alarm bar showing with no alarm (CSS beat `hidden`); the
+- Usability pass (15 Oct 2026, #650): fixed the empty alarm bar showing with no alarm (CSS beat `hidden`); the
   eight tabs as a 4x2 grid so all are visible on a phone; a "How it works" on the library (Elective GA marked "Start
   here") and a collapsible "How to use · a first anaesthetic" in the theatre (checked on five patients: sevoflurane 2%
   at 1 L/min only reaches MAC 0.3, so the guide uses 4% at 4 L/min to MAC 0.8, then 2%); less-common drugs folded under
   "More drugs"; the Log's TCI lines fixed (effect-site/plasma, stop); stale text removed.
-- M3.3 slice 3 (15 Oct 2026, #650, open: CI blocked only by the bis-dsa flake — see NOTES "Lessons"): the Log tab (`ui/log.js`) — a readable, timestamped, newest-first record of
+- M3.3 slice 3 (15 Oct 2026, #650): the Log tab (`ui/log.js`) — a readable, timestamped, newest-first record of
   everything in `sim.log` (drugs, airway/vent, fluids, rhythm/resus, operation, NIBP, alarms, responses); the same
   record the M5 debrief will replay. `test/log.test.mjs` + e2e.
 - M3.3 slice 2 (15 Oct 2026, #645): technical alarms (`monitor.js`) — "No CO₂ — check the tube and circuit"
