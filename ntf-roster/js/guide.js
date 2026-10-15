@@ -284,9 +284,10 @@ export function startTasks(app) {
           : 'Rule added. They are never on call together this month, so there is nothing to fix.';
       },
       show: async () => {
-        const combo = document.querySelector('.rp-sheet .rp-combo [data-kind="together"]');
+        // (skip a picker that is still closing: its backdrop has .out until it's removed)
+        const combo = [...document.querySelectorAll('.rp-sheet .rp-combo [data-kind="together"]')].find(b => !b.closest('.out'));
         if (combo) return showMe(app, { el: combo, text: `${tap} Between two people` });
-        const secs = [...document.querySelectorAll('.rb-sheet .rb-sec')];
+        const secs = [...document.querySelectorAll('.rb-sheet .rb-sec')].filter(x => !x.closest('.out'));
         if (secs.length) {
           // the builder: Other people (under What) first, then Who, then Add rule
           const sec = name => secs.find(x => (x.querySelector('.rb-sec-h') || {}).textContent === name);
