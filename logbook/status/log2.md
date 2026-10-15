@@ -107,6 +107,11 @@ Agreed queue (one PR each, in order, once he says go):
    in a column at most a quarter of the screen; tighter cells. Target lines stay on by default, with a "Show targets"
    toggle at the bottom of the table (beside All tags / Towards minimums). Excel downloads keep full names and full
    category names. Compact off: the table as now.
+9i. **Suggested colours** (owner, 15 Oct; replaces the 13 Oct "no preset swatches" call in ui-settings.js): Settings →
+   Display → Colour shows a row of swatches (NUHS navy, the default; the NUH orange, red and blue; teal; purple; green;
+   slate) and a last "Custom…" swatch that opens the device's own picker as now; a tick on the one in use (a custom
+   colour shows in the Custom swatch). The same light / dark readability adjustment as today; each suggested colour
+   checked for contrast in light, dark and OLED.
 10. **Grid as a spreadsheet:** thin lines, no boxed inputs; drag to resize columns (per device, double-tap resets);
     lines per row 1 / 2 / 3 / Fit to content.
 11. **Paging by default** (owner's call, 15 Oct): 100 per page, 25 / 50 / 100 / 300 / All (per device); "‹ Page 2 of
