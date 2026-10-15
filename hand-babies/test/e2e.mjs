@@ -13,7 +13,8 @@ const SHOTS = process.env.SHOTS;
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
 // The real addresses are served from this checkout: anawj.com (GitHub Pages) as the whole repo, hand.anawj.com as the
-// Worker maps it (/babies/ -> hand-babies/, nothing else), so the move and the page editor can be tested offline.
+// Worker maps it (/babies/ -> hand-babies/, plus the shared /nuhsdesign/), so the move and the page editor can be
+// tested offline.
 const root = new URL('../../', import.meta.url).pathname;
 const MIME = { html: 'text/html', js: 'text/javascript', css: 'text/css', gif: 'image/gif', svg: 'image/svg+xml', json: 'application/json' };
 const serve = (map) => async route => {
@@ -26,7 +27,8 @@ const serve = (map) => async route => {
   await route.fulfill({ status: 200, contentType: MIME[f.split('.').pop()] || 'application/octet-stream', body: fs.readFileSync(f) });
 };
 await ctx.route(/^https:\/\/(www\.)?anawj\.com\//, serve(p => p.replace(/^\//, '')));
-await ctx.route(/^https:\/\/hand\.anawj\.com\//, serve(p => p.startsWith('/babies/') ? 'hand-babies/' + p.slice(8) : null));
+await ctx.route(/^https:\/\/hand\.anawj\.com\//, serve(p => p.startsWith('/babies/') ? 'hand-babies/' + p.slice(8)
+  : p.startsWith('/nuhsdesign/') ? p.slice(1) : null));
 const page = await ctx.newPage();
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));

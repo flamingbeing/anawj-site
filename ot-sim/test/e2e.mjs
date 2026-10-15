@@ -279,15 +279,30 @@ try {
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${name}: no horizontal scroll`);
     await axe(page, `${name} theatre, Drugs tab and Behind the monitor`);
 
-    // an unknown screen falls back to the library
-    // the library has an Elective GA card; its deep link boots the theatre already induced and intubated
+    // the library's Elective GA card opens the pre-op briefing (patient summary + sign-in), which begins the theatre
     await page.goto(BASE);
-    assert.ok(await page.$('a.card[href="?case=electiveGA#theatre"]'), `${name}: Elective GA card present`);
-    await page.goto(BASE + '?test&seed=3&case=electiveGA#theatre');
+    assert.ok(await page.$('a.card[href="?case=electiveGA#preop"]'), `${name}: Elective GA card goes to pre-op`);
+    await page.goto(BASE + '?test&seed=3&case=electiveGA#preop');
+    await page.waitForSelector('#preop', { state: 'visible', timeout: 3000 });
+    assert.ok(!(await page.isVisible('#theatre')), `${name}: theatre hidden on pre-op`);
+    assert.match(await page.textContent('#preop-sum'), /Age|years/, `${name}: pre-op shows the patient summary`);
+    assert.match(await page.textContent('#preop-clin'), /ASA/, `${name}: pre-op shows the ASA grade`);
+    assert.ok((await page.$$('#preop-list input[type=checkbox]')).length >= 5, `${name}: pre-op sign-in checklist present`);
+    const box = page.locator('#preop-list input[type=checkbox]').first();
+    await box.check(); assert.ok(await box.isChecked(), `${name}: a sign-in item ticks`);
+    await axe(page, `${name} pre-op`);
+    assert.ok(/[?&]case=electiveGA#theatre$/.test(await page.getAttribute('#preop-begin', 'href')), `${name}: Begin goes to the theatre`);
+    await page.click('#preop-begin');
     await page.waitForFunction(() => window.otsim && document.getElementById('n-hr').textContent !== '--');
     assert.ok(await page.evaluate(() => otsim.state.pd.asleep && otsim.state.aw.device === 'ett' && otsim.state.resp.mode === 'vc'), `${name}: Elective GA starts induced, intubated, ventilated`);
     assert.ok(await page.evaluate(() => otsim.state.gas.sao2 > 97), `${name}: Elective GA oxygenated`);
 
+    // the deep link straight to the theatre still works; an unknown screen (or an unknown case) falls back to the library
+    await page.goto(BASE + '?test&seed=3&case=electiveGA#theatre');
+    await page.waitForFunction(() => window.otsim && document.getElementById('n-hr').textContent !== '--');
+    assert.ok(await page.evaluate(() => otsim.state.aw.device === 'ett'), `${name}: direct ?case=electiveGA#theatre still induced`);
+    await page.goto(BASE + '?case=nope#preop');
+    await page.waitForSelector('#library', { state: 'visible', timeout: 3000 });
     await page.goto(BASE + '#nowhere');
     await page.waitForSelector('#library', { state: 'visible', timeout: 3000 });
     await page.close();

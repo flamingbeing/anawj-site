@@ -12,7 +12,8 @@ Evaluation Exercise) assessments on their phone. Static app: no sign-in, no serv
   description must never carry patient names, NRIC, MRN or dates of birth. Say so on the form.
 - **Forms live in `js/forms.js`** (items, domains, rating scales for DOPS and Mini-CEX). Change a form there, not in
   `js/app.js`.
-- Phone first (390 px), NUHS-style top band and tokens from `../nuhsdesign/tokens.css`, `noindex` meta, offline via
+- Phone first (390 px), styled with the NUHS app kit (`../nuhsdesign/app.css` + `app.js`, `.a-*` classes; `style.css`
+  only adds what the kit lacks), `noindex` meta, offline via
   `sw.js` (network first; VERSION is stamped on deploy, don't bump it by hand).
 
 ## Speed of entry (13 Oct 2026)

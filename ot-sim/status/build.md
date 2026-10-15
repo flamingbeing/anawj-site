@@ -20,6 +20,12 @@
   (awake/preoxygenated/sedation/induced/maintenance/emergence start states, replayed from awake; `applyPreset`),
   `?preset=`/`?case=electiveGA`/`?at=` deep links, an Elective GA library card, `test/presets.test.mjs`. All green
   under `tools/test-ot-sim.sh`.
-- M3.2 still to come (slice 2+): the pre-op screen (patient summary + sign-in checklist), the surgical-stimulus
-  timeline with "skip to next event", the Examine and Help tabs. Then M3.3 alarms, then M4.x (scenario drugs + the
-  crisis scenarios — the "diverse use cases").
+- M3.2 slice 2 built on this branch (from main after #608 merged): the pre-op screen (`#preop`, `ui/preop.js`). The
+  Elective GA card now opens a briefing — the synthetic patient's summary (demographics read from `sim.state.patient`
+  so they match the monitor) and the case narrative (ASA/airway/history/allergies/fasting/plan), then a paraphrased
+  WHO sign-in checklist (tickable, nothing enforced; the debrief in M5 will note skips), then "Begin the anaesthetic"
+  into the theatre. Begin keeps the whole query and changes only the hash, so the theatre uses the same patient (and
+  it's a hashchange, not a reload). `test/preop.test.mjs`; e2e covers the card → pre-op → theatre flow, the checklist,
+  axe on the screen, and the unknown-case fallback. `tools/test-ot-sim.sh` green.
+- M3.2 still to come (slice 3+): the surgical-stimulus timeline with "skip to next event", the Examine and Help tabs.
+  Then M3.3 alarms, then M4.x (scenario drugs + the crisis scenarios — the "diverse use cases").
