@@ -655,6 +655,12 @@ portfolio content.
 
 ## Tags and suggestions (`tags.js`, `suggest.js`)
 
+- **Detection** (Settings → Logging → Detection; owner, 15 Oct 2026): account settings `detectInitials` (false: never
+  read initials from the text), `skipStarts` ("===, Pt:", dropped before initials, only when initials follow) and
+  `oneLetterInitials` (a lone capital is initials; I and A still need an age, "/" or "("). `ui-core.settings()` passes
+  them into engine.js (`setDetection`), so the box, pastes and spreadsheets read initials alike. The line under the
+  Case box shows what was read; a tap keeps it as text for that case only (`draft.noIni`, `draft.noAge`).
+
 - Tag numbers ("16", "20iii") come from the APMES portfolio's Section 4 table and the old Google Form; they stay as
   internal IDs (Section 4 fill, old-form import, CSV IDs) but are never shown: Still needed, Totals, the Excel backup
   (full or short names) and the Admin names table use names only.

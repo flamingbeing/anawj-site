@@ -2,7 +2,7 @@
 // "You" card (youCard), used by ui-account.js; the More page's cards are in more-cards.js.
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
-import { sortCodes, uid, academicYear, withParents, weekStart, humanAge } from './engine.js';
+import { sortCodes, uid, academicYear, withParents, weekStart, humanAge, cleanSkip } from './engine.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, facultyRole, shows, setShown, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, updateMany, updatedToast, UNDO_SECS, rowIcon } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace, placeNewTag } from './tags.js';
 import { pickDialog, CASE_PARTS, AFTER_SAVE, RECENT_COUNTS } from './ui-log.js';
@@ -461,6 +461,18 @@ export function renderLogging() {
         'Off by default. Untick any you don’t want.', 'The surest suggestions are ticked as you type and follow your words. One you untick stays off for that case. Check the ticks before you save: they count towards your targets.'),
       toggle('Autodetect age and gender', st.detectAgeSex !== false, v => save({ detectAgeSex: v }),
         'On by default. Optional for APMES.', 'Turning this off stops age-based Paediatrics and Geriatric suggestions. Choose those tags yourself when needed; explicit words can still suggest them.'),
+      // Detection (owner, 15 Oct 2026): what the box reads as initials. The line under the box shows what was read;
+      // a tap there keeps it as text for that case
+      h('h3', {}, 'Detection'),
+      help('The line under the case box shows what was read (AB = initials, 72M = 72 years · male). Tap one there to keep it as text for that case.'),
+      toggle('Read initials from the start of the case box', st.detectInitials !== false, v => save({ detectInitials: v ? null : false }),
+        'On by default.', 'Off: everything you type stays in the case text; use the Initials box (Advanced logging) if you want initials.'),
+      toggle('Allow one-letter initials', !!st.oneLetterInitials, v => save({ oneLetterInitials: v || null }),
+        'Off by default: one letter needs an age or "/" after it.', 'On: a capital letter on its own is initials (J lap chole). I and A still need an age, "/" or "(" after them, as they are words too.'),
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Skip these at the start',
+        h('input', { type: 'text', value: cleanSkip(st.skipStarts).join(', '), placeholder: 'e.g. ===, Pt:', maxlength: '200', autocomplete: 'off', 'aria-describedby': 'skip-help',
+          onchange: e => { const list = cleanSkip(e.target.value); e.target.value = list.join(', '); save({ skipStarts: list.length ? list.join(', ') : null }, 'Saved'); } })),
+      h('p', { class: 'hint help', id: 'skip-help' }, 'Separated by commas. Dropped from the start of a case before the initials are read, e.g. "=== AB 45F" saves AB and 45F. Not when there are no initials after them.'),
       h('h3', {}, 'Start a case'), h('p', { class: 'hint' }, 'Device setting · other devices keep their own style.'),
       toggle('Show common tags first', display().compactTags, v => { setDisplay({ compactTags: v }); paintPreview(); },
         'A shortlist from your recent cases.', 'Off by default. All tags stay searchable and can be expanded.'),
@@ -471,7 +483,7 @@ export function renderLogging() {
       pick('After Save', AFTER_SAVE, st.afterSave || 'next', v => save({ afterSave: v === 'next' ? null : v }, 'Saved'),
         '“Save, keep date” keeps the date either way.', 'Keeping the tags helps with a run of the same kind of case.')),
     h('section', { class: 'card' }, preview, h('button', { onclick: async () => {
-      try { await patchLogbook({ settings: { suggestions: true, autoTick: null, detectAgeSex: true, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
+      try { await patchLogbook({ settings: { suggestions: true, autoTick: null, detectAgeSex: true, detectInitials: null, oneLetterInitials: null, skipStarts: null, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
     } }, 'Reset these logging defaults'), h('p', { class: 'hint' }, 'Resets only the choices on this page. Advanced logging settings keep their current values.')),
     advancedLink('loggingadv', 'Advanced logging settings', 'The Case tab, the keyboard, search, dates and undo, tips'));
 }
