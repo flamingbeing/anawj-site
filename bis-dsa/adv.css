@@ -10,7 +10,7 @@
 .advbrand{height:0;padding-bottom:5.6%;position:relative;font:600 0/1 Selawik,"Segoe UI",sans-serif}
 .advbrand b{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;color:#bbcde1;font:600 clamp(11px,3.1cqw,30px)/1 Selawik,"Segoe UI",system-ui,sans-serif;letter-spacing:.01em}
 .advband{container-type:inline-size}
-@media (max-width:640px){.advcase{padding:0;background:none;border-radius:0;box-shadow:none}.advband{padding:1.2% 1.2% 0;border-radius:6px}.advbrand{padding-bottom:3.6%}}
+@media (max-width:640px){.advcase{padding:6px;border-radius:12px}.advband{padding:1.2% 1.2% 0;border-radius:6px}.advbrand{padding-bottom:3.6%}}
 .advs{--u:calc(100cqw / 1246);--sw:calc(1246 * 1px);container-type:inline-size;position:relative;aspect-ratio:16/10;background:#000;overflow:hidden;border-radius:calc(4*var(--cu,1px));color:#fff;font-family:Selawik,"Segoe UI","Open Sans",system-ui,sans-serif;user-select:none;-webkit-user-select:none;line-height:1}
 .advs *{box-sizing:border-box}
 .advs button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:inherit}
