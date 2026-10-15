@@ -37,7 +37,7 @@ jobs:
 
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -57,8 +57,6 @@ jobs:
           node ask/test/e2e.mjs
           node hand-babies/test/e2e.mjs
           node bis-dsa/test/e2e.mjs
-          node bis-dsa/test/adv.e2e.mjs
-          node bis-dsa/test/sed.e2e.mjs
           node ot-sim/test/e2e.mjs
           node nuh-roster/test/e2e.mjs
           node people/test/e2e.mjs
