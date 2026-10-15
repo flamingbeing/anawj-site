@@ -21,7 +21,7 @@ export async function appVersion() {
 // this device's settings, and never the other apps on the site) and reloads from the server. Only when the server
 // answers: offline, the saved copy is what lets the app open, so it stays (returns false).
 export async function freshCopy() {
-  try { if (!(await fetch('index.html', { cache: 'no-store' })).ok) return false; } catch { return false; }
+  try { if (!(await fetch('sw.js', { cache: 'no-store' })).ok) return false; } catch { return false; }
   const scope = new URL('./', location.href).href;
   try { for (const r of await navigator.serviceWorker.getRegistrations()) if (r.scope === scope) await r.unregister(); } catch { /* reload anyway */ }
   try { for (const k of await caches.keys()) if (k.startsWith('logbook-')) await caches.delete(k); } catch { /* reload anyway */ }

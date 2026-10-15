@@ -22,7 +22,7 @@ export const SWITCHES = [
   ['case:plan', 'Plan for later on the Case tab', 'case'],
   ['targets', 'Counts against the APMES targets', 'apmes'],
   ['case:still', 'Still needed (on the Case tab)', 'apmes'],
-  ['totals', 'Programme totals (Compare with your intake)', 'apmes'],
+  ['totals', 'Totals (everyone\u2019s counts; Compare with your intake)', 'apmes'],
   ['portfolio', 'Portfolio export and Section 1 details', 'apmes'],
   ['year', 'Residency year', 'apmes'],
   ['reflHeadings', 'Reflection headings (the APMES list)', 'apmes'],
@@ -180,12 +180,13 @@ export function switchChanges(st, mode, to = mode) {
 // ---- the device half: which tabs a profile keeps off the bar or puts on it ----
 
 // tabs off the bar until someone puts them there (they live in More by default)
-export const OFF_BAR = ['caselogs', 'notes', 'account', 'settings', 'recovery', 'data', 'admin'];
+export const OFF_BAR = ['totals', 'caselogs', 'notes', 'account', 'settings', 'recovery', 'data', 'admin'];
 // the Basic profiles keep Analytics in More too, and Basic: logbook only Reflections; Faculty / PCs keeps the person's
 // own Case, Logbook and Reflections in More
 export const PROFILE_OFF = { advanced: [], basic: ['progress'], logbook: ['progress', 'reflect'], personal: [], faculty: ['log', 'logbook', 'reflect'] };
-// OFF_BAR tabs a profile puts on the bar: Case logs and the Admin portal (admins only) in Faculty / PCs, Notes in Personal
-export const PROFILE_ON = { faculty: ['caselogs', 'admin'], personal: ['notes'] };
+// OFF_BAR tabs a profile puts on the bar: Totals (first, in place of Case logs since 15 Oct 2026) and the Admin portal
+// (admins only) in Faculty / PCs, Notes in Personal
+export const PROFILE_ON = { faculty: ['totals', 'admin'], personal: ['notes'] };
 export const offBar = mode => [...OFF_BAR.filter(id => !(PROFILE_ON[mode] || []).includes(id)), ...(PROFILE_OFF[mode] || [])];
 // a profile's default for one tab: off the bar?
 export const presetHidesTab = (mode, id) => offBar(mode).includes(id);

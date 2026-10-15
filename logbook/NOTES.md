@@ -28,7 +28,9 @@ portfolio content.
 - Logbook **Case summary** (the case box). Reflection **Case details** (prefilled from the case summary).
 - **☆ Interesting** = the star on a case (`reflectTag`; was "Possible reflection"): a bookmark for interesting cases.
   Logbook rows show "☆ interesting", Filter → Show has "Interesting", the Reflections tab offers them first.
-- **Analytics** = the old Progress tab (`#progress`). Totals is under it ("Compare with your intake").
+- **Analytics** = the old Progress tab (`#progress`); its "Compare with your intake" opens **Totals** (`#totals`), a tab of
+  its own since 15 Oct 2026 (owner): in More by default (`OFF_BAR`), first on the bar in Faculty / PCs. Shown to
+  programme residents, faculty, PDs and admins (`showTotals`), unless Profile turns Totals off.
   Reflection progress credits at most one complete JR reflection per heading (two for Paediatrics).
   Extra JR reflections remain saved, with a note explaining why they do not count. Heading bars,
   overall progress and shared summary counts use this same cap. Required JR cases and sub-types remain reminders.
@@ -421,12 +423,13 @@ portfolio content.
   - **Advanced**: hides nothing.
   - **Faculty / PCs** (`facultyMode()`; offered only to `facultyRole()`: admins, PDs and active faculty; their
     default when nothing is saved, outside the demo; owner, 12 Oct 2026: PCs are added as admins, no PC role; no
-    Generic profile): tab bar **Case logs** (`#caselogs`, `ui-caselogs.js`: residents by year with total cases, tags
+    Generic profile): tab bar **Totals** first (owner, 15 Oct 2026; it replaced Case logs there), then in More **Case logs**
+    (`#caselogs`, `ui-caselogs.js`: residents by year with total cases, tags
     behind / due, reflections; tap → `#caselog`, that resident's counts per tag against the targets (`totalsTable`
     with one column), reflection headings met, Excel download), then **Analytics** as programme analytics
-    (`renderProgramme`: who's behind, the tags most residents are behind on, then Programme totals), then the Admin
+    (`renderProgramme`: who's behind, the tags most residents are behind on, then Totals), then the Admin
     portal for admins (left of More; owner), then More (their own
-    Case, Logbook, Reflections first). All from the counts summaries, never case details. The rules let active
+    Case, Logbook, Reflections first, Case logs after them). All from the counts summaries, never case details. The rules let active
     faculty read `summaries/` (counts are no secret, owner); they still can't read the residents list, cases,
     reflections or notes. Case logs is listed in More for them in other profiles.
   - Display preview (`displayPreview`): dashed accent edge, faint stripes and a "Preview only: not a real case" pill,

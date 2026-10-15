@@ -342,7 +342,7 @@ export function renderTotals() {
 
   add(card, 
     h('div', { class: 'bar' },
-      h('h2', { style: 'margin:0' }, 'Programme totals'),
+      h('h2', { style: 'margin:0' }, 'Totals'),
       h('select', { 'aria-label': 'Residency year', onchange: e => { tview.year = Number(e.target.value); hooks.render(); } },
         years.map(y => h('option', { value: String(y), selected: y === tview.year }, groupName(y, all)))),
       h('span', { class: 'grow' }),

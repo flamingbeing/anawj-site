@@ -37,7 +37,7 @@ export function renderAdmin() {
   const n = (A.residents || []).length;
   return h('div', {}, readyPortfoliosCard(),
     h('section', { class: 'card more-list admin-links' }, h('ul', {},
-      linkRow('admintotals', 'Programme totals', 'Case counts by residency year; Excel download'),
+      linkRow('admintotals', 'Totals', 'Case counts by residency year; Excel download'),
       linkRow('adminresidents', 'Residents', A.residents ? `${n} on the programme list · years, status, paste the list` : 'The programme list: years, status, paste the list'),
       // APMES People (people/): the same resident list, plus faculty and PDs, a yearly intake and the year check
       h('li', {}, h('a', { href: '../people/' }, h('span', { class: 'mt' }, h('b', {}, 'People (logbook and evals)'),

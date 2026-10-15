@@ -137,14 +137,19 @@ try { for (const width of [390, 1280]) {
   assert.deepEqual(new Set(await tabsNow()), new Set(tabsAdvanced));
   await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { caseHide: null } }); });
 
-  // Faculty / PCs (faculty, PDs and admins; the demo user is an admin): Case logs, Analytics (the programme's), More
+  // Faculty / PCs (faculty, PDs and admins; the demo user is an admin): Totals, Analytics (the programme's), More;
+  // Case logs in More (owner, 15 Oct 2026)
   await pickProfile('faculty');
   await p.waitForFunction(() => document.body.classList.contains('faculty-profile'));
-  assert.deepEqual(await tabsNow(), ['caselogs', 'progress', 'admin', 'more'], 'admins get the Admin portal left of More');
+  assert.deepEqual(await tabsNow(), ['totals', 'progress', 'admin', 'more'], 'Totals first; admins get the Admin portal left of More');
+  await p.locator('[role=tab][data-tab=totals]').click();
+  await p.getByRole('heading', { name: 'Totals' }).waitFor();
+  await p.locator('table.totals td.n').first().waitFor();
   await p.locator('[role=tab][data-tab=admin]').click();
   await p.locator('a[data-go=adminresidents]').click();
   assert.equal(await p.locator('[role=tab][data-tab=admin]').getAttribute('aria-selected'), 'true', 'Admin portal pages sit under its tab');
-  await p.locator('[role=tab][data-tab=caselogs]').click();
+  await p.locator('[role=tab][data-tab=more]').click();
+  await p.locator('.more-list a[data-go=caselogs]').click();
   await p.locator('.caselog-list li').filter({ hasText: 'Resident A' }).waitFor();
   assert.match(await p.locator('.caselog-list li').filter({ hasText: 'Resident A' }).innerText(), /\d+ cases/);
   await p.getByLabel('Find a resident').fill('resident b');
@@ -153,12 +158,12 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('heading', { name: 'Resident B' }).waitFor();
   await p.locator('table.totals td.n').first().waitFor();
   await p.getByRole('heading', { name: /^Reflections · \d+ of \d+ headings met$/ }).waitFor();
-  assert.equal(await p.locator('[role=tab][data-tab=caselogs]').getAttribute('aria-selected'), 'true', 'a case log sits under Case logs');
+  assert.equal(await p.locator('[role=tab][data-tab=more]').getAttribute('aria-selected'), 'true', 'a case log sits under Case logs, in More');
   const logDl = p.waitForEvent('download'); await p.getByRole('button', { name: 'Download Excel' }).click();
   assert.match((await logDl).suggestedFilename(), /^case-log-Resident-B-\d{4}-\d{2}-\d{2}\.xlsx$/);
   await p.locator('[role=tab][data-tab=progress]').click();
   await p.getByRole('heading', { name: 'Programme analytics' }).waitFor();
-  await p.getByRole('heading', { name: 'Programme totals' }).waitFor();
+  await p.getByRole('heading', { name: 'Totals', exact: true }).waitFor();
   // their own Case, Logbook and Reflections are first in More
   await p.locator('[role=tab][data-tab=more]').click();
   assert.deepEqual((await p.locator('.more-list li a').evaluateAll(as => as.map(a => a.dataset.go))).slice(0, 3), ['log', 'logbook', 'reflect']);

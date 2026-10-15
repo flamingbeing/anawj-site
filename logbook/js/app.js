@@ -112,6 +112,9 @@ const icon = id => {
 };
 
 const TABS = [
+  // the programme's counts per tag by residency year (owner, 15 Oct 2026: a tab of its own, in More by default; first on
+  // the bar in Faculty / PCs, in place of Case logs)
+  { id: 'totals', label: 'Totals', render: page(['progress'], m => m.progress.renderTotals()), desc: 'Everyone\u2019s case counts per tag, by residency year (counts only)' },
   // Faculty / PCs profile (faculty, PDs and admins): residents' compiled case logs, from the counts summaries
   { id: 'caselogs', label: 'Case logs', render: page(['caselogs'], m => m.caselogs.renderCaseLogs()), faculty: true, desc: 'Residents’ case logs: counts per tag against the targets' },
   { id: 'log', label: 'Case', render: renderLog },
@@ -124,8 +127,6 @@ const TABS = [
   // five tabs on the bar; the rest live under More (still reachable by #totals, #account, #settings)
   { id: 'more', label: 'More', render: () => renderMore() },
   { id: 'caselog', label: 'Case log', render: page(['caselogs'], m => m.caselogs.renderCaseLog()), faculty: true, hidden: true, under: 'caselogs', unlisted: true },
-  // under Analytics: how your counts compare with your intake
-  { id: 'totals', label: 'Totals', render: page(['progress'], m => m.progress.renderTotals()), hidden: true, under: 'progress', unlisted: true },
   // under the Logbook: every learning point (or other labelled part), from Filter (Labelled parts on)
   { id: 'points', label: 'Learning points', render: page(['parts'], m => m.parts.renderPoints()), hidden: true, under: 'logbook', unlisted: true },
   { id: 'account', bar: true, label: 'Account', render: page(['account', 'settings'], m => m.account.renderAccount()), hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
@@ -156,7 +157,7 @@ const TABS = [
   { id: 'feedbackinbox', label: 'Feedback', render: page(['feedback'], m => m.feedback.renderFeedbackInbox()), owner: true, hidden: true, under: 'more', desc: 'App owner only: feedback sent by residents' },
   // admins open it from More
   { id: 'admin', bar: true, short: 'Admin', label: 'Admin portal', render: page(['admin'], m => m.admin.renderAdmin()), admin: true, hidden: true, under: 'more', desc: 'Admins only: ready portfolios, programme totals, residents, settings' },
-  { id: 'admintotals', label: 'Programme totals', render: page(['progress'], m => m.progress.renderTotals()), admin: true, hidden: true, under: 'admin', unlisted: true },
+  { id: 'admintotals', label: 'Totals', render: page(['progress'], m => m.progress.renderTotals()), admin: true, hidden: true, under: 'admin', unlisted: true },
   { id: 'adminresidents', label: 'Residents', render: page(['admin'], m => m.admin.renderAdminResidents()), admin: true, hidden: true, under: 'admin', unlisted: true },
   { id: 'adminadv', label: 'Advanced admin settings', render: page(['admin'], m => m.admin.renderAdminAdvanced()), admin: true, hidden: true, under: 'admin', unlisted: true },
   // opened from Settings
@@ -170,9 +171,10 @@ const menuItem = (id, label, desc, onclick) => h('li', {}, h('a', { href: '#' + 
 function renderMore() {
   const items = visibleTabs().filter(t => t.under === 'more' && !t.unlisted);
   // tabs hidden from the bar (Advanced display) come first, so they are one tap away
-  // (Case logs, for faculty, PDs and admins outside their own profile, after the person's own tabs)
+  // (Totals, then Case logs for faculty, PDs and admins outside their own profile, after the person's own tabs)
+  const late = { totals: 1, caselogs: 2 };
   const hidden = arrangeTabs(barCandidates(), display()).hidden.filter(id => !TABS.find(t => t.id === id).hidden)
-    .sort((a, b) => (a === 'caselogs') - (b === 'caselogs'));
+    .sort((a, b) => (late[a] || 0) - (late[b] || 0));
   return h('div', {},
     h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
       h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.moreLabel || t.label, t.desc || 'Hidden from the tab bar')), items.map(t => menuItem(t.id, t.moreLabel || t.label, t.desc)))),
@@ -329,15 +331,16 @@ function renderSettingsMenu() {
 // at the very bottom: which app version this device runs, and a way to fetch the latest when it seems stuck on an old
 // one (the "Update available" banner is the usual way)
 function versionLine() {
-  const ver = h('span', {}, 'App version …');
-  appVersion().then(v => { ver.textContent = 'App version ' + versionLabel(v); });
+  const ver = h('span', {}, 'App version …'), dot = document.createTextNode(' · ');
+  // no saved copy (no service worker): no version to show
+  appVersion().then(v => { if (v === 'no-sw') { ver.remove(); dot.remove(); } else ver.textContent = 'App version ' + versionLabel(v); });
   const latest = async () => {
     // a change still on its way could be lost with the reload: wait for it
     if (S.pending) return toast('Some changes are still sending: try again once it says Synced');
     if (!(await confirmBox('Get the latest version', 'Download the app again and reload? Your logbook, drafts and settings stay.', 'Get it'))) return;
     if (!(await freshCopy())) toast('Can’t reach the server: try again with a signal');
   };
-  return h('p', { class: 'hint app-ver' }, ver, ' · ', h('button', { type: 'button', class: 'linkish', onclick: latest }, 'Get the latest version'));
+  return h('p', { class: 'hint app-ver' }, ver, dot, h('button', { type: 'button', class: 'linkish', onclick: latest }, 'Not updating? Get the latest version'));
 }
 
 // Connect Claude (advanced): the read-only MCP server residents run on their own computer (logbook/mcp/README.md)
@@ -450,7 +453,9 @@ const banner = document.getElementById('banner');
 // ---------- tabs and routing (#log, #logbook, ...) ----------
 
 // Totals (names and counts of programme residents) is for the programme only; the rules agree.
-const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (!t.owner || S.owner) && (!t.faculty || facultyRole()) && (t.id !== 'totals' || S.admin || S.pd || S.resident));
+const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (!t.owner || S.owner) && (!t.faculty || facultyRole()) && (t.id !== 'totals' || showTotals()));
+// Totals: programme residents, faculty, PDs and admins (who can read the counts), unless Profile turns it off
+const showTotals = () => !!(S.resident || facultyRole()) && !basicHides('totals');
 // the tabs that can sit on the bar: the main ones, and the pages in the More list (bar: true), when put there
 const barCandidates = () => visibleTabs().filter(t => !t.hidden || t.bar).map(t => t.id);
 const TAB_ALIASES = { reflections: 'reflect' };
