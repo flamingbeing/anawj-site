@@ -416,8 +416,10 @@ async function runImport() {
     try {
       // responses the Google Form inbox already brought into this logbook aren't imported again (form-inbox.js)
       const { withoutFormCases } = await import('./form-inbox.js');
-      const { rows, dropped } = withoutFormCases(cases, await cloud.listCases(r.email));
-      const res = await cloud.importCases(r.email, g.rid, rows, n => { A.prog = (done + Math.min(n, cases.length)) / total; paintProgress(); });
+      const before = await cloud.listCases(r.email);
+      const { rows, dropped } = withoutFormCases(cases, before);
+      // a case already in the logbook is never overwritten (the resident may have edited it since)
+      const res = await cloud.importCases(r.email, g.rid, rows, n => { A.prog = (done + Math.min(n, cases.length)) / total; paintProgress(); }, { have: before.map(c => c.id) });
       if (dropped) res.skipped += dropped;
       // counts for the Totals tab, from everything in the logbook (cases logged in the app included)
       const all = await cloud.listCases(r.email);

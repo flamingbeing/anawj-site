@@ -44,13 +44,21 @@ export function binEntry(kind, item, now = Date.now()) {
 
 let binCache = [];   // last list seen by a bin watcher (for undo lookups); refreshed on demand
 resetters.push(() => { binCache = []; });   // never hand one user's deleted cases to the next
+const deleteBase = new WeakMap();   // bin entry -> the version its delete checked (extra.base), for rollBack
 
 // Returns the bin entry (or entries, for an array). Never deletes the original if the copy failed.
+// extra.base (one reflection): the version the delete checks, when it isn't the item itself: the editor bins what it
+// shows (unsaved typing too) but the server has the version it last saved. The bin copy takes that version's stamp, so
+// other devices remove their copy of it (sync.js).
 export async function moveToBin(kind, item, extra = {}) {
   const items = Array.isArray(item) ? item : [item];
   if (!items.length) return [];
   const owner = mine(), now = Date.now();
-  const entries = items.map((it, i) => binEntry(kind, it, now + i));   // distinct ids for same-id items
+  const hasBase = kind === 'reflection' && 'base' in extra && items.length === 1;
+  const baseOf = it => (hasBase ? extra.base : it);
+  const stamped = it => (hasBase && extra.base && Number(extra.base.updatedAt) > (Number(it.updatedAt) || 0) ? { ...it, updatedAt: extra.base.updatedAt } : it);
+  const entries = items.map((it, i) => binEntry(kind, stamped(it), now + i));   // distinct ids for same-id items
+  if (hasBase) deleteBase.set(entries[0], extra.base);
   // in parallel: offline, each write waits up to ACK_WAIT before it counts as queued
   await Promise.all(entries.map(e => cloud.saveBinEntry(owner, e)));
   if (S.user?.email !== owner) throw new Error('Account changed; the original record has not been deleted');
@@ -79,9 +87,13 @@ export async function moveToBin(kind, item, extra = {}) {
     const bad = r.find(x => x.status === 'rejected');
     if (bad) await failed(entries.map(e => e.data.id).filter(id => !ok.has(id)), bad.reason);
   } else {
-    const r = await Promise.allSettled(entries.map(e => cloud.deleteReflection(mine(), e.data.id)));
+    // through the write queue with the version being deleted, as cases and notes: a reflection changed on another
+    // device meanwhile (finished on the laptop while this phone showed its outline) is kept. A blind delete lost it,
+    // and the bin kept only the outline (audit, 14 Oct 2026). The open list drops them at once.
+    const r = await Promise.allSettled(entries.map((e, i) => writes.save('reflection', owner, { id: e.data.id, _deleted: true }, baseOf(items[i]))));
     const ok = new Set(entries.filter((e, i) => r[i].status === 'fulfilled').map(e => e.data.id));
     if (Array.isArray(S.reflections)) S.reflections = S.reflections.filter(x => !ok.has(x.id));
+    watchDeletes(owner, kind, entries.filter(e => ok.has(e.data.id)));
     const bad = r.find(x => x.status === 'rejected');
     if (bad) await failed(entries.map(e => e.data.id).filter(id => !ok.has(id)), bad.reason);
   }
@@ -104,11 +116,15 @@ async function rollBack(owner, kind, entries) {
   for (const e of entries) {
     try { await cloud.deleteBinEntry(owner, e.id); binCache = binCache.filter(x => x.id !== e.id); }
     catch (err) { console.warn('Bin entry left after a failed delete', e.id, err); }
-    const job = kind !== 'reflection' && writes.entries().find(x => x.kind === kind && x.record.id === e.data.id && (x.state === 'failed' || x.state === 'conflict'));
+    const job = writes.entries().find(x => x.kind === kind && x.record.id === e.data.id && (x.state === 'failed' || x.state === 'conflict'));
     if (job) await writes.archive(job.key).catch(() => {});
     // the record changed elsewhere first: that version stays, so the delete is undone; say so, or the case seems to
     // come back by itself
     if (job && job.state === 'conflict') {
+      // archive() keeps newer saves (writes.js), but a restore from the bin queued behind this delete is the binned,
+      // older copy: it goes too, or it would meet the newer version as one more conflict
+      const latest = writes.jobKey(kind, e.data.id);
+      if (latest && latest !== job.key && writes.stateOf(latest) !== 'synced') await writes.archive(latest).catch(() => {});
       // the version kept: the server's copy the conflict reported (or this device's, once it shows again)
       if (kind === 'case') { const kept = job.remote || S.cases.find(c => c.id === e.data.id); if (kept) toSheet([kept]); }
       toast(`A ${kind} you deleted was changed on another device, so it was kept`); continue;
@@ -116,18 +132,23 @@ async function rollBack(owner, kind, entries) {
     try {
       if (kind === 'case') { await restoreCase({ ...e.data }, e.data); toSheet([e.data]); }
       else if (kind === 'note') await writes.save('note', owner, { ...e.data }, e.data);
-      else await cloud.saveReflection(owner, { ...e.data });
+      // (never a blind save: the server may hold a newer version)
+      else await writes.save('reflection', owner, { ...e.data }, deleteBase.has(e) ? deleteBase.get(e) : e.data);
     } catch (err) { console.warn('Could not save the record again after a failed delete', e.data.id, err); }
   }
 }
 
+// each delete's own job is followed (the latest for that record when it was queued), not the record's latest: a restore
+// from the bin queued behind a delete still waiting for signal is a later job, and while it waits the delete's refusal
+// would go unseen
 function watchDeletes(owner, kind, entries) {
   const left = new Map(entries.map(e => [e.data.id, e]));
   if (!left.size) return;
+  const keys = new Map([...left.keys()].map(id => [id, writes.jobKey(kind, id)]));
   let off = null;
   const check = () => {
     for (const [id, e] of [...left]) {
-      const st = writes.status(kind, id);
+      const st = writes.stateOf(keys.get(id));
       if (st === 'pending') continue;
       left.delete(id);
       if (st === 'failed' || st === 'conflict') rollBack(owner, kind, [e]).catch(err => console.warn('Bin entry left after a failed delete', err));
@@ -171,7 +192,10 @@ export async function restoreFromBin(id) {
   } else {
     out = { ...e.data };
     if ((S.reflections || []).some(r => r.id === out.id)) out.id = uid();
-    out = await cloud.saveReflection(mine(), out);
+    // through the write queue, as notes and cases (base null: never over a copy the server has): queued behind a delete
+    // still waiting for signal, so it shows at once and lands after it. A blind save went ahead of that delete, which
+    // then removed the restored copy (its content matches the version deleted), with the bin entry already gone
+    out = await writes.save('reflection', mine(), out, null);
   }
   await cloud.deleteBinEntry(mine(), e.id);
   binCache = binCache.filter(x => x.id !== e.id);

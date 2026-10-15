@@ -465,16 +465,18 @@ export async function fixCaseInitials(email, fixes, onProgress) {
   return fixes.length;
 }
 
-export async function importCases(email, rid, cases, onProgress) {
+export async function importCases(email, rid, cases, onProgress, { have = [] } = {}) {
   email = lc(email);
   const s = load();
   const prev = s.imports[rid];
   const known = new Set(prev && (!prev.email || prev.email === email) ? prev.keys || [] : []);
+  const there = new Set(have);
   const fresh = [];
   for (const c of cases) {
     if (!c.importKey || known.has(c.importKey)) continue;
     known.add(c.importKey);
-    fresh.push(cleanCase({ ...c, id: importDocId(c.importKey), source: 'import', createdAt: c.createdAt || c.timestamp }));
+    const id = importDocId(c.importKey);
+    if (!there.has(id)) fresh.push(cleanCase({ ...c, id, source: 'import', createdAt: c.createdAt || c.timestamp }));
   }
   const lb = book(s, email);
   for (const d of fresh) lb.cases[d.id] = d;

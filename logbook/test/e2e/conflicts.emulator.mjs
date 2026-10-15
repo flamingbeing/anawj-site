@@ -304,6 +304,120 @@ const scenarios = {
     assert.ok(!(await outbox()).has('sheet2'), 'off: nothing queued');
     return 'queued, masked, edit ignored, removed on delete, paste yes, restore no, off';
   },
+  // a reflection finished on B while A, offline, still shows the outline and moves it to the bin: back online the
+  // delete is refused, B's text stays (on the server and on A), and no copy is left in the bin (audit, 14 Oct 2026)
+  async reflectionBinStale(A, B) {
+    const now = Date.now();
+    await put(`logbooks/${E}/reflections/refl1`, { id: 'refl1', headingId: 'thyroid', initials: 'AB', title: 'Fake reflection', summary: 'outline', status: 'draft', createdAt: now, updatedAt: now });
+    await reopen(A); await reopen(B);
+    const summaryOn = d => d.p.evaluate(async () => (await import('./js/ui-core.js')).S.reflections.find(x => x.id === 'refl1')?.summary ?? null);
+    for (const d of [A, B]) for (const t = Date.now(); (await summaryOn(d)) !== 'outline'; await d.p.waitForTimeout(150)) if (Date.now() - t > 15000) throw new Error(d.name + ' never showed the reflection');
+    await A.ctx.setOffline(true);
+    await B.p.evaluate(async () => { const { S, writes } = await import('./js/ui-core.js'); const r = S.reflections.find(x => x.id === 'refl1'); await writes.save('reflection', S.user.email, { ...r, summary: '900 finished words' }, r); });
+    await settle(B);
+    const ra = await A.p.evaluate(async () => {
+      const { S } = await import('./js/ui-core.js'), bin = await import('./js/bin.js');
+      try { await bin.moveToBin('reflection', S.reflections.find(x => x.id === 'refl1')); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }
+    });
+    await A.ctx.setOffline(false); await settle(A); await A.p.waitForTimeout(1500); await settle(A);
+    const server = (await list(E, 'reflections')).find(d => d.name.endsWith('/refl1'));
+    assert.equal(server?.fields.summary?.stringValue, '900 finished words', 'B’s finished text is on the server');
+    assert.equal((await list(E, 'bin')).filter(d => d.fields.data?.mapValue?.fields?.id?.stringValue === 'refl1').length, 0, 'no copy left in the bin');
+    await reopen(A);
+    assert.equal(await summaryOn(A), '900 finished words', 'A shows the finished text');
+    return `delete ${ra.ok ? 'accepted offline, then refused' : 'refused: ' + ra.error}; finished text kept`;
+  },
+  // Restore from a backup writes only what the server lacks (cloud.addMissing: ids looked up 30 at a time), never the
+  // backup's older copy over a case that is there; with no signal it says so and writes nothing
+  async restoreAddsOnlyMissing(A) {
+    // its own reflection on the server (not one an earlier scenario left), changed since the backup was made
+    const stamp = Date.now();
+    await put(`logbooks/${E}/reflections/reflKeep`, { id: 'reflKeep', headingId: 'thyroid', initials: 'AB', title: 'Fake reflection', summary: 'newer on the server', status: 'draft', createdAt: stamp, updatedAt: stamp });
+    await reopen(A);
+    const ids = [];
+    for (let i = 0; i < 32; i++) ids.push(await seedCase('fake case: restore keeps ' + i));
+    const r = await A.p.evaluate(async ids => {
+      const cloud = await import('./js/cloud.js'), { S } = await import('./js/ui-core.js');
+      const backup = [...ids, 'restored1'].map(id => ({ id, date: '2026-10-01', initials: 'AB', details: id === 'restored1' ? 'fake case only in the backup' : 'fake OLD backup copy', cats: ['08'], createdAt: 1, updatedAt: 1, source: 'app' }));
+      const added = await cloud.addMissing(S.user.email, 'case', backup);
+      const refl = await cloud.addMissing(S.user.email, 'reflection', [{ id: 'reflKeep', headingId: 'thyroid', initials: 'AB', title: 'Fake reflection', summary: 'old backup text', status: 'draft' },
+        { id: 'reflR', headingId: 'thyroid', initials: 'AB', title: 'Fake restored', summary: 'only in the backup', status: 'draft' }]);
+      return { added: added.map(c => c.id), refl: refl.map(x => x.id) };
+    }, ids);
+    await settle(A);
+    assert.deepEqual(r.added, ['restored1']);
+    const on = await serverCases();
+    ids.forEach((id, i) => assert.equal(on.get(id), 'fake case: restore keeps ' + i, id + ' was written over'));
+    assert.equal(on.get('restored1'), 'fake case only in the backup');
+    const refls = new Map((await list(E, 'reflections')).map(d => [d.name.split('/').pop(), d.fields.summary?.stringValue]));
+    assert.deepEqual(r.refl, ['reflR']);
+    assert.equal(refls.get('reflKeep'), 'newer on the server', 'reflKeep was written over');
+    assert.equal(refls.get('reflR'), 'only in the backup');
+    await A.ctx.setOffline(true);
+    const off = await A.p.evaluate(async () => {
+      const cloud = await import('./js/cloud.js'), { S } = await import('./js/ui-core.js');
+      try { await cloud.addMissing(S.user.email, 'case', [{ id: 'restored2', date: '2026-10-01', initials: 'AB', details: 'fake offline restore', cats: ['08'], createdAt: 1, updatedAt: 1, source: 'app' }]); return 'written'; }
+      catch (e) { return e.message; }
+    });
+    await A.ctx.setOffline(false); await settle(A);
+    assert.match(off, /no signal/);
+    assert.ok(!(await serverCases()).has('restored2'), 'nothing written offline');
+    return '1 of 33 cases and 1 of 2 reflections added; offline: ' + off.slice(0, 40);
+  },
+  // a reflection moved to the bin offline, then restored from the bin while still offline: it shows at once, and after
+  // signal (the delete, then the restore) it is on the server and still shows here, also after reopening (the delete's
+  // tombstone is older than the restored copy). Review, 15 Oct 2026: a blind restore was hidden here by that tombstone
+  async reflectionBinRestoreOffline(A) {
+    const now = Date.now();
+    await put(`logbooks/${E}/reflections/reflRB`, { id: 'reflRB', headingId: 'thyroid', initials: 'AB', title: 'Fake bin restore', summary: 'keep me', status: 'draft', createdAt: now, updatedAt: now });
+    await reopen(A);
+    const shows = () => A.p.evaluate(async () => !!(await import('./js/ui-core.js')).S.reflections.find(x => x.id === 'reflRB'));
+    for (const t = Date.now(); !(await shows()); await A.p.waitForTimeout(150)) if (Date.now() - t > 15000) throw new Error('reflRB never showed');
+    await A.ctx.setOffline(true);
+    const r = await A.p.evaluate(async () => {
+      const { S } = await import('./js/ui-core.js'), bin = await import('./js/bin.js');
+      const e = await bin.moveToBin('reflection', S.reflections.find(x => x.id === 'reflRB'));
+      const back = await bin.restoreFromBin(e.id);
+      return { back: back.id, listed: !!S.reflections.find(x => x.id === 'reflRB') };
+    });
+    await A.ctx.setOffline(false); await settle(A); await A.p.waitForTimeout(3000); await settle(A);
+    const server = (await list(E, 'reflections')).some(d => d.name.endsWith('/reflRB'));
+    const binLeft = (await list(E, 'bin')).filter(d => d.fields.data?.mapValue?.fields?.id?.stringValue === 'reflRB').length;
+    const listedAfter = await shows();
+    await reopen(A);
+    for (const t = Date.now(); !(await shows()); await A.p.waitForTimeout(150)) if (Date.now() - t > 8000) break;
+    const listedReopen = await shows();
+    const msg = `restored as ${r.back}; listed at once: ${r.listed}; on the server: ${server}; bin copies: ${binLeft}; listed after: ${listedAfter}; after reopening: ${listedReopen}`;
+    assert.ok(r.back === 'reflRB' && r.listed && server && !binLeft && listedAfter && listedReopen, msg);
+    return msg;
+  },
+  // the same with flaky signal (the browser says online, the server can't be reached): the queued delete must not run
+  // after the restore and delete the restored copy (review, 15 Oct 2026: it did, with the bin entry already gone)
+  async reflectionBinRestoreFlaky(A) {
+    const now = Date.now();
+    await put(`logbooks/${E}/reflections/reflRF`, { id: 'reflRF', headingId: 'thyroid', initials: 'AB', title: 'Fake bin restore flaky', summary: 'keep me', status: 'draft', createdAt: now, updatedAt: now });
+    await reopen(A);
+    const shows = () => A.p.evaluate(async () => !!(await import('./js/ui-core.js')).S.reflections.find(x => x.id === 'reflRF'));
+    for (const t = Date.now(); !(await shows()); await A.p.waitForTimeout(150)) if (Date.now() - t > 15000) throw new Error('reflRF never showed');
+    const block = r => r.abort('internetdisconnected');
+    await A.ctx.route(`http://127.0.0.1:${FS}/**`, block);
+    const r = await A.p.evaluate(async () => {
+      const { S } = await import('./js/ui-core.js'), bin = await import('./js/bin.js');
+      const e = await bin.moveToBin('reflection', S.reflections.find(x => x.id === 'reflRF'));
+      const back = await bin.restoreFromBin(e.id);
+      return { back: back.id, listed: !!S.reflections.find(x => x.id === 'reflRF') };
+    });
+    await A.p.waitForTimeout(8000);
+    await A.ctx.unroute(`http://127.0.0.1:${FS}/**`, block);
+    const q = () => A.p.evaluate(async () => (await import('./js/writes.js')).writes.entries().filter(j => j.record.id === 'reflRF').map(j => j.state + (j.record._deleted ? ':delete' : ':save')));
+    for (const t = Date.now(); (await q()).some(x => x.startsWith('pending')); await A.p.waitForTimeout(500)) if (Date.now() - t > 90000) break;
+    await A.p.waitForTimeout(3000);
+    const server = (await list(E, 'reflections')).some(d => d.name.endsWith('/reflRF'));
+    const binLeft = (await list(E, 'bin')).filter(d => d.fields.data?.mapValue?.fields?.id?.stringValue === 'reflRF').length;
+    const msg = `listed at once: ${r.listed}; on the server: ${server}; bin copies: ${binLeft}; listed after: ${await shows()}; queue: ${(await q()).join(', ')}`;
+    assert.ok(r.listed && server && await shows(), msg);
+    return msg;
+  },
   // signing out with unsent work asks first; Cancel keeps it and it lands later; "Sign out anyway" leaves nothing for the
   // next account on the device
   async signOut(A) {
@@ -345,7 +459,7 @@ try {
       results.push([name, false, `${e.message.split('\n')[0]} (device A shows: ${screen})\n    console: ${A.log.slice(-6).join('\n    ')}`]);
     }
     // a scenario that failed half-way leaves conflicts: clear them so the next starts clean
-    await Promise.all([A, B].map(async d => { await d.ctx.setOffline(false); await d.p.evaluate(async () => { const { writes } = await import('./js/writes.js'); for (const j of writes.entries()) if (j.state === 'conflict' || j.state === 'failed') await writes.archive(j.key); }).catch(() => {}); }));
+    await Promise.all([A, B].map(async d => { await d.ctx.setOffline(false); await d.p.evaluate(async () => { const { writes } = await import('./js/writes.js'); const left = writes.entries().filter(j => j.state !== 'synced' && j.state !== 'archived'); for (const j of left) if (left.some(x => x.record.id === j.record.id && (x.state === 'conflict' || x.state === 'failed'))) await writes.archive(j.key); }).catch(() => {}); }));
     const [name2, ok, note] = results.at(-1);
     console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${name2}: ${note}`);
   }

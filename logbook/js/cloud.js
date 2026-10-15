@@ -563,6 +563,40 @@ export async function saveCases(email, cases) {
   return docs;
 }
 
+// Restore from a backup (kind 'case' or 'reflection'): writes only the records the server doesn't have. One already
+// there is never written, even when it differs: it may have been changed since the backup was made (a restore used to
+// write the backup's older copy over it), and a restore only adds what is missing. The ids are looked up on the server
+// first, 30 at a time and four lookups at once (a read for each one found, at least one per lookup; about 13 rounds for
+// 1,500 cases), then the missing ones go in batches. Needs signal. -> the docs written
+export async function addMissing(email, kind, records) {
+  const coll = COLLECTION[kind];
+  const docs = [...new Map(records.map(r => CLEAN[kind](r)).map(d => [d.id, d])).values()];
+  if (demo) {
+    const have = new Set((kind === 'case' ? await D.listCases(email) : D.reflectionsOf(lc(email))).map(x => x.id));
+    const out = docs.filter(d => !have.has(d.id));
+    if (kind === 'case') return out.length ? D.saveCases(email, out) : [];
+    const saved = [];
+    for (const d of out) saved.push(await D.saveReflection(email, d));
+    return saved;
+  }
+  email = lc(email);
+  const { db, F } = await sdk();
+  const have = new Set();
+  const lookup = async ids => {
+    const snap = await F.getDocsFromServer(F.query(F.collection(db, 'logbooks', email, coll), F.where(F.documentId(), 'in', ids)));
+    if (reads) count(coll, 'billed', Math.max(1, snap.size));
+    for (const d of snap.docs) have.add(d.id);
+  };
+  try {
+    for (let i = 0; i < docs.length; i += 30 * 4)
+      await Promise.all([0, 1, 2, 3].map(k => docs.slice(i + 30 * k, i + 30 * (k + 1)).map(d => d.id)).filter(ids => ids.length).map(lookup));
+  } catch (e) { throw e && e.code === 'unavailable' ? new Error('no signal (a restore first checks what your logbook already has). Try again with signal.') : e; }
+  const out = docs.filter(d => !have.has(d.id));
+  await inBatches(out, (b, d, F, db) => b.set(F.doc(db, 'logbooks', email, coll, d.id), d),
+    (b, part) => queued(b.commit(), late(email, coll, part.map(d => d.id))));
+  return out;
+}
+
 // for good (no bin entry): Undo of a plan's "done" or of a pasted list, and after the bin copy
 export async function deleteCases(email, ids) {
   await hub.drop(lc(email), 'cases', ids.map(String));
@@ -705,9 +739,12 @@ export async function fixCaseInitials(email, fixes, onProgress) {
 // after new form responses costs only the new rows (the free tier allows 20k writes a day).
 // Each batch also updates imports/{rid}, so an interrupted import resumes where it stopped.
 // Case doc ids are derived from the importKey, so even a lost imports doc cannot duplicate cases.
+// have: ids of the cases already in the logbook (listCases). A row whose case is already there is never written
+// again, even when the record lacks its key (a case written by another route, or a lost record): writing it would
+// overwrite the resident's own edits, links and tags with the sheet's text. Its key is added to the record.
 // onProgress(done, total) after each batch. Returns { written, skipped }.
-export async function importCases(email, rid, cases, onProgress) {
-  if (demo) return D.importCases(email, rid, cases, onProgress);
+export async function importCases(email, rid, cases, onProgress, { have = [] } = {}) {
+  if (demo) return D.importCases(email, rid, cases, onProgress, { have });
   email = lc(email);
   rid = String(rid);
   const { db, F } = await sdk();
@@ -715,14 +752,17 @@ export async function importCases(email, rid, cases, onProgress) {
   const snap = await F.getDoc(impRef);
   // the record belongs to the address the cases went to: after an email fix, import again in full
   const prev = snap.exists() && (!snap.data().email || snap.data().email === email) ? snap.data().keys || [] : [];
-  const known = new Set(prev);
+  const known = new Set(prev), there = new Set(have), found = [];
   const fresh = [];
   for (const c of cases) {
     if (!c.importKey || known.has(c.importKey)) continue;
     known.add(c.importKey);   // also drops repeats within this upload
-    fresh.push(cleanCase({ ...c, id: importDocId(c.importKey), source: 'import', createdAt: c.createdAt || c.timestamp }));
+    const id = importDocId(c.importKey);
+    if (there.has(id)) { found.push(c.importKey); continue; }
+    fresh.push(cleanCase({ ...c, id, source: 'import', createdAt: c.createdAt || c.timestamp }));
   }
-  const done = new Set(prev);
+  const done = new Set([...prev, ...found]);
+  if (found.length && !fresh.length) await F.setDoc(impRef, { email, keys: [...done], updatedAt: Date.now() });
   if (onProgress) onProgress(0, fresh.length);
   await inBatches(fresh, (b, d) => b.set(F.doc(db, 'logbooks', email, 'cases', d.id), d), async (b, part, n) => {
     for (const d of part) done.add(d.importKey);

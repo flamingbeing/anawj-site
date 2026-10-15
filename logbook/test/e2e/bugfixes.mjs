@@ -1,5 +1,6 @@
 // Fake data only. Regressions from the bug hunt of 13 Oct 2026 that need a browser: a move to the recycle bin whose
-// delete fails takes its copy out of the bin again (at once, or when it fails after being accepted); Settings search
+// delete fails takes its copy out of the bin again (at once, or when it fails after being accepted); Tag N cases, a tag
+// merge and a spreadsheet's changed rows keep a case changed on another device (audit, 14 Oct 2026); Settings search
 // finds the Settings page's own cards and Account; a settings file from before the `show` map wins over the account's
 // switches, and one that changes the profile moves this device's tabs as picking it does; the APMES switches that need
 // the targets' counts say so while those are off.
@@ -75,6 +76,62 @@ try { for (const width of [390, 1280]) {
   assert.equal(await outboxEntry(keptId), null, 'taken out once the delete was accepted');
   await poll(async () => /edited on another device/.test((await outboxEntry(keptId))?.details || ''), 'the kept version went back into the outbox');
   await p.evaluate(async () => { const { writes, cloud, S } = await import('./js/ui-core.js'); writes.configure({ backend: cloud.commitRecord }); S.resident = null; });
+  // ---- Tag N cases, a tag merge and a spreadsheet's changed rows keep a case changed on another device (audit, 14 Oct
+  // 2026: they put this device's stale copy over it). The other device's edit goes straight into the demo store, so
+  // this page doesn't hear of it, as a phone offline in theatre wouldn't. ----
+  await p.evaluate(async () => {
+    const { S, cloud, patchLogbook, tagSet } = await import('./js/ui-core.js');
+    for (const [i, x] of ['a', 'b', 'c', 'd', 'e'].entries()) await cloud.saveCase(S.user.email, { id: 'fake-bulk-' + x, date: `2020-01-0${i + 1}`, initials: 'ZZ', details: 'Fakebulk case ' + x, cats: ['16'], createdAt: i + 1, updatedAt: Date.now(), source: 'app' });
+    await patchLogbook({ settings: { tagSet: [...tagSet(), { k: 'u:fakeone', n: 'Fake one' }, { k: 'u:faketwo', n: 'Fake two' }, { k: 'u:fakethree', n: 'Fake three' }] } });
+  });
+  const elsewhere = x => p.evaluate(id => { const k = 'apmes-logbook-demo-v1', s = JSON.parse(localStorage.getItem(k)); Object.assign(s.logbooks['demo@example.com'].cases[id], { details: 'Fakebulk changed elsewhere', cats: ['16', '17'], updatedAt: Date.now() }); localStorage.setItem(k, JSON.stringify(s)); }, 'fake-bulk-' + x);
+  const onServer = x => p.evaluate(async id => (await (await import('./js/ui-core.js')).cloud.listCases('demo@example.com')).find(c => c.id === id), 'fake-bulk-' + x);
+  const toastSays = async re => { await poll(async () => re.test(await p.locator('#toast').innerText()), 'toast ' + re); };
+  await elsewhere('a');
+  await goHash('logbook');
+  await p.getByLabel('Search cases').fill('Fakebulk case');
+  await p.getByRole('button', { name: 'Filter' }).click();
+  await p.locator('button.lb-fold', { hasText: 'More' }).click();
+  await p.locator('button', { hasText: /^Tag 5 cases/ }).click();
+  await p.locator('dialog[open] select').nth(1).selectOption('u:fakeone');
+  await p.locator('dialog[open]').getByRole('button', { name: 'Apply' }).click();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Add', exact: true }).click();
+  await toastSays(/4 cases updated\. 1 kept as it was changed on another device \(keep that version in Recent changes, then tag them again\)/);
+  assert.equal((await onServer('a')).details, 'Fakebulk changed elsewhere', 'Tag N cases: the edit made elsewhere stays');
+  assert.equal((await onServer('a')).tags, undefined); assert.deepEqual((await onServer('b')).tags, ['u:fakeone']);
+  const fakeTags = () => p.evaluate(async () => (await import('./js/ui-core.js')).tagSet().filter(x => /^u:fake/.test(x.k)).map(x => x.k));
+  const merge = async (from, to) => {
+    await goHash('tags');
+    await p.locator(`.te-list li[data-k="${from}"] .te-name`).click();
+    await p.locator('dialog.tag-info').getByRole('button', { name: 'Edit', exact: true }).click();
+    await p.locator('dialog[open]').getByRole('button', { name: 'Merge…', exact: true }).click();
+    await p.locator('dialog[open]').getByLabel('Merge into').selectOption(to);
+    await p.locator('dialog[open]').getByRole('button', { name: 'Merge', exact: true }).click();
+  };
+  // merged with every case saved: the old tag comes off the list
+  await merge('u:fakeone', 'u:faketwo');
+  await toastSays(/Merged into Fake two: 4 cases updated/);
+  assert.deepEqual(await fakeTags(), ['u:faketwo', 'u:fakethree']);
+  // one changed elsewhere: kept, and the old tag stays on the list (that case still has it)
+  await elsewhere('c');
+  await merge('u:faketwo', 'u:fakethree');
+  await toastSays(/Merged into Fake three: 3 of 4 cases; “Fake two” stays on your list\. 1 kept .*then merge again/);
+  assert.deepEqual(await fakeTags(), ['u:faketwo', 'u:fakethree']);
+  assert.equal((await onServer('c')).details, 'Fakebulk changed elsewhere', 'merge: the edit made elsewhere stays');
+  assert.deepEqual((await onServer('c')).tags, ['u:faketwo']); assert.deepEqual((await onServer('b')).tags, ['u:fakethree']);
+  // a spreadsheet's changed rows (an ID column): the same
+  await elsewhere('e');
+  await goHash('data');
+  const csv = 'ID,Date,Initials,Case summary,Tags\r\nfake-bulk-d,4/1/2020,ZZ,Fakebulk case d from the sheet,16\r\nfake-bulk-e,5/1/2020,ZZ,Fakebulk case e from the sheet,16\r\n';
+  await p.locator('label', { hasText: 'Upload Excel/CSV' }).locator('input').setInputFiles({ name: 'fake-cases.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await p.locator('dialog[open]', { hasText: 'match the columns' }).getByRole('button', { name: 'Review changes' }).click();
+  const rev = p.locator('dialog[open]', { hasText: 'Review changes' });
+  assert.match(await rev.locator('p').first().innerText(), /^2 changed, 0 new, 0 deleted/);
+  await rev.getByRole('button', { name: 'Apply' }).click();
+  await toastSays(/Applied: 1 changed, 0 new, 0 deleted\. 1 kept as it was changed on another device(?! \()/);   // (no "tag again": a row is no transform)
+  assert.equal((await onServer('d')).details, 'Fakebulk case d from the sheet');
+  assert.equal((await onServer('e')).details, 'Fakebulk changed elsewhere', 'import: the edit made elsewhere stays');
+  await p.evaluate(async () => { const { writes } = await import('./js/ui-core.js'); for (const j of writes.entries().filter(x => x.state === 'conflict')) await writes.archive(j.key); });
 
   // ---- Settings search: the Settings page's own cards, the bin, and Account ----
   await goHash('settings');
@@ -228,6 +285,88 @@ try { for (const width of [390, 1280]) {
   await poll(async () => (await rids()).every(x => x === 'DEMO01'), 'the rid set here and saved, in this session');
   const lateId = await p.evaluate(async () => (await (await import('./js/ui-core.js')).createCase({ details: 'UV 45M fake lap chole', cats: ['08'] })).id);
   assert.ok(await outboxEntry(lateId), "this session's new case is queued for the sheet");
+  // ======== round 3 (audit, 14 Oct 2026) ========
+  const core = fn => p.evaluate(fn);
+  // ---- restore while the logbook is still loading (a new phone looks empty): it waits for the server's copy ----
+  await goHash('data');
+  for (const sm of await p.locator('details:not([open]) > summary').all()) await sm.click().catch(() => {});
+  const backupJson = await core(async () => JSON.stringify(await (await import('./js/backup.js')).makeBackup()));
+  const editedId = await core(async () => {
+    const { S, cloud, setCases } = await import('./js/ui-core.js');
+    const c = S.cases[0];
+    await cloud.saveCase(S.user.email, { ...c, details: c.details + ' EDITED ON THE LAPTOP' });   // after the backup
+    S.casesSynced = false; setCases([]);   // still loading
+    return c.id;
+  });
+  const restoreInput = p.locator('input[type=file][accept*=".gz"]');
+  const restoreFile = { name: 'logbook-backup.json', mimeType: 'application/json', buffer: Buffer.from(backupJson) };
+  await restoreInput.setInputFiles(restoreFile);
+  await p.locator('#toast', { hasText: 'Loading your logbook first' }).waitFor();
+  await p.waitForTimeout(600);
+  assert.equal(await p.locator('dialog[open]').count(), 0, 'no restore dialog while loading');
+  await core(async () => { const { S, cloud, setCases } = await import('./js/ui-core.js'); setCases(await cloud.listCases(S.user.email)); S.casesSynced = true; });
+  await p.locator('dialog[open]').filter({ hasText: 'Everything in this backup is already in your logbook.' }).waitFor();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Close' }).click();
+  // a list that misses a case the server has: the restore never writes over it (only what the server lacks goes)
+  await core(async () => { const { S, setCases } = await import('./js/ui-core.js'); setCases(S.cases.slice(1)); });
+  await restoreInput.setInputFiles(restoreFile);
+  await p.locator('dialog[open]').filter({ hasText: 'Add 1 case' }).waitFor();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Restore', exact: true }).click();
+  await p.locator('#toast', { hasText: 'Restored 0 cases, 0 reflections' }).waitFor();
+  const serverCase = await p.evaluate(async id => { const { S, cloud } = await import('./js/ui-core.js'); return (await cloud.listCases(S.user.email)).find(c => c.id === id); }, editedId);
+  assert.match(serverCase.details, /EDITED ON THE LAPTOP/, 'the newer copy kept');
+  await core(async () => { const { S, cloud, setCases } = await import('./js/ui-core.js'); setCases(await cloud.listCases(S.user.email)); });
+
+  // ---- Download backup waits for the server's copy; with no signal it saves this device's and says so ----
+  await core(async () => { (await import('./js/ui-core.js')).S.reflectionsSynced = false; });
+  let dl = p.waitForEvent('download');
+  await p.getByRole('button', { name: 'Download backup' }).click();
+  await p.locator('#toast', { hasText: 'Loading your logbook first' }).waitFor();
+  await p.waitForTimeout(500);
+  await core(async () => { (await import('./js/ui-core.js')).S.reflectionsSynced = true; });
+  await dl;
+  await p.locator('#toast', { hasText: /^Backup saved: \d+ cases/ }).waitFor();
+  assert.doesNotMatch(await p.locator('#toast').innerText(), /this device’s copy/);
+  if (width < 600) {
+    await core(async () => { (await import('./js/ui-core.js')).S.casesSynced = false; });
+    dl = p.waitForEvent('download', { timeout: 20000 });
+    await p.getByRole('button', { name: 'Download as one spreadsheet' }).click();
+    await dl;
+    await p.locator('#toast', { hasText: 'this device’s copy: it may miss recent changes' }).waitFor();
+    await core(async () => { (await import('./js/ui-core.js')).S.casesSynced = true; });
+  }
+
+  // ---- a reflection deleted in the editor with unsaved typing: it goes (no false "changed elsewhere"), and the bin
+  // keeps what was on screen ----
+  const reflId = await core(async () => {
+    const { S, cloud } = await import('./js/ui-core.js');
+    const r = await cloud.saveReflection(S.user.email, { id: 'fake-refl-del', headingId: 'thyroid', initials: 'ZZ', title: 'Fake to delete', summary: 'saved text', status: 'draft' });
+    (await import('./js/ui-reflect.js')).openReflection(r);
+    return r.id;
+  });
+  await p.waitForSelector('.refl-editor input[placeholder="Title"]');
+  await p.locator('.refl-editor input[placeholder="Title"]').fill('Fake to delete, typed');
+  await p.locator('.refl-editor button.danger', { hasText: 'Delete' }).click();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Move to bin' }).click();
+  await p.locator('#toast', { hasText: 'Reflection moved to the recycle bin' }).waitFor();
+  const afterDel = await p.evaluate(async id => {
+    const { S, cloud, writes } = await import('./js/ui-core.js');
+    const D = await import('./js/demo-backend.js');
+    return { server: D.reflectionsOf(S.user.email.toLowerCase()).some(r => r.id === id), shown: S.reflections.some(r => r.id === id),
+      bin: (await cloud.listBin(S.user.email)).find(e => e.data.id === id)?.data.title, stuck: writes.entries().filter(x => x.record.id === id && x.state !== 'synced' && x.state !== 'archived').length };
+  }, reflId);
+  assert.deepEqual(afterDel, { server: false, shown: false, bin: 'Fake to delete, typed', stuck: 0 });
+  // ---- one changed on another device since this one last saw it: the delete is refused and the newer one stays ----
+  const refused = await core(async () => {
+    const { S, cloud } = await import('./js/ui-core.js'), { moveToBin } = await import('./js/bin.js');
+    const old = await cloud.saveReflection(S.user.email, { id: 'fake-refl-stale', headingId: 'thyroid', initials: 'ZZ', title: 'Fake stale', summary: 'outline', status: 'draft' });
+    await cloud.saveReflection(S.user.email, { ...old, summary: '900 finished words' });   // the laptop
+    try { await moveToBin('reflection', old); return 'moved'; } catch (err) { return err.message; }
+  });
+  assert.match(refused, /changed elsewhere/);
+  await p.locator('#toast', { hasText: 'was changed on another device, so it was kept' }).waitFor();
+  await poll(() => p.evaluate(async () => (await import('./js/ui-core.js')).S.reflections.some(r => r.id === 'fake-refl-stale' && r.summary === '900 finished words')), 'the newer reflection shows');
+  assert.equal(await p.evaluate(async () => { const { S, cloud } = await import('./js/ui-core.js'); return (await cloud.listBin(S.user.email)).filter(e => e.data.id === 'fake-refl-stale').length; }), 0, 'no copy left in the bin');
 
   assert.deepEqual(errors, [], 'console errors');
   await ctx.close();

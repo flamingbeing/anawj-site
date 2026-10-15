@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-14 by Claude Code (first version).
+Last updated: 2026-10-14 by Claude Code (final integration of the three monitor skins).
 
 ## Now
 
@@ -14,9 +14,19 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next (ideas, not agreed)
 
-1. More states: nitrous oxide, opioid-heavy, hypothermia; a left/right (SedLine-style) view.
+1. More states: nitrous oxide, opioid-heavy, hypothermia.
+2. Owner to compare each skin with his own unit or photos (only the Medtronic one was built from the owner's photos); known gaps per skin are in `NOTES.md`, "The three monitor skins at a glance".
+3. Decide whether to push the local skin commits (not pushed yet) and open a PR.
 
 ## Recently done
+
+- Final integration of the three skins (14 Oct 2026, local commits, not pushed): all checks green (`tools/check.mjs`, `tools/proofread.mjs`, engine check, full e2e including the Advance and SedLine tests); a race in the Advance battery-low test fixed (it read the text before the next frame; assertion unchanged); NOTES has a table of what is cloned from evidence, inferred or unknown for each skin; fonts listed with licences; no reference images or manual text in the repo.
+
+- BIS Advance screen rebuilt (14 Oct 2026, local commits, not pushed) as a 16:10 near-clone from the manual figures and 2021 marketing screens: two-channel and four-channel layouts, tile menu tree, dialogs, alarms and messages, sensor check, chart view, case review, demo mode, bundled Selawik. Detail: `NOTES.md`, "Medtronic BIS Advance".
+
+- Masimo SedLine screen rebuilt as a Root (800 x 1280 portrait) near-clone from Masimo's manuals and screen figures (14 Oct 2026, local commits, not pushed): status bar, four-channel EEG sweep, EMG / PSi / SR trends, DSA with ASYM, suppression and artefact marks, history bar, analog view, electrode strip, PSi alarm and window messages, Root-style menu tree with the manual's names and defaults, bundled Source Sans 3. Detail and what is unverified: `NOTES.md`, "Masimo SedLine".
+
+- Medtronic screen fidelity pass (14 Oct 2026, local commit, not pushed): DSA rebuilt (1 px columns, display scale, suppression gaps), 1 hour time axis with 10 min labels, alarm that sounds and gates like the manual (Target Range now Inactive by default, Trend Time Scale default 1 hour: the owner may want either back; both are one-line changes in `MT` / `mtDefaults`), menu and sensor-check details. Detail: `NOTES.md`, "Fidelity pass".
 
 - Two-sided screens (BIS Advance style, SedLine style) with a right-hemisphere engine and a one-sided slowing control (14 Oct 2026). Menu made functional (on-screen list, alarm limits). Queued: photos of Advance and SedLine screens to tighten the layouts; DSA suppression and artefact marks for SedLine.
 
