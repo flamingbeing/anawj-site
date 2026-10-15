@@ -20,6 +20,8 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Recently done
 
+- 2026-10-15: app kit (native look): app bar, large titles, bottom tab bar (sidebar on computers), grouped lists, segmented ratings.
+
 - 2026-10-13: speed-of-entry features (remembered fields, recent procedures, rate-all, drafts, log again, list filter, phrase chips); e2e checks added for them.
 
 - 2026-10-13: first version: DOPS and Mini-CEX forms, list, entry detail with delete, summary with CSV/JSON export, offline.
