@@ -702,9 +702,12 @@ export async function fixCaseInitials(email, fixes, onProgress) {
 // after new form responses costs only the new rows (the free tier allows 20k writes a day).
 // Each batch also updates imports/{rid}, so an interrupted import resumes where it stopped.
 // Case doc ids are derived from the importKey, so even a lost imports doc cannot duplicate cases.
+// have: ids of the cases already in the logbook (listCases). A row whose case is already there is never written
+// again, even when the record lacks its key (a case written by another route, or a lost record): writing it would
+// overwrite the resident's own edits, links and tags with the sheet's text. Its key is added to the record.
 // onProgress(done, total) after each batch. Returns { written, skipped }.
-export async function importCases(email, rid, cases, onProgress) {
-  if (demo) return D.importCases(email, rid, cases, onProgress);
+export async function importCases(email, rid, cases, onProgress, { have = [] } = {}) {
+  if (demo) return D.importCases(email, rid, cases, onProgress, { have });
   email = lc(email);
   rid = String(rid);
   const { db, F } = await sdk();
@@ -712,14 +715,17 @@ export async function importCases(email, rid, cases, onProgress) {
   const snap = await F.getDoc(impRef);
   // the record belongs to the address the cases went to: after an email fix, import again in full
   const prev = snap.exists() && (!snap.data().email || snap.data().email === email) ? snap.data().keys || [] : [];
-  const known = new Set(prev);
+  const known = new Set(prev), there = new Set(have), found = [];
   const fresh = [];
   for (const c of cases) {
     if (!c.importKey || known.has(c.importKey)) continue;
     known.add(c.importKey);   // also drops repeats within this upload
-    fresh.push(cleanCase({ ...c, id: importDocId(c.importKey), source: 'import', createdAt: c.createdAt || c.timestamp }));
+    const id = importDocId(c.importKey);
+    if (there.has(id)) { found.push(c.importKey); continue; }
+    fresh.push(cleanCase({ ...c, id, source: 'import', createdAt: c.createdAt || c.timestamp }));
   }
-  const done = new Set(prev);
+  const done = new Set([...prev, ...found]);
+  if (found.length && !fresh.length) await F.setDoc(impRef, { email, keys: [...done], updatedAt: Date.now() });
   if (onProgress) onProgress(0, fresh.length);
   await inBatches(fresh, (b, d) => b.set(F.doc(db, 'logbooks', email, 'cases', d.id), d), async (b, part, n) => {
     for (const d of part) done.add(d.importKey);

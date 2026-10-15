@@ -6,7 +6,7 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-14 (late evening) by Claude Code, Logbook 2 (log2).
+Last updated: 2026-10-15 (early morning) by Claude Code, Logbook 2 (log2).
 
 ## Now
 
@@ -15,27 +15,18 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Waiting on the owner
 
-- **Install the nightly Totals check on the sheet** (14 Oct; #551): replace the `LogbookOutbox` file in the sheet's Apps Script
-  project with the new `form-script/Outbox.gs`, run `logbookOutboxTotalsReport` (changes nothing; should say ok after the 14 Oct
-  rebuild), then `logbookOutboxTotalsSetup` (daily trigger ~03:00), then set the Script property `LOGBOOK_TOTALS_FIX` = `on`
-  (until then it only reports). Matters because "Allow response editing" stays ON (owner, 14 Oct): the sheet's `onFormSubmit`
-  appends Database rows again for an edited response; the nightly check repairs that.
-- **Firetop, only on the owner's OK in its own session:** delete the 72 stray documents it wrote under wrongly named logbooks
-  (email URL-encoded in the path; unreadable by the app; list in its `step2_stray_wrong_path.json`). Housekeeping, not urgent.
-- **Fix the "Page edits check" routine** (claude.ai/code/routines): its run on 14 Oct had no GitHub access to
-  `flamingbeing/anawj-site`; attach the repo with push access to the routine's environment (NTF Anaesthesia) and check
-  claude.ai/connect-github.
+- **Nightly Totals check:** the owner installed it (15 Oct). Confirm the Script property `LOGBOOK_TOTALS_FIX` is `on` (until then it
+  only reports) and that `logbookOutboxTotalsSetup` added the 03:00 trigger. Matters because "Allow response editing" stays ON
+  (owner, 14 Oct): the sheet's `onFormSubmit` appends Database rows again for an edited response; the nightly check repairs that.
+- **The CSV for resident 202411** (owner, 15 Oct): Firetop was asked to write a local CSV of her 11 Oct edits (before/after, plain
+  explanation) for the owner to send her; the file holds case text, so it goes through a channel the owner trusts.
+- Optional, to finish the sync check: look at the sheet's Apps Script Executions page for `logbookOutboxRun` (no errors) and log a
+  case while a Form response arrives. The app → sheet sync itself WORKED on 15 Oct 00:45 SGT (resident 202602's two real cases landed
+  in the Case tab with `app:` markers; drift check IN SYNC at 01:34).
 - Weekly drift check runs on Firetop Mondays 08:30 SGT (first 19 Oct) and messages the owner's phone; ask Claude to refresh the
   private dashboard ("Logbook Sync Check", claude.ai/artifact/TFa1Dvn9b4uA4oAedz5111) from the run's counts.
 - **Delete the test "ZZ" case again** (14 Oct): its first delete hit the zombie-delete bug (fixed in #519); after the
   site updates, reload and delete it once more (the old attempt sits as a conflict in Recent changes on that phone).
-- **App → sheet sync is LIVE (14 Oct) but not yet seen working end to end.** Needs one programme resident (someone on the
-  Residents list) to log a fake case in the app. Then check, within ~5 minutes: (1) the sheet's Case tab has a new row at the
-  top with `app:<id>` in column J (resident text, a real date, categories in D–G); (2) the Database tab has a row per
-  category; (3) the Executions page of the sheet's Apps Script shows `logbookOutboxRun` ran without errors; (4) log a second
-  case while submitting a Form response and check both land. If nothing appears in 10 minutes: Executions page, then tell
-  the assistant. Off switch: delete the `logbookOutboxRun` trigger, and set `SHEET_OUTBOX_ON = false` (`js/sheet-outbox.js`).
-  Details: `logbook/PLAN-app-to-sheet.md`, `logbook/form-script/OUTBOX-README.md`.
 - 14 Nov 2026 reminder (scheduled in log2's session): turn the response sheet's "anyone with the link: viewer" off.
 - **Try the 6-hour build** (13–14 Oct): Settings → Profile → Personal; Logbook day → + Daily note; Settings → Advanced
   logging → Labelled parts; Settings → Sync (GitHub / Drive / Dropbox); Send to. Everything new is off until switched on.
@@ -72,7 +63,7 @@ its own file), so sessions never edit the same lines. Read them all before start
    WebKit can't reach the emulator reliably); known limits (a phone clock >10 min slow; a sign-out not made from the button).
    Tools: `tools/test-multidevice.sh` (random, `DEVICES/ROUNDS/SEED/BROWSER/SLOW`) and `TEST=conflicts` (fixed scenarios).
 0b. **App → response-sheet sync is live (14 Oct); first end-to-end check pending** (needs a programme resident: see
-   "Waiting on the owner"). A reminder to ask the owner is scheduled for the morning of 15 Oct.
+   "Waiting on the owner"). (Verified 15 Oct: see Waiting on the owner.)
 1. Subdomains: **all steps done 13 Oct** (`SUBDOMAINS.md`); the logbook is at `apmes.anawj.com/logbook/`. Nothing queued here.
 2. **Waiting on the owner's answers** (13 Oct): the owner wants the logbook to also be his own log (daily note, learning points,
    knowledge-note review, a generic profile; residents may follow). Plans, consequences and the open questions:
@@ -128,12 +119,17 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Decisions log
 
+- 2026-10-15 (log2): Resident 202411's 11 Oct edits (36 text edits, 2 duplicates deleted) were DELIBERATE; Firetop's earlier restore
+  was reversed from its saved before-state, the two duplicates are in her bin and were removed from the sheet by the owner
+  (Rebuild Database + AY Reports), and the owner also synced the 36 text edits into the sheet. Rule: a change found in the
+  drift check is the resident's until they say otherwise; ask before restoring. App edits and deletes still do not reach the sheet
+  (next candidate build: app edits/deletes → sheet via the `app:` marker; sheet edits → app is harder, no row ids).
 - 2026-10-14 (log2): Two-way direction (owner): the app is the source of truth AND the Form / response sheet stays trusted, so
   changes in either should reach the other; built so far: drift check, re-import, nightly Totals check; not built: app
   edits/deletes to the sheet, sheet edits/deletes to the app (`logbook/PLAN-app-to-sheet.md`, "Two-way drift"). 26iv "Other
   blocks" stays an APMES category (it is a live Form option), added to the sheet script's CATEGORIES. "Allow response editing"
   stays ON. Names may appear in chat and on the private dashboard, never in the repo. A resident testing the app changes real
-  data (Abigail Sim's 38 cases on 11 Oct were restored from the sheet).
+  data (resident 202411's 38 cases on 11 Oct were restored from the sheet).
 - 2026-10-14 (log2): App → sheet sync decided and built: on for every programme resident, new cases only, a few minutes' delay
   fine, the same bot account as the Form inbox (it also reads/deletes `sheetOutbox`), column J "App marker" with `app:<caseId>`;
   the response sheet stays "anyone with the link: viewer" until 14 Nov. Dry run on a copy of the sheet showed one case holds the

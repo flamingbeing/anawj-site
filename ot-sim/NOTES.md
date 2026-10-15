@@ -57,7 +57,33 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
   `playwright install`).
 - Phone screenshots (390 px) of every UI change go in the PR (AGENTS.md "Show it").
 
+## Stubs in place (replaced by their PR, DESIGN.md "PR order")
+
+- `js/model/vitals.js` (M0.1): steady awake vitals with seeded noise, beats and breaths. Replaced by `rhythm.js` and
+  `cardio.js` (M2.1), `gas.js` and `resp.js` (M2.4), `temp.js` (M2.6). `synth.js` and `monitor.js` read `state.vit`
+  for now; they move to the real slices with those PRs.
+
 ## Decisions log
+
+- 14 Oct 2026 (M1.1): `pk.js` steps only drugs that have been given. Amounts are in mg (propofol, ketamine) or mcg
+  (opioids, midazolam), so concentrations read in the papers' units. The patient's PK multipliers act on V1 and the
+  metabolic clearance only (inter-compartment clearances stay). Context-sensitive half-times are tested as Hughes
+  1992 defines them (plasma held constant, then stopped); a constant-rate infusion gives a shorter 8 h value.
+  Alfentanil (Maitre PK, ke0 0.77) peaks at about 2.6 min, not Miller's 1.4 (Scott PK): recorded, not tuned, like
+  midazolam; on the clinical read-through list.
+
+- 14 Oct 2026 (M0.2): the default seed is 1 when the URL has no `?seed`, so first frames (and PR screenshots) repeat;
+  free runs with a new patient each time can come with the library (M3.2). The warm start keeps its last events with
+  negative times, so the lanes have a full sweep of history at t = 0. The lanes draw at device-pixel resolution and
+  keep the extreme value within each pixel (otherwise R waves vary in height on phones). The ResizeObserver refills a
+  lane only when its canvas size changes (numbers changing must not wipe the sweep). Pause is an icon button (the
+  phone top bar fits on one line). NIBP: 5-minute cycle by default, a reading takes 30 s, a manual start restarts the
+  cycle timer. In browser tests, wipe and count a canvas inside one `page.evaluate`: Chrome can repaint a GPU canvas
+  between evaluations.
+
+- 14 Oct 2026 (M0.1): the owner said go. Blood volume indexing starts above BMI 25 (not 22) so the default patient is
+  4.9 L. `vitals.js` is a placeholder (steady values plus noise, beats and breaths) that later PRs replace system by
+  system. `tools/test-ot-sim.sh` runs every `test/*.test.mjs`, so new model tests need no wiring.
 
 - 14 Oct 2026: folder `ot-sim/`, address `anaes.anawj.com/ot/`, plain ES modules with no build step, model separate
   from UI so Node tests can run it. Environment prepared (routes, labels, checks, test runner, build brief).

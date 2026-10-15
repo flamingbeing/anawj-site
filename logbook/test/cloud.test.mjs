@@ -105,6 +105,15 @@ const E = DEMO_USER.email;
   assert.deepEqual(await cloud.importCases('fixed@example.com', 'R1', rows), { written: 3, skipped: 0 });
   assert.equal((await cloud.listCases('fixed@example.com')).length, 3);
   assert.equal(got[0].find(c => c.importKey === 'h1#0').createdAt, 1720000000000);
+  // a case already in the logbook but missing from the record (written by another route) is never overwritten:
+  // the resident's edit stays, and the record learns its key
+  const id = got[0].find(c => c.importKey === 'h3#0').id;
+  await cloud.saveCase('other@example.com', { ...got[0].find(c => c.id === id), details: 'edited in the app' });
+  const book = await cloud.listCases('other@example.com');
+  const rows2 = [...rows, { ...rows[2], importKey: 'h3#0' }, { ...rows[2], importKey: 'h4#0' }];
+  assert.deepEqual(await cloud.importCases('other@example.com', 'R2', rows2, null, { have: book.map(c => c.id) }), { written: 1, skipped: 4 });
+  assert.equal((await cloud.listCases('other@example.com')).find(c => c.id === id).details, 'edited in the app');
+  assert.deepEqual(await cloud.importCases('other@example.com', 'R2', rows2), { written: 0, skipped: 5 });
 }
 
 // summaries, residents, shared templates
