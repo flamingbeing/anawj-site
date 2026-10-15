@@ -64,4 +64,28 @@ function hypoxic(seed = 1) {
   assert.ok(sim.state.mon.alarms.length, 'the alarm stays active while silenced');
 }
 
+// technical: an oesophageal tube on the ventilator → "No CO₂" high-priority alarm (no gas reaches the lungs)
+{
+  const sim = createSim({ seed: 1 });
+  sim.act({ type: 'bolus', drug: 'propofol', dose: 200, unit: 'mg', route: 'iv' });
+  sim.act({ type: 'bolus', drug: 'rocuronium', dose: 100, unit: 'mg', route: 'iv' });
+  sim.act({ type: 'intubate', placement: 'oesophageal' });
+  sim.act({ type: 'vent', mode: 'vc', vt: 500, rr: 12, peep: 5, fio2: 1 });
+  sim.runTo(sim.state.t + 60);
+  const noco2 = sim.state.mon.alarms.find(a => a.param === 'noco2');
+  assert.ok(noco2, 'a "No CO₂" technical alarm with an oesophageal tube on the ventilator');
+  assert.equal(noco2.priority, 'high', 'No CO₂ is high priority');
+  assert.ok(noco2.tech, 'flagged as technical');
+  assert.ok(sim.state.mon.etco2 < 2, `EtCO₂ is essentially zero (${sim.state.mon.etco2})`);
+}
+
+// technical: VF → "SpO₂ no pulse" (a non-perfusing rhythm), and no numeric SpO₂ alarm while there is no pulse to read
+{
+  const sim = createSim({ seed: 1 });
+  sim.act({ type: 'rhythm', to: 'vf' });
+  sim.runTo(sim.state.t + 60);
+  assert.ok(sim.state.mon.alarms.some(a => a.param === 'spo2sig'), '"SpO₂ no pulse" technical alarm in VF');
+  assert.ok(!sim.state.mon.alarms.some(a => a.param === 'spo2' && a.dir === 'lo'), 'no numeric SpO₂ alarm while there is no pulse to read');
+}
+
 console.log('ot-sim alarms: ok');

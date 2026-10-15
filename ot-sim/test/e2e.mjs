@@ -339,6 +339,18 @@ try {
     assert.ok(await page.evaluate(() => document.getElementById('alarmbar').classList.contains('silenced')), `${name}: bar shows silenced`);
     assert.match(await page.textContent('#alarm-silence'), /Silenced/, `${name}: silence button counts down`);
     assert.ok(await page.evaluate(() => otsim.state.mon.alarms.length > 0), `${name}: alarm stays active while silenced`);
+    // technical alarm: an oesophageal tube on the ventilator → a high-priority "No CO₂" alarm on the bar
+    await page.goto(BASE + '?test&seed=1#theatre');
+    await page.waitForFunction(() => window.otsim && document.getElementById('n-hr').textContent !== '--');
+    await page.evaluate(() => {
+      otsim.sim.act({ type: 'bolus', drug: 'propofol', dose: 200, unit: 'mg', route: 'iv' });
+      otsim.sim.act({ type: 'bolus', drug: 'rocuronium', dose: 100, unit: 'mg', route: 'iv' });
+      otsim.sim.act({ type: 'intubate', placement: 'oesophageal' });
+      otsim.sim.act({ type: 'vent', mode: 'vc', vt: 500, rr: 12, peep: 5, fio2: 1 });
+      otsim.step(900);
+    });
+    assert.ok(await page.evaluate(() => otsim.state.mon.alarms.some(a => a.param === 'noco2' && a.tech)), `${name}: "No CO₂" technical alarm with an oesophageal tube`);
+    assert.match(await page.textContent('#alarm-msg'), /No CO|SpO|low/, `${name}: alarm bar shows the technical alarm`);
 
     // the library's Elective GA card opens the pre-op briefing (patient summary + sign-in), which begins the theatre
     await page.goto(BASE);
