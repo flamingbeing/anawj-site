@@ -128,6 +128,10 @@ Agreed queue (one PR each, in order, once he says go):
    cards, underline tab bar, a clean system sans), WhatsApp-style (owner: teal-green accent, beige ground, rounded
    cards, the dark version in deep teal-grey), ACGME-style (owner: to feel like the ACGME Case Log System; build it
    from the owner's screenshot of it, colours and layout only, no logo or wording).
+   Also Pixel-style (owner: Material You look: soft tinted surfaces, large rounded corners, pill buttons and pill tab
+   indicator, Roboto-like sans; the accent follows the chosen colour) and Apple-style (owner: iOS look: grouped
+   inset lists on light grey, hairline separators, system blue accent, the device's system font, translucent
+   header and tab bar).
    A theme sets the Advanced display settings too (owner, 15 Oct): fonts, line spacing and width, corners, borders,
    shadows, compact, icons on buttons, icons-only tab bar, page titles in the header, plain calendar, shorter rows;
    every one stays editable afterwards (the card then says "Custom (based on …)"), and a theme never touches layout
