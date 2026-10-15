@@ -34,7 +34,7 @@ Agreed queue (one PR each, in order, once he says go):
    Lighter highlights in the box (owner: hard to read): style.css `.box-marks mark.m-ini` 22% → ~10%, `m-age` 24% →
    ~10%, `m-lab` 18% → ~9%, plus a 2 px underline in the full colour so they still stand out; check contrast in light,
    dark and high-contrast themes (a11y.mjs).
-3. **Reset all settings** at the bottom of Settings: This device / My account too (tag list kept unless ticked); never
+3. **Built (Reset PR).** **Reset all settings** at the bottom of Settings: This device / My account too (tag list kept unless ticked); never
    cases, reflections, notes or drafts; asks, offers a settings-file backup, Undo.
 4. **Full Analytics for every profile:** the `analytics` switch on by default everywhere. Exceptions kept (owner):
    Personal stays without the APMES parts; Basic: logbook only stays without the Reflections card.

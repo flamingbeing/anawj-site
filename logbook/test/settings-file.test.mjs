@@ -108,3 +108,13 @@ console.log('settings-file display keys and profile switches tests passed');
   assert.equal(got.hideTabsTyping, true);
   assert.equal(got.show.evalRequest, true);
 }
+
+// Reset all settings: preferences go back to their defaults; your year, profile, places, searches and (unless asked) tags stay
+{
+  const { resetAccountPatch } = await import('../js/settings-file.js');
+  const st = { rYear: 2, mode: 'basic', show: { analytics: true }, savedSearches: [{ name: 'x' }], destinations: [{ id: 'a' }], sync: { on: true },
+    tagSet: [{ k: 'u:x' }], subcats: {}, autoTick: true, enterMode: 'single', markdown: { day: 'x' }, detectInitials: false, borders: 2, gone: null };
+  assert.deepEqual(resetAccountPatch(st), { autoTick: null, enterMode: null, markdown: null, detectInitials: null, borders: null });
+  assert.deepEqual(resetAccountPatch(st, { tags: true }), { tagSet: null, subcats: null, autoTick: null, enterMode: null, markdown: null, detectInitials: null, borders: null });
+  assert.deepEqual(resetAccountPatch(null), {});
+}

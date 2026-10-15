@@ -246,7 +246,7 @@ function buildSettingsIndex() {
     }
   }
   // the Settings page's own cards (Settings file, Connect Claude: their buttons too) and its Recycle bin
-  for (const card of [settingsFileCard(), connectClaudeCard()]) {
+  for (const card of [settingsFileCard(), connectClaudeCard(), resetAllCard()]) {
     const text = card.querySelector('h2').textContent.trim();
     out.push({ id: 'settings', page: 'Settings', text, hint: [...card.querySelectorAll('button, a, label'), ...card.querySelectorAll('p')].map(x => x.textContent.trim()).join(' · ').slice(0, 160) });
   }
@@ -327,7 +327,8 @@ function renderSettingsMenu() {
     h('section', { class: 'card more-list settings-menu' }, h('h2', {}, 'Settings'),
       settingsGroups().map(([name, ids]) => [h('h3', {}, name), h('ul', {}, ids.map(item))])),
     settingsFileCard(),
-    connectClaudeCard());
+    connectClaudeCard(),
+    resetAllCard());
 }
 
 // at the very bottom of More (owner, 15 Oct 2026; was Settings): which app version this device runs, and a way to fetch the latest when it seems stuck on an old
@@ -356,14 +357,15 @@ function connectClaudeCard() {
 
 // Settings export / import: preferences, tags, shorthand, tag groups, formats as one small file
 // (settings-file.js). Never cases, reflections or portfolio details.
+function exportSettings() {
+  // this device's display settings travel in the file (in place of any old ones in the account)
+  const dev = Object.fromEntries(DISPLAY_KEYS.filter(k => !/^customCss/.test(k)).map(k => [k, display()[k]]).filter(([, v]) => v != null));   // custom CSS never goes in a file to share
+  const plain = Object.fromEntries(Object.entries((S.logbook && S.logbook.settings) || {}).filter(([k]) => !DISPLAY_KEYS.includes(k)));
+  const f = mod.settingsFile.settingsFile({ ...S.logbook, settings: { ...plain, ...dev } }, { theme: cachedTheme() });
+  download(`logbook-settings-${todayISO()}.json`, new Blob([JSON.stringify(f, null, 2)], { type: 'application/json' }));
+}
 function settingsFileCard() {
-  const exportIt = () => {
-    // this device's display settings travel in the file (in place of any old ones in the account)
-    const dev = Object.fromEntries(DISPLAY_KEYS.filter(k => !/^customCss/.test(k)).map(k => [k, display()[k]]).filter(([, v]) => v != null));   // custom CSS never goes in a file to share
-    const plain = Object.fromEntries(Object.entries((S.logbook && S.logbook.settings) || {}).filter(([k]) => !DISPLAY_KEYS.includes(k)));
-    const f = mod.settingsFile.settingsFile({ ...S.logbook, settings: { ...plain, ...dev } }, { theme: cachedTheme() });
-    download(`logbook-settings-${todayISO()}.json`, new Blob([JSON.stringify(f, null, 2)], { type: 'application/json' }));
-  };
+  const exportIt = () => exportSettings();
   const importIt = async file => {
     const text = await file.text();
     // a file of this browser's choices from the old address (anawj.com/logbook): look, text size, tab layout, drafts
@@ -407,6 +409,45 @@ function settingsFileCard() {
     h('div', { class: 'bar', style: 'margin-bottom:0' },
       h('button', { onclick: exportIt }, 'Export settings'),
       fileButton('Import settings…', '.json,application/json', importIt)));
+}
+
+// Reset all settings (owner, 15 Oct 2026): this device's look and layout, and optionally the account's preferences
+// (settings-file.js resetAccountPatch: your year, profile, saved searches, places and tags stay unless asked). Never
+// cases, reflections, notes or drafts. Asks first, can save a settings file first, and Undo in the toast.
+let resetScope = 'device';
+function resetAllCard() {
+  const tagsBox = h('input', { type: 'checkbox', id: 'reset-tags' });
+  const fileBox = h('input', { type: 'checkbox', id: 'reset-file', checked: true });
+  const tagsRow = h('label', { class: 'check', hidden: resetScope !== 'account' }, tagsBox, 'Also reset my tags and shorthand');
+  const scope = h('fieldset', { class: 'pick' }, h('legend', {}, 'What to reset'),
+    [['device', 'This device only (look, layout, text size)'], ['account', 'This device and my account (logging, formats and the rest)']].map(([v, t]) =>
+      h('label', { class: 'pick-opt' }, h('input', { type: 'radio', name: 'reset-scope', value: v, checked: resetScope === v, onchange: () => { resetScope = v; tagsRow.hidden = v !== 'account'; } }), t)));
+  const go = async () => {
+    const acct = resetScope === 'account', tags = acct && tagsBox.checked;
+    const what = acct ? 'Every setting on this device and in your account goes back to how the app starts' + (tags ? ', your tags and shorthand too' : '; your tags and shorthand stay') : 'Every setting on this device (look, layout, text size) goes back to how the app starts; your account’s settings stay';
+    if (!(await confirmBox('Reset all settings', `${what}. Your year, profile, saved searches and places to send and sync to stay. Cases, reflections, notes and drafts are never touched. Undo is in the message after.`, 'Reset', true))) return;
+    if (fileBox.checked) { try { exportSettings(); } catch (err) { return toast('Could not save the settings file: ' + err.message); } }
+    const beforeDev = { ...display() }, beforeMode = cachedTheme(), beforeAcct = { ...((S.logbook && S.logbook.settings) || {}) };
+    const patch = acct ? mod.settingsFile.resetAccountPatch(beforeAcct, { tags }) : {};
+    applyTheme('light');
+    applyDisplay(setDisplay(Object.fromEntries(DISPLAY_KEYS.map(k => [k, null]))));
+    applyCustomCss();
+    if (Object.keys(patch).length) await patchLogbook({ settings: patch });
+    hooks.paintTabs?.(); render();
+    toast('All settings reset', { action: 'Undo', onaction: async () => {
+      applyTheme(beforeMode);
+      applyDisplay(setDisplay(Object.fromEntries(DISPLAY_KEYS.map(k => [k, beforeDev[k] ?? null]))));
+      applyCustomCss();
+      if (Object.keys(patch).length) await patchLogbook({ settings: Object.fromEntries(Object.keys(patch).map(k => [k, beforeAcct[k] ?? null])) });
+      hooks.paintTabs?.(); render(); toast('Settings put back');
+    } });
+  };
+  return h('section', { class: 'card danger-zone reset-all' },
+    h('h2', {}, 'Reset all settings'),
+    h('p', { class: 'hint help' }, 'Start again from how the app looks and works on a new phone. Cases, reflections, notes and drafts are never touched.'),
+    scope, tagsRow,
+    h('label', { class: 'check' }, fileBox, 'Save a settings file first (a backup you can import)'),
+    h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { class: 'danger', onclick: go }, 'Reset all settings…')));
 }
 
 // The Word upload for reflections (its module loads on first use); when done, on to Reflections

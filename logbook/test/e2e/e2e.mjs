@@ -1828,7 +1828,7 @@ async function run(label, ctxOpts) {
       if (w[0] > w[1]) bad.push(`${t}: scrollWidth ${w[0]} > ${w[1]}`);
       if (phone) {
         const small = await p.evaluate(() => [...document.querySelectorAll('button, .btn, [role=button], a, select, input:not([type=file]):not([hidden]), summary')]
-          .filter(el => el.offsetParent !== null && !el.closest('table.grid, table.totals, ul.cases, .scroll, label.check'))
+          .filter(el => el.offsetParent !== null && !el.closest('table.grid, table.totals, ul.cases, .scroll, label.check, label.pick-opt'))   // (a ✓ list's radio: its 44px row is the target)
           .map(el => ({ el, r: el.getBoundingClientRect() }))
           .filter(({ r }) => r.width > 0 && (r.height < 40))
           .map(({ el, r }) => `${el.tagName.toLowerCase()}.${el.className}:"${(el.innerText || el.value || '').replace(/\s+/g, ' ').slice(0, 18)}" ${Math.round(r.height)}px`));
