@@ -23,6 +23,9 @@ Agreed queue (one PR each, in order, once he says go):
    from the box (not typed in the Initials field). Tap one to undo it (with item 2). Bug found alongside: the age reading
    takes any 1–3 digits ("544y = 544 years"); `splitAge` / `humanAge` (engine.js) should only take ages up to ~120 years
    (and sane months / weeks / days), as `parseAge` in suggest.js already caps at 110.
+   Lighter highlights in the box (owner: hard to read): style.css `.box-marks mark.m-ini` 22% → ~10%, `m-age` 24% →
+   ~10%, `m-lab` 18% → ~9%, plus a 2 px underline in the full colour so they still stand out; check contrast in light,
+   dark and high-contrast themes (a11y.mjs).
 3. **Reset all settings** at the bottom of Settings: This device / My account too (tag list kept unless ticked); never
    cases, reflections, notes or drafts; asks, offers a settings-file backup, Undo.
 4. **Full Analytics for every profile:** the `analytics` switch on by default everywhere. Exceptions kept (owner):
