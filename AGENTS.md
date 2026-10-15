@@ -11,6 +11,9 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
   (add a yearly intake, year check, CSV), at `apmes.anawj.com/people/`; admins and PDs only. It reuses evals' code. Start
   with `people/NOTES.md`.
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`), at `nuhroster.anawj.com` (the old `anawj.com/nuh-roster/` redirects). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
+- `ntf-roster/`: NTF (Ng Teng Fong) anaesthesia monthly duty roster: calls, PM shifts, leave and requests on one grid,
+  rules the owner adds in the app (combination restrictions included), and auto-fill; at `ntfroster.anawj.com`. Start with
+  `ntf-roster/NOTES.md` (department codes, data model, how to add a rule type), then `ntf-roster/SPEC.md`.
 - `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template); served at `prewarmstudy.anawj.com`. Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
 - `bis-dsa/`: BIS to DSA teaching simulator for anaesthesia residents (one static page, synthetic EEG, no data), at
   `anaes.anawj.com/bis/`. Start with `bis-dsa/NOTES.md`.
@@ -86,12 +89,12 @@ Before merging, run (GitHub runs these too on every PR, plus the editor, feedbac
 
 ```
 node tools/check.mjs
-for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do node "$f"; done
+for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs ntf-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do node "$f"; done
 ```
 
 - Logbook changes: `tools/test-logbook.sh` runs all of the above plus the full e2e and every focused browser test
   (about 10 min; `quick` skips the full e2e). Its portfolio-template steps use `apmes/templates/portfolio-template-blank.docx`. After UI changes also run `node logbook/test/e2e/a11y.mjs` (accessibility).
-- Rules changes (`logbook/firestore.rules`, `prewarm/firestore.rules`, `nuh-roster/firestore.rules`): `tools/test-rules.sh` runs the logbook, evals, prewarm and roster rules suites in the
+- Rules changes (`logbook/firestore.rules`, `prewarm/firestore.rules`, `nuh-roster/firestore.rules`, `ntf-roster/firestore.rules`): `tools/test-rules.sh` runs the logbook, evals, prewarm and both roster rules suites in the
   local emulator (fake accounts, demo project; no sign-in, never the live projects).
 - Evals UI changes: also run the e2e test (see `evals/README.md`).
 - Prewarming UI changes: `tools/test-prewarm.sh` runs the repo check, prewarm unit tests and the three browser tests
@@ -99,6 +102,8 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - Hand assessment changes: run `node hand-babies/test/e2e.mjs` (see `hand-babies/README.md`).
 - NUH roster changes: run `node nuh-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe on every tab;
   under a minute; also in the Checks workflow).
+- NTF roster changes: run `node ntf-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe; also in the
+  Checks workflow) and the unit tests in `ntf-roster/test/`.
 - Hand log changes: run `node hand-log/test/e2e.mjs`.
 - OT simulator changes: run `tools/test-ot-sim.sh` (model tests, repo check, browser test; see `ot-sim/NOTES.md`).
 - BIS to DSA changes: run `node bis-dsa/test/e2e.mjs` (it also runs `adv.e2e.mjs` and `sed.e2e.mjs`) and `node bis-dsa/test/engine.check.mjs` (engine tuning, no browser).

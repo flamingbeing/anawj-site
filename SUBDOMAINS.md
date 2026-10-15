@@ -17,6 +17,7 @@ The rule for new apps is in `AGENTS.md`.
 | `hand.anawj.com/handlog/` | `hand-log/` | Hand DOPS/Mini-CEX log; data on the phone only, no sign-in (owner, 13 Oct 2026). |
 | `prewarmstudy.anawj.com/` | `prewarm/` | **Real study data.** The name is a reminder that it holds sensitive data and stays isolated. |
 | `nuhroster.anawj.com/` | `nuh-roster/` | Own Firebase project `nuh-roster`. |
+| `ntfroster.anawj.com/` | `ntf-roster/` | NTF anaesthesia monthly duty roster (15 Oct 2026). Data in the browser until its own Firebase project `ntf-roster` exists. Needs the owner's custom-domain click. |
 | `apmes.anawj.com/logbook/` | `logbook/` | With evals: one Firebase project (`apmes-logbook`), one sign-in. |
 | `apmes.anawj.com/evals/` | `evals/` | |
 | `apmes.anawj.com/people/` | `people/` | The people lists logbook and evals share (admins and PDs; 13 Oct 2026). |
@@ -111,7 +112,8 @@ trainer, `apmes.anawj.com/logbook/?demo`, `apmes.anawj.com/evals/?demo`, `nuhros
 each one's step makes it a redirect), and `hand.anawj.com/logbook/` is a 404.
 
 Later addresses take the same two clicks once their PR is merged: `anaes.anawj.com` (BIS to DSA) was added by the owner
-and checked on 14 Oct 2026 (`/bis/` 200; `/` and `/logbook/` 404).
+and checked on 14 Oct 2026 (`/bis/` 200; `/` and `/logbook/` 404). `ntfroster.anawj.com` (NTF Roster, 15 Oct 2026) is
+waiting for its click; until then the app works on the PR preview and at `anawj.com/ntf-roster/` (GitHub Pages).
 
 ## The page editor (decided in step 5)
 
