@@ -79,6 +79,10 @@ Agreed queue (one PR each, in order, once he says go):
 9f. **Reflections on the Logbook calendar** (owner; off by default): a "Show reflections" toggle on the Calendar view
    itself (per device). Days with a reflection get a small reflection mark beside the notes mark; the day's list shows
    each reflection under its case (or on its own when not linked to a case), tap opens it.
+9g. **Case box height that stays** (owner): a dragged height is remembered per device (after Save, tab switches,
+   reloads); Settings → Advanced logging → Box height shows it and its reset undoes it. Phones can't drag the
+   browser's own corner handle, so add a grab bar under the box (a 44 px touch target, pointer events, works with a
+   mouse too; double-tap resets). Optional "Grow as I type" switch (off by default).
 10. **Grid as a spreadsheet:** thin lines, no boxed inputs; drag to resize columns (per device, double-tap resets);
     lines per row 1 / 2 / 3 / Fit to content.
 11. **Paging by default** (owner's call, 15 Oct): 100 per page, 25 / 50 / 100 / 300 / All (per device); "‹ Page 2 of
