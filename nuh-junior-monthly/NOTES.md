@@ -12,6 +12,12 @@ the scripts that read them are in the owner's private repo `flamingbeing/life` (
 - Address: `nuhjuniormonthly.anawj.com` (own subdomain: it keeps data), practice department at `?demo`.
 - Static, vanilla ES modules, no build step. Data in this browser (`localStorage` `nuhjm-v1`; practice `nuhjm-demo`).
   Team sync code from the NTF app is there but off (no Firebase project).
+- Design: the NUHS app kit (`../nuhsdesign/app.css` + `app.js`, linked after `tokens.css`, cached by `sw.js`; 15 Oct
+  2026, as the NUH roster): the four-quarter band in the `.a-bar`, the kit's tab bar (bottom on phones up to 720 px, a
+  strip on tablets, an icon rail at 1000–1599 px so a whole month of the grid fits beside it, the full sidebar from
+  1600 px), white rounded groups on the grey ground, the kit's switch, segmented controls, sheets and toast look, phone
+  font. The app scrolls inside `#main`, not the page, so `style.css` turns the kit's fixed bars into parts of the flex
+  layout. One filled button per screen (Auto-fill steps back to tinted on Rules and More). Light only.
 
 ## The department's sheet (what the app reads and writes)
 
