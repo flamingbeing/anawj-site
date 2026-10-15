@@ -9,6 +9,7 @@
 
 import { DRUGS, doseAmount, rateAmount } from './drugs.js';
 import { pkLbm } from './patient.js';
+import { emptyNm, stepNm } from './nmb.js';
 
 const LN2 = 0.6931471805599453;
 
@@ -95,14 +96,19 @@ export const pk = {
   name: 'pk',
   init(state) {
     const p = {};
-    for (const id in DRUGS) p[id] = rates(MODELS[DRUGS[id].model](state.patient), state.patient);
-    return { p, d: {}, inf: {} };
+    for (const id in DRUGS) if (MODELS[DRUGS[id].model]) p[id] = rates(MODELS[DRUGS[id].model](state.patient), state.patient);
+    return { p, d: {}, inf: {}, nm: null };
   },
   step(prev, ctx) {
     const s = prev.pk, w = prev.patient.weightKg, dtMin = ctx.dt / 60;
     let inf = s.inf;
     const add = {};
+    const nmAdd = {};
     for (const a of ctx.actions) {
+      if (a.type === 'bolus' && a.route === 'iv' && DRUGS[a.drug] && DRUGS[a.drug].model === 'nmb') {
+        nmAdd[a.drug] = (nmAdd[a.drug] || 0) + doseAmount(a.drug, a.dose, a.unit, w);
+        continue;
+      }
       if (!(a.drug in s.p)) continue;
       if (a.type === 'bolus' && a.route === 'iv') add[a.drug] = (add[a.drug] || 0) + doseAmount(a.drug, a.dose, a.unit, w);
       else if (a.type === 'infusion') {
@@ -119,7 +125,9 @@ export const pk = {
       if (add[id]) nx.a1 += add[id];
       d[id] = nx;
     }
-    return { ...s, d, inf };
+    // neuromuscular drugs (nmb.js): stepped once any has been given
+    const nm = s.nm || Object.keys(nmAdd).length ? stepNm(s.nm || emptyNm(), nmAdd, prev.patient, dtMin) : null;
+    return { ...s, d, inf, nm };
   },
   trend(s) {
     const out = {};

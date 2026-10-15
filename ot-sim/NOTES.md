@@ -65,6 +65,15 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Decisions log
 
+- 15 Oct 2026 (M1.3): neuromuscular drugs live in `nmb.js` (state `pk.nm`), the readout in `pd.js` (`pd.nmb`), the TOF
+  module in `monitor.js` (every 15 s; PTC on request, once per 2 min). The TOF readout is fitted to acceleromyography,
+  because every reversal trial used it; that forced a retune: rocuronium ke0 0.2 on / 0.9 off (onset: 80% block at
+  0.92 min; sugammadex 2 mg/kg at T2 1.36 min, 4 mg/kg at PTC 1 2.2, 16 mg/kg 1.5), neostigmine max x 2, EC50 20.
+  Known misses, recorded in MODEL.md: spontaneous T2 to TOFR 0.9 50 vs 21 min (Sorgenfrei 2006, small placebo arm),
+  neostigmine from a deep block 32 vs 50 min (Jones 2008). Suxamethonium: cholinesterase as `patient.che` (profile
+  `che`: 0.5 heterozygous, 0.01 homozygous); phase II fades from 3 mg/kg total. Glycopyrrolate and atropine (with
+  neostigmine) come with the vasoactive drugs (M2.3); suxamethonium's potassium rise comes with `gas.js` (M2.4).
+
 - 14 Oct 2026 (M1.2): the pump's effect-site TCI runs in two phases. While loading it targets the predicted
   effect-site peak (Shafer & Gregg style); once the prediction reaches the target it holds plasma at the target.
   Peak-targeting alone switched between bursts and zero every 10 s. A running pump keeps its model. Syringes are

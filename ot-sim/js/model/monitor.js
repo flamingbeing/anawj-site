@@ -1,6 +1,6 @@
 // What the monitor reports (DESIGN.md, "Monitor and alarms"; MODEL.md section 9): the model's values turned into
 // displayed numbers, in simulated time so the display behaves the same at every speed. M0.2: averaging and the NIBP
-// cycle. Sensor delays come with gas.js (M2.4); limits and alarms with M3.3.
+// cycle; M1.3: the TOF module. Sensor delays come with gas.js (M2.4); limits and alarms with M3.3.
 //
 // Like every subsystem it reads the previous step (Jacobi), so it sees a beat or breath one step (0.1 s) after the
 // model has it: the same lag as a real monitor's beat detector, and far below its averaging.
@@ -11,6 +11,8 @@ const SPO2_TAU = 4;     // s: exponential average, about an 8 s window [D] (moni
 const TEMP_TAU = 10;    // s [D]
 export const NIBP_TAKES = 30;  // s from cuff start to a reading [D] (about 30 s on real monitors)
 export const NIBP_CYCLES = [0, 1, 2, 2.5, 3, 5, 10, 15]; // minutes, 0 = manual
+export const TOF_EVERY = 15;   // s between automatic trains of four [D] (monitors offer 15 s to 15 min)
+const PTC_LOCK = 120;          // s: a post-tetanic count potentiates the twitches, so wait before the next [D]
 
 const push = (arr, x, n) => { const a = arr.concat([x]); return a.length > n ? a.slice(a.length - n) : a; };
 const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
@@ -24,6 +26,8 @@ export const monitor = {
       rrs: [], cycles: [], seenBeat: v.nextBeat, seenBreath: v.nextBreath,
       // NIBP: cycle in minutes (0 = manual); start = when the running measurement began (null when idle)
       nibp: { cycle: 5, start: null, next: 0, last: null },
+      // TOF at the adductor pollicis: count, ratio (count 4 only), when; a PTC on request when the count is 0
+      tof: { count: 4, ratio: 1, t: 0, next: 0, ptc: null, ptcT: null },
     };
   },
   step(prev, ctx) {
@@ -59,6 +63,19 @@ export const monitor = {
       ctx.log({ kind: 'nibp', sys: Math.round(v.sbp), dia: Math.round(v.dbp), map: Math.round(v.map) });
     }
     if (n !== m.nibp) out.nibp = n;
+
+    // TOF every 15 s, or now on request; PTC on request (meaningful only with no TOF response)
+    const nb = prev.pd ? prev.pd.nmb : null;
+    if (nb) {
+      let tof = m.tof;
+      const now = ctx.actions.some(a => a.type === 'tof' && a.do === 'now'), ptcAsk = ctx.actions.some(a => a.type === 'tof' && a.do === 'ptc');
+      if (now || t >= tof.next) tof = { ...tof, count: nb.tofCount, ratio: nb.tofr, t, next: t + TOF_EVERY };
+      if (ptcAsk && (tof.ptcT == null || t - tof.ptcT >= PTC_LOCK)) {
+        tof = { ...tof, ptc: nb.tofCount === 0 ? nb.ptc : null, ptcT: t };
+        ctx.log({ kind: 'ptc', ptc: nb.tofCount === 0 ? nb.ptc : null });
+      }
+      if (tof !== m.tof) out.tof = tof;
+    }
     return out;
   },
   rebase(m, off) {
@@ -66,6 +83,7 @@ export const monitor = {
     return {
       ...m, seenBeat: m.seenBeat - off, seenBreath: m.seenBreath - off,
       nibp: { ...n, start: n.start == null ? null : n.start - off, next: Math.max(0, n.next - off), last: n.last && { ...n.last, t: n.last.t - off } },
+      tof: { ...m.tof, t: m.tof.t - off, next: Math.max(0, m.tof.next - off), ptcT: m.tof.ptcT == null ? null : m.tof.ptcT - off },
     };
   },
 };

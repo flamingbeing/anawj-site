@@ -7,7 +7,12 @@ import { DRUGS } from '../model/drugs.js';
 import { PUMP_MODELS } from '../model/pump.js';
 import { pumpView } from '../model/pump.js';
 
-const CLASS = { induction: ['Induction agent', '#ffd200'], benzo: ['Benzodiazepine', '#f68d2e'], opioid: ['Opioid', '#79c7e3'] };
+const CLASS = {
+  induction: ['Induction agent', '#ffd200'], benzo: ['Benzodiazepine', '#f68d2e'], opioid: ['Opioid', '#79c7e3'],
+  nmb: ['Neuromuscular blocker', '#ff5a5a'],
+  // reversal agents: red and white diagonal stripes
+  reversal: ['Reversal agent', '#ff5a5a', 'repeating-linear-gradient(135deg,#ff5a5a 0 6px,#fff 6px 12px)'],
+};
 const round = (x, to) => Math.max(to, Math.round(x / to) * to);
 
 // what each drug row offers [D: usual adult doses, shown as choices, not advice]
@@ -18,6 +23,11 @@ const ROWS = [
   { id: 'fentanyl', cls: 'opioid', bolus: () => [25, 50, 100], unit: 'mcg' },
   { id: 'alfentanil', cls: 'opioid', bolus: () => [250, 500], unit: 'mcg' },
   { id: 'remifentanil', cls: 'opioid', unit: 'mcg', inf: { unit: 'mcg/kg/min', def: 0.1, step: 0.05 }, tci: { unit: 'ng/mL', def: 3, step: 0.5 } },
+  { id: 'rocuronium', cls: 'nmb', bolus: w => [round(w * 0.6, 5), round(w * 1.2, 5)], unit: 'mg' },
+  { id: 'suxamethonium', cls: 'nmb', bolus: w => [round(w * 1, 10), round(w * 1.5, 10)], unit: 'mg' },
+  { id: 'sugammadex', cls: 'reversal', bolus: w => [round(w * 2, 10), round(w * 4, 10), round(w * 16, 50)], unit: 'mg' },
+  // neostigmine: 2.5 mg, or 50 mcg/kg up to the 5 mg maximum (MODEL.md section 2)
+  { id: 'neostigmine', cls: 'reversal', bolus: w => [...new Set([2.5, Math.min(5, round(w * 0.05, 0.5))])], unit: 'mg' },
 ];
 const MODEL_NAME = { schnider: 'Schnider', marsh: 'Marsh (ke0 1.2)', marsh026: 'Marsh (ke0 0.26)', minto: 'Minto' };
 
@@ -29,13 +39,15 @@ export class DrugsPanel {
     this.root = root; this.sim = sim; this.onAct = onAct;
     const w = sim.state.patient.weightKg;
     root.innerHTML = `<p class="hint">Doses worked out for this synthetic patient (${esc(w)} kg). Choices to practise with, not advice.</p>` + ROWS.map(r => this.row(r, w)).join('') +
+      `<section class="drug" style="--tag:#c9a7ff" aria-labelledby="dn-tof"><h3 id="dn-tof">Neuromuscular monitor <span class="cls">TOF every 15 s at the thumb</span></h3>` +
+      `<div class="act"><button type="button" data-tof="now">TOF now</button><button type="button" data-tof="ptc">Post-tetanic count</button></div></section>` +
       `<h3 class="sub">Given</h3><ol class="given" id="given"><li class="none">Nothing yet</li></ol>`;
     root.addEventListener('click', e => this.click(e));
   }
 
   row(r, w) {
-    const d = DRUGS[r.id], [label, colour] = CLASS[r.cls], id = r.id;
-    let h = `<section class="drug" style="--tag:${colour}" aria-labelledby="dn-${id}"><h3 id="dn-${id}">${esc(d.name)} <span class="cls">${label}</span></h3>`;
+    const d = DRUGS[r.id], [label, colour, img] = CLASS[r.cls], id = r.id;
+    let h = `<section class="drug" style="--tag:${colour}${img ? `;--tagimg:${img}` : ''}" aria-labelledby="dn-${id}"><h3 id="dn-${id}">${esc(d.name)} <span class="cls">${label}</span></h3>`;
     if (r.bolus) {
       h += `<div class="act">${r.bolus(w).map(x => `<button type="button" data-bolus="${id}" data-dose="${x}" data-unit="${r.unit}">${x} ${r.unit}</button>`).join('')}` +
         `<label class="dose"><span class="sr">${esc(d.name)} dose in ${r.unit}</span><input type="number" inputmode="decimal" min="0" step="any" id="bd-${id}" placeholder="${r.unit}"></label>` +
@@ -72,6 +84,7 @@ export class DrugsPanel {
       const v = this.num(`tt-${ds.tci}`);
       if (v != null) this.act({ type: 'tci', drug: ds.tci, model: document.getElementById(`tm-${ds.tci}`).value, mode: document.getElementById(`ts-${ds.tci}`).value, target: v });
     } else if (ds.tcistop) this.act({ type: 'tci', drug: ds.tcistop, stop: true });
+    else if (ds.tof) this.act({ type: 'tof', do: ds.tof });
   }
 
   // running infusions and pumps, and the list of what was given (DOM writes only when text changes)
