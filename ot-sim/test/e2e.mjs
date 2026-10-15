@@ -113,6 +113,14 @@ try {
     assert.match(await page.textContent('#n-nibp-age'), /min ago|just now/);
     assert.ok(!/cycle/.test(await page.textContent('#n-nibp-age')), 'manual mode shows no cycle');
 
+    // vasoactive drugs on the Circulation tab: phenylephrine raises the pressure within a minute
+    const mapBefore = await page.evaluate(() => otsim.state.cv.map);
+    await page.click('[data-bolus="phenylephrine"][data-dose="100"]');
+    await page.evaluate(() => otsim.step(450));
+    assert.ok(await page.evaluate(m => otsim.state.cv.map > m + 5, mapBefore), `${name}: phenylephrine raises MAP`);
+    await page.click('[data-inf="noradrenaline"]');
+    assert.match(await page.textContent('#inf-state-noradrenaline'), /Running 0.05 mcg\/kg\/min/);
+    await page.click('[data-infstop="noradrenaline"]');
     // fluids: a bolus runs and is counted; bleeding lowers the blood volume
     await page.click('[data-fluid="crystalloid"][data-ml="250"]');
     await page.evaluate(() => otsim.step(20));

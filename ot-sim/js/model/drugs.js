@@ -17,25 +17,40 @@ export const DRUGS = {
   suxamethonium: { name: 'Suxamethonium', amount: 'mg',  conc: 'mcg/mL', model: 'nmb' },                   // [V] Roy 2002 PK
   sugammadex:    { name: 'Sugammadex',    amount: 'mg',  conc: 'mcg/mL', model: 'nmb' },                   // [V] Kleijn 2011
   neostigmine:   { name: 'Neostigmine',   amount: 'mcg', conc: 'ng/mL',  model: 'nmb' },                   // effect model [D]
+  // vasoactive drugs (M2.3): PK in pk.js MODELS [D unless marked], receptor effects in vaso.js
+  phenylephrine: { name: 'Phenylephrine', amount: 'mcg', conc: 'ng/mL', model: 'anderson', delayS: 20 }, // Anderson 2017 [V] + front end [D]
+  noradrenaline: { name: 'Noradrenaline', amount: 'mcg', conc: 'ng/mL', model: 'nora' },   // t1/2 1-2 min [V]
+  adrenaline:    { name: 'Adrenaline',    amount: 'mcg', conc: 'ng/mL', model: 'adre' },   // t1/2 2-3 min [V]
+  vasopressin:   { name: 'Vasopressin',   amount: 'mU',  conc: 'mU/L',  model: 'vaso' },
+  metaraminol:   { name: 'Metaraminol',   amount: 'mcg', conc: 'ng/mL', model: 'meta', hidden: true }, // not on the HSA register
+  ephedrine:     { name: 'Ephedrine',     amount: 'mcg', conc: 'ng/mL', model: 'ephe' },   // t1/2 3-6 h [V]
+  atropine:      { name: 'Atropine',      amount: 'mcg', conc: 'ng/mL', model: 'atro' },   // t1/2 2-5 h [V]
+  glycopyrrolate:{ name: 'Glycopyrrolate',amount: 'mcg', conc: 'ng/mL', model: 'glyc' },
+  esmolol:       { name: 'Esmolol',       amount: 'mcg', conc: 'ng/mL', model: 'esmo' },   // t1/2 9 min, CL 285 mL/kg/min [V]
+  labetalol:     { name: 'Labetalol',     amount: 'mcg', conc: 'ng/mL', model: 'labe' },   // t1/2 about 4 h [V]
+  gtn:           { name: 'GTN',           amount: 'mcg', conc: 'ng/mL', model: 'gtn' },    // t1/2 2-3 min [V]
 };
 
-// mass units relative to a microgram
+// mass units relative to a microgram, and vasopressin's units relative to a milliunit (a drug's own amount unit
+// decides which family applies)
 const MASS = { g: 1e6, mg: 1e3, mcg: 1, ng: 1e-3 };
+const UNITS = { units: 1e3, mU: 1 };
+const family = d => (d.amount in UNITS ? UNITS : MASS);
 
 // a dose in the unit given ('mg', 'mcg', 'mg/kg', 'mcg/kg') as an amount in the drug's own unit
 export function doseAmount(drug, dose, unit, weightKg) {
   const d = DRUGS[drug];
   if (!d) throw new Error(`unknown drug ${drug}`);
-  const [mass, per] = unit.split('/');
-  if (!(mass in MASS) || (per && per !== 'kg')) throw new Error(`unknown dose unit ${unit}`);
-  return (dose * (per ? weightKg : 1) * MASS[mass]) / MASS[d.amount];
+  const [mass, per] = unit.split('/'), F = family(d);
+  if (!(mass in F) || (per && per !== 'kg')) throw new Error(`unknown dose unit ${unit}`);
+  return (dose * (per ? weightKg : 1) * F[mass]) / F[d.amount];
 }
 
 // an infusion rate ('mg/h', 'mcg/min', 'mg/kg/h', 'mcg/kg/min', ...) as the drug's own amount per minute
 export function rateAmount(drug, rate, unit, weightKg) {
   const d = DRUGS[drug];
   if (!d) throw new Error(`unknown drug ${drug}`);
-  const parts = unit.split('/'), mass = parts[0], time = parts[parts.length - 1], perKg = parts.length === 3 && parts[1] === 'kg';
-  if (!(mass in MASS) || !(time === 'h' || time === 'min') || (parts.length === 3 && !perKg) || parts.length > 3) throw new Error(`unknown rate unit ${unit}`);
-  return (rate * (perKg ? weightKg : 1) * MASS[mass]) / MASS[d.amount] / (time === 'h' ? 60 : 1);
+  const parts = unit.split('/'), mass = parts[0], time = parts[parts.length - 1], perKg = parts.length === 3 && parts[1] === 'kg', F = family(d);
+  if (!(mass in F) || !(time === 'h' || time === 'min') || (parts.length === 3 && !perKg) || parts.length > 3) throw new Error(`unknown rate unit ${unit}`);
+  return (rate * (perKg ? weightKg : 1) * F[mass]) / F[d.amount] / (time === 'h' ? 60 : 1);
 }

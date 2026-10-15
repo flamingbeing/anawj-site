@@ -15,6 +15,7 @@
 import { exp, log } from './fmath.js';
 import { ceREq } from './pd.js';
 import { initFluids, fluidActions, stepFluids, hbOf } from './fluids.js';
+import { RECEPTORS, activations, vasoEffects, stepStore } from './vaso.js';
 
 // defaults (MODEL.md section 5 and the prototype) [S/D]
 export const CV = {
@@ -52,12 +53,16 @@ export function drives(prev) {
   const eR = ceR / (ceR + 2.0);                       // opioid, saturating [D]
   const mac = prev.vol && prev.vol.mac ? prev.vol.mac : 0;
   const m = Math.min(1, mac / 1.6);
+  // vasoactive drugs (vaso.js) at their effect sites
+  const ce = {};
+  for (const id in RECEPTORS) if (d[id]) ce[id] = d[id].ce;
+  const A = activations(ce, prev.cv ? prev.cv.store ?? 1 : 1), V = vasoEffects(A);
   return {
-    eP, eR, mac,
+    eP, eR, mac, A, V,
     symScale: 1 - 0.3 * eP,                           // sympathetic tone (MSNA falls at induction, Ebert 1992)
-    svr: (1 - 0.15 * eP) * (1 - 0.075 * eR) * (1 - 0.3 * Math.min(1, mac / 1.5)),
-    vu: 100 * eP,
-    ees: 1 - 0.1 * eP,
+    svr: (1 - 0.15 * eP) * (1 - 0.075 * eR) * (1 - 0.3 * Math.min(1, mac / 1.5)) * V.svr,
+    vu: 100 * eP + V.vu,
+    ees: (1 - 0.1 * eP) * V.ees,
     setShift: -15 * eP,
     gHR: (1 - 0.75 * m) * (1 - 0.3 * eP),             // reflex gain on the heart-period limbs
     gVasc: (1 - 0.5 * m) * (1 - 0.3 * eP),            // milder, on the vascular limbs
@@ -166,10 +171,13 @@ export const cardio = {
       ees: lag(c.eff.ees, symp(BARO.ees[0], D.gVasc), dt, BARO.ees[1]),
     };
     // heart period: intrinsic period, slowed by vagal and quickened by sympathetic drive
-    const hp = Math.max(0.3, fx.T0 + fx.aV * eff.hpV - fx.aS * eff.hpS);
+    // drugs act on the lagged limbs: muscarinic block scales vagal drive, beta block the sympathetic drive, beta-1
+    // agonists add to it (vaso.js)
+    const hp = Math.max(0.3, fx.T0 + fx.aV * Math.min(1, eff.hpV * D.V.vagal + D.V.vt) - fx.aS * (eff.hpS * D.V.hrSym + D.V.b1));
+    const store = stepStore(c.store ?? 1, D.A.relNow, dt / 60);
     const pp = (CV.ppFactor * svL) / CV.Ca, co = (svL / rr) * 0.06;
     return {
-      ...c, Va, Vv, Vp, svL, svR, rr, hp, mapF, sHist, eff, edvL, s, dc, fl: F.fl, bloodVol, hb: hbOf(F.fl, bloodVol),
+      ...c, Va, Vv, Vp, svL, svR, rr, hp, mapF, sHist, eff, edvL, s, dc, fl: F.fl, bloodVol, hb: hbOf(F.fl, bloodVol), store,
       hr: 60 / rr, map: Psa, sbp: Psa + (2 / 3) * pp, dbp: Psa - pp / 3, cvp: R.P, lap: L.P, pa: Pp, co,
       svr: co > 0 ? ((Psa - R.P) / co) : 0, // Wood units (mmHg·min/L)
     };

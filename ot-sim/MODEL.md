@@ -325,6 +325,11 @@ Hybrid design (`research/cardio.md` section 1, prototyped in `research/prototype
 | GTN | 50–100 mcg bolus (off-label); infusion 10–200 mcg/min | onset 1–3 min, offset 5–10 min, preload falls first | Stengert 1978; SmPC [V] |
 | Metaraminol | 0.5–1 mg (off by default: not on the HSA register) | onset 1–2 min, lasts 20–60 min | SmPC [V]; HSA listing checked 14 Oct 2026 |
 
+As built in M2.3 (`vaso.js`, `test/vaso.test.mjs`): phenylephrine 50/100/200 mcg under the MAC-1.6 test state gives
+MAP +9.7/+13/+18.7 with the 100 mcg peak at 46 s and CO −1.0; noradrenaline 10 mcg +12; adrenaline 10 mcg HR +21 with
+DBP −5, 1 mg MAP +23; atropine 0.6 mg HR +25 at 3 min; glycopyrrolate 0.2 mg +18; labetalol 20 mg and GTN 50 mcg/min
+lower MAP about 5–12 mmHg; ephedrine 6 mg +11 then less with each repeat [D].
+
 ## 6. Rhythms and the ECG
 
 - A rhythm engine with an atrial clock (sinus, AF, flutter, ectopic, none), an AV-node state (1:1, first degree,

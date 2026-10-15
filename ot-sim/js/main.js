@@ -7,7 +7,7 @@ import { Loop, SPEEDS } from './ui/loop.js';
 import { Lane } from './ui/lanes.js';
 import { ecg, pleth, co2, modelSource, FastSource } from './ui/synth.js';
 import { Numerics, clockText } from './ui/numerics.js';
-import { DrugsPanel } from './ui/drugs.js';
+import { DrugsPanel, CIRC_ROWS } from './ui/drugs.js';
 import { behindHtml } from './ui/behind.js';
 
 const $ = id => document.getElementById(id);
@@ -45,6 +45,7 @@ function panels(force = false) {
   if (!force && now - panelsAt < 500) return;
   panelsAt = now;
   drugs.update(sim.state);
+  if (!$('panel-circ').hidden) circDrugs.update(sim.state);
   if (!$('panel-circ').hidden) { const t = fluidText(sim.state); if ($('fluid-state').textContent !== t) $('fluid-state').textContent = t; }
   if (!$('panel-pt').hidden) { const h = eventsHtml(sim.state); if ($('events').innerHTML !== h) $('events').innerHTML = h; }
   if ($('behind-box').open) { const h = behindHtml(sim.state); if ($('behind').innerHTML !== h) $('behind').innerHTML = h; }
@@ -66,6 +67,7 @@ function acted() {
   panels(true);
 }
 const drugs = new DrugsPanel($('panel-drugs'), sim, acted);
+const circDrugs = new DrugsPanel($('circ-drugs'), sim, acted, { rows: CIRC_ROWS, extras: false });
 
 // Patient tab: talk, stimuli, events (the full Examine tab comes with the case flow, M3.2)
 $('talk').addEventListener('click', () => {

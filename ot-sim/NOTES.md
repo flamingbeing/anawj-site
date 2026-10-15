@@ -67,6 +67,16 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Decisions log
 
+- 15 Oct 2026 (M2.3): `vaso.js` holds receptor activations (Emax/EC50 per drug, combined as independent fractions)
+  and their mapping to SVR, venous capacity, heart period and contractility; `cardio.js` applies them through the
+  existing reflex. PK in `pk.js` MODELS, short and [D] except the cited clearances and half-lives; phenylephrine keeps
+  the prototype's 5 L front end and a 20 s transit delay. Ephedrine releases noradrenaline from a store that runs down
+  (tachyphylaxis). Vasopressin is dosed in units (`mU` internally). Metaraminol is in the catalogue but hidden (not on
+  the HSA register; owner question). Known gaps: a noradrenaline infusion takes about 5 min, not 1-2, to wear off
+  (its level sits near the EC50); esmolol slows a resting heart only about 4/min, because resting HR here is mostly
+  vagal (it does blunt a stimulated rise, tested). Vasoactive rows sit on the Circulation tab with ISO 26825 colours
+  (vasopressors violet, hypotensive agents violet stripes, anticholinergics green).
+
 - 15 Oct 2026 (M2.2): `fluids.js` is called by `cardio.js` (state `cv.fl`), so volume stays in one slice; everything
   enters or leaves through the veins. Crystalloid excess `cx` leaves to the interstitium and urine at Hahn's
   MAP-dependent rates (k21 taken as 0); colloid leaves with t½ 2.5 h; red cells add 280 mL and 56 g of Hb; bleeding
