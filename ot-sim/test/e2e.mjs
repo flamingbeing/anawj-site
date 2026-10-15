@@ -316,6 +316,30 @@ try {
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${name}: no horizontal scroll`);
     await axe(page, `${name} theatre, Drugs tab and Behind the monitor`);
 
+    // Alarms (M3.3): on a fresh theatre, drive hypoxia (induce, paralyse, apnoea on air) and the SpO2 high-priority
+    // alarm shows on the bar; Silence pauses the audio (label + class) without clearing the alarm
+    await page.goto(BASE + '?test&seed=1#theatre');
+    await page.waitForFunction(() => window.otsim && document.getElementById('n-hr').textContent !== '--');
+    assert.ok(await page.evaluate(() => document.getElementById('alarmbar').hidden), `${name}: no alarm bar when all is well`);
+    await page.evaluate(() => {
+      otsim.sim.act({ type: 'bolus', drug: 'propofol', dose: 200, unit: 'mg', route: 'iv' });
+      otsim.sim.act({ type: 'bolus', drug: 'rocuronium', dose: 100, unit: 'mg', route: 'iv' });
+      otsim.sim.act({ type: 'o2', fio2: 0.21 });
+      otsim.step(6000);
+    });
+    assert.ok(await page.evaluate(() => otsim.state.mon.alarms.some(a => a.param === 'spo2' && a.priority === 'high')), `${name}: SpO2 high alarm active`);
+    assert.ok(!(await page.evaluate(() => document.getElementById('alarmbar').hidden)), `${name}: alarm bar shown`);
+    assert.ok(await page.evaluate(() => document.getElementById('alarmbar').classList.contains('high')), `${name}: alarm bar is high priority`);
+    assert.match(await page.textContent('#alarm-msg'), /SpO/, `${name}: alarm bar names SpO2`);
+    assert.equal(await page.getAttribute('#alarmbar', 'aria-live'), 'assertive', `${name}: high alarm is assertive`);
+    await axe(page, `${name} theatre, alarm active`);
+    await page.click('#alarm-silence');
+    await page.evaluate(() => otsim.step(2));
+    assert.ok(await page.evaluate(() => otsim.state.mon.silencedUntil > otsim.state.t), `${name}: silence window set`);
+    assert.ok(await page.evaluate(() => document.getElementById('alarmbar').classList.contains('silenced')), `${name}: bar shows silenced`);
+    assert.match(await page.textContent('#alarm-silence'), /Silenced/, `${name}: silence button counts down`);
+    assert.ok(await page.evaluate(() => otsim.state.mon.alarms.length > 0), `${name}: alarm stays active while silenced`);
+
     // the library's Elective GA card opens the pre-op briefing (patient summary + sign-in), which begins the theatre
     await page.goto(BASE);
     assert.ok(await page.$('a.card[href="?case=electiveGA#preop"]'), `${name}: Elective GA card goes to pre-op`);

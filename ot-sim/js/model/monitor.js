@@ -20,6 +20,47 @@ const PTC_LOCK = 120;          // s: a post-tetanic count potentiates the twitch
 const push = (arr, x, n) => { const a = arr.concat([x]); return a.length > n ? a.slice(a.length - n) : a; };
 const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
 
+// --- alarms (M3.3): per-parameter limits, three IEC 60601-1-8 priorities, an onset debounce and a 2-minute silence.
+// Evaluated here in simulated time, so onset timing is identical at every speed, and logged on each on/off transition.
+// The default limits and priorities are our design choice [D]; the owner reviews them, and M3.3 slice 2 lets the
+// trainee change them. A parameter alarms low or high (never both at once); NIBP uses the last reading, temp the core.
+export const SILENCE = 120;                               // s an alarm silence (audio pause) lasts [D]
+const ONSET = { high: 3, medium: 5, low: 10 };            // s a breach must persist before the alarm latches [D]
+export const PRIORITY_RANK = { high: 3, medium: 2, low: 1 };
+export const ALARM_LIMITS = {
+  spo2:   { lo: 90, loPr: 'high', loMsg: 'SpO₂ low' },
+  hr:     { lo: 45, hi: 130, loPr: 'medium', hiPr: 'medium', loMsg: 'Heart rate low', hiMsg: 'Heart rate high' },
+  etco2:  { lo: 25, hi: 60, loPr: 'medium', hiPr: 'medium', loMsg: 'EtCO₂ low', hiMsg: 'EtCO₂ high' },
+  rr:     { lo: 6, hi: 30, loPr: 'medium', hiPr: 'low', loMsg: 'Respiratory rate low', hiMsg: 'Respiratory rate high' },
+  nibpSys:{ lo: 85, hi: 180, loPr: 'medium', hiPr: 'medium', loMsg: 'Systolic BP low', hiMsg: 'Systolic BP high' },
+  temp:   { lo: 35, hi: 38.5, loPr: 'medium', hiPr: 'low', loMsg: 'Temperature low', hiMsg: 'Temperature high' },
+};
+const alarmKey = a => a.param + a.dir;
+
+// evaluate the alarms against the freshly-computed displayed values; mutates out.{breach,alarms,silencedUntil}
+function evalAlarms(out, m, ctx, t) {
+  let silencedUntil = m.silencedUntil || 0;
+  for (const a of ctx.actions) if (a.type === 'alarmSilence') silencedUntil = a.off ? 0 : t + SILENCE;
+
+  const vals = { spo2: out.spo2, hr: out.hr, etco2: out.etco2, rr: out.rr, nibpSys: out.nibp.last ? out.nibp.last.sys : null, temp: out.temp };
+  const breach = { ...(m.breach || {}) }, active = [];
+  for (const p in ALARM_LIMITS) {
+    const L = ALARM_LIMITS[p], v = vals[p];
+    let dir = null, pr = null, msg = null;
+    if (v == null || Number.isNaN(v)) { delete breach[p]; continue; }
+    if (L.lo != null && L.loPr && v < L.lo) { dir = 'lo'; pr = L.loPr; msg = L.loMsg; }
+    else if (L.hi != null && L.hiPr && v > L.hi) { dir = 'hi'; pr = L.hiPr; msg = L.hiMsg; }
+    if (!dir) { delete breach[p]; continue; }
+    const was = breach[p], since = was && was.dir === dir ? was.since : t;
+    breach[p] = { dir, since };
+    if (t - since >= ONSET[pr]) active.push({ param: p, dir, priority: pr, msg, since });
+  }
+  const prevKeys = new Set((m.alarms || []).map(alarmKey)), nowKeys = new Set(active.map(alarmKey));
+  for (const a of active) if (!prevKeys.has(alarmKey(a))) ctx.log({ kind: 'alarm', param: a.param, dir: a.dir, priority: a.priority, msg: a.msg, state: 'on' });
+  for (const a of (m.alarms || [])) if (!nowKeys.has(alarmKey(a))) ctx.log({ kind: 'alarm', param: a.param, dir: a.dir, priority: a.priority, msg: a.msg, state: 'off' });
+  out.breach = breach; out.alarms = active; out.silencedUntil = silencedUntil;
+}
+
 export const monitor = {
   name: 'mon',
   init(state) {
@@ -33,6 +74,9 @@ export const monitor = {
       nibp: { cycle: 5, start: null, next: 0, last: null },
       // TOF at the adductor pollicis: count, ratio (count 4 only), when; a PTC on request when the count is 0
       tof: { count: 4, ratio: 1, t: 0, next: 0, ptc: null, ptcT: null },
+      // alarms (M3.3): the active alarm list, the per-parameter breach timers (for the onset debounce) and when the
+      // audio is silenced until
+      alarms: [], breach: {}, silencedUntil: 0,
     };
   },
   step(prev, ctx) {
@@ -97,14 +141,17 @@ export const monitor = {
       }
       if (tof !== m.tof) out.tof = tof;
     }
+    evalAlarms(out, m, ctx, t);
     return out;
   },
   rebase(m, off) {
-    const n = m.nibp;
+    const n = m.nibp, breach = {};
+    for (const p in m.breach) breach[p] = { ...m.breach[p], since: m.breach[p].since - off };
     return {
       ...m, seenBeat: m.seenBeat - off, seenBreath: m.seenBreath - off, satT: m.satT - off,
       nibp: { ...n, start: n.start == null ? null : n.start - off, next: Math.max(0, n.next - off), last: n.last && { ...n.last, t: n.last.t - off } },
       tof: { ...m.tof, t: m.tof.t - off, next: Math.max(0, m.tof.next - off), ptcT: m.tof.ptcT == null ? null : m.tof.ptcT - off },
+      alarms: m.alarms.map(a => ({ ...a, since: a.since - off })), breach, silencedUntil: Math.max(0, m.silencedUntil - off),
     };
   },
 };

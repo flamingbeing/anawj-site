@@ -64,6 +64,15 @@ h1{font-size:1.6rem;line-height:1.2;margin:.75rem 0 .25rem}
 .tbody{padding:8px}
 .monitor{background:#000;border:1px solid #1d2635;border-radius:10px;padding:6px;position:relative;font-family:var(--f-mon)}
 .fastnote{position:absolute;right:8px;top:4px;font:11px/1.2 var(--f-narrow);color:#c9d3e0;background:#1b2638;padding:2px 6px;border-radius:4px;z-index:1}
+/* alarm bar (IEC 60601-1-8: red high/flashing, amber medium/flashing, cyan low/steady) */
+.alarmbar{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;margin-bottom:5px;font:700 14px/1.2 var(--f-mon);min-height:38px}
+.alarmbar .msg{flex:1}
+.alarmbar .silence{min-height:32px;padding:0 10px;font-size:12px;font-family:system-ui,sans-serif;background:rgba(0,0,0,.28);color:inherit;border:1px solid currentColor;border-radius:6px}
+.alarmbar.high{background:#e4002b;color:#fff;animation:almflash .6s steps(1,end) infinite}
+.alarmbar.medium{background:#f3b63a;color:#0a0f18;animation:almflash 1.4s steps(1,end) infinite}
+.alarmbar.low{background:#10476b;color:#dff1ff}
+.alarmbar.silenced{animation:none;opacity:.85}
+@keyframes almflash{50%{filter:brightness(.62)}}
 .lane{display:grid;grid-template-columns:1fr 92px;align-items:stretch;border-bottom:1px solid #141b26;min-height:96px}
 .lane .trace{position:relative}
 .lane canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
@@ -111,7 +120,7 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
   .num .nv{font-size:56px}
   .side{margin-top:0}
 }
-@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}.alarmbar{animation:none!important}}
 </style>
 </head>
 <body>
@@ -159,6 +168,10 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
   <div class="tbody">
     <div class="monitor" id="monitor" role="group" aria-label="Patient monitor">
       <div class="fastnote" id="fastnote" hidden></div>
+      <div class="alarmbar" id="alarmbar" role="status" aria-live="polite" hidden>
+        <span class="msg" id="alarm-msg"></span>
+        <button type="button" class="silence" id="alarm-silence">Silence 2 min</button>
+      </div>
       <div class="lane">
         <div class="trace"><span class="lab ecg" aria-hidden="true">II</span><canvas id="c-ecg" aria-hidden="true"></canvas><span class="rhy" id="n-rhythm" aria-hidden="true"></span></div>
         <div class="num ecg"><span class="nl">HR</span><span class="nv" id="n-hr">--</span><span class="nu">/min</span></div>
