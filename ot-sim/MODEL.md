@@ -551,6 +551,22 @@ several percent a minute) [U shape]; amiodarone raises it after repeated shocks;
 organised rhythm with enough output (shockable: a successful shock; non-shockable: the cause reversed); transcutaneous
 pacing capture threshold drawn per patient (about 50–90 mA [U]), output set about 10 mA above capture (QRH 2-6) [V].
 
+As built in M2.8 (`resus.js`, `test/resus.test.mjs`, with couplings in `cardio.js` and `gas.js`): compressions
+(`{type:'cpr', on, quality}`) make a fraction of the normal output by quality (poor 0.10, good 0.23, excellent 0.33),
+scaled by a coronary-perfusion build-up that rises over about 25 s of compressions and falls on a pause; cardio reads
+`resus.cprFrac` as the output of a non-perfusing rhythm. With CO coupled into gas exchange (CO2 clearance follows
+pulmonary blood flow, saturating at the resting output so normal and anaesthetised patients are unchanged; and the
+arterial/venous O2 pools stagnate at very low flow), the model gives EtCO2 about 16 (poor) / 24 (good) / 27 (excellent)
+and MAP about 29 / 43 / 53 under compressions, and — closing the M2.7 known miss — SpO2 now falls over minutes in an
+untreated arrest and recovers with compressions or a restored rhythm. A shock (`{type:'defib', joules}`) converts a
+shockable rhythm (VF, VT, torsades) with a probability that is high in the first minute and falls about 9%/min, better
+with perfusion before the shock and after amiodarone past three shocks (`shockSuccess`); success switches the rhythm to
+sinus (return of circulation), and the circulation recovers. Transcutaneous pacing (`{type:'pace', on, mA}`) captures
+once the current reaches the patient's drawn threshold (`patient.paceThresh`, ~45–95 mA), driving a paced rhythm.
+Known miss as flagged: a non-shockable arrest (PEA, asystole) returns only by reversing the cause, which the scenarios
+(M4) drive; here it is a manual rhythm change. The amiodarone drug itself is M4.0; `{type:'amiodarone'}` sets the
+success hook for now.
+
 ## What is not modelled (first version)
 
 Children and pregnancy (parameters exist; scenarios later), regional and neuraxial blocks other than the LAST scenario,

@@ -81,7 +81,15 @@ export const rhythm = {
     let r = prev.rh;
     const hp = prev.cv ? prev.cv.hp : 60 / 72;
     // an action changes the rhythm: rebuild the clocks from now
-    for (const a of ctx.actions) if (a.type === 'rhythm' && CATALOG[a.to]) r = build(a.to, ctx.t, hp);
+    let acted = false;
+    for (const a of ctx.actions) if (a.type === 'rhythm' && CATALOG[a.to]) { r = build(a.to, ctx.t, hp); acted = true; }
+    // resuscitation (resus.js) drives the rhythm too: a successful shock converts to an organised rhythm, and pacing
+    // that reaches the capture threshold drives a paced rhythm. A direct rhythm action this step takes precedence.
+    const res = prev.resus;
+    if (!acted && res) {
+      if (res.convert && CATALOG[res.convert]) r = build(res.convert, ctx.t, hp);
+      else if (res.pace && res.pace.capturing && r.rhythm !== 'paced') r = build('paced', ctx.t, hp);
+    }
 
     const events = [];
     let { next, last, na, ai, phase } = r;

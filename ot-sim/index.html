@@ -233,11 +233,27 @@ summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weig
           <optgroup label="Arrest"><option value="pea">PEA</option><option value="asystole">Asystole</option></optgroup>
           <optgroup label="Hyperkalaemia"><option value="hyperk1">Peaked T waves</option><option value="hyperk2">Wide QRS</option><option value="hyperk3">Sine wave</option></optgroup>
         </select></label></div>
+        <h3 class="sub">Resuscitation</h3>
+        <p class="hint">Chest compressions make a fraction of the normal output (watch EtCO<sub>2</sub> and the pressure); defibrillation can convert a shockable rhythm (VF, VT, torsades); transcutaneous pacing drives the heart once the current reaches this patient's capture threshold.</p>
+        <div class="act">
+          <button type="button" id="cpr" aria-pressed="false">Start compressions</button>
+          <label>Quality <select id="cpr-q"><option value="poor">Poor</option><option value="good" selected>Good</option><option value="excellent">Excellent</option></select></label>
+        </div>
+        <div class="act">
+          <label>Shock <input type="number" inputmode="numeric" min="50" max="360" step="10" id="defib-j" value="200"> J</label>
+          <button type="button" id="defib">Defibrillate</button>
+          <button type="button" id="amio">Amiodarone</button>
+        </div>
+        <div class="act">
+          <button type="button" id="pace" aria-pressed="false">Pacer</button>
+          <label><span id="pace-mal">Output</span> <input type="number" inputmode="numeric" min="0" max="140" step="5" id="pace-ma" value="70"> mA</label>
+        </div>
+        <p class="state" id="resus-state" aria-live="polite"></p>
         <h3 class="sub">Events</h3>
         <ol class="given" id="events"><li class="none">Nothing yet</li></ol>
       </div>
       <details id="behind-box"><summary>Behind the monitor</summary><div id="behind"></div></details>
-      <p class="foot">Free run: a healthy synthetic adult. A full model: drugs, the airway gases, breathing and the ventilator, heart rate and blood pressure, oxygen and CO2, temperature and the heart rhythm all respond. The airway and the crises come next. Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
+      <p class="foot">Free run: a healthy synthetic adult. A full model: drugs, the airway gases, breathing and the ventilator, heart rate and blood pressure, oxygen and CO2, temperature, the heart rhythm and resuscitation (compressions, defibrillation, pacing) all respond. The airway and the crises come next. Teaching only: the patient is synthetic and the numbers are a model, not clinical advice.</p>
     </div>
   </div>
 </section>

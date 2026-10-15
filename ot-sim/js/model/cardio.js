@@ -133,8 +133,12 @@ export const cardio = {
     const R = solveAtrium(CV.rv, fx.Arv, eesR, Psv, CV.Rvr, Pp, ppl, c.rr, fill, ppl);
     const L = solveAtrium(CV.lv, fx.Alv, eesL, Pp, fx.Rpv, Psa, ppl, c.rr, fill, 0);
     // the rhythm's mechanical effectiveness (rhythm.js): 1 for sinus, less for the fast and poorly-filled rhythms,
-    // 0 for VF, asystole and PEA, so those make no pulse and the arterial pressure decays (the Schipke curve) [D]
-    const out = prev.rh && prev.rh.output != null ? prev.rh.output : 1;
+    // 0 for VF, asystole and PEA. A non-perfusing rhythm makes an output only through chest compressions
+    // (resus.js, resus.cprFrac); without compressions the arterial pressure decays (the Schipke curve) [D]
+    const rhOut = prev.rh && prev.rh.output != null ? prev.rh.output : 1;
+    const perfusing = !(prev.rh && prev.rh.perfusing === false);
+    const cprFrac = prev.resus ? prev.resus.cprFrac : 0;
+    const out = perfusing ? rhOut : cprFrac;
     // beats in the previous step latch new stroke volumes and the interval
     let svL = c.svL, svR = c.svR, rr = c.rr, edvL = c.edvL;
     const beats = prev.rh ? prev.rh.events : [];
@@ -147,10 +151,10 @@ export const cardio = {
     }
     // flows over this step (mL), capped at what is available; gated by the rhythm's effectiveness
     const qL = Math.min((svL * out / rr) * dt, Math.max(0, c.Vp - 1)), qR = Math.min((svR * out / rr) * dt, Math.max(0, c.Vv - 1));
-    // arterial drainage. In a non-perfusing rhythm (VF, torsades, asystole, PEA) arteriolar tone is kept, so the
-    // arterial pressure decays slowly towards the mean filling pressure (Schipke 2003: about 24 mmHg at 13 s) rather
-    // than collapsing at once; perfusing rhythms (including the reduced-output ones) are unchanged [D].
-    const arrest = prev.rh && prev.rh.perfusing === false;
+    // arterial drainage. In a non-perfusing rhythm with no compressions, arteriolar tone is kept, so the arterial
+    // pressure decays slowly towards the mean filling pressure (Schipke 2003: about 24 mmHg at 13 s) rather than
+    // collapsing at once; once compressions (or any perfusing rhythm) produce flow, drainage is normal again [D].
+    const arrest = !perfusing && cprFrac <= 0;
     const qS = Math.min(Math.max(0, (Psa - Psv) / (arrest ? Rsys * 6 : Rsys)) * dt, Math.max(0, c.Va - 1));
     // fluids in and blood out through the veins (fluids.js)
     const F = stepFluids(fluidActions(c.fl, ctx.actions), c.Va + c.Vv + c.Vp, c.Vv, Psa, dt);

@@ -39,6 +39,14 @@ const source = () => (fast || modelSource(sim.state));
 function refill() { const src = source(); for (const l of lanes) l.refill(src, tDisp); }
 
 // panels: written at most twice a second of wall time, like the numerics
+function resusText(state) {
+  const r = state.resus, parts = [];
+  if (r.cpr) parts.push(`Compressions: ${r.quality} (output about ${Math.round(r.cprFrac * 100)}% of normal)`);
+  if (r.pace.on) parts.push(`Pacer ${r.pace.mA} mA: ${r.pace.capturing ? 'capturing' : 'not capturing'}`);
+  if (r.defib.shocks) parts.push(`${r.defib.shocks} shock${r.defib.shocks > 1 ? 's' : ''} (last: ${r.defib.lastOutcome})`);
+  return parts.join(' · ');
+}
+
 let panelsAt = -1e9;
 function panels(force = false) {
   const now = performance.now();
@@ -53,7 +61,10 @@ function panels(force = false) {
     if ($('agent-state').textContent !== at) $('agent-state').textContent = at;
     const r = sim.state.resp; const t = r.mode === 'spont' ? (r.apnoea ? 'Apnoeic (no spontaneous breaths).' : `Spontaneous: Vt ${Math.round(r.vt)} mL, rate ${r.rr.toFixed(0)}, MV ${r.mv.toFixed(1)} L/min.`) : `${r.mode === 'vc' ? 'Volume' : 'Pressure'} control: Vt ${Math.round(r.vt)} mL, Ppeak ${Math.round(r.ppeak)}, Pplat ${Math.round(r.pplat)}, MV ${r.mv.toFixed(1)} L/min${r.autoPeep > 0.05 ? `, auto-PEEP ${r.autoPeep.toFixed(1)}` : ''}.`; if ($('vent-state').textContent !== t) $('vent-state').textContent = t; }
   if (!$('panel-circ').hidden) { const t = fluidText(sim.state); if ($('fluid-state').textContent !== t) $('fluid-state').textContent = t; }
-  if (!$('panel-pt').hidden) { const h = eventsHtml(sim.state); if ($('events').innerHTML !== h) $('events').innerHTML = h; }
+  if (!$('panel-pt').hidden) {
+    const h = eventsHtml(sim.state); if ($('events').innerHTML !== h) $('events').innerHTML = h;
+    const rt = resusText(sim.state); if ($('resus-state').textContent !== rt) $('resus-state').textContent = rt;
+  }
   if ($('behind-box').open) { const h = behindHtml(sim.state); if ($('behind').innerHTML !== h) $('behind').innerHTML = h; }
 }
 
@@ -115,6 +126,15 @@ for (const b of document.querySelectorAll('[data-fluid]')) b.addEventListener('c
 $('bleed').addEventListener('change', () => { sim.act({ type: 'bleed', mlPerMin: +$('bleed').value }); acted(); });
 $('warmer').addEventListener('click', () => { const on = $('warmer').getAttribute('aria-pressed') !== 'true'; $('warmer').setAttribute('aria-pressed', String(on)); sim.act({ type: 'warming', on }); acted(); });
 $('rhythm').addEventListener('change', () => { sim.act({ type: 'rhythm', to: $('rhythm').value }); acted(); });
+// resuscitation: compressions, defibrillation, pacing
+const cprBtn = $('cpr');
+cprBtn.addEventListener('click', () => { const on = cprBtn.getAttribute('aria-pressed') !== 'true'; cprBtn.setAttribute('aria-pressed', String(on)); cprBtn.textContent = on ? 'Stop compressions' : 'Start compressions'; sim.act({ type: 'cpr', on, quality: $('cpr-q').value }); acted(); });
+$('cpr-q').addEventListener('change', () => { if (cprBtn.getAttribute('aria-pressed') === 'true') { sim.act({ type: 'cpr', on: true, quality: $('cpr-q').value }); acted(); } });
+$('defib').addEventListener('click', () => { sim.act({ type: 'defib', joules: +$('defib-j').value }); acted(); });
+$('amio').addEventListener('click', () => { sim.act({ type: 'amiodarone' }); acted(); });
+const paceBtn = $('pace');
+paceBtn.addEventListener('click', () => { const on = paceBtn.getAttribute('aria-pressed') !== 'true'; paceBtn.setAttribute('aria-pressed', String(on)); sim.act({ type: 'pace', on, mA: +$('pace-ma').value }); acted(); });
+$('pace-ma').addEventListener('change', () => { if (paceBtn.getAttribute('aria-pressed') === 'true') { sim.act({ type: 'pace', on: true, mA: +$('pace-ma').value }); acted(); } });
 const PRODUCT_NAME = { crystalloid: 'crystalloid', colloid: 'colloid', rbc: 'red cells' };
 function fluidText(state) {
   const fl = state.cv.fl, run = fl.running.map(r => `${PRODUCT_NAME[r.product]} ${Math.round(r.left)} mL to go`);
