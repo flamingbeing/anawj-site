@@ -65,6 +65,15 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Decisions log
 
+- 15 Oct 2026 (M1.4): `pd.js` holds hypnosis (asleep when P(no response to voice) > the patient's q), the stimulus
+  surface (movement at stimulus onset when P(no response) < q and the thumb twitch is over 10%), the BIS-like index
+  (arousal adds up to 8) and `pd.auto` (a second surface at 1.6 x with the opioid C50 0.5 ng/mL, from the MAC-BAR
+  ratios; rises with a 20 s and fades with a 90 s time constant; brief stimuli last 30 s, surgery runs until stopped,
+  intensity 0.6-1.0, default 0.8). The volatile term reads `vol.ce.sevoflurane` once M2.5 exists (MAC40 1.80%). Stub
+  until M3.1/M3.2: the Patient tab (talk, stimuli, events); "Talk" reads the state and logs nothing. Midazolam and
+  ketamine have no hypnotic effect yet: MODEL.md section 4 gives no surface for them (a research step before the
+  case flow, M3.2).
+
 - 15 Oct 2026 (M1.3): neuromuscular drugs live in `nmb.js` (state `pk.nm`), the readout in `pd.js` (`pd.nmb`), the TOF
   module in `monitor.js` (every 15 s; PTC on request, once per 2 min). The TOF readout is fitted to acceleromyography,
   because every reversal trial used it; that forced a retune: rocuronium ke0 0.2 on / 0.9 off (onset: 80% block at

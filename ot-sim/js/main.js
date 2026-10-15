@@ -6,7 +6,7 @@ import { NIBP_CYCLES } from './model/monitor.js';
 import { Loop, SPEEDS } from './ui/loop.js';
 import { Lane } from './ui/lanes.js';
 import { ecg, pleth, co2, modelSource, FastSource } from './ui/synth.js';
-import { Numerics } from './ui/numerics.js';
+import { Numerics, clockText } from './ui/numerics.js';
 import { DrugsPanel } from './ui/drugs.js';
 import { behindHtml } from './ui/behind.js';
 
@@ -45,6 +45,7 @@ function panels(force = false) {
   if (!force && now - panelsAt < 500) return;
   panelsAt = now;
   drugs.update(sim.state);
+  if (!$('panel-pt').hidden) { const h = eventsHtml(sim.state); if ($('events').innerHTML !== h) $('events').innerHTML = h; }
   if ($('behind-box').open) { const h = behindHtml(sim.state); if ($('behind').innerHTML !== h) $('behind').innerHTML = h; }
 }
 
@@ -65,6 +66,29 @@ function acted() {
 }
 const drugs = new DrugsPanel($('panel-drugs'), sim, acted);
 
+// Patient tab: talk, stimuli, events (the full Examine tab comes with the case flow, M3.2)
+$('talk').addEventListener('click', () => {
+  const pd = sim.state.pd;
+  $('talk-reply').textContent = !pd.asleep ? 'Opens their eyes and answers.' : pd.pAsleep < 0.95 ? 'No answer. Stirs a little to a louder voice.' : 'No response.';
+});
+for (const b of document.querySelectorAll('[data-stim]')) b.addEventListener('click', () => { sim.act({ type: 'stimulus', kind: b.dataset.stim }); acted(); });
+$('surgery').addEventListener('click', () => {
+  const on = $('surgery').getAttribute('aria-pressed') !== 'true';
+  $('surgery').setAttribute('aria-pressed', String(on));
+  sim.act({ type: 'stimulus', kind: 'surgery', level: on ? 0.8 : 0 });
+  acted();
+});
+const EVENT_TEXT = {
+  asleep: () => 'No longer responds to voice', awake: () => 'Responds to voice again',
+  movement: e => `Moved at ${e.stimulus === 'surgery' ? 'the start of surgery' : e.stimulus}`,
+  stimulus: e => (e.stimulus === 'surgery' ? 'Surgery under way' : `${e.stimulus[0].toUpperCase()}${e.stimulus.slice(1)}`),
+  nibp: e => `NIBP ${e.sys}/${e.dia}`, ptc: e => (e.ptc == null ? 'PTC: TOF present' : `PTC ${e.ptc}`),
+};
+function eventsHtml(state) {
+  const ev = state.log.filter(e => EVENT_TEXT[e.kind] && e.kind !== 'nibp').slice(-8).reverse();
+  return ev.length ? ev.map(e => `<li><span class="when">${clockText(e.t)}</span> ${EVENT_TEXT[e.kind](e)}</li>`).join('') : '<li class="none">Nothing yet</li>';
+}
+
 // tabs (ARIA tabs pattern: arrow keys move between tabs)
 const tabs = [...document.querySelectorAll('[role=tab]')];
 function selectTab(tab, focus = false) {
@@ -77,7 +101,7 @@ function selectTab(tab, focus = false) {
   if (focus) tab.focus();
 }
 for (const t of tabs) {
-  t.addEventListener('click', () => selectTab(t));
+  t.addEventListener('click', () => { selectTab(t); panels(true); });
   t.addEventListener('keydown', e => {
     const i = tabs.indexOf(t), n = tabs.length;
     const j = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i + n - 1) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1;
