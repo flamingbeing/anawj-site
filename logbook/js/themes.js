@@ -53,6 +53,7 @@ export const THEMES = [
   { id: 'apple', name: 'Apple-style', group: 'inspired', desc: 'Grouped grey lists, iOS blue, no band', look: { accent: '#007aff', bgTint: 'iosgrey', shadows: false, borders: 1, fontUi: 'system', tabStyle: 'plain', btnStyle: 'plain', band: 'none' } },
   { id: 'material', name: 'Material-style', group: 'inspired', desc: 'Bold colour, raised cards', look: { accent: '#3f51b5', round: 1, fontUi: 'system', btnStyle: 'filled', band: 'shades' } },
   { id: 'instagram', name: 'Instagram-style', group: 'inspired', desc: 'Pink to orange, white, rounded', look: { accent: '#d62976', bgTint: 'white', shadows: false, borders: 2 }, band: ['#833ab4', '#c13584', '#fd1d1d', '#fcaf45'] },
+  { id: 'acgme', name: 'ACGME-style', group: 'inspired', desc: 'Case-log red, white forms, square fields, grey labels', look: { accent: '#d32f2f', bgTint: 'grey', round: 0, shadows: false, borders: 3, fontUi: 'system', btnStyle: 'filled', tabStyle: 'plain' }, band: ['#e53935', '#e53935', '#d32f2f', '#d32f2f'] },
   { id: 'tiktok', name: 'TikTok-style', group: 'inspired', desc: 'Black with cyan and pink-red', mode: 'oled', look: { accent: '#25f4ee', bgTint: 'black', shadows: false, borders: 2, fontUi: 'inter' }, band: ['#25f4ee', '#ffffff', '#fe2c55', '#25f4ee'] },
 ];
 export const themeById = id => THEMES.find(t => t.id === id) || THEMES[0];
