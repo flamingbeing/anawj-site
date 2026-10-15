@@ -56,7 +56,7 @@ const FIRST = ['Aaron', 'Bella', 'Chen', 'Divya', 'Ethan', 'Farah', 'Gavin', 'Ha
 const LAST = ['Ang', 'Balan', 'Chua', 'D\'Souza', 'Eng', 'Fong', 'Gill', 'Hashim', 'Iskandar', 'Jayaram', 'Kang', 'Loo', 'Mahmud',
   'Nathan', 'Oon', 'Phang', 'Rajan', 'Shah', 'Teo', 'Vellu', 'Wong', 'Yeo', 'Zainal', 'Boon', 'Cheong', 'Devan', 'Ee', 'Fadzil'];
 // Group sizes about like the real department's juniors.
-const SIZES = { r: 6, res3: 10, res2: 14, res1: 14, nhg: 4, rp: 4, loc: 4, mopex: 12, rr: 10, fellow: 6, ac: 4 };
+const SIZES = { r: 6, res3: 10, res2: 14, res1: 14, nhg: 4, rp: 4, loc: 4, mopex: 12, rr: 10, fellow: 6, ac: 0 };
 const RR_FROM = ['GS', 'Ortho', 'ED', 'Uro', 'ENT', 'HRM', 'GS', 'Ortho', 'ED', 'GS'];
 const FELLOW_OF = ['C', 'ICU', 'GA', 'GA', 'CP', 'ICU'];
 
