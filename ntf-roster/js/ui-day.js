@@ -19,8 +19,8 @@ export function mount(el, app) {
   const prevBtn = h('button', { type: 'button', class: 'icon-btn day-arrow', 'aria-label': 'Previous day', html: icon('left') });
   const nextBtn = h('button', { type: 'button', class: 'icon-btn day-arrow', 'aria-label': 'Next day', html: icon('right') });
   const title = h('div', { class: 'day-title' });
-  const head = h('div', { class: 'day-head' }, prevBtn, title, nextBtn);
-  const strip = h('div', { class: 'day-strip', role: 'group', 'aria-label': 'Days of the month' });
+  const head = h('div', { class: 'day-head', 'data-tour': 'day' }, prevBtn, title, nextBtn);   // (data-tour: the first-time tour)
+  const strip = h('div', { class: 'day-strip', role: 'group', 'aria-label': 'Days of the month', 'data-tour': 'day' });
   const content = h('div', { class: 'day-content' });
   root.append(head, strip, content);
 

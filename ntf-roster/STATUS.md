@@ -45,6 +45,11 @@ merged or live.
 
 ## Recently done
 
+- 2026-10-15: first-time walkthrough (owner: "can you make a walkthrough for first time user?"), in the NUHS look:
+  Getting started checklist on your own roster (six steps that tick themselves), a 10-stop interface tour (practice
+  opens it once; "?" Help and More › Show the walkthrough replay it), three "Try it yourself" practice tasks, and the
+  Help sheet. `test/tour.e2e.mjs` added to Checks. Branch `ntf-tour2` (not pushed yet).
+
 - 2026-10-15: back to the NUHS design system (owner, after trying NTF's app design in #605): the look is the first
   version's again; the speed work from #605 stays (grid patches cells, progressive month redraw, live rule checks once per
   frame, Auto-fill about 3x faster with the tight-department fix), plus the paint Clear fix; `test/perf.e2e.mjs` in Checks.

@@ -103,6 +103,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - NUH roster changes: run `node nuh-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe on every tab;
   under a minute; also in the Checks workflow).
 - NTF roster changes: run `node ntf-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe; also in the
+  Checks workflow), `node ntf-roster/test/tour.e2e.mjs` (Getting started, the tour and practice tasks; also in the
   Checks workflow), `node ntf-roster/test/perf.e2e.mjs` (speed budgets on a slowed phone; also in the Checks workflow)
   and the unit tests in `ntf-roster/test/`.
 - Hand log changes: run `node hand-log/test/e2e.mjs`.

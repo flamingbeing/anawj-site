@@ -611,7 +611,7 @@ body[data-tab="people"] .ctx-row { display: none; }   /* the month and Auto-fill
   .demobar .linkish { font-size: 12px; min-height: 32px; }
 
   .top-row { height: 50px; padding: 0 4px 0 12px; gap: 8px; }
-  .tabs, #help { display: none; }
+  .tabs { display: none; }
   .brand-mark { width: 30px; height: 30px; font-size: 10px; }
   .brand-dept { display: none; }
   .icon-btn { width: 44px; height: 44px; }
@@ -805,3 +805,185 @@ body[data-tab="people"] .ctx-row { display: none; }   /* the month and Auto-fill
 .gk-mark { flex: none; width: 44px; display: inline-flex; justify-content: center; }
 .gk-cell { position: relative; display: inline-block; width: 30px; height: 24px; border: 1px solid var(--line); background: var(--surface); }
 .gk-txt { font-weight: 700; font-size: 12px; color: var(--navy); }
+
+/* ======================================================================
+   First-time help (guide.js, tour.js): Getting started, the tour, Help, Try it yourself.
+   NUHS: square panels with a navy top rule; only controls are rounded (5 px), badges 3 px.
+   ====================================================================== */
+.guide-slot { flex: none; padding: 12px 12px 0; }
+.welcome .guide-slot { padding: 0; }
+.welcome-card.has-guide { max-width: 640px; }
+.welcome-intro { text-align: center; }
+
+/* ---------- Getting started ---------- */
+.gs { background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--navy); text-align: left; }
+.gs-head { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; min-height: 56px; padding: 8px 12px 8px 16px; }
+.gs-headtext { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.gs-title { margin: 0; font-size: 16px; font-weight: 700; color: var(--navy); line-height: 1.2; }
+.gs-fold { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; margin: -4px 0 -4px -4px; padding: 0 4px; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; }
+@media (hover: hover) { .gs-fold:hover { background: var(--navy-soft); } }   /* no sticky hover after a tap */
+.gs-chev .ic { width: 16px; height: 16px; transition: transform .15s; }
+.gs-chev.is-open .ic { transform: rotate(90deg); }
+.gs-progress { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.gs-meter { flex: none; display: inline-flex; gap: 3px; }
+.gs-meter i { width: 16px; height: 6px; background: #dce3ec; }
+.gs-meter i.on { background: var(--navy); }
+.gs-sub { margin: 0; font-size: 13px; color: var(--muted); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-nextline { margin: 0; font-size: 13px; color: var(--muted); }
+.gs-nextline strong { color: var(--navy); font-weight: 600; }
+.gs-note { margin: 2px 0 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
+.gs-hide { min-height: 36px; padding: 0 6px; font-size: 13px; color: var(--muted); }
+.gs-hide:hover { color: var(--navy); }
+.gs-body { border-top: 1px solid var(--line); }
+
+/* laptop: the six steps in a row, the open one's words and buttons underneath */
+.gs-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.gs-step { display: contents; }
+.gs-step-btn {
+  grid-row: 1; display: flex; align-items: center; gap: 8px; min-height: 54px; padding: 8px 10px 6px 12px;
+  border: 0; border-right: 1px solid var(--line); border-bottom: 3px solid transparent; background: var(--surface);
+  text-align: left; font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.25;
+}
+.gs-step:last-child .gs-step-btn { border-right: 0; }
+.gs-step-btn:hover { background: #f7f9fc; }
+.gs-step-btn:focus-visible { outline-offset: -3px; }
+.gs-step.is-open .gs-step-btn { background: #f1f5fa; border-bottom-color: var(--navy); color: var(--navy); }
+.gs-num { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border: 2px solid var(--line-strong); border-radius: 3px; background: var(--surface); font-size: 12px; font-weight: 700; color: var(--muted); }
+.gs-num .ic { width: 15px; height: 15px; stroke-width: 3; }
+.gs-step.is-open .gs-num { border-color: var(--navy); color: var(--navy); }
+.gs-step.is-done .gs-num { background: var(--navy); border-color: var(--navy); color: #fff; }
+.gs-step.is-done .gs-step-title { color: var(--muted); }
+.gs-step.is-done.is-open .gs-step-title { color: var(--navy); }
+.gs-step-title { flex: 1; min-width: 0; }
+.gs-step-chev { display: none; color: var(--muted); }
+.gs-step-chev .ic { width: 16px; height: 16px; transition: transform .15s; }
+.gs-detail { grid-row: 2; grid-column: 1 / -1; display: flex; align-items: center; gap: 10px 24px; flex-wrap: wrap; padding: 12px 16px; background: #f1f5fa; }
+.gs-text { flex: 1 1 360px; max-width: 72ch; margin: 0; font-size: 14px; line-height: 1.5; }
+.gs-wait { font-weight: 600; color: var(--soft-ink); }
+.gs-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.gs-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 18px; padding: 6px 16px 8px; border-top: 1px solid var(--line); }
+.gs-link { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; font-size: 13px; font-weight: 600; color: var(--link); text-underline-offset: 2px; }
+.gs-link .ic { width: 17px; height: 17px; }
+
+/* phones and the welcome screen: the steps as a list that opens one at a time */
+.gs.is-vertical .gs-steps { display: block; }
+.gs.is-vertical .gs-step { display: block; border-top: 1px solid var(--line); }
+.gs.is-vertical .gs-step:first-child { border-top: 0; }
+.gs.is-vertical .gs-step-btn { width: 100%; min-height: 50px; padding: 8px 12px 8px 14px; border: 0; font-size: 14px; }
+.gs.is-vertical .gs-step.is-open .gs-step-btn { background: none; }
+.gs.is-vertical .gs-step-chev { display: grid; }
+.gs.is-vertical .gs-step.is-open .gs-step-chev .ic { transform: rotate(90deg); }
+.gs.is-vertical .gs-detail { display: block; padding: 0 14px 14px 46px; background: none; }
+.gs.is-vertical .gs-text { margin-bottom: 10px; }
+.gs.is-welcome { border: 0; margin-top: 20px; }
+.gs.is-welcome .gs-head { padding: 0 0 10px; min-height: 0; border-top: 1px solid var(--line); padding-top: 16px; }
+.gs.is-welcome .gs-body { border: 1px solid var(--line); border-top: 3px solid var(--navy); }
+.gs.is-welcome .gs-foot { justify-content: space-between; }
+
+/* all six done: a short "All set" before the card goes */
+.gs-allset { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top-color: var(--ok); }
+.gs-allset-ic { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 3px; background: var(--ok); color: #fff; }
+.gs-allset-ic .ic { stroke-width: 3; }
+.gs-allset .gs-sub { white-space: normal; }
+
+/* ---------- the tour ---------- */
+.tour { position: fixed; inset: 0; z-index: 85; animation: fade-in .15s ease-out; }
+.tour.is-leaving, .tour-spot.is-leaving { opacity: 0; transition: opacity .15s; }
+.tour-shade { position: absolute; inset: 0; }
+.tour-holes { position: fixed; inset: 0; pointer-events: none; }
+.tour-dim { position: absolute; left: 0; top: 0; display: block; }
+.tour-dim path { fill: rgba(8, 22, 44, .56); }
+.tour-ring { position: absolute; left: 0; top: 0; border: 3px solid #178fd7; border-radius: 6px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .7); pointer-events: none; }
+.tour-card {
+  position: absolute; left: 0; top: 0; padding: 16px 16px 12px; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); transition: transform .22s cubic-bezier(.2, .7, .3, 1);
+}
+.tour-card:focus { outline: none; }   /* (the card takes focus after a tap; keyboard use focuses Next) */
+.tour.is-still .tour-card, .tour.is-still .tour-prog span { transition: none; }
+.tour-prog { position: absolute; left: 0; right: 0; top: 0; height: 4px; background: #dce3ec; }
+.tour-prog span { display: block; width: 0; height: 100%; background: var(--navy); transition: width .22s; }
+.tour-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 -4px 2px 0; }
+.tour-count { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.tour-skip { min-height: 32px; padding: 0 4px; font-size: 13px; color: var(--muted); }
+.tour-skip:hover { color: var(--navy); }
+.tour-title { margin: 0 0 6px; font-size: 18px; font-weight: 700; line-height: 1.25; color: var(--navy); }
+.tour-text { margin: 0 0 14px; font-size: 14px; line-height: 1.5; }
+.tour-foot { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.tour-next { min-width: 92px; }
+
+/* "Show me": the control lit, the page still usable underneath */
+.tour-spot { position: fixed; inset: 0; z-index: 84; pointer-events: none; animation: fade-in .15s ease-out; }
+.tour-spot .tour-dim path { fill: rgba(8, 22, 44, .38); }
+.tour-tip { position: absolute; left: 0; top: 0; margin: 0; padding: 8px 12px; background: var(--navy); color: #fff; font-size: 14px; font-weight: 600; line-height: 1.35; }
+
+/* ---------- Help sheet ---------- */
+.help-list { list-style: none; margin: -16px -20px; padding: 0; }
+.help-row {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-height: 66px; padding: 10px 20px;
+  border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); text-align: left; text-decoration: none;
+}
+.help-list li:last-child .help-row { border-bottom: 0; }
+.help-row:hover { background: #f5f8fc; }
+.help-row:focus-visible { outline-offset: -3px; }
+.help-ic { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-sm); background: var(--navy-soft); color: var(--navy); }
+.help-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.help-txt strong { font-size: 15px; font-weight: 600; color: var(--navy); }
+.help-txt span { font-size: 13px; color: var(--muted); }
+.help-go { flex: none; color: var(--muted); }
+
+/* ---------- Try it yourself ---------- */
+.task-card {
+  position: fixed; right: 16px; bottom: 16px; z-index: 81; width: 350px; max-width: calc(100vw - 24px);
+  padding: 16px 16px 12px; background: var(--surface); border: 1px solid var(--line-strong);
+}
+/* the task card stays above windows (the cell editor, Add rule, Auto-fill), which make room for it underneath */
+body.has-taskcard .sheet-back { padding-bottom: calc(var(--task-h, 0px) + 32px); }
+body.has-taskcard .sheet { max-height: calc(100vh - var(--task-h, 0px) - 64px); }
+.task-prog { position: absolute; left: 0; right: 0; top: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; height: 4px; }
+.task-prog i { background: #dce3ec; }
+.task-prog i.on { background: var(--navy); }
+.task-card.is-done .task-prog i.on:last-of-type, .task-card.is-done .task-prog i.on { background: var(--ok); }
+.task-kicker { margin: 0 0 2px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.task-title { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 16px; font-weight: 700; color: var(--navy); }
+.task-title:focus:not(:focus-visible) { outline: none; }
+.task-tick { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 3px; background: var(--ok); color: #fff; }
+.task-tick .ic { width: 14px; height: 14px; stroke-width: 3; }
+.task-text { margin: 0 0 10px; font-size: 14px; line-height: 1.45; }
+.task-acts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
+.task-stop { min-height: 32px; padding: 0 4px; font-size: 13px; color: var(--muted); }
+.task-stop:hover { color: var(--navy); }
+
+@media (max-width: 720px) {
+  .guide-slot { padding: 8px 8px 0; }
+  .gs-head { padding: 6px 4px 6px 12px; gap: 4px 8px; flex-wrap: nowrap; }
+  .gs-headtext { flex: 1 1 auto; }
+  .gs-next { display: none; }
+  .gs-hide { min-height: 44px; padding: 0 10px; }
+  .gs-fold { min-height: 44px; margin: -8px 0 -8px -4px; }
+  .gs.is-vertical .gs-step-btn { min-height: 52px; }
+  .gs.is-vertical .gs-detail { padding: 0 12px 14px 12px; }
+  .gs-acts .btn, .gs-foot .btn { flex: 1 1 auto; }
+  .gs-link { min-height: 44px; }
+  .gs.is-welcome .gs-head { padding: 14px 0 10px; }
+  .welcome-card.has-guide { padding: 22px 14px; }
+
+  .tour-card { padding: 14px 14px 10px; }
+  .tour-card .btn { min-height: 44px; }
+  .tour-skip { min-height: 44px; padding: 0 10px; margin-right: -6px; }
+  .tour-foot .tour-next { flex: 1 1 auto; }
+  .tour-title { font-size: 17px; }
+
+  .help-list { margin: -14px -16px; }
+  .help-row { padding: 10px 16px; }
+
+  .task-card { left: 8px; right: 8px; width: auto; max-width: none; bottom: calc(56px + env(safe-area-inset-bottom) + 8px); padding: 14px 14px 8px; }
+  .task-acts .btn, .task-acts .linkish { min-height: 44px; }
+  .task-stop { padding: 0 10px; }
+  body.has-taskcard .main { padding-bottom: calc(var(--task-h, 0px) + 12px); }
+  /* with a window open the tab bar is covered: the card goes to the bottom, the window sits above it */
+  body.has-taskcard:has(.sheet-back) .task-card { bottom: calc(8px + env(safe-area-inset-bottom)); }
+  body.has-taskcard .sheet-back { padding-bottom: calc(var(--task-h, 0px) + 16px + env(safe-area-inset-bottom)); }
+  body.has-taskcard .sheet { max-height: calc(100dvh - var(--task-h, 0px) - 40px); border-radius: 16px; }
+  body.has-taskcard .toasts { bottom: calc(68px + var(--task-h, 0px) + 10px + env(safe-area-inset-bottom)); }
+}
+@media print { .tour, .tour-spot, .task-card, .guide-slot { display: none !important; } }

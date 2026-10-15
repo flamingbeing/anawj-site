@@ -47,6 +47,7 @@ const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch
 await ctx.route('https://www.gstatic.com/**', r => r.abort());        // no Firebase
 await ctx.route('https://fonts.googleapis.com/**', r => r.abort());   // no web font round trip in the timings
 await ctx.addInitScript(HELPER);
+await ctx.addInitScript(() => { try { localStorage.setItem('ntf-roster-tour', JSON.stringify({ v: 1, done: true })); } catch (e) { /* ignore */ } });   // (no first-time tour)
 const page = await ctx.newPage();
 page.on('pageerror', e => errors.push(e.message));
 const cdp = await ctx.newCDPSession(page);
