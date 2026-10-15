@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-15 by Claude Code (build session: M2.2-M2.6 in #582, M2.7 rhythms in #598, then M2.8 resuscitation).
+Last updated: 2026-10-15 by Claude Code (build session: M2.7 rhythms #598, M2.8 resuscitation #604, then M3.1 airway).
 
 ## Now
 
@@ -19,12 +19,17 @@ Each session keeps its own line in `status/<session>.md`. Read them before start
 
 ## Next
 
-1. M3.1 (airway: `airway.js` — obstruction, adjuncts, mask/SAD/laryngoscopy, ETT), then M3.2 case flow, M3.3 alarms,
-   then M4.x scenarios, one PR at a time, each merged before the next (`DESIGN.md` order).
+1. M3.2 (case flow: `presets.js`, the elective GA from pre-oxygenation to extubation, surgical-stimulus timeline,
+   Examine/Help tabs), then M3.3 alarms, then M4.x scenarios, one PR at a time, each merged before the next
+   (`DESIGN.md` order).
 
 ## Recently done
 
-- M2.8 (15 Oct 2026): resuscitation (`resus.js`): chest compressions (output + EtCO2 + DBP by quality),
+- M3.1 (15 Oct 2026): the airway (`airway.js`): per-patient Cormack-Lehane/mask difficulty; obstruction under
+  sedation/paralysis relieved by manoeuvres or a device; mask seal and pre-oxygenation entrainment; tube placement
+  (tracheal/oesophageal → no CO2/endobronchial one-lung). An Airway tab. resp/gas calibration unchanged (a patent
+  airway delivers fully).
+- M2.8 (15 Oct 2026, #604): resuscitation (`resus.js`): chest compressions (output + EtCO2 + DBP by quality),
   defibrillation (time-in-VF success curve → ROSC), transcutaneous pacing (per-patient capture threshold); SpO2 now
   falls in an untreated arrest and recovers with CPR (CO coupled into gas exchange). Resuscitation controls on the
   Patient tab.

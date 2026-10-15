@@ -71,7 +71,7 @@ export const gas = {
     // their weight (about 290 mL/min at 130 kg, MODEL.md section 8) [D]
     const metW = p.ibw + 0.3 * Math.max(0, p.weightKg - p.ibw);
     const vo2 = GAS.vo2PerKg * metW * (asleep ? GAS.gaVo2 : 1) * (p.vo2Scale || 1), vco2 = vo2 * GAS.rq;
-    const shTarget = Math.max(0.02, (asleep ? GAS.shuntGa : GAS.shuntAwake) + (p.shuntAdd || 0) - GAS.peepShunt * (r.peep || 0));
+    const shTarget = Math.max(0.02, (asleep ? GAS.shuntGa : GAS.shuntAwake) + (p.shuntAdd || 0) + (r.shuntAdd || 0) - GAS.peepShunt * (r.peep || 0));
     const shunt = g.shunt + (shTarget - g.shunt) * (dt / GAS.shuntTau);
     // inspired gas at the airway opening
     const fi = { o2: r.fio2 ?? 0.2093, co2: 0 };

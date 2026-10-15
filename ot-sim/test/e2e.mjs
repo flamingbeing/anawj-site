@@ -171,6 +171,21 @@ try {
     assert.ok(await page.evaluate(() => otsim.state.vol.mac) > 0.8, `${name}: sevoflurane raises MAC`);
     assert.match(await page.textContent('#n-agent'), /^\d/);
     await axe(page, `${name} theatre, Breathing tab`);
+    // the Airway tab: laryngoscopy shows a view; an oesophageal tube reads no CO2, a tracheal tube restores it
+    await page.click('#tab-aw');
+    await page.click('#aw-laryn');
+    await page.evaluate(() => otsim.step(10));
+    assert.ok(await page.evaluate(() => otsim.state.aw.view >= 1), `${name}: laryngoscopy shows a view`);
+    await page.selectOption('#aw-place', 'oesophageal');
+    await page.click('#aw-intubate');
+    await page.evaluate(() => otsim.step(600));
+    assert.ok(await page.evaluate(() => otsim.state.gas.etco2 < 5), `${name}: oesophageal tube shows no CO2`);
+    await page.selectOption('#aw-place', 'tracheal');
+    await page.click('#aw-intubate');
+    await page.evaluate(() => otsim.step(900));
+    assert.ok(await page.evaluate(() => otsim.state.gas.etco2 > 25), `${name}: tracheal tube restores CO2`);
+    assert.match(await page.textContent('#aw-state'), /Tracheal tube/);
+    await axe(page, `${name} theatre, Airway tab`);
     await page.click('#tab-drugs');
     // the Patient tab: asleep under TCI; a stimulus shows in the events
     await page.evaluate(() => { otsim.sim.act({ type: 'tci', drug: 'propofol', target: 4 }); otsim.step(3000); });

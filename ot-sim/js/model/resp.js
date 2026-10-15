@@ -2,7 +2,8 @@
 // (volume control, pressure control) with closed-form pressures within each breath. Gas exchange uses the continuous
 // alveolar ventilation set here (gas.js); breath events feed the capnogram and the monitor's rate. Pleural pressure
 // through each breath goes to the circulation (pulse pressure variation emerges there).
-// Until the airway module (M3.1) the ventilator works as if the patient is intubated, and the airway stays open.
+// The airway (airway.js) decides how much of the breath reaches the alveoli (aw.toLungs), the inspired-O2 dilution at
+// a leaky mask (aw.entrain) and one-lung ventilation (aw.oneLung); a patent airway leaves the breathing unchanged.
 
 import { exp, pow, sin } from './fmath.js';
 import { ceREq } from './pd.js';
@@ -121,9 +122,14 @@ export const resp = {
     let ppl = 0;
     if (out.mech) ppl = RESP.pplFrac * palv(out.mech, x) * RESP.cmH2OtoMmHg;
     else if (cycle > 0 && x < cycle / 3) ppl = -2 * sin((3.141592653589793 * x) / (cycle / 3)) * (out.vt / r.vt0);
-    // the airway is open unless the airway module (M3.1) says it is obstructed
-    const open = !(prev.aw && prev.aw.obstruction >= 1);
-    if (!open) Object.assign(out, { va: 0, mv: 0 });
+    // the airway (airway.js) scales the delivered alveolar ventilation, dilutes the inspired O2 at a leaky mask, and
+    // adds a one-lung shunt. A patent airway (toLungs 1, entrain 0, oneLung false) leaves everything unchanged.
+    const aw = prev.aw, toLungs = aw ? aw.toLungs : 1;
+    if (aw && aw.entrain > 0) out.fio2 = out.fio2 * (1 - aw.entrain) + 0.21 * aw.entrain;
+    out.va *= toLungs;
+    out.mv *= toLungs;
+    out.shuntAdd = aw && aw.oneLung ? 0.25 : 0;
+    const open = toLungs > 0.01;
     return { ...out, nextBreath: next, breathT, cycle, pplMmHg: ppl, open };
   },
   rebase(r, off) { return { ...r, nextBreath: r.nextBreath - off, breathT: r.breathT - off }; },

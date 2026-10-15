@@ -475,6 +475,23 @@ Prototyped (`research/prototypes.md`): one alveolar store, arterial and venous O
   (no published timing found) [D]; negative-pressure pulmonary oedema after forceful efforts against a closed glottis
   [V].
 
+As built in M3.1 (`airway.js`, `test/airway.test.mjs`): a hidden per-patient difficulty is drawn from the `airway`
+sub-stream — a Cormack-Lehane view (direct and video) with a realistic distribution (grade 1 about 50%, 2 about 40%,
+3 about 8%, 4 about 2%), a mask-ventilation grade, a pharyngeal collapsibility and a front-of-neck difficulty. The
+airway decides `aw.toLungs`, the fraction of the breath reaching the alveoli, which `resp.js` multiplies into the
+alveolar ventilation (a patent airway is 1, so every earlier calibration is unchanged). A natural airway obstructs as
+the patient deepens (from the BIS-like depth) or is paralysed (the upper-airway muscle block); a jaw thrust, oro- or
+nasopharyngeal airway relieves it; a supraglottic airway or tube bypasses it. A face mask delivers through the upper
+airway (so obstruction still counts) and its seal sets both delivery and the room-air entrainment that dilutes a
+pre-oxygenation (a leaky mask reaches a lower end-tidal O2). A tracheal tube delivers fully; an oesophageal tube sends
+nothing to the lungs (no CO2 — the capnograph is the catch — then desaturation on the closed FRC store); an
+endobronchial tube ventilates one lung (reduced delivery plus an added shunt, slower desaturation). Laryngoscopy
+reports the patient's view and repeated attempts worsen it. Controlled ventilation on a natural airway is treated as a
+secured airway (backward-compatible with the ventilator before the airway existed). UI: an Airway tab (manoeuvre,
+device, laryngoscopy direct/video, intubate with placement, extubate) with a live airway state line. Known miss:
+laryngospasm is a condition owned by the crisis engine (section 11, M4), not here; a laryngoscopy attempt does not yet
+suspend ventilation for its duration (noted) [D].
+
 ## 10. Temperature
 
 - Two compartments: core (trunk and head, about 66% of mass) and periphery, with a core-peripheral conductance that

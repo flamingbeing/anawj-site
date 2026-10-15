@@ -69,6 +69,20 @@ Lasting decisions for `ot-sim/`. Status and next steps: `STATUS.md`. The build b
 
 ## Decisions log
 
+- 15 Oct 2026 (M3.1): the airway (`airway.js`, a new subsystem after pd, before resp). It owns `aw` and decides
+  `aw.toLungs` (fraction of the breath reaching the alveoli), which resp.js multiplies into the alveolar ventilation;
+  a patent airway is 1, so resp/gas calibration is untouched (the airway only ever reduces delivery). Per-patient
+  difficulty (Cormack-Lehane direct/video, mask grade, pharyngeal collapsibility, FONA) drawn once from a new `airway`
+  sub-stream in `airway.init(state, ctx)` — init receives ctx, so the draw is seeded and deterministic. Obstruction
+  under sedation/paralysis (from pd.bisLike and pd.nmb.upperAirway), relieved by jaw thrust/OPA/NPA or bypassed by a
+  SAD/tube; mask seal sets delivery and pre-oxygenation entrainment; tube placement tracheal/oesophageal/endobronchial
+  (oesophageal → no CO2 then desat; endobronchial → one-lung shunt via resp.shuntAdd, read by gas). Controlled
+  ventilation on a natural airway counts as secured (backward-compatible with the pre-airway ventilator, so the old
+  gas/resp tests hold). Two gas/resp tests that used to inject a bare `aw:{obstruction:1}` now use the real model (a
+  paralysed natural airway obstructs; intubating gives apnoeic oxygenation) — airway.step is authoritative over `aw`,
+  so injecting a partial slice no longer works. UI: an Airway tab. Known miss: laryngospasm is a crisis condition
+  (M4), and a laryngoscopy attempt doesn't yet suspend ventilation for its duration.
+
 - 15 Oct 2026 (M2.8): resuscitation (`resus.js`, a new subsystem between rhythm and cardio). It owns the arrest
   "devices": chest compressions (`cprFrac`, an output fraction by quality with a coronary build-up), the defibrillator
   (shock success by time-in-VF and perfusion, exported as `shockSuccess`), and transcutaneous pacing (capture at the

@@ -11,5 +11,10 @@
   stagnation to cardiac output (gated below normal CO, so earlier calibration is intact) — closing the M2.7
   SpO2-in-arrest miss; a Resuscitation block on the Patient tab; `test/resus.test.mjs`. All green under
   `tools/test-ot-sim.sh` locally.
-- Next in DESIGN.md: M3.1 airway (`airway.js`), M3.2 case flow (`presets.js`, the elective GA), M3.3 alarms, then M4.x
-  (scenario drugs + crises).
+- M3.1 (airway) built on this branch (restarted from main after #604 merged): new `airway.js` (per-patient Cormack-
+  Lehane/mask difficulty from an `airway` sub-stream; obstruction under sedation/paralysis relieved by manoeuvres or a
+  device; mask seal → delivery + pre-ox entrainment; tube placement tracheal/oesophageal/endobronchial). resp.js reads
+  `aw.toLungs`/entrain/oneLung; gas.js reads `resp.shuntAdd` (one lung). Airway tab; `test/airway.test.mjs`; two gas
+  tests updated to the real airway. All green under `tools/test-ot-sim.sh` locally.
+- Next in DESIGN.md: M3.2 case flow (`presets.js`, the elective GA pre-op → extubation, surgical-stimulus timeline,
+  Examine/Help tabs), M3.3 alarms, then M4.x (scenario drugs + the crisis scenarios — the "diverse use cases").

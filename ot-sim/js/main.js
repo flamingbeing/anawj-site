@@ -39,6 +39,17 @@ const source = () => (fast || modelSource(sim.state));
 function refill() { const src = source(); for (const l of lanes) l.refill(src, tDisp); }
 
 // panels: written at most twice a second of wall time, like the numerics
+function airwayText(state) {
+  const a = state.aw, parts = [];
+  const dev = { none: 'Natural airway', mask: 'Face mask', sad: 'Supraglottic airway', ett: 'Tracheal tube', fona: 'Front-of-neck' }[a.device];
+  parts.push(a.device === 'ett' ? `Tracheal tube (${a.placement}${a.cuff ? ', cuff up' : ''})` : dev);
+  if (a.manoeuvre !== 'none') parts.push({ jawThrust: 'jaw thrust', opa: 'oropharyngeal airway', npa: 'nasopharyngeal airway' }[a.manoeuvre]);
+  if (a.view) parts.push(`view grade ${a.view}`);
+  if (a.obstruction > 0.1 && a.device !== 'ett' && a.device !== 'sad') parts.push(`obstruction ${Math.round(a.obstruction * 100)}%`);
+  parts.push(`reaching the lungs ${Math.round(a.toLungs * 100)}%`);
+  return parts.join(' · ');
+}
+
 function resusText(state) {
   const r = state.resus, parts = [];
   if (r.cpr) parts.push(`Compressions: ${r.quality} (output about ${Math.round(r.cprFrac * 100)}% of normal)`);
@@ -65,6 +76,7 @@ function panels(force = false) {
     const h = eventsHtml(sim.state); if ($('events').innerHTML !== h) $('events').innerHTML = h;
     const rt = resusText(sim.state); if ($('resus-state').textContent !== rt) $('resus-state').textContent = rt;
   }
+  if (!$('panel-aw').hidden) { const t = airwayText(sim.state); if ($('aw-state').textContent !== t) $('aw-state').textContent = t; }
   if ($('behind-box').open) { const h = behindHtml(sim.state); if ($('behind').innerHTML !== h) $('behind').innerHTML = h; }
 }
 
@@ -135,6 +147,13 @@ $('amio').addEventListener('click', () => { sim.act({ type: 'amiodarone' }); act
 const paceBtn = $('pace');
 paceBtn.addEventListener('click', () => { const on = paceBtn.getAttribute('aria-pressed') !== 'true'; paceBtn.setAttribute('aria-pressed', String(on)); sim.act({ type: 'pace', on, mA: +$('pace-ma').value }); acted(); });
 $('pace-ma').addEventListener('change', () => { if (paceBtn.getAttribute('aria-pressed') === 'true') { sim.act({ type: 'pace', on: true, mA: +$('pace-ma').value }); acted(); } });
+// airway: manoeuvre, device, laryngoscopy, intubation
+$('aw-man').addEventListener('change', () => { sim.act({ type: 'manoeuvre', to: $('aw-man').value }); acted(); });
+$('aw-device').addEventListener('change', () => { sim.act({ type: 'device', to: $('aw-device').value }); acted(); });
+$('aw-laryn').addEventListener('click', () => { sim.act({ type: 'laryngoscopy' }); acted(); });
+$('aw-video').addEventListener('click', () => { sim.act({ type: 'laryngoscopy', video: true }); acted(); });
+$('aw-intubate').addEventListener('click', () => { sim.act({ type: 'intubate', placement: $('aw-place').value }); acted(); });
+$('aw-extubate').addEventListener('click', () => { sim.act({ type: 'extubate' }); acted(); });
 const PRODUCT_NAME = { crystalloid: 'crystalloid', colloid: 'colloid', rbc: 'red cells' };
 function fluidText(state) {
   const fl = state.cv.fl, run = fl.running.map(r => `${PRODUCT_NAME[r.product]} ${Math.round(r.left)} mL to go`);
