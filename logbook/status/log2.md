@@ -53,6 +53,13 @@ Agreed queue (one PR each, in order, once he says go):
    cases changed elsewhere since); through `updateMany`. Second step at 20+ cases for overwriting changes only
    (replace date / initials / summary, remove or replace tags, Interesting off): 3 sample before → after and a button
    naming the size. Folds in "Tag N cases…".
+9b. **Select and bulk edit in Notes too** (owner): press and hold a note (desktop: Select) in More → Notes; the same bar
+   (Select all / none, Bulk edit…, Done). Bulk edit: date (set or clear), title (replace / find and replace / add in
+   front), text (add to the end / find and replace), unlink from case, merge the selected notes into one (in date
+   order), share or export just these, move to the bin. Same warning, 20+ second step and Undo as cases.
+9c. **Select and bulk edit in Reflections too** (owner): the same press and hold / Select and bar. Bulk edit: heading,
+   status (draft / complete), in the portfolio export (tick on / off), JR flag, date; export just these (Word portfolio
+   or Markdown); move to the bin. Same warning, 20+ second step and Undo.
 10. **Grid as a spreadsheet:** thin lines, no boxed inputs; drag to resize columns (per device, double-tap resets);
     lines per row 1 / 2 / 3 / Fit to content.
 11. **Paging by default** (owner's call, 15 Oct): 100 per page, 25 / 50 / 100 / 300 / All (per device); "‹ Page 2 of
@@ -66,10 +73,15 @@ Agreed queue (one PR each, in order, once he says go):
     ☆ Interesting, Plan for later) / None; Sort Newest / Oldest / Initials A–Z / Most tags. Headings fold with counts;
     per device. Pages count cases ("(continued)" on a split group); when selecting, a group heading selects the
     group (a case in several groups is selected once). After paging.
-15. **Reflections and linked notes inside the day's note** (Markdown export, Copy / Share, Send to, Sync): Settings →
-    Markdown → "Reflections in the day's note": Link (now) / Embed (Obsidian `![[…]]`, one copy of the text) / Full
-    text (copied under its case as a sub-heading; works everywhere; the zip can then skip the separate reflection
-    notes). The same three choices for linked notes. markdown.js (`mdDay`, `caseNotes`) with unit tests.
+15. **Markdown, one PR** (Copy / Share, Send to, Sync, the notes zip, all alike): Settings → Markdown → "Reflections in
+    the day's note": None / Link / Embed (Obsidian `![[…]]`) / Full text (copied under its case); the same for linked
+    notes. **Sync also writes the reflection notes** (a Reflections folder, same names and folders as the zip) so Link
+    and Embed work in a synced vault. Where no reflection note can exist (Copy / Share, Send to apps other than
+    Obsidian) Link and Embed fall back to Full text. **Day heading** default becomes plain (`2026-10-10`, not
+    `[[…]]`); choice Plain / Heading (`#`) / Link (`[[…]]`) / Custom template. **Date format** presets (2026-10-10,
+    20261010, 10 Oct 2026, Sat 10 Oct 2026, 10/10/2026) plus a Custom pattern (YYYY YY MM M DD D MMM MMMM ddd dddd)
+    with a live preview; link targets and file names follow it, file names can have their own. One preview box shows a
+    sample day with a case and a reflection. markdown.js (`mdDay`, `caseNotes`), ui-sync.js, unit tests.
 
 No batching (owner, 15 Oct): build and merge in order, each PR on its own (bulk edit still gets the full tests and a
 Firetop run on a test account). All the Send to presets above are in. The app is alpha with almost no users (owner, 15 Oct): no compatibility
