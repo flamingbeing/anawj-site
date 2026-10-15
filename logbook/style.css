@@ -1645,3 +1645,5 @@ html:not(.rows-short) ul.cases .c-tags > * { max-width: 100%; }
 /* More: its title with Edit beside it */
 .more-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .more-head h2 { margin: 0; }
+/* a page's section heading outside the cards (Profile → Show or hide) */
+h2.set-heading { margin: 18px 6px 4px; }
