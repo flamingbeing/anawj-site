@@ -387,7 +387,7 @@ async function loadSummaries() {
   }
   catch (err) { if (gen !== tview.gen) return; tview.summaries = []; tview.error = 'Could not load totals: ' + err.message; }
   tview.loading = false;
-  if (['totals', 'admintotals', 'caselogs', 'caselog', 'progress'].includes(S.tab)) hooks.render();
+  if (['totals', 'admintotals', 'programme', 'caselogs', 'caselog', 'progress'].includes(S.tab)) hooks.render();
 }
 
 // Totals' counts (this device): every tag logged, all years (default), or only what counts towards the minimums

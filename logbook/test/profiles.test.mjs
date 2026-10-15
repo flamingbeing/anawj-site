@@ -110,12 +110,13 @@ const PARTS = ['interesting', 'parsed', 'sugg', 'recent', 'still', 'groupsave', 
   assert.deepEqual(switchChanges({ mode: 'personal', show: { targets: true } }, 'personal'), { on: [], off: ['targets'] });
 }
 
-// tabs: Personal puts Notes on the bar, Faculty / PCs Case logs and the Admin portal; the Basic profiles keep
+// tabs: Personal puts Notes on the bar, Faculty / PCs Totals and the Admin portal (Case logs in More); the Basic profiles keep
 // Analytics (and logbook only Reflections) in More
 {
   assert.ok(!offBar('personal').includes('notes'));
   assert.ok(offBar('advanced').includes('notes'));
-  assert.ok(!offBar('faculty').includes('caselogs') && !offBar('faculty').includes('admin'));
+  assert.ok(!offBar('faculty').includes('programme') && !offBar('faculty').includes('admin') && offBar('faculty').includes('caselogs'));
+  assert.ok(offBar('advanced').includes('programme'));
   assert.ok(offBar('basic').includes('progress') && !offBar('basic').includes('reflect'));
   assert.ok(offBar('logbook').includes('reflect'));
   assert.equal(presetHidesTab('faculty', 'log'), true);
@@ -124,7 +125,7 @@ const PARTS = ['interesting', 'parsed', 'sugg', 'recent', 'still', 'groupsave', 
   const personal = new Set(tabsAfter(['progress', 'reflect', 'account', 'notes'], 'logbook', 'personal'));
   assert.ok(!personal.has('notes') && !personal.has('progress') && !personal.has('reflect') && personal.has('account'));
   const fac = new Set(tabsAfter([], 'advanced', 'faculty'));
-  assert.ok(fac.has('log') && fac.has('logbook') && fac.has('reflect') && !fac.has('caselogs') && !fac.has('admin'));
+  assert.ok(fac.has('log') && fac.has('logbook') && fac.has('reflect') && fac.has('caselogs') && !fac.has('programme') && !fac.has('admin'));
   // tabs placed by hand that neither profile moves stay put: Notes on the bar and Logbook hidden, Basic to Advanced
   const hand = ['account', 'settings', 'recovery', 'data', 'progress', 'caselogs', 'admin', 'logbook'];
   assert.deepEqual(new Set(tabsAfter(hand, 'basic', 'advanced')), new Set(hand.filter(id => id !== 'progress')));

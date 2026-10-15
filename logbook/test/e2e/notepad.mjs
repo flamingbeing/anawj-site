@@ -179,7 +179,7 @@ try { for (const width of [390, 1280]) {
   // over seven (a settings file, say): the last ones before More go to More
   assert.deepEqual(await p.evaluate(async () => { const { arrangeTabs, BAR_TABS } = await import('./js/ui-settings.js');
     return arrangeTabs(BAR_TABS.map(([id]) => id), { tabHidden: [], tabOrder: BAR_TABS.map(([id]) => id) }).shown; }),
-    ['caselogs', 'log', 'logbook', 'reflect', 'progress', 'notes', 'more']);
+    ['programme', 'caselogs', 'log', 'logbook', 'reflect', 'progress', 'more']);
   await p.evaluate(async () => { const { applyDisplay, setDisplay } = await import('./js/ui-settings.js'); applyDisplay(setDisplay({ tabHidden: null, tabOrder: null })); });
 
   // at 2,000 notes, no more; the list shows 100 at a time (fillers go into the demo store in one write, then one save
