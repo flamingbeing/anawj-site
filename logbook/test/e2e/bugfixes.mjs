@@ -174,7 +174,7 @@ try { for (const width of [390, 1280]) {
   await p.evaluate(async () => {
     const { patchLogbook } = await import('./js/ui-core.js'), { applyDisplay, setDisplay } = await import('./js/ui-settings.js');
     await patchLogbook({ settings: { mode: 'advanced', show: null, basicOn: null } });
-    applyDisplay(setDisplay({ tabHidden: ['caselogs', 'notes', 'account', 'settings', 'recovery', 'data', 'admin'] }));   // arranged by hand
+    applyDisplay(setDisplay({ tabHidden: ['programme', 'caselogs', 'notes', 'account', 'settings', 'recovery', 'data', 'admin'] }));   // arranged by hand
   });
   await importFile({ mode: 'personal' });
   assert.equal((await st()).mode, 'personal');

@@ -46,15 +46,15 @@ export const settings = () => ({ suggestions: true, rYear: 1, ...(S.logbook && S
 // written; no Reflect buttons or ☆ Interesting). Advanced hides nothing. Personal is for logging outside APMES: the
 // APMES parts (targets, Still needed, totals, portfolio, residency year, reflection headings) off, the extras on and
 // Notes on the tab bar. Faculty / PCs (faculty, PDs and admins, who include the programme coordinators; their
-// default, outside the demo): residents' case logs first (Case logs: counts per tag from the summaries, never case
-// details, then Programme totals below them; no Analytics tab), then More; their own Case, Logbook, Reflections and Notes tabs start in More.
+// default, outside the demo): Programme totals first (Totals: counts per tag from the summaries, never case details;
+// no Analytics tab), then More, with residents' Case logs first in it; their own Case, Logbook, Reflections and Notes tabs start in More.
 export const PROFILES = [
   // simplest first: logbook only hides the most
   ['logbook', 'Basic: logbook only', 'Basic without reflections, if you submit your reflections separately. Reflections you already wrote stay in More.'],
   ['basic', 'Basic', 'A simpler app (the default): the same tabs and buttons without the extras. Analytics is in More.'],
   ['advanced', 'Advanced', 'Everything: quick picks, the Logbook grid, Analytics trends and forecasts, reflection figures and references.'],
   ['personal', 'Personal', 'For logging outside APMES: no targets, totals or portfolio; the Advanced extras, your own tags and Notes on the tab bar.'],
-  ['faculty', 'Faculty / PCs', 'For faculty, PDs and programme coordinators: residents’ case logs and Programme totals first, then More.'],
+  ['faculty', 'Faculty / PCs', 'For faculty, PDs and programme coordinators: Programme totals first; residents’ case logs in More.'],
 ];
 // may use Faculty / PCs: admins (PCs), PDs and active faculty (the rules let them read the counts summaries)
 export const facultyRole = () => !!(S.admin || S.pd || S.faculty);

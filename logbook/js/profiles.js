@@ -180,12 +180,14 @@ export function switchChanges(st, mode, to = mode) {
 // ---- the device half: which tabs a profile keeps off the bar or puts on it ----
 
 // tabs off the bar until someone puts them there (they live in More by default)
-export const OFF_BAR = ['caselogs', 'notes', 'account', 'settings', 'recovery', 'data', 'admin'];
+export const OFF_BAR = ['programme', 'caselogs', 'notes', 'account', 'settings', 'recovery', 'data', 'admin'];
 // the Basic profiles keep Analytics in More too, and Basic: logbook only Reflections; Faculty / PCs keeps the person's
-// own Case, Logbook and Reflections in More
-export const PROFILE_OFF = { advanced: [], basic: ['progress'], logbook: ['progress', 'reflect'], personal: [], faculty: ['log', 'logbook', 'reflect'] };
-// OFF_BAR tabs a profile puts on the bar: Case logs and the Admin portal (admins only) in Faculty / PCs, Notes in Personal
-export const PROFILE_ON = { faculty: ['caselogs', 'admin'], personal: ['notes'] };
+// own Case, Logbook and Reflections in More, and Case logs (also in OFF_BAR: listed here so a device moving into
+// the profile with its tabs arranged takes it off the bar)
+export const PROFILE_OFF = { advanced: [], basic: ['progress'], logbook: ['progress', 'reflect'], personal: [], faculty: ['log', 'logbook', 'reflect', 'caselogs'] };
+// OFF_BAR tabs a profile puts on the bar: Totals and the Admin portal (admins only) in Faculty / PCs (Case logs in More;
+// owner, 15 Oct 2026), Notes in Personal
+export const PROFILE_ON = { faculty: ['programme', 'admin'], personal: ['notes'] };
 export const offBar = mode => [...OFF_BAR.filter(id => !(PROFILE_ON[mode] || []).includes(id)), ...(PROFILE_OFF[mode] || [])];
 // a profile's default for one tab: off the bar?
 export const presetHidesTab = (mode, id) => offBar(mode).includes(id);

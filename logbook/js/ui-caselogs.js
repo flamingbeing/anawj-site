@@ -1,13 +1,13 @@
 // Faculty / PCs profile (faculty, PDs and admins; ui-core.js PROFILES): Case logs (#caselogs) lists the programme's
 // residents by residency year with their counts at a glance, and one resident's compiled case log (#caselog: counts
 // per tag against the targets, reflection headings met; Excel download). Built from the counts summaries only
-// (summaries/, the same data as Programme totals), never case details. Programme totals sit below the list (this
-// profile has no Analytics tab; owner, 15 Oct 2026).
+// (summaries/, the same data as Programme totals), never case details. Programme totals have their own tab
+// (#programme, the first tab in this profile; Case logs is in More there; owner, 15 Oct 2026).
 
 import { REFLECTION_HEADINGS } from './categories.js';
 import { progress, todayISO, fmtDate } from './engine.js';
 import { h, hooks, resetters } from './ui-core.js';
-import { programme, groupYearName, totalsTable, downloadTotals, legend, renderTotals, countSwitch } from './ui-progress.js';
+import { programme, groupYearName, totalsTable, downloadTotals, legend, countSwitch } from './ui-progress.js';
 
 // q: the name search; rid: the resident open in #caselog
 const cv = { q: '', rid: null };
@@ -56,8 +56,7 @@ export function renderCaseLogs() {
       h('p', { class: 'hint help' }, 'Each resident’s compiled case log: counts per tag against the targets, and reflection headings met. Counts only, never case details. Tap a resident to see theirs.'),
       h('input', { type: 'search', placeholder: 'Find a resident', 'aria-label': 'Find a resident', value: cv.q, style: 'width:100%;margin:6px 0',
         oninput: e => { cv.q = e.target.value; const at = e.target.selectionStart; hooks.render(); const box = document.querySelector('input[aria-label="Find a resident"]'); if (box) { box.focus(); box.setSelectionRange(at, at); } } }),
-      people.length ? list : h('p', { class: 'empty' }, q ? 'No resident matches.' : 'No residents in this year.')),
-    renderTotals());
+      people.length ? list : h('p', { class: 'empty' }, q ? 'No resident matches.' : 'No residents in this year.')));
 }
 
 export function renderCaseLog() {
