@@ -13,13 +13,9 @@ async function restore(job, record) {
   if (S.user?.email !== owner) return;
   try {
     const list = (job.kind === 'case' ? S.cases : job.kind === 'note' ? S.notes : S.reflections) || [];
-    // after a conflict: saved over the other copy, the stopped chain set aside only once the new save is stored
-    const chain = writes.entries().filter(x => x.kind === job.kind && x.record.id === job.record.id && x.state !== 'synced' && x.state !== 'archived');
-    const conflict = chain.find(x => x.state === 'conflict');
-    const base = conflict ? conflict.remote || null : list.find(x => x.id === job.record.id) || null;
-    const saved = await writes.save(job.kind, owner, record, base);
+    // (the queue picks the base when this record's saves are stopped by a conflict or a failed save)
+    const saved = await writes.restore(job.kind, owner, record, list.find(x => x.id === job.record.id) || null);
     if (S.user?.email !== owner) return;
-    if (conflict) await writes.archive(chain[0].key);   // (the queue did, unless it was the other copy unchanged)
     if (job.kind === 'case') setCases([saved, ...S.cases.filter(x => x.id !== saved.id)]);
     toast('Version restored'); hooks.render();
   } catch (err) { toast(err.message); hooks.render(); }

@@ -803,15 +803,20 @@ Case creation, individual edits/Undo and reflection editor saves first commit im
 After a conflict (14 Oct 2026 audit) nothing more for that record is sent until the resident chooses in Recent changes;
 a later save used to wait behind it for good, say "Saved locally", and be set aside by either conflict button. Now
 (`writes.js`): a save made on the version shown (the other copy) replaces the stopped chain (this device's earlier
-versions are set aside, kept in the history); saving it unchanged changes nothing; one made on this device's own
-version is kept as one more conflict and fails, so the editor keeps its input (each next one replaces that held copy).
-"Keep version from elsewhere" sets aside that save and older ones, never a newer one. "Restore my version" saves this
-device's newest version over the other copy, and the chain is set aside only once that save is stored. While a
-conflict is open the list shows the server's copy (from the sync engine), so an edit or delete made elsewhere since
-shows and is counted (it showed the copy found at the conflict: parked seed 285932884); the copy found at the conflict
-shows only while the list still holds this device's own version, or its delete took the record off. Windows that share
-the store (two tabs, the home-screen app and a browser tab) read a save's stored state again just before sending it,
-on Retry and when a failed save is reused, so one another window already sent or set aside is not sent again.
+versions are set aside, kept in the history past the last 100, and a toast says so); saving it unchanged changes
+nothing; one made on this device's own version is kept as one more conflict and fails, so the editor keeps its input
+(each next one replaces that held copy). "Keep version from elsewhere" sets aside that save, older ones and the held
+copies, never a newer pending one. The Restore buttons go through `writes.restore()`: after a conflict it saves over
+the other copy, and behind a failed save it saves from that save's base (what the server holds; it used to queue
+behind the failed save for good and say "Version restored"); the chain is set aside only once that save is stored.
+Retry on a save waiting behind a failed one sends the failed one again first. While a conflict is open the list shows
+the server's copy (from the sync engine), so an edit or delete made elsewhere since shows and is counted (it showed
+the copy found at the conflict: parked seed 285932884); the copy found at the conflict shows only while the list still
+holds this device's own version, or the very version it started from (same `updatedAt`: a stale cached list; a
+restore elsewhere is a newer one), or its delete took the record off. Windows that share the store (two tabs, the
+home-screen app and a browser tab) read a save's stored state again just before sending it, on Retry and when a
+failed save is reused, so one another window already sent or set aside is not sent again (nor one it has since
+dropped from the history: gone, with 100 newer finished saves in the store).
 
 Case and reflection drafts use separate document slots, including when session storage is cloned into a duplicated tab. Case input writes synchronously and flushes on pagehide/hidden; draft status reports storage failures. Recovering a draft preserves the currently open draft in its previous slot.
 
