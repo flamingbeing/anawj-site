@@ -265,17 +265,16 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const old = M.defaultState();
   old.months['2026-09'] = { status: 'draft', publishedAt: '', note: '' };
   const store = createStore({ demo: false, fallback: () => old });
-  ok(!M.isMonthLocked(store.get(), '2026-09'), 'an existing month is open before the first start');
-  store.lockAllOnce();
-  ok(M.isMonthLocked(store.get(), '2026-09'), 'every existing month is locked once');
+  ok(!M.isMonthLocked(store.get(), '2026-09'), 'an existing month is open before the app starts');
+  store.lockAll();
+  ok(M.isMonthLocked(store.get(), '2026-09'), 'every existing month is locked when the app opens');
   store.commit('unlock', d => { M.setMonthLocked(d, '2026-09', false); });
-  store.lockAllOnce();
-  ok(!M.isMonthLocked(store.get(), '2026-09'), 'and not again: an unlocked month stays unlocked');
+  ok(!M.isMonthLocked(store.get(), '2026-09') && store.lockAll() === true && M.isMonthLocked(store.get(), '2026-09'), 'an unlock lasts one visit: closing (or reopening) locks it again');
   ok(store.ensureLocked('2026-10') && M.isMonthLocked(store.get(), '2026-10'), 'a new month starts locked');
   store.commit('unlock', d => { M.setMonthLocked(d, '2026-10', false); });
   ok(store.ensureLocked('2026-10') === false && !M.isMonthLocked(store.get(), '2026-10'), 'a month someone unlocked is left alone');
   const demo = createStore({ demo: true, fallback: () => M.defaultState() });
-  ok(demo.ensureLocked('2026-10') === false && demo.lockAllOnce() === false && !M.isMonthLocked(demo.get(), '2026-10'), 'Practice is never locked');
+  ok(demo.ensureLocked('2026-10') === false && demo.lockAll() === false && !M.isMonthLocked(demo.get(), '2026-10'), 'Practice is never locked');
 }
 // the header's cloud button: what it says
 {

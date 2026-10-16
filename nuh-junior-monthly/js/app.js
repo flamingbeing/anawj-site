@@ -723,7 +723,9 @@ async function start() {
   // Month on screen: the hash (?m=), else this month.
   const hp = parseHash().params;
   app.month = monthFromParams(hp) || thisMonth();
-  app.store.lockAllOnce();
+  app.store.lockAll();
+  // closing the app locks everything again (a reopened phone app may not reload the page, so this also runs as it goes away)
+  window.addEventListener('pagehide', () => { try { app.store.lockAll(); } catch (e) { /* closing anyway */ } });
   app.store.ensureLocked(app.month);
 
   renderNav();

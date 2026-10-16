@@ -135,11 +135,11 @@ at the next Save to team. Every save is kept for good for now. Thinning (a Fires
 
 ## Months start locked (owner, 16 Oct 2026)
 
-Every month is locked until someone unlocks it (the Locked button at the top). A month with no entry yet gets a locked one
-when it is opened (`store.ensureLocked`); the first time this version starts on a device, every existing month is locked
-once (`settings.lockedByDefault`, `store.lockAllOnce`). Reading a month in from Google or the sheet unlocks that one month
-(it is deliberate). Not in Practice. A month the team copy holds as unlocked stays unlocked when pulled. The stored
-status values are unchanged (`published` = locked), so no rules change.
+Every month is locked until someone unlocks it (the padlock at the top), and **an unlock lasts one visit**: every month is
+locked again whenever the app opens and when it is closed (`store.lockAll`, at start and on `pagehide`; owner, 16 Oct 2026). A
+month with no entry yet gets a locked one when it is opened (`store.ensureLocked`). Reading a month in from Google or the
+sheet unlocks that one month (it is deliberate). Not in Practice. A month the cloud copy holds as unlocked comes in unlocked
+and is locked again at the next close or start. The stored status values are unchanged (`published` = locked), so no rules change.
 
 ## The cloud (owner, 16 Oct 2026)
 
@@ -211,3 +211,9 @@ People for a future month's sheet.
   a visible scrollbar.
 - **Equal calls matter more:** the cardiac and ICU fairness rules are weight 40 (were 10; an older saved roster still at 10 is
   raised once, `rulesVersion` 7).
+
+## Posting filter (owner, 16 Oct 2026)
+
+The roster toolbar has a posting dropdown (all postings; "C3 postings" and "R1B postings", the postings the fairness rules
+count people on; or one posting), and the C3 and R1B column headers at the top right of the grid are buttons that do the same
+(press again for everyone). It shows people with that posting on any day of the month (`ui-roster.js` `postingSet`).

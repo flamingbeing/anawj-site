@@ -1123,3 +1123,10 @@ body:not([data-tab="roster"]) #autofill { display: none; }
 .r-scroll.panning, .r-scroll.panning thead { cursor: grabbing; user-select: none; }
 .tbtn-pan { padding: 0 8px; }
 @media (hover: none) { .tbtn-pan { display: none; } }
+
+/* a call's column header in the grid is a button: show only the people on its postings */
+.grid th.sh { cursor: default; }
+.sh-btn { all: unset; box-sizing: border-box; cursor: pointer; padding: 2px 6px; border-radius: 6px; font: inherit; color: inherit; }
+.sh-btn:hover { background: #e6e9f0; }
+.sh-btn[aria-pressed="true"] { background: var(--navy, #002f6c); color: #fff; }
+.sh-btn:focus-visible { outline: 2px solid var(--navy, #002f6c); outline-offset: 1px; }
