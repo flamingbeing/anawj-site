@@ -181,13 +181,20 @@ export const DEFAULT_RULES = [
   R('r-r1b-fair', 'spread', 'Share ICU calls fairly', { codes: ['R1B'], period: 'month', scheme: 'offdays', offBonus: 0.5, eveBonus: 0.5, weekendWeight: 2, holidayWeight: 1.5, tolerance: 1, among: ['ICU'], carry: 0.5, carryMonths: 4, alert: 1, alertPct: 40 }, soft(40)),
   R('r-r1b-sat', 'limit', 'At most 2 Saturday ICU calls a month', { codes: ['R1B'], period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(20, { when: { days: [6] } })),
   // everyone
-  // screening the requests before the app assigns R1 to R3 (Bridget's rules, 16 Oct 2026). X/NP is one request, not two. The pool
+  // screening the requests before the app assigns R1 to R3 (the R1 to R3 rosterer's rules, 16 Oct 2026). X/NP is one request, not two. The pool
   // rules stay off until the strong / weak list is imported (More > People > Tags), then the import turns them on.
   R('r-req-load', 'limit', 'At most 4 requests a month (call requests, X, NP; X/NP counts once)', { codes: ['R', 'R!', 'R?', 'X', 'X!', 'X?', 'NP'], period: 'month', window: 7, min: null, max: 4, fte: false, prorate: false }, soft(5)),
   R('r-req-npload', 'limit', 'At most 2 no-premed requests a month', { codes: ['NP'], period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(5, { note: 'Premed duties (P1 to P6) are not counted yet: they are not on the sheet until the premed roster is planned.' })),
   R('r-pool-1', 'cover', 'One call request a day from the MO1 pool (strong and weak)', { codes: ['R', 'R!', 'R?'], min: null, max: 1 }, soft(5, { who: { tags: ['mo1s', 'mo1w'] }, enabled: false })),
   R('r-pool-2', 'cover', 'One call request a day from the MO2 pool (strong and weak)', { codes: ['R', 'R!', 'R?'], min: null, max: 1 }, soft(5, { who: { tags: ['mo2s', 'mo2w'] }, enabled: false })),
   R('r-pool-3', 'cover', 'One call request a day from strong MO2 and weak MO3', { codes: ['R', 'R!', 'R?'], min: null, max: 1 }, soft(5, { who: { tags: ['mo2s', 'mo3w'] }, enabled: false })),
+  // the R1 to R3 rosterer's rules (16 Oct 2026). Off with the other R1 to R3 rules until the rosterer turns the group on (Rules tab).
+  R('r-mo-nogo', 'sameDay', 'No R1 to R3 call on a posting, obstetric call or rest day', { codesA: ['OGN', 'OGD', 'OGC', 'TTSH', 'NTF', 'KKH', 'LI', 'C', 'C3', 'C-e', 'C-p', 'AP', 'CP', 'WR', 'RD'], codesB: ['R1', 'R2', 'R3'], mode: 'forbid' }, { enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. ' }),
+  R('r-mo-weak', 'cover', 'At most one weak MO on the R1, R2 and R3 calls of a night', { codes: ['R1', 'R2', 'R3'], min: null, max: 1 }, soft(60, { who: { tags: ['mo1w', 'mo2w', 'mo3w'] }, enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. A weak R1 gets a strong R2 and R3, a weak R2 a strong R1 and R3, a weak R3 a strong R1 and R2. Needs the strong / weak list (People > Tags).' })),
+  R('r-mo-satfri', 'sequence', 'No Friday call the week after a Saturday call', { ifCodes: ['R1', 'R2', 'R3'], thenCodes: ['R1', 'R2', 'R3'], mode: 'forbid', from: 6, to: 6 }, soft(10, { when: { days: [6] }, enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. ' })),
+  R('r-mo-res', 'limit', 'Residents: 3 to 5 R1 to R3 calls a month', { codes: ['R1', 'R2', 'R3'], period: 'month', window: 7, min: 3, max: 5, fte: false, prorate: false }, soft(20, { who: { groups: ['res1', 'res2', 'res3'] }, enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. ' })),
+  R('r-mo-fellow', 'limit', 'Fellows: 1 to 2 R1 to R3 calls a month', { codes: ['R1', 'R2', 'R3'], period: 'month', window: 7, min: 1, max: 2, fte: false, prorate: false }, soft(20, { who: { groups: ['fellow'] }, enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. ' })),
+  R('r-mo-mopex', 'limit', 'MOPEX: 1 R1 to R3 call a month', { codes: ['R1', 'R2', 'R3'], period: 'month', window: 7, min: 1, max: 1, fte: false, prorate: false }, soft(20, { who: { groups: ['mopex'] }, enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. ' })),
   R('r-leave', 'sameDay', 'No calls on leave', { codesA: ['@leave'], codesB: ['@shift'], mode: 'forbid' }),
   R('r-postcall', 'sameDay', 'Post call is a day off', { codesA: ['x', 'PC'], codesB: ['@shift'], mode: 'forbid' }),
   R('r-ppc', 'sameDay', 'No EOD call: nothing on the day off after an ICU post call (PPC), unless a night would be empty', { codesA: ['PPC'], codesB: ['@shift'], mode: 'forbid' }, soft(500, { note: 'EOD call: a call right after the post call day. Used only when no one else can cover the night.' })),
@@ -277,9 +284,9 @@ export function cleanRule(r) {
 // One-time updates to rules that were already saved (the owner's rulings of 16 Oct 2026): requests and blocks become
 // preferences, "new to ICU" is strict only for rotating residents and MOPEXes. Only a rule still in its old form changes.
 function updateRules(s) {
-  if ((s.rulesVersion || 1) >= 17) return;
+  if ((s.rulesVersion || 1) >= 18) return;
   const from2 = (s.rulesVersion || 1) < 2;
-  s.rulesVersion = 17;
+  s.rulesVersion = 18;
   const find = id => s.rules.find(r => r.id === id);
   if (from2) for (const [id, w] of [['r-req-x', 60], ['r-req-xx', 80]]) { const r = find(id); if (r && r.hard) { r.hard = false; r.weight = w; } }
   const n = from2 && find('r-r1b-new');
@@ -345,7 +352,8 @@ function updateRules(s) {
   // no day-1 cardiac call rule for RES3 and senior residents (owner, 16 Oct 2026); a rule still without a group limit changes
   const c3d1 = find('r-c3-d1');
   if (c3d1 && c3d1.who && !(Array.isArray(c3d1.who.onlyGroups) && c3d1.who.onlyGroups.length)) c3d1.who.onlyGroups = [...C3_D1_GROUPS];
-  // strong / weak pools and the request screening (Bridget's rules, 16 Oct 2026)
+  for (const id of ['r-mo-nogo', 'r-mo-weak', 'r-mo-satfri', 'r-mo-res', 'r-mo-fellow', 'r-mo-mopex']) add(id);
+  // strong / weak pools and the request screening (the R1 to R3 rosterer's rules, 16 Oct 2026)
   for (const t of DEFAULT_TAGS.filter(t => /^mo[123][sw]$/.test(t.id))) if (!(s.tags || []).some(x => x.id === t.id)) (s.tags = s.tags || []).push(clone(t));
   add('r-req-load'); add('r-req-npload'); add('r-pool-1'); add('r-pool-2'); add('r-pool-3');
   // the sheet's colours on the original soft look (owner, 16 Oct 2026; stronger fills made the text hard to read): every duty with a palette colour takes it once. (An earlier

@@ -198,9 +198,9 @@ anything is assigned. Built as ordinary rules, so they show on Check and in the 
   strong / weak list** takes the department's manpower master list pasted from the sheet (heading row "Strong MO1", "Weak MO1" ...;
   other columns ignored), matches names with the staff list, and gives each person the call level and the pool tag (`js/pools.js`).
   The real list (names) is in the owner's private notes, not here.
-- Still to build (rules she sent, 16 Oct 2026; more coming on Sundays): a weak R1 gets a strong R2 and R3 (and the same for weak R2
-  and R3), each person 3 to 5 calls a month (fellows 1 to 2, MOPEX 1), no Friday or Saturday call after a Sunday call in the week, no Friday call after a
-  Saturday call, no Saturday call after ICU on the Thursday to Sunday before, a Saturday cap of 2, and assign R1/R2/R3 to a request by pool.
+- Built next (rules `r-mo-*`, all off until the Rules tab's "Turn on all the R1 to R3 rules" button is pressed, with the other R1 to R3 rules `r-r1/2/3-cover`, `-who`, `r-gap`, `r-fair`): no R1 to R3 call on a posting, obstetric call or rest day; at most one weak MO among a night's R1, R2 and R3 (so a weak R1 gets a strong R2 and R3, and so on); no Friday call six days after a Saturday call; residents 3 to 5 calls a month, fellows 1 to 2, MOPEX 1.
+  The other rules she sent are the existing ones: calls followed by PC, leave and Z, X and X/NP, the Saturday cap of 2, no two Saturdays running, no Friday or Saturday after a Sunday.
+- Not built yet: no Saturday call after an ICU call on the previous Thursday to Sunday (needs "then on a Saturday" in the sequence rule), the same-week Friday to Sunday cap for one named person (a limit rule with that person picked in Who), and assigning R1/R2/R3 to a request by pool.
 
 ## Phone header has no gap (owner, 16 Oct 2026)
 

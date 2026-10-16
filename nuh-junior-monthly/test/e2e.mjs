@@ -153,6 +153,13 @@ const noSideScroll = async (page, label) => {
   ok(await page.getByText(/no calls until/).first().isVisible(), 'People shows who has no calls until a date');
   await go(page, '#rules');
   ok(await page.getByText('To confirm').first().isVisible(), 'predicted rules say To confirm');
+  ok(await page.getByText('How the rules work, in order').isVisible() && await page.getByRole('heading', { name: /^Cardiac calls/ }).isVisible(), 'the Rules tab explains the order and groups rules by topic');
+  await page.getByRole('button', { name: /R1 to R3 rules/ }).first().click();
+  await page.waitForTimeout(300);
+  ok(await page.evaluate(() => window.jmApp.store.get().rules.filter(r => /^r-(mo-|r1-|r2-|r3-)/.test(r.id)).every(r => r.enabled !== false)), 'one button turns the whole R1 to R3 group on');
+  await page.getByRole('button', { name: /Turn off all the R1 to R3 rules/ }).click();
+  await page.waitForTimeout(300);
+  ok(await page.evaluate(() => window.jmApp.store.get().rules.filter(r => /^r-(mo-|r1-|r2-|r3-)/.test(r.id)).every(r => r.enabled === false)), 'and the same button turns it off again');
   // People > Tags: the strong / weak list is pasted, matched people get the pool tag and the pool rules turn on
   await go(page, '#people');
   await page.waitForTimeout(300);

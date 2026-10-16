@@ -10,6 +10,7 @@ import { apmesList } from '../js/apmes.js';
 import * as G from '../js/gsheets.js';
 import * as W from '../js/waitlist.js';
 import * as Pools from '../js/pools.js';
+import { topicOf } from '../js/ui-rules.js';
 import * as C from '../js/cloud.js';
 import { relevanceOf } from '../js/ui-check.js';
 import { applyAssignments, postingSet } from '../js/ui-roster.js';
@@ -664,7 +665,7 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(G.findTab([{ title: '1 - 30 Nov 26 Request' }, { title: 'Leave Waitlist' }], /wait\s*-?\s*list/i).title === 'Leave Waitlist', 'waitlist: the tab is found by its name');
 }
 
-// request screening and the strong / weak pools (Bridget's rules, 16 Oct 2026; made-up names)
+// request screening and the strong / weak pools (the R1 to R3 rosterer's rules, 16 Oct 2026; made-up names)
 {
   const s = M.defaultState();
   for (const [id, nm, tags] of [['a', 'Alpha One', []], ['b', 'Bravo Two', []], ['c', 'Charlie Three', []], ['d', 'Delta Four', []]]) s.staff.push({ id, name: nm, group: 'res2', tags, fte: 1, active: true });
@@ -690,6 +691,33 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(ev('r-pool-1').length === 1 && ev('r-pool-2').length === 1 && ev('r-pool-3').length === 0, 'pools: two call requests on one day in the same pool are flagged, different pools are not');
   const old = M.defaultState(); old.rulesVersion = 16; old.tags = old.tags.filter(t => !/^mo\d[sw]$/.test(t.id)); old.rules = old.rules.filter(r => !/^r-(req-load|req-npload|pool-\d)$/.test(r.id));
   const mg = M.migrate(JSON.parse(JSON.stringify(old)));
-  ok(mg.rulesVersion === 17 && mg.tags.some(t => t.id === 'mo3w') && mg.rules.some(r => r.id === 'r-pool-3' && !r.enabled), 'pools: a saved roster gains the tags and rules once');
+  ok(mg.rulesVersion === 18 && mg.tags.some(t => t.id === 'mo3w') && mg.rules.some(r => r.id === 'r-pool-3' && !r.enabled), 'pools: a saved roster gains the tags and rules once');
+}
+
+// the Rules tab groups rules by topic
+{
+  const by = {};
+  for (const r of M.defaultState().rules) (by[topicOf(r)] ||= []).push(r.id);
+  ok(by.c3.includes('r-c3-fair') && by.r1b.includes('r-r1b-fair') && by.mo.includes('r-r1-cover') && by.requests.includes('r-req-x') && by.requests.includes('r-pool-1') && by.everyone.includes('r-leave'), 'rules tab: topics follow the duties a rule names');
+  ok(!(by.everyone || []).some(id => /^r-(c3|r1b)-/.test(id)), 'rules tab: no cardiac or ICU rule is left under Everyone');
+}
+
+// the R1 to R3 rosterer's other rules (the R1 to R3 rosterer, 16 Oct 2026; made-up names)
+{
+  const s = M.defaultState();
+  for (const [id, tags, g] of [['w1', ['mo1', 'mo1w'], 'res1'], ['w2', ['mo2', 'mo2w'], 'res2'], ['s3', ['mo3', 'mo3s'], 'res3']]) s.staff.push({ id, name: 'Test ' + id, group: g, tags, fte: 1, active: true });
+  for (const r of s.rules) if (r.id.startsWith('r-mo-')) r.enabled = true;
+  const D = M.monthDays('2026-12');
+  const ev = rule => evaluate(s, { from: D[0], to: D[D.length - 1] }).violations.filter(v => v.ruleId === rule);
+  M.setCell(s, D[3], 'w1', { a: ['R1'] }); M.setCell(s, D[3], 'w2', { a: ['R2'] }); M.setCell(s, D[3], 's3', { a: ['R3'] });
+  ok(ev('r-mo-weak').length === 1, 'R1 to R3 rules: two weak MOs on the same night are flagged');
+  M.setCell(s, D[5], 'w1', { a: ['R1', 'AP'] });
+  ok(ev('r-mo-nogo').length >= 1, 'R1 to R3 rules: a call on a posting like AP is flagged');
+  ok(ev('r-mo-res').length >= 1, 'R1 to R3 rules: a resident with fewer than 3 calls is flagged');
+  const day = D.find(d => M.weekday(d) === 6 && D.indexOf(d) + 6 < D.length), at = D.indexOf(day);
+  M.setCell(s, day, 's3', { a: ['R3'] }); M.setCell(s, D[at + 6], 's3', { a: ['R3'] });
+  ok(ev('r-mo-satfri').length === 1, 'R1 to R3 rules: a Friday call six days after a Saturday call is flagged');
+  const off = M.defaultState();
+  ok(['r-mo-nogo', 'r-mo-weak', 'r-mo-satfri', 'r-mo-res', 'r-mo-fellow', 'r-mo-mopex'].every(id => off.rules.find(r => r.id === id && r.enabled === false)), 'R1 to R3 rules: all off until the group is turned on');
 }
 console.log(`nuh-junior-monthly: ${n} checks passed`);
