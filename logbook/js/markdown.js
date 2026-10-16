@@ -32,7 +32,12 @@ export const DEFAULT_MARKDOWN = {
   fileDatePattern: '',
   cats: 'names',                // {{categories}}: 'names' | 'codes' | 'tags' (#LSCS)
   links: 'wiki',                // 'wiki' [[note]] | 'md' [note](note.md)
-  boldLabels: false,            // labelled parts (Settings → Advanced logging) as **Plan:** … in {{details}}
+  boldLabels: false,
+  // under each case in a day or one case (log2 15): its reflections 'none' | 'link' | 'embed' (Obsidian ![[…]]) | 'full'
+  // (the note's text); Link and Embed need the reflection's note (the export, Sync), else Full text. Linked notes:
+  // 'none' | 'full' (a note has no file of its own; under its case it leaves the day's Notes)
+  reflInDay: 'none',
+  notesInDay: 'none',            // labelled parts (Settings → Advanced logging) as **Plan:** … in {{details}}
   // the notes export
   caseNotes: 'month',           // one note per 'month' or per 'day'
   folders: 'month',             // reflection notes: 'month' | 'heading' | 'flat'
@@ -52,7 +57,7 @@ const TEXT_KEYS = ['dayHead', 'dayCase', 'dayNotes', 'oneCase', 'fileName', 'ref
 export const HEAD_STYLES = { plain: '{{date}}', heading: '# {{date}}', link: '{{dateLink}}' };
 const OLD_ONE = '[[{{date}}]]\n{{initials}}\n{{details}}';   // the one-case default before the styles
 const oneCaseFor = style => `${HEAD_STYLES[style]}\n{{initials}}\n{{details}}`;
-const CHOICES = { dayHeadStyle: ['plain', 'heading', 'link', 'custom'], dateFormat: ['iso', 'compact', 'long', 'wlong', 'dmy', 'custom'], fileDate: ['same', 'iso', 'compact', 'long', 'wlong', 'custom'], cats: ['names', 'codes', 'tags'], links: ['wiki', 'md'], caseNotes: ['month', 'day'], folders: ['month', 'heading', 'flat'] };
+const CHOICES = { reflInDay: ['none', 'link', 'embed', 'full'], notesInDay: ['none', 'full'], dayHeadStyle: ['plain', 'heading', 'link', 'custom'], dateFormat: ['iso', 'compact', 'long', 'wlong', 'dmy', 'custom'], fileDate: ['same', 'iso', 'compact', 'long', 'wlong', 'custom'], cats: ['names', 'codes', 'tags'], links: ['wiki', 'md'], caseNotes: ['month', 'day'], folders: ['month', 'heading', 'flat'] };
 const MAX_FIELD = 1000;
 export const MAX_JSON = 8 * 1024;   // what settings.markdown may take in the account
 
@@ -175,19 +180,39 @@ function caseVals(c, n, count, f, ctx) {
   };
 }
 
+// What goes under a case: its reflections and linked notes, as chosen. ctx.reflectionsOf(c) -> [r]; ctx.reflPath(r) ->
+// the reflection note's path where one exists (the export, Sync), else '' (Link and Embed then give the full text);
+// ctx.notesOf(c) -> [n]. Their headings go two levels down, under the day's.
+const demote = t => t.replace(/^(#{1,4}) /gm, '$1## ');
+function underCase(c, f, ctx) {
+  const out = [];
+  if (f.reflInDay !== 'none' && ctx.reflectionsOf) for (const r of ctx.reflectionsOf(c) || []) {
+    const path = ctx.reflPath ? ctx.reflPath(r) || '' : '', title = r.title || r.diagnosis || 'Reflection';
+    if (path && f.reflInDay === 'embed' && f.links === 'wiki') out.push(`![[${path.replace(/\.md$/, '')}]]`);
+    else if (path && f.reflInDay !== 'full') out.push('Reflection: ' + noteLink(path, title, f.links));   // (Markdown links can't embed)
+    else out.push(demote(reflectionNote(r, { ...f, frontMatter: false }).trim()));
+  }
+  if (f.notesInDay === 'full' && ctx.notesOf) { const t = notesMd(ctx.notesOf(c) || []); if (t) out.push(demote(t)); }
+  return out.join('\n\n');
+}
+const withUnder = (text, c, f, ctx) => { const u = underCase(c, f, ctx); return u ? `${text}\n\n${u}` : text; };
+
 // Copy / Share: one case, and a day (heading, then each case; a blank line between cases when the case
 // format takes more than one line, none for a one-line format)
-export function mdCase(c, m, ctx = {}) { const f = cleanMarkdown(m); return fill(f.oneCase, caseVals(c, 1, 1, f, ctx)); }
+export function mdCase(c, m, ctx = {}) { const f = cleanMarkdown(m); return withUnder(fill(f.oneCase, caseVals(c, 1, 1, f, ctx)), c, f, ctx); }
 // notes: that day's notes (More → Notes); {{notes}} in the day heading puts them there, otherwise they follow the
 // cases in the dayNotes format. A day without notes gets no Notes heading.
 export function mdDay(date, cases, m, ctx = {}, notes = []) {
   const f = cleanMarkdown(m);
+  // notes linked to one of the day's cases go under it (Linked notes: Full text), not in the day's Notes too
+  if (f.notesInDay === 'full' && ctx.notesOf) { const ids = new Set(cases.map(c => c.id)); notes = notes.filter(n => !(n.caseId && ids.has(n.caseId))); }
   const nText = notesMd(notes);
   const vals = { date: mdDate(date, f), dateLink: dateLink(date, f), iso: date || '', day: date ? fmtDate(date) : 'No date', weekday: weekday(date), count: cases.length };
   const inHead = /\{\{?notes\}?\}/.test(f.dayHead);
   const head = fill(f.dayHead, inHead ? { ...vals, notes: nText } : vals);
-  const sep = f.dayCase.includes('\n') ? '\n\n' : '\n';
-  const body = cases.map((c, i) => fill(f.dayCase, caseVals(c, i + 1, cases.length, f, ctx))).join(sep);
+  const parts = cases.map((c, i) => [fill(f.dayCase, caseVals(c, i + 1, cases.length, f, ctx)), underCase(c, f, ctx)]);
+  const sep = f.dayCase.includes('\n') || parts.some(([, u]) => u) ? '\n\n' : '\n';
+  const body = parts.map(([t, u]) => (u ? `${t}\n\n${u}` : t)).join(sep);
   const tail = !inHead && nText ? fill(f.dayNotes, { ...vals, notes: nText }) : '';
   return [head, body].filter(Boolean).join('\n') + (tail ? (head || body ? '\n\n' : '') + tail : '');
 }
@@ -298,7 +323,8 @@ export function exportNotes({ cases = [], reflections = [], notes = [], m = null
   const reflPath = new Map();
   if (o.reflections) for (const r of reflections) reflPath.set(r.id, reflectionPath(r, f, used));
   const byCase = new Map(reflections.filter(r => r.caseId && reflPath.has(r.id)).map(r => [r.caseId, r]));
-  const caseCtx = { ...ctx, reflectionLink: c => { const r = byCase.get(c.id); return r ? noteLink(reflPath.get(r.id), r.title || 'Reflection', f.links) : ''; } };
+  const caseCtx = { ...ctx, reflectionLink: c => { const r = byCase.get(c.id); return r ? noteLink(reflPath.get(r.id), r.title || 'Reflection', f.links) : ''; },
+    reflectionsOf: c => (o.reflections ? reflections.filter(r => r.caseId === c.id) : []), reflPath: r => reflPath.get(r.id) || '', notesOf: c => myNotes.filter(n => n.caseId === c.id) };
   if (o.cases || myNotes.some(n => n.date)) files.push(...caseNotes(o.cases ? cases : [], f, caseCtx, myNotes));
   const undated = myNotes.filter(n => !n.date);
   if (undated.length) files.push({ path: 'Notes.md', text: (f.frontMatter ? frontMatter({ notes: String(undated.length), tags: ['apmes/notes'] }) : '') + '# Notes\n\n' + notesMd(sortNotes(undated)) + '\n' });

@@ -377,7 +377,10 @@ export function renderMarkdownSettings() {
   const latest = [...(S.cases || [])].filter(c => c.date).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0))[0];
   const dayList = latest ? S.cases.filter(c => c.date === latest.date).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)) : SAMPLE;
   const refl = [...(S.reflections || [])].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0] || SAMPLE_REFL;
-  const ctx = { catName, catShort, labels: labelsOn(settings()) };
+  // the preview's reflections and linked notes: yours, or the made-up one on the made-up day; Link and Embed show the
+  // reflection's note as the export and Sync name it
+  const reflsOf = c => { const mine = (S.reflections || []).filter(r => r.caseId === c.id); return mine.length ? mine : c.id === 's1' ? [{ ...SAMPLE_REFL, caseId: 's1' }] : []; };
+  const ctx = { catName, catShort, labels: labelsOn(settings()), reflectionsOf: reflsOf, notesOf: c => (Array.isArray(S.notes) ? S.notes : []).filter(n => n.caseId === c.id) };
   // the day heading's style (Plain by default); Custom shows the heading's box. The date formats: presets or a pattern,
   // each with a live example
   const headBox = area('dayHead', 'Your day heading', 1), oneBox = area('oneCase', 'One case', 3);
@@ -399,6 +402,7 @@ export function renderMarkdownSettings() {
   filePick.querySelector('select').addEventListener('change', () => { filePat.hidden = m.fileDate !== 'custom'; });
   const paint = () => {
     const f = cleanMarkdown(m);
+    ctx.reflPath = r => reflectionPath(r, f);
     dateEx.textContent = `10 Oct 2026 is written ${mdDate('2026-10-10', f)}; its day note is named ${fileDate('2026-10-10', f)}.md.`;
     dayOut.textContent = mdDay(dayList[0].date, dayList, f, ctx);
     oneOut.textContent = mdCase(dayList[dayList.length - 1], f, ctx);
@@ -428,6 +432,9 @@ export function renderMarkdownSettings() {
       lbl('Each case in a day', area('dayCase', 'Each case in a day', 3), 'A blank line goes between cases when each takes more than one line.'),
       fillins(CASE_FILLINS),
       lbl('A day’s notes (More → Notes)', area('dayNotes', 'A day’s notes', 2), 'Follows the cases when the day has notes. {{notes}} is each note (### title, then its text). Or put {{notes}} in the day heading to place them there.'),
+      pick('reflInDay', 'Reflections under their case', [['none', 'None (default)'], ['link', 'Link to the reflection note'], ['embed', 'Embed it (Obsidian ![[…]])'], ['full', 'Full text']]),
+      h('p', { class: 'hint help', style: 'margin:4px 0 0' }, 'Link and Embed point to the reflection’s own note in the Markdown export. Copy, Share and Send to have no such note, so they give the full text.'),
+      pick('notesInDay', 'Linked notes under their case', [['none', 'None (default)'], ['full', 'Full text']]),
       h('div', { class: 'hint', style: 'margin:8px 0 2px' }, latest ? 'Preview (your latest day)' : 'Preview'), dayOut,
       lbl('One case', oneBox),
       h('div', { class: 'hint', style: 'margin:8px 0 2px' }, 'Preview'), oneOut,

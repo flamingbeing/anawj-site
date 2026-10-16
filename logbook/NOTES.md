@@ -347,7 +347,11 @@ portfolio content.
   literal; `fmtPattern`). **File names and link targets** (`fileDate`): As the dates (slashes become spaces) or their
   own; they name the export's day notes, reflection files' {{date}} and what Link points to. Sync's own file name
   pattern (Settings → Sync) is separate. Changing the heading makes Sync rewrite each synced day once (3-way merge
-  keeps the user's edits). e2e: `md-format.mjs`. An older
+  keeps the user's edits). **Under each case** (`reflInDay`: None (default) / Link / Embed `![[…]]` / Full text;
+  `notesInDay`: None / Full text): a case's reflections and linked notes after it in a day and in one case, their
+  headings two levels down. Link and Embed need the reflection's own note, which only the export has (`ctx.reflPath`);
+  Copy, Share, Send to and Sync give the full text (Markdown links can't embed: a link). A linked note under its case
+  leaves the day's Notes. e2e: `md-format.mjs`. An older
   `settings.shareFormat` (the Copy & share format) carries over until the Markdown page is saved; `share-format.js`
   is kept for that and its tests. Previews use the user's own latest day and reflection.
 - **Sync** (Settings → Sync, `#sync`; `ui-sync.js` page + run, `sync-remote.js` calls, `sync-md.js` pure and tested;

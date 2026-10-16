@@ -1,6 +1,7 @@
 // Fake data only. Settings → Markdown (log2 15, first part): the day heading's styles (Plain by default, Heading,
 // Link, Custom) and the date formats (presets and a custom pattern, file names of their own), with live previews;
-// Save keeps them in the account, and Copy follows.
+// reflections and linked notes under their case (Link falls back to the full text in Copy); Save keeps them in the
+// account.
 import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 const base = `http://localhost:${process.env.PORT || 8080}/logbook/`;
@@ -43,6 +44,18 @@ try { for (const width of [390, 1280]) {
   await open();
   assert.equal(await p.getByLabel('Day heading', { exact: true }).inputValue(), 'custom', 'kept');
   assert.equal(await p.getByLabel('Your day heading').inputValue(), '## {{date}}');
+  // a case's reflection under it (Full text; Link falls back to it where no reflection note exists, as in Copy)
+  await p.getByLabel('Reflections under their case').selectOption('link');
+  await p.getByRole('button', { name: 'Save', exact: true }).click();
+  await poll(async () => (await p.evaluate(async () => (await import('./js/ui-core.js')).settings().markdown?.reflInDay)) === 'link', 'saved: link');
+  const under = await p.evaluate(async () => {
+    const { S } = await import('./js/ui-core.js'), { dayText, caseText } = await import('./js/share.js');
+    const r = (S.reflections || []).find(x => x.caseId && S.cases.some(c => c.id === x.caseId && c.date));
+    const c = S.cases.find(x => x.id === r.caseId);
+    return { day: dayText(c.date), one: caseText(c), title: r.title || r.diagnosis };
+  });
+  for (const t of [under.day, under.one]) assert.ok(t.includes(`### ${under.title}`) && !t.includes('Reflection: [['), 'the full text where no note exists: ' + t.slice(0, 200));
+  await p.getByLabel('Reflections under their case').selectOption('none');
   // back to the default: nothing stored
   await p.getByLabel('Day heading', { exact: true }).selectOption('plain');
   await p.getByLabel('Dates ({{date}})').selectOption('iso');
