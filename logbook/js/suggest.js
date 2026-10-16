@@ -68,11 +68,13 @@ export function parseAge(text) {
 }
 
 // "BMI 42", "bmi42", "BMI: 41.5", "BMI of 40" -> number | null
-export function parseBMI(text) {
+export function parseBMI(text) { const m = bmiAt(text); return m ? m.value : null; }
+// where it is in the text, for the case box's highlight: { from, to, value } | null
+export function bmiAt(text) {
   const m = String(text || '').match(/\bbmi\s*(?:of|is|was|[:=~-])?\s*(\d{2}(?:\.\d+)?)(?![\d/])/i);
   if (!m) return null;
   const v = parseFloat(m[1]);
-  return v >= 10 && v <= 100 ? v : null;
+  return v >= 10 && v <= 100 ? { from: m.index, to: m.index + m[0].length, value: v } : null;
 }
 
 // Same tokenisation as tools/build_logbook_keywords.py: drop leading patient initials, lowercase,

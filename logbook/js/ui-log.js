@@ -3,7 +3,7 @@
 
 import { BY_CODE, TIPS } from './categories.js';
 import { withParents, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, humanAge, nth, weekLead } from './engine.js';
-import { suggest as suggestCodes } from './suggest.js';
+import { suggest as suggestCodes, bmiAt } from './suggest.js';
 import { apmesShorthand, shorthandTags } from './tags.js';
 import {
   S, h, ic, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagName, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
@@ -799,6 +799,9 @@ function paintParsed(typed) {
       i += line.length + 1;
     }
   }
+  // the BMI the suggestions read ("BMI 42": Bariatric from 40), wherever it is (log2 2); in order, none overlapping
+  const bmi = settings().suggestions !== false ? bmiAt(v) : null;
+  if (bmi && !marks.some(([, a, b]) => bmi.from < b && bmi.to > a)) { marks.push(['bmi', bmi.from, bmi.to]); marks.sort((x, y) => x[1] - y[1]); }
   marksSoon(marks);
 }
 // The marks are drawn just before the next frame: one paint for a burst of keys, and the box never shows

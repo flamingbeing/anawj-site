@@ -183,7 +183,8 @@ portfolio content.
   sticky line you tap anywhere to jump to a date. Reflection rows: initials with a small JR, the date on one line
   ("11 Sep", or "11 Sep 25" in an earlier year); a heading's counts never split over two lines. Analytics cards show
   the summary and one bar folded; "You and your year" (the spread strips) is inside the opened card.
-- **Case box marks** (polish 4): the initials and the age/sex are highlighted inside the case box (a see-through copy
+- **Case box marks** (polish 4): the initials, the age/sex, labelled parts and (log2 2) the BMI the suggestions read
+  (`suggest.js` `bmiAt`, purple) are highlighted inside the case box (a see-through copy
   of its text on top, `.box-marks`, styled from the box's own computed font and padding so the wrapping matches).
   The line under the box says only what the age was read as ("6m = 6 years · male"): kept on purpose, as the check
   that 6m means years and 6mo months. The initials and procedure are no longer repeated there.
