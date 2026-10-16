@@ -46,6 +46,13 @@ the scripts that read them are in the owner's private repo `flamingbeing/life` (
 - **Import** (More): paste the whole grid tab copied from Google Sheets, or a downloaded .xlsx. A call, PC or PPC typed
   over a posting day gets the posting from the days around it. The layout and every cell's text are kept per month
   (`state.sheets[month]`).
+- **Staff list for APMES People** (`js/apmes.js`; 16 Oct 2026): APMES People (`apmes.anawj.com/people/` › Import from
+  roster) opens this app with `?send=apmes`; a sheet asks, then sends Grade, Name, From, Until for everyone in post (no
+  roster, no notes) to the tab that opened it by `postMessage` (to `apmes.anawj.com` or this origin only) and closes.
+  More › Export › Copy the staff list for APMES People gives the same text to paste there. The grade is the group's
+  first sheet grade (RES2, R, AC…); the first line names the last month imported from the sheet. People's side:
+  `people/NOTES.md`. Note the sheet import doesn't move an existing person to a new grade, so after July check that
+  People › Staff has everyone in their new group before sending.
 - **Put it back** (More): the block from day 1 of the first person row to the 1st of next month of the last row, as
   tab-separated text to paste at that top-left cell. Cells whose meaning didn't change go back exactly as typed;
   seniors' rows come back untouched; the list of changed cells is shown. Import again just before pasting if others edit.

@@ -5,6 +5,9 @@
   rules marked To confirm. Built in one session on the NTF roster app. Then the NUHS app kit, and rules and import
   tuned on a backtest of past rosters (NOTES.md, Backtest).
 
+- 16 Oct 2026: APMES People can import this app's staff list (More › Export, or one tap from People with
+  `?send=apmes`) to bring residents' years up to date.
+
 ## Waits on the owner
 - The rosterer's review of the December 2026 trial copy (in the owner's Drive) and of the predicted rules.
 - Custom domain `nuhjuniormonthly.anawj.com` (Cloudflare Workers route click, as for ntfroster).

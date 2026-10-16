@@ -91,6 +91,21 @@ const noSideScroll = async (page, label) => {
   await page.waitForTimeout(600);
   const after = await hard(page);
   ok(after <= 3 && after < before, `auto-fill fixes the cover (${before} -> ${after} must-fix problems)`);
+  // the staff list for APMES People: More › Export copies it
+  await go(page, '#more');
+  await page.getByRole('button', { name: 'Copy the staff list for APMES People' }).click();
+  await page.waitForTimeout(200);
+  ok(/^NUH Junior Monthly staff, roster month \d{4}-\d{2}.*\nGrade\tName\tFrom\tUntil\n/.test(await page.evaluate(() => navigator.clipboard.readText())), 'APMES People list copied');
+  // opened by APMES People (?send=apmes) but without the tab that asked: it offers the copy instead; the link forgets the ask
+  await page.goto(BASE + '?demo&send=apmes#people');
+  await ready(page);
+  const dlg = page.getByRole('dialog', { name: 'Send the staff list to APMES People?' });
+  await dlg.waitFor();
+  ok(await dlg.getByRole('button', { name: 'Copy the list' }).isVisible(), 'send sheet without its opener offers the copy');
+  await axe(page, 'desktop send to APMES People');
+  await dlg.getByRole('button', { name: 'Cancel' }).click();
+  await page.waitForTimeout(300);
+  ok(!/send=apmes/.test(page.url()), 'the link forgets send=apmes');
   await page.close();
 }
 // ---------- phone ----------

@@ -30,6 +30,23 @@
   .p-issue:first-child { border-top: 0; }
   .p-issue > div { flex: 1 1 200px; min-width: 0; }
   .p-issue .e-row__meta { white-space: normal; }
+  /* Import from the monthly roster: groups of tickable changes */
+  .p-group-h { padding: 14px 16px 10px; }
+  .p-group-h .e-h3 { margin: 0; }
+  .p-group-h .e-hint { margin-top: 2px; }
+  .p-group .e-checks { background: var(--a-surface); border-radius: 0; box-shadow: inset 0 .5px 0 var(--a-sep); }
+  .p-pick, .p-pick:has(input:disabled) { cursor: default; opacity: 1; }
+  .p-pick > input:disabled { opacity: .45; cursor: not-allowed; }
+  .p-pick__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .p-pick__body > label { cursor: pointer; }
+  .p-pick__body .e-row__meta { white-space: normal; }
+  .p-pick__what { font-size: var(--a-text-sm); font-weight: 600; }
+  .p-pick__fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 12px; margin-top: 8px; }
+  .p-pick__fields[hidden] { display: none; }
+  .p-more summary { cursor: pointer; font-weight: 600; }
+  .p-plain { margin: 8px 0 0; padding-left: 20px; font-size: var(--a-text-sm); }
+  .p-month { max-width: 240px; margin-top: 12px; }
+  #p-roster { max-height: 10.5em; }
 </style>
 </head>
 <body class="a-app">
