@@ -161,6 +161,7 @@ export function solve(state, opts = {}) {
   // "A needs B the same day" (a cardiac call only on a cardiac day): an auto code A is blocked where the fixed codes have no B
   const hardNeed = compiled.filter(cr => cr.hard && cr.rule.type === 'sameDay' && cr.info && !cr.info.forbid);
   const hardElig = compiled.filter(cr => cr.hard && cr.rule.type === 'eligible' && cr.info);
+  const hardUntil = compiled.filter(cr => cr.hard && cr.rule.type === 'noCallsUntil' && cr.info);
   const hardAvoid = compiled.filter(cr => cr.hard && cr.rule.type === 'requests' && cr.info && !cr.info.want && !cr.info.weekend);
   const blockCache = new Int8Array(P * n * (K + 1)).fill(-1);
   function blocked(p, d, k) {
@@ -180,6 +181,10 @@ export function solve(state, opts = {}) {
       if (ok[d] && inWho[p] && mA.elem(code) && !mB.elem(code) && !els.some(mB.elem)) { b = true; break; }
     }
     if (!b) for (const cr of hardElig) if (cr.info.ok[d] && !cr.info.inWho[p] && cr.info.m.elem(code)) { b = true; break; }
+    if (!b) for (const cr of hardUntil) {
+      const { m, ok, inWho, until } = cr.info;
+      if (ok[d] && inWho[p] && until[p] && ctx.days[d] < until[p] && m.elem(code)) { b = true; break; }
+    }
     if (!b) for (const cr of hardAvoid) {
       const { m, code: rc, ok, inWho } = cr.info;
       if (ok[d] && inWho[p] && m.elem(code) && els.includes(rc)) { b = true; break; }

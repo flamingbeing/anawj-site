@@ -107,6 +107,7 @@ export function mount(el, app) {
     if (Number(p.fte) && Number(p.fte) !== 1) meta.push(`FTE ${p.fte}`);
     if (p.start) meta.push(`from ${M.fmtDay(p.start)} ${p.start.slice(0, 4)}`);
     if (p.end) meta.push(`until ${M.fmtDay(p.end)} ${p.end.slice(0, 4)}`);
+    if (p.noCallsUntil) meta.push(`no calls until ${M.fmtDay(p.noCallsUntil)} ${p.noCallsUntil.slice(0, 4)}`);
     if (p.active === false) meta.push('not active');
     return h('div', { class: `pv-row${left ? ' is-left' : ''}` },
       h('button', { type: 'button', class: 'pv-main', onclick: () => editPerson(p) },
@@ -156,8 +157,8 @@ export function mount(el, app) {
   function editPerson(p, groupId) {
     const st = app.store.get();
     const isNew = !p;
-    const d = p ? structuredClone(p) : { id: M.uid('s'), name: '', short: '', group: groupId || ((st.groups || [])[0] || {}).id || 'mo', tags: [], fte: 1, start: '', end: '', note: '', active: true };
-    const ids = { name: fid('pn'), short: fid('ps'), group: fid('pg'), fte: fid('pf'), start: fid('pst'), end: fid('pe'), note: fid('pno') };
+    const d = p ? structuredClone(p) : { id: M.uid('s'), name: '', short: '', group: groupId || ((st.groups || [])[0] || {}).id || 'mo', tags: [], fte: 1, start: '', end: '', noCallsUntil: '', note: '', active: true };
+    const ids = { name: fid('pn'), short: fid('ps'), group: fid('pg'), fte: fid('pf'), start: fid('pst'), end: fid('pe'), until: fid('pnc'), note: fid('pno') };
     const err = h('p', { class: 'bx-err', role: 'alert' });
     const name = h('input', { type: 'text', id: ids.name, value: d.name, autocomplete: 'off', maxlength: '80', required: true });
     const short = h('input', { type: 'text', id: ids.short, value: d.short || '', maxlength: '20', placeholder: 'Shown on the grid' });
@@ -166,6 +167,9 @@ export function mount(el, app) {
     const fte = h('input', { type: 'number', id: ids.fte, value: String(d.fte ?? 1), min: '0.1', max: '1', step: '0.1', inputmode: 'decimal' });
     const start = h('input', { type: 'date', id: ids.start, value: d.start || '' });
     const end = h('input', { type: 'date', id: ids.end, value: d.end || '' });
+    const until = h('input', { type: 'date', id: ids.until, value: d.noCallsUntil || '' });
+    // a baby MO or a very new person: calls start a month after they start, or whenever you set it
+    const suggest = h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { if (start.value) until.value = M.iso(new Date(M.parseISO(start.value).getFullYear(), M.parseISO(start.value).getMonth() + 1, M.parseISO(start.value).getDate())); else err.textContent = 'Set the start date first.'; } }, 'A month after they start');
     const note = h('textarea', { id: ids.note, rows: '2', placeholder: 'Rotation, dates, anything useful' }, d.note || '');
     const active = h('input', { type: 'checkbox', checked: d.active !== false });
     const tagBox = tagToggles(st, d.tags);
@@ -175,6 +179,7 @@ export function mount(el, app) {
       (st.tags || []).length ? h('div', { class: 'bx-field' }, h('p', { class: 'bx-label' }, 'Tags'), tagBox) : null,
       h('div', { class: 'bx-two' }, field('FTE (1 = full time)', ids.fte, fte), h('div', { class: 'bx-field bx-sw-field' }, h('label', { class: 'switch' }, active, h('span', { class: 'sw-track' }), h('span', null, 'Active')))),
       h('div', { class: 'bx-two' }, field('Starts (optional)', ids.start, start), field('Leaves (optional)', ids.end, end)),
+      h('div', { class: 'bx-field' }, field('No calls until (optional)', ids.until, until), h('p', { class: 'bx-help' }, 'Baby MOs until they pass the test, very new people. Blank means calls are allowed. Their leave and postings are planned as usual. ', suggest)),
       field('Note (optional)', ids.note, note), err);
     const actions = [{ label: 'Cancel' }, {
       label: isNew ? 'Add person' : 'Save', primary: true,
@@ -183,7 +188,7 @@ export function mount(el, app) {
         if (!nm) { err.textContent = 'Type a name.'; name.focus(); return false; }
         if (start.value && end.value && end.value < start.value) { err.textContent = 'The leaving date is before the start date.'; return false; }
         const f = Number(fte.value);
-        const out = { ...d, name: nm, short: short.value.trim(), group: group.value, tags: [...d.tags], fte: f > 0 && f <= 1 ? Math.round(f * 100) / 100 : 1, start: start.value, end: end.value, note: note.value.trim(), active: active.checked };
+        const out = { ...d, name: nm, short: short.value.trim(), group: group.value, tags: [...d.tags], fte: f > 0 && f <= 1 ? Math.round(f * 100) / 100 : 1, start: start.value, end: end.value, noCallsUntil: until.value, note: note.value.trim(), active: active.checked };
         app.store.commit(isNew ? 'Add person' : 'Edit person', s => {
           const i = s.staff.findIndex(x => x.id === out.id);
           if (i >= 0) s.staff[i] = out;

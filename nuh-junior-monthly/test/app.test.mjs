@@ -312,6 +312,22 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(on.keep(ev.violations[2]) && !on.keep(ev.violations[3]), 'a rule about C3 with no cell is kept; one about other calls is hidden');
   ok(on.keep(ev.violations[4]) && off.keep(ev.violations[1]) && on.hidden === 2 && off.hidden === 0, 'must-fix problems always show, and the switch off shows everything');
 }
+// "No calls until" a date set on a person: a hard rule, and Fill never places a call on them before it
+{
+  const st = team();
+  ok(st.rules.some(r => r.id === 'r-nocalls' && r.type === 'noCallsUntil' && !r.hard === false), 'the rule is on by default and hard');
+  const i0 = st.staff.find(x => x.id === 'i0'); i0.noCallsUntil = days[10];
+  M.setCell(st, days[3], 'i0', { a: ['ICU', 'R1B'] }); M.setCell(st, days[12], 'i0', { a: ['ICU', 'R1B'] });
+  const v = ids(st, 'r-nocalls');
+  ok(v.length === 1 && v[0].hard && v[0].date === days[3] && /no calls until/.test(v[0].msg), 'a call before the date is a must-fix problem, one on or after it is not');
+  const clear = team(); clear.staff.find(x => x.id === 'i0').noCallsUntil = days[10];
+  const res = solve(clear, { from: days[0], to: days[days.length - 1], timeMs: 500, seed: 5 });
+  const early = days.slice(0, 10).filter(d => (res.assignments[d].i0 || []).length);
+  ok(early.length === 0, 'Fill places no call on them before their date');
+  ok(days.slice(10).some(d => (res.assignments[d].i0 || []).length), 'and does place calls on them from it');
+  const old = M.defaultState(); old.rulesVersion = 8; old.rules = old.rules.filter(r => r.id !== 'r-nocalls');
+  ok(M.migrate(old).rules.some(r => r.id === 'r-nocalls') && M.migrate({ staff: [{ id: 'z', name: 'Z', noCallsUntil: 'soon' }] }).staff[0].noCallsUntil === '', 'a saved roster gains the rule, and a bad date is dropped');
+}
 // Fill only what was picked: other calls stay as they are but still count for the rules
 {
   const st = team();

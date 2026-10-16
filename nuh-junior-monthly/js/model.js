@@ -170,6 +170,7 @@ export const DEFAULT_RULES = [
   R('r-sun-fri', 'sequence', 'MedHub: no Fri or Sat call after a Sunday call', { ifCodes: CALLS, thenCodes: CALLS, mode: 'forbid', from: 5, to: 6 }, soft(2, { when: { days: [0] }, note: 'The guide: very hard to keep; real rosters break it often (1 in 3 cardiac calls). ' + PREDICTED })),
   R('r-livot', 'sameDay', 'Avoid calls in liver transplant OT week', { codesA: ['LivOT'], codesB: CALLS, mode: 'forbid' }, soft(5, { note: PREDICTED })),
   R('r-og-eod', 'sequence', 'No every-other-day obstetric calls', { ifCodes: ['OGC'], thenCodes: ['OGC'], mode: 'forbid', from: 2, to: 2 }, soft(30, { note: PREDICTED })),
+  R('r-nocalls', 'noCallsUntil', 'No calls before the date set on the person', { codes: CALLS }),
   R('r-baby', 'limit', 'Baby MOs: no calls', { codes: CALLS, period: 'month', window: 7, min: null, max: 0, fte: false, prorate: false }, soft(50, { who: { tags: ['babymo'] }, enabled: false, note: PREDICTED })),
   // the main calls (off until the rosterer starts filling them in the app)
   R('r-r1-cover', 'cover', 'One MO1 call (R1) every night', { codes: ['R1'], min: 1, max: 1 }, { enabled: false, note: PREDICTED }),
@@ -239,9 +240,9 @@ export function cleanRule(r) {
 // One-time updates to rules that were already saved (the owner's rulings of 16 Oct 2026): requests and blocks become
 // preferences, "new to ICU" is strict only for rotating residents and MOPEXes. Only a rule still in its old form changes.
 function updateRules(s) {
-  if ((s.rulesVersion || 1) >= 8) return;
+  if ((s.rulesVersion || 1) >= 9) return;
   const from2 = (s.rulesVersion || 1) < 2;
-  s.rulesVersion = 8;
+  s.rulesVersion = 9;
   const find = id => s.rules.find(r => r.id === id);
   if (from2) for (const [id, w] of [['r-req-x', 60], ['r-req-xx', 80]]) { const r = find(id); if (r && r.hard) { r.hard = false; r.weight = w; } }
   const n = from2 && find('r-r1b-new');
@@ -280,6 +281,8 @@ function updateRules(s) {
   }
   const cf = find('r-c3-fair');
   if (cf && cf.params && Array.isArray(cf.params.among) && cf.params.among.join() === 'C,C-e,C-p') cf.params.among = ['C'];
+  // "no calls until" a date set on a person (owner, 16 Oct 2026)
+  add('r-nocalls');
   // blocked by the planner is already decided, so it outranks every request (owner, 16 Oct 2026): 80 -> 200
   const xx = find('r-req-xx');
   if (xx && !xx.hard && Number(xx.weight) === 80) xx.weight = 200;
@@ -307,9 +310,9 @@ export function migrate(s) {
   s.duties = s.duties.map(cleanDuty);
   if (!s.duties.some(d => d.code === 'x')) s.duties.push(clone(DEFAULT_DUTIES.find(d => d.code === 'x')));
   s.staff = byId(s.staff).map(p => ({
-    short: '', group: 'res1', tags: [], fte: 1, start: '', end: '', note: '', active: true, ...p,
+    short: '', group: 'res1', tags: [], fte: 1, start: '', end: '', noCallsUntil: '', note: '', active: true, ...p,
     name: str(p.name, p.id), short: str(p.short), group: str(p.group, 'res1'), note: str(p.note),
-    start: str(p.start), end: str(p.end), tags: strList(p.tags),
+    start: str(p.start), end: str(p.end), noCallsUntil: /^\d{4}-\d{2}-\d{2}$/.test(str(p.noCallsUntil)) ? str(p.noCallsUntil) : '', tags: strList(p.tags),
   }));
   if (!Array.isArray(s.rules)) s.rules = clone(DEFAULT_RULES);
   s.rules = s.rules.filter(r => isObj(r) && typeof r.type === 'string').map(cleanRule);
