@@ -12,8 +12,8 @@ made-up names only.
 The monthly duty roster of the Department of Anaesthesia, Ng Teng Fong General Hospital (NTFGH): calls, PM shifts,
 clinics and other duties together with leave and requests, on one grid like the department's "ALL STAFF LEAVE
 REQUEST" sheet (staff by grade group down the side, days across). It checks the roster against **rules the owner adds
-and edits in the app at any time** (the owner's main ask: "I will need to constantly add rules and combination
-restrictions after the app is published") and can **fill the calls and shifts automatically** (Auto-fill).
+and edits in the app at any time** (the owner's main ask: rules and combination restrictions keep changing after
+launch) and can **fill the calls and shifts automatically** (Auto-fill).
 
 - Address: <https://ntfroster.anawj.com/> (own subdomain because it saves data; `worker/routes.js` maps it to
   `ntf-roster/`). Practice with a made-up department: <https://ntfroster.anawj.com/?demo>.
@@ -23,8 +23,8 @@ restrictions after the app is published") and can **fill the calls and shifts au
 
 ## The department (what the sheets showed; the owner confirms)
 
-Learned from the department's monthly "ALL STAFF LEAVE REQUEST" sheets (Jan to Dec 2026), the Dept Ops admin leave
-plan and a teaching programme the owner uploaded (read in a session scratchpad only, never committed).
+Learned from department sheets the owner shared (read in a session scratchpad only, never committed; details in the
+owner's private notes).
 
 ### Groups (sheet order)
 
@@ -41,7 +41,7 @@ plan and a teaching programme the owner uploaded (read in a session scratchpad o
 | `locum` | LOCUM / LOCUMS | junior |
 | `mo` | MEDICAL OFFICERS | junior |
 
-About 61 to 65 people a month (Dec 2026: 11, 6, 2, 3, 4, 2, 4, 7, 7, 15 by section). Names on the sheet can carry a
+About 60 people a month. Names on the sheet can carry a
 bracket note with the posting and its dates, e.g. "Name (R4-SR1 25/5/26-13/9/26)" or "Name (B) 6/5/26-7/9/26".
 
 Tags (app-only labels): `babymo` Baby MO (a new MO, never on call alone), `parttime`, `pain` (APS), `icu`.

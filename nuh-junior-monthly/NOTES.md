@@ -21,12 +21,11 @@ the scripts that read them are in the owner's private repo `flamingbeing/life` (
 
 ## The department's sheet (what the app reads and writes)
 
-- One spreadsheet per month; the grid tab is "1 - 30 Nov 26 Request" (newer months just "Request"). Header row (row 6):
-  `S/N | Grade | Name | 1 … 30 | 1-Dec`; the weekday names are in the row above. One row per person, one code per day,
-  then the 1st of next month (for carrying post call over). Below: count rows (R1, R2, R3, R1B, C3, … each should be 1)
-  and manpower totals. Right of the days: points (Fri/Sun/PH 1.5, Sat 2) and totals per person. Every other tab
-  ("Junior Call Roster", "WR/ Premed Roster") is formulas over this grid. The day cells hold values only (no formulas;
-  checked on Dec 2026), so pasting values back over them is safe.
+- One spreadsheet per month with a grid tab: a header row `S/N | Grade | Name | 1 … 30 | 1st of next month` (weekday
+  names in the row above), one row per person, one code per day, then the 1st of next month (for carrying post call
+  over). Below: count rows (each call should be 1 a day) and manpower totals; to the right, points and totals per
+  person. The other tabs are formulas over this grid and the day cells hold values only, so pasting values back over
+  them is safe. (Exact layout in the owner's private notes; the app finds the header row itself.)
 - Grades: AC, R, RES3, RES2, RES1, NHG (TTSH cardiac residents), RP, HC, LOC, MOPEX, RR (rotating residents, the home
   department in brackets after the name), Fellow. Seniors (HOD, SC, C) are left alone on import.
 - Codes: postings `C` cardiac (`C-e` echo week, `C-p` perfusion week: no calls), `ICU`, `CP`, `AP`, `OG1`, `OG2`, `LI`,
@@ -48,25 +47,24 @@ the scripts that read them are in the owner's private repo `flamingbeing/life` (
   over a posting day gets the posting from the days around it. The layout and every cell's text are kept per month
   (`state.sheets[month]`).
 - **Put it back** (More): the block from day 1 of the first person row to the 1st of next month of the last row, as
-  tab-separated text to paste at that top-left cell (D7). Cells whose meaning didn't change go back exactly as typed;
+  tab-separated text to paste at that top-left cell. Cells whose meaning didn't change go back exactly as typed;
   seniors' rows come back untouched; the list of changed cells is shown. Import again just before pasting if others edit.
 
 ## Rules (Rules tab; the rosterer changes them)
 
-Cardiac and ICU rules come from two years of rosters (2025–2026: a C3 and an R1B every night; C3 → PC → back to C;
-R1B → PC → PPC → ICU; first calls by experience as in Dr Yanni's SICU list). The rest are predictions from the
+Cardiac and ICU rules come from past rosters (a C3 and an R1B every night; C3 → PC → back to C; R1B → PC → PPC → ICU;
+first calls by experience as in a senior's SICU list). The rest are predictions from the
 department's roster guide, marked **To confirm** (note "Predicted…"); the R1–R3 cover and level rules are off until
 the rosterer uses the app for them. New rule type here: **`postingStart`** ("no calls in the first N days of a
 posting": no ICU call on day 1, new to ICU from day 4 (tag `icunew`), Ortho/HRM residents from day 8 (tag `rrlate`)).
 `spread` has an optional `among` (only people on that posting, their share by days on it). Tags `mo1`–`mo3` are the
 call levels; `supernum` = in ICU without calls.
 
-**Backtest (15 Oct 2026)**: the app's import, rules and Auto-fill were run on 22 months of the real rosters (the
-scripts and results are in the private repo, `life/data/nuh-junior-monthly/`). The real rosters break the must-hold
-rules 25 times (genuine exceptions: a cardiac call covered by someone not on cardiac, a call on the first day of a
-posting); Auto-fill twice (nights with nobody eligible, which it flags), with fairer shares of calls and weekend
-calls than the real rosters. Import then copy-back gives every month back cell for cell except the PC / PPC the
-sheet was missing. Changes it led to: a cardiac call may fall in an echo/perfusion week (a preference against); the
+**Backtest (15 Oct 2026)**: the app's import, rules and Auto-fill were run on past real rosters (scripts and numbers
+in the owner's private notes). The real rosters break the must-hold rules only in genuine exceptions (a cardiac call
+covered by someone not on cardiac, a call on the first day of a posting); Auto-fill breaks them only on nights with
+nobody eligible, which it flags, and shares calls more evenly. Import then copy-back gives every month back cell for
+cell except post calls the sheet was missing. Changes it led to: a cardiac call may fall in an echo/perfusion week (a preference against); the
 Ortho/HRM day-8 ICU rule is a preference; MedHub Sun-then-Fri/Sat weight 2 and liver OT week weight 5 (real rosters
 break them often); fair shares weight 10, counting echo/perfusion weeks as cardiac days; import keeps the posting
 under leave and blank days inside a posting and across the month boundary; someone listed twice keeps the row with

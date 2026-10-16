@@ -142,6 +142,4 @@ Firetop run on a test account). All the Send to presets above are in. The app is
 links or migration niceties needed for moved pages.
 
 Earlier work (all merged): the reliability fixes (#569–#589; follow-ups in `status/wip/README.md`), the app → sheet sync,
-the drift-check skill and the private dashboard "Logbook Sync Check" (claude.ai/artifact/TFa1Dvn9b4uA4oAedz5111).
-The 14 Nov reminder `trig_01XdhSrpiJ31pLuSdwXAKb3V` (turn off "anyone with the link" on the response sheet) is still scheduled.
-Messages to Firetop that ask for LIVE changes are blocked by the permission classifier: give the owner paste-ready wording.
+the drift check and its private dashboard (details in the owner's private notes).

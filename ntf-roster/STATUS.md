@@ -8,11 +8,9 @@ Last updated: 2026-10-15 by Claude Code (NTF Roster build session, branch `claud
 
 ## The request (owner, 15 Oct 2026)
 
-"Make an NTF roster web app for NTF anaesthesia, usable from both phone and laptop. No restrictions on the interface;
-reference high-quality rostering apps. No need to be the same logic or interface as my NUH roster app. I will need to
-constantly add rules and combination restrictions after the app is published, so build that in too." His uploads
-(the department's monthly leave request sheets, the Dept Ops leave plan, a teaching programme) hold real names: they
-were read in a session scratchpad only and are **never committed**. What was learned is in `NOTES.md`.
+An NTF anaesthesia roster app for phone and laptop, to the standard of good rostering apps, free to differ from the
+NUH roster app, with rules and combination restrictions the owner can keep adding after launch. The department sheets
+he shared hold real names: read in a session scratchpad only, **never committed**. What was learned is in `NOTES.md`.
 
 ## Now
 
