@@ -4,6 +4,14 @@ import { PRESETS, cleanDestination, cleanDestinations, sendLink, linkHost, linkO
 
 // every preset is a usable template except the empty "other app" one
 for (const p of PRESETS) assert.equal(linkOk(p.uri), p.id !== 'custom', p.id);
+// the iPhone presets (log2 12): each puts the text where its app reads it
+const pre = id => PRESETS.find(p => p.id === id);
+for (const id of ['applenotes', 'email', 'telegram', 'drafts', 'bear', 'things', 'dayone']) assert.ok(pre(id) && linkOk(pre(id).uri), id);
+assert.equal(sendLink(pre('applenotes'), { content: 'A & B', title: 'T' }).url, 'shortcuts://run-shortcut?name=Logbook%20to%20Notes&input=text&text=A%20%26%20B');
+assert.equal(sendLink(pre('email'), { content: 'x y', title: 'Day 1' }).url, 'mailto:?subject=Day%201&body=x%20y');
+assert.equal(sendLink(pre('things'), { content: 'n', title: 't' }).url, 'things:///add?title=t&notes=n');
+assert.equal(linkHost(pre('telegram').uri), 'tg');
+assert.equal(PRESETS.at(-1).id, 'custom', 'Other app stays last');
 
 // hosts: what the confirmation shows
 assert.equal(linkHost('https://wa.me/?text={content}'), 'wa.me');

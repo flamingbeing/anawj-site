@@ -639,6 +639,10 @@ portfolio content.
   column (`display().gridCols`, this device; ← → on the focused edge too; a double-tap resets it, "Reset column
   widths" resets all); Lines per row 1 / 2 / 3 / Fit to text (`display().gridLines`; the summary is a textarea that
   grows to its text with Fit).
+- **Send to presets** (log2 12): Apple Notes through a Shortcut named “Logbook to Notes” (`shortcuts://run-shortcut?
+  name=…&input=text&text=…`; setup steps folded on the Send to page), Email (mailto), Telegram (`tg://msg`), Drafts,
+  Bear, Things, Day One, besides Obsidian, WhatsApp, UpNote and Other app. Keep, Notion and OneNote take no text from
+  a link: the page says to use Share. Each link follows the app's documented format; check them on a real iPhone.
 - **Pages** (log2 11; owner's call, 15 Oct): the Logbook List and Grid show 100 cases a page (25 / 50 / 100 / 300 /
   All, this device: `display().pageSize`, unset = 100); "‹ Page 2 of 14 ›" with a list of the pages and each page's
   dates to jump to (`paging.js`, unit-tested); a new search, filter or view goes back to page 1; the Calendar stays
