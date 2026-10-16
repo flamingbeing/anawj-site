@@ -44,3 +44,13 @@ Nothing queued. Ideas: `NOTES.md`, "Ideas for later".
 - 16 Oct 2026: faculty are not imported from the roster (no consultants on the junior roster, no emails).
 - 16 Oct 2026: before sending the list in July, import the new month's sheet in NUH Junior Monthly so everyone's grade is
   current (owner asked the import to move grades; #703).
+- 16 Oct 2026: **People will become the source of truth for grade and postings** (owner: "in future i might migrate the grade
+  and postings to the peoples app too"). So no two-way sync with NUH Junior Monthly, no email field in the roster app and
+  no People → roster direction now: the one-way import (#699) is a bridge until that migration.
+- 16 Oct 2026: when linking people across apps, **match by email** (the logbook's official emails are the source; they are
+  login keys, so valid and unique) with the resident `rid` as the permanent ID underneath. No new hidden ID. Other apps
+  stay on their own Firebase projects and share an ID only where they genuinely need to talk.
+- 16 Oct 2026: a **change-of-email merge** is wanted in future (owner), as an explicit admin "Change email" action in People,
+  never automatic: copy the logbook to the new email (old kept as backup), rewrite the emails on evaluations, keep previous
+  emails; faculty and PDs have no permanent ID yet (give them one or keep a previous-emails list). It touches live data
+  (logbook): full tests, emulator, preview, owner approval and probably a job to firetop. Not started.

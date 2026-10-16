@@ -57,3 +57,7 @@ missing was one obvious screen to keep them, and an easy way to add the yearly b
 
 - Bulk status change (e.g. a whole intake to Graduated) and an "R5s this year" list before July.
 - Faculty "last assessed" date from evals, to spot inactive assessors.
+- Take over grade and postings from NUH Junior Monthly (owner's plan), so the roster app reads People's list and the
+  import goes away. Link by email, `rid` underneath (decisions in `STATUS.md`, 16 Oct 2026).
+- "Change email": an admin action that moves a person's logbook and evaluations to a new email without losing history
+  (details in `STATUS.md`). Faculty and PDs need a permanent ID or a previous-emails list first.
