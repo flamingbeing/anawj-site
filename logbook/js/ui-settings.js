@@ -18,7 +18,7 @@ import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.
 import { partsSettings } from './ui-parts.js';
 import { labelsOn } from './parts.js';
 import { deviceOn, deviceChanges, deviceReset, DEVICE_SWITCHES } from './device-presets.js';
-import { applyCompact, applyTheme, cachedTheme, TEXT_SIZES, ZOOMS, applyTextSize, applyZoom, applyAccent, display, setDisplay, applyDisplay, LINE_WIDTHS, LINE_HEIGHTS, CONTRASTS, MOTIONS, BUTTON_STYLES, defaultTitle, BORDERS, ROUNDS, roundLevel, BAR_TABS, barTabs, MAX_BAR, arrangeTabs, setTabOnBar, borderLevel, cleanTitle, IPHONE_APP, START_TABS } from './display.js';
+import { applyCompact, applyTheme, cachedTheme, TEXT_SIZES, ZOOMS, applyTextSize, applyZoom, applyAccent, display, setDisplay, applyDisplay, LINE_WIDTHS, LINE_HEIGHTS, CONTRASTS, MOTIONS, BUTTON_STYLES, defaultTitle, BORDERS, ROUNDS, roundLevel, BAR_TABS, barTabs, MAX_BAR, arrangeTabs, setTabOnBar, borderLevel, cleanTitle, IPHONE_APP, START_TABS, CARD_STYLES, cardStyle, cardPatch } from './display.js';
 import { resetLink, help, toggle } from './settings-rows.js';
 // (the display helpers are still exported from here: the e2e tests import them from this file)
 export * from './display.js';
@@ -165,11 +165,8 @@ export function renderThemes() {
       look('band', 'Top band', BANDS, 'theme', 'The four-colour strip along the top. NUHS keeps the NUH stripe; other themes bring their own.')),
     h('section', { class: 'card' },
       h('h2', {}, 'Shape and type'),
-      // Flat first: no lines and no page cards (its own key, so the saved border levels keep their meaning)
-      slider('Borders', ['Flat (no lines, no cards)', ...BORDERS], st.flat ? 0 : borderLevel(st) + 1, BORDERS.length,
-        n => applyDisplay(setDisplay(n === 0 ? { flat: true, borders: 0 } : { flat: null, borders: n === null ? null : n - 1 }))),
+      pick('Card style', CARD_STYLES, cardStyle(st), v => { applyDisplay(setDisplay(cardPatch(v))); hooks.render(); }, 'How cards and lists stand off the page. How strong the lines are: Advanced display.'),
       slider('Corners', ROUNDS.map(([n]) => n), roundLevel(st), 2, n => applyDisplay(setDisplay({ round: n }))),
-      toggle('Soft shadows instead of lines around cards (default)', st.shadows !== false, v => applyDisplay(setDisplay({ shadows: v ? null : false }))),
       look('spacing', 'Spacing', SPACINGS, 'normal'),
       look('tabStyle', 'Tab bar style', TAB_STYLES, 'underline', 'How the tab you’re on is marked.'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Heading font',
@@ -193,6 +190,9 @@ export function renderDisplayAdvanced() {
     h('section', { class: 'card' },
       h('h2', {}, 'Advanced display'),
       h('h3', {}, 'Look'),
+      help('Card style, corners, colours and fonts are in ', h('a', { href: '#themes' }, 'Themes'), '.'),
+      // the strength of the lines around cards, fields, buttons and chips (Flat, in Card style, hides them all)
+      slider('Line strength', BORDERS, borderLevel(st), BORDERS.length - 1, n => applyDisplay(setDisplay({ borders: n }))),
       lookPick('btnStyle', 'Button style', BUTTON_STYLES, 'outlined', 'The buttons that aren’t the main one on a screen.'),
       toggle('Icons instead of words on common buttons', st.iconBtns, set('iconBtns'), 'Share, Copy, Notes and Filter.', 'Each still says its name to screen readers, and on a computer when you point at it.'),
       toggle('Plain calendar', st.calPlain, set('calPlain'), 'Numbers with the count under them, no tiles.', 'Today in a coloured circle, the day you picked in a dark one.'),
@@ -222,8 +222,8 @@ export function renderDisplayAdvanced() {
       toggle('Pin the search box at the top of the Logbook and Reflections', st.pinSearch, set('pinSearch'), 'They stay in view while the list scrolls under them.'),
       DEVICE_NOTE()),
     customCssCard(),
-    resetLink('the name in the header, the page width, the tab bar (order and hidden tabs) and header options, the Logbook row buttons, upside down, pinning and custom CSS (switched off; your CSS is kept), and the button style, icons, plain calendar, page titles and shorter rows on this device', () =>
-      applyDisplay(setDisplay({ appTitle: null, lineWidth: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, tabOrder: null, tabHidden: null, rowMenu: null, rowCopy: null, dayCopy: null, btnStyle: null, iconBtns: null, calPlain: null, pageTitles: null, rowShort: null }))));
+    resetLink('the line strength, the name in the header, the page width, the tab bar (order and hidden tabs) and header options, the Logbook row buttons, upside down, pinning and custom CSS (switched off; your CSS is kept), and the button style, icons, plain calendar, page titles and shorter rows on this device', () =>
+      applyDisplay(setDisplay({ borders: null, appTitle: null, lineWidth: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, tabOrder: null, tabHidden: null, rowMenu: null, rowCopy: null, dayCopy: null, btnStyle: null, iconBtns: null, calPlain: null, pageTitles: null, rowShort: null }))));
 }
 export function renderAccessibility() {
   const st = display();

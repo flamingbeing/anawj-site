@@ -298,7 +298,7 @@ portfolio content.
   keys, after a confirm; custom CSS is switched off but kept, own font files stay stored.
 - **Look options, Oct 2026** (device keys): **Corners** (Display, `round` 0 Square / 1 / 2 Normal / 3 Very round): every
   border-radius in style.css (and the reflection editor's inline ones) is `calc(Npx * var(--round, 1))`; tag tick
-  boxes cap at 1.2 so they never look like radio buttons. **Soft shadows instead of lines** (`shadows`, cards only; **on by default**, owner 12 Oct 2026: `shadows: false` = lines).
+  boxes cap at 1.2 so they never look like radio buttons. **Card style** (Themes; owner, 16 Oct 2026; `cardStyle` / `cardPatch` in display.js): Raised = soft shadows (default; owner 12 Oct 2026), Outlined = lines (`shadows: false`), Flat = no lines and no page cards (`flat`). It replaced the Soft shadows switch and the Flat end of the Borders slider; the line strength (`borders`, Borderless … Normal) moved to Advanced display → Look as **Line strength**, kept while Flat is on.
   **Bigger tap targets on the Case tab** (Advanced display, `bigTaps`). **Tab bar order and hidden tabs** (Advanced
   display, `tabOrder` / `tabHidden`, `arrangeTabs` in ui-settings.js): ↑ ↓ and a switch per tab; More can't be
   hidden, at least two and at most seven (`MAX_BAR`, More included; owner, Oct 2026) stay. Every page in the More list

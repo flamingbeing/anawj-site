@@ -1733,9 +1733,10 @@ async function run(label, ctxOpts) {
     await hit.click();
     await p.waitForURL(/#loggingadv$/);
     await p.locator('fieldset.pick.flash', { hasText: 'Undo window' }).waitFor();
+    await tab('displayadv');
+    await p.locator('input[type=range][aria-label="Line strength"]').fill('0'); await nap(150);
     await tab('themes');
     assert(await p.locator('.display-preview .row-btn').count() >= 1, 'no Display preview');
-    await p.locator('input[type=range][aria-label="Borders"]').fill('1'); await nap(150);
     await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
     await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);
     assert(!(await p.evaluate(() => document.documentElement.classList.contains('edges'))), 'reset did not put borders back');
@@ -1744,9 +1745,9 @@ async function run(label, ctxOpts) {
   await step('display: corners, shadows, bigger tap targets; tab bar order and hidden tabs (listed on More)', async () => {
     await tab('themes');
     await p.locator('input[type=range][aria-label="Corners"]').fill('0');
-    await p.getByLabel('Soft shadows instead of lines around cards (default)').uncheck(); await nap(150);
+    await choose('Card style', 'outlined'); await nap(150);
     assert(await p.evaluate(() => !document.documentElement.classList.contains('shadows')), 'shadows not off');
-    await p.getByLabel('Soft shadows instead of lines around cards (default)').check(); await nap(150);
+    await choose('Card style', 'raised'); await nap(150);
     assert(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--round').trim() === '0' && document.documentElement.classList.contains('shadows')), 'corners or shadows not applied');
     await tab('displayadv');
     await p.getByLabel('Show Reflections').uncheck();
@@ -1869,7 +1870,7 @@ async function run(label, ctxOpts) {
     const eq = (x, y, m) => assert(x === y, `${m}: ${x}`);
     const cls = k => p.evaluate(k => document.documentElement.classList.contains(k), k);
     await tab('themes');
-    await p.locator('input[type=range][aria-label="Borders"]').fill('0'); await nap(150);
+    await choose('Card style', 'flat'); await nap(150);
     assert(await cls('flat') && await cls('edges-fill'), 'Flat not applied');
     await tab('displayadv');
     await choose('Button style', 'tinted');
@@ -1904,7 +1905,7 @@ async function run(label, ctxOpts) {
       for (let i = 0; i < 3 && await p.locator('dialog[open]').count(); i++) { await p.keyboard.press('Escape'); await nap(200); }
       await tab('access'); await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click(); await nap(200);
       await tab('displayadv'); await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click(); await nap(200);
-      await tab('themes'); await p.locator('input[type=range][aria-label="Borders"]').fill('5'); await nap(150);
+      await tab('themes'); await choose('Card style', 'raised'); await nap(150);
     }
     for (const k of ['flat', 'btn-tinted', 'icon-btns', 'cal-plain', 'page-titles', 'rows-short', 'row-hold']) assert(!(await cls(k)), k + ' not reset');
     eq(await p.locator('.top h1').textContent(), 'APMES Logbook', 'app name not back');
@@ -1994,9 +1995,9 @@ async function run(label, ctxOpts) {
     await check('Suggested tags as you type').uncheck(); await check('Quick picks').uncheck(); await check('Autocorrect').check(); await nap(300);
     await tab('displayadv');
     await check('Pin the case box').check(); await check('Pin the search box').check(); await nap(200);
-    // Borders all the way down: lines gone, fields filled
+    // Card style Flat: lines gone, fields filled
     await tab('themes');
-    await p.locator('input[type=range][aria-label="Borders"]').fill('0'); await nap(200);
+    await choose('Card style', 'flat'); await nap(200);
     try {
       await tab('logbook');
       const cal = p.locator('main .seg button', { hasText: /^Calendar$/ }); if (await cal.count()) { await cal.first().click(); await nap(200); }
@@ -2024,7 +2025,7 @@ async function run(label, ctxOpts) {
       await tab('displayadv');
       await check('Pin the case box').uncheck(); await check('Pin the search box').uncheck(); await nap(200);
       await tab('themes');
-      await p.locator('input[type=range][aria-label="Borders"]').fill('4'); await nap(200);
+      await choose('Card style', 'raised'); await nap(200);
     }
   });
 
