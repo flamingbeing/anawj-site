@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import * as M from '../js/model.js';
 import * as S from '../js/sheet.js';
-import { evaluate, describeRule, buildContext, dayOffWeight } from '../js/rules.js';
+import { evaluate, describeRule, buildContext, dayOffWeight, carryBalances } from '../js/rules.js';
 import { solve } from '../js/solver.js';
 import { demoState } from '../js/demo.js';
 import { apmesList } from '../js/apmes.js';
@@ -555,5 +555,22 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(who === 'c', 'no day-1 cardiac call preference for RES3 and senior residents, still for the others');
   const old = M.defaultState(); old.rulesVersion = 10; old.rules.find(r => r.id === 'r-c3-d1').who = { groups: [], tags: [], staff: [], exclude: [] };
   ok(M.migrate(JSON.parse(JSON.stringify(old))).rules.find(r => r.id === 'r-c3-d1').who.onlyGroups.length > 5, 'a saved roster gets the group limit once');
+}
+{
+  // carry-over: last month's difference counts this month
+  const st = M.defaultState();
+  const rule = JSON.parse(JSON.stringify(M.DEFAULT_RULES.find(r => r.id === 'r-c3-fair')));
+  st.rules = [rule];
+  for (const id of ['x', 'y']) st.staff.push({ id, name: id, group: 'nhg', tags: [], fte: 1, active: true });
+  const oct = M.monthDays('2026-10'), nov = M.monthDays('2026-11');
+  for (const d of [...oct, ...nov]) for (const id of ['x', 'y']) M.setCell(st, d, id, { a: ['C'] });
+  const wk = oct.filter(d => !M.isWeekend(d)).slice(0, 6);
+  wk.forEach(d => M.setCell(st, d, 'x', { a: ['C3'] }));        // x took six weekday calls in October, y none
+  M.setCell(st, nov[3], 'x', { a: ['C3'] }); M.setCell(st, nov[10], 'y', { a: ['C3'] });   // equal in November
+  const bal = carryBalances(st, '2026-11', { ...rule.params, carryMonths: 4 });
+  ok(bal.get('x') > 2.5 && bal.get('y') < -2.5, 'carry-over: x is over and y under by about three points after October');
+  const flagged = c => { rule.params.carry = c; return evaluate(st, { from: nov[0], to: nov[nov.length - 1] }).violations.filter(v => v.ruleId === 'r-c3-fair').length; };
+  ok(flagged(0) === 0 && flagged(1) > 0, 'carry-over: equal Novembers are fair without it, and not once October counts');
+  ok(/carries over/.test(describeRule({ ...rule, params: { ...rule.params, carry: 0.5 } }, st)), 'carry-over: the rule says so');
 }
 console.log(`nuh-junior-monthly: ${n} checks passed`);

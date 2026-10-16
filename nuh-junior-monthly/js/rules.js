@@ -46,6 +46,48 @@ const NONE = Object.freeze([]);
 // (weekend or public holiday) and plus `eb` when the day after is one too: Friday 1.5, Saturday 2, Sunday 1.5, a public holiday
 // 1.5, or 2 when the day after is also off.
 export function dayOffWeight(isOff, nextOff, ob = 0.5, eb = 0.5) { return 1 + (isOff ? ob : 0) + (nextOff ? eb : 0); }
+// What each person was over (+) or under (-) their fair share of a posting's calls in the months before `month`, in points:
+// for each earlier month, their points minus their posting days times the pool's rate that month; the last month counts fully
+// and each month before it a quarter less (carryMonths of them). A call day counts as a day on the posting. Past months only:
+// next month is not rostered yet. Returns Map(person id -> points).
+export function carryBalances(state, month, { codes, among, carryMonths = 4, scheme, offBonus, eveBonus, weekendWeight, holidayWeight }) {
+  const out = new Map();
+  const callSet = new Set(codes || []), postSet = new Set([...(among || []), ...(codes || [])]);
+  if (!callSet.size || !(among || []).length) return out;
+  const offdays = scheme !== 'fixed';
+  const isOff = s => { const wd = new Date(s + 'T00:00:00').getDay(); return wd === 0 || wd === 6 || isHoliday(state, s); };
+  const wOf = s => {
+    if (offdays) return dayOffWeight(isOff(s), isOff(addDays(s, 1)), offBonus ?? 0.5, eveBonus ?? 0.5);
+    const wd = new Date(s + 'T00:00:00').getDay(), wk = wd === 0 || wd === 6;
+    return isHoliday(state, s) ? (wk ? Math.max(holidayWeight ?? 2, weekendWeight ?? 2) : (holidayWeight ?? 2)) : wk ? (weekendWeight ?? 2) : 1;
+  };
+  const staff = (state.staff || []).filter(p => p && p.active !== false);
+  let m = month;
+  for (let j = 0; j < Math.max(0, Math.min(12, carryMonths | 0)); j++) {
+    m = monthOf(addDays(m + '-01', -1));
+    const w = Math.max(0.25, 1 - 0.25 * j), per = new Map();
+    let sumP = 0, sumD = 0;
+    for (const d of monthDays(m)) {
+      const day = state.cells && state.cells[d];
+      if (!day) continue;
+      for (const p of staff) {
+        const c = day[p.id];
+        if (!c || !Array.isArray(c.a)) continue;
+        const isCall = c.a.some(x => callSet.has(x));
+        if (!isCall && !c.a.some(x => postSet.has(x))) continue;
+        const t = per.get(p.id) || { P: 0, D: 0 };
+        t.D++; sumD++;
+        if (isCall) { const pts = wOf(d); t.P += pts; sumP += pts; }
+        per.set(p.id, t);
+      }
+    }
+    if (!sumD) continue;
+    const rate = sumP / sumD;
+    for (const [id, t] of per) out.set(id, (out.get(id) || 0) + w * (t.P - t.D * rate));
+  }
+  return out;
+}
+
 
 export function ruleReach(rules) {
   let reach = 7;
@@ -1016,14 +1058,17 @@ export const RULE_TYPES = {
       P.num('holidayWeight', 'Public holiday counts as (second way)', { min: 0, max: 10 }),
       P.num('tolerance', 'Allowed difference from average', { min: 0, max: 10 }),
       { key: 'among', label: 'Only people on (their days on it set the share)', kind: 'codes', optional: true, help: 'A posting, e.g. ICU: only people in ICU count, and someone in ICU for half the month gets half a share.' },
+      P.num('carry', 'Carry over from earlier months (0 to 1)', { min: 0, max: 1 }, 'How much of what a person was over or under in the months before counts now: 0 none, 1 all. Needs "Only people on". The last month counts fully, each month before a quarter less.'),
+      P.num('carryMonths', 'Months to look back', { min: 1, max: 12 }),
     ],
-    defaults: () => ({ codes: [], period: 'month', scheme: 'offdays', offBonus: 0.5, eveBonus: 0.5, weekendWeight: 2, holidayWeight: 2, tolerance: 1, among: [] }),
+    defaults: () => ({ codes: [], period: 'month', scheme: 'offdays', offBonus: 0.5, eveBonus: 0.5, weekendWeight: 2, holidayWeight: 2, tolerance: 1, among: [], carry: 0, carryMonths: 4 }),
     describe(r, T) {
       const p = r.params;
       const among = (p.among || []).length ? `people on ${T.codes(p.among)}` : T.who(r.who);
       const how = p.scheme === 'fixed' ? `weekends x${num(p.weekendWeight, 2)}, holidays x${num(p.holidayWeight, 2)}`
         : `a day off adds ${num(p.offBonus, 0.5)} and so does the day before one: Fri ${1 + num(p.eveBonus, 0.5)}, Sat ${1 + num(p.offBonus, 0.5) + num(p.eveBonus, 0.5)}, Sun ${1 + num(p.offBonus, 0.5)}`;
-      return withWhen(`Share ${T.codes(p.codes)} fairly among ${among} (${how})`, r, T);
+      const cy = num(p.carry, 0) > 0 && (p.among || []).length ? `; ${Math.round(num(p.carry, 0) * 100)}% of the last ${num(p.carryMonths, 4)} months' difference carries over` : '';
+      return withWhen(`Share ${T.codes(p.codes)} fairly among ${among} (${how}${cy})`, r, T);
     },
     compile(r, X) {
       const p = r.params, m = X.codes(p.codes);
@@ -1037,6 +1082,16 @@ export const RULE_TYPES = {
       const K = periods.length;
       const val = new Float64Array(ctx.P * K).fill(NaN);   // weighted count per FTE, NaN = not in this period
       const raw = new Float64Array(ctx.P * K);
+      // what each person was over or under in the months before each period (points), scaled by how much carries over
+      const cw = (p.among || []).length ? Math.max(0, Math.min(1, num(p.carry, 0))) : 0;
+      const carry = new Float64Array(ctx.P * K);
+      if (cw > 0) {
+        for (let k = 0; k < K; k++) {
+          const mk = p.period === 'range' ? ctx.month[ctx.lo] : periods[k].key;
+          const bal = carryBalances(ctx.state, mk, { ...p, carryMonths: num(p.carryMonths, 4) });
+          ctx.people.forEach((pp, pi) => { carry[pi * K + k] = cw * (bal.get(pp.id) || 0); });
+        }
+      }
       // a public holiday on a weekend counts as the larger of the two weights
       const isOff = d => ctx.wd[d] === 0 || ctx.wd[d] === 6 || !!ctx.hol[d];
       const nextOff = d => (d + 1 < n ? isOff(d + 1) : (ctx.wd[d] + 1) % 7 === 0 || (ctx.wd[d] + 1) % 7 === 6);   // past the window: weekends only
@@ -1057,7 +1112,7 @@ export const RULE_TYPES = {
           }
           const frac = tot ? a_ / tot : 0;
           raw[pi * K + k] = sum;
-          val[pi * K + k] = frac >= (ma ? 0.15 : 0.25) ? sum / (fte * frac) : NaN;
+          val[pi * K + k] = frac >= (ma ? 0.15 : 0.25) ? (sum + carry[pi * K + k]) / (fte * frac) : NaN;
         }
       };
       return {
@@ -1081,7 +1136,7 @@ export const RULE_TYPES = {
                 const lab = p.period === 'range' ? 'in these dates' : `in ${fmtMonth(periods[k].key)}`;
                 // about the whole period, so no date: the grid marks the name, Check's Show opens their month
                 const wtxt = ww !== 1 || hw !== 1 ? ' (weekends and holidays count extra)' : '';
-                out.push(X.V(pp, `${X.name(pi)}: ${X.T.codes(p.codes)} ${round1(v)} ${lab}${wtxt}; group average ${round1(mean)}`, { staffId: ctx.people[pi].id, month: periods[k].key }));
+                out.push(X.V(pp, `${X.name(pi)}: ${X.T.codes(p.codes)} ${round1(v)} ${lab}${wtxt}${carry[pi * K + k] ? ` (includes ${carry[pi * K + k] > 0 ? '+' : ''}${round1(carry[pi * K + k])} carried over from earlier months)` : ''}; group average ${round1(mean)}`, { staffId: ctx.people[pi].id, month: periods[k].key }));
               }
             }
           }
