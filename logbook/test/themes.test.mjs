@@ -62,3 +62,16 @@ for (const [k, t] of Object.entries(TINTS)) for (const side of ['light', 'dark']
   assert.ok(contrast(v.muted, v.bg) >= 4.5, `${k} ${side} muted on the page`);
 }
 console.log('themes tests passed');
+
+// Card style (16 Oct 2026): one choice over flat / shadows; the line strength stays as it was
+{
+  const { cardStyle, cardPatch, CARD_STYLES } = await import('../js/display.js');
+  assert.deepEqual(CARD_STYLES.map(([k]) => k), ['raised', 'outlined', 'flat']);
+  assert.equal(cardStyle({}), 'raised', 'soft shadows by default');
+  assert.equal(cardStyle({ shadows: false }), 'outlined');
+  assert.equal(cardStyle({ flat: true, shadows: false, borders: 2 }), 'flat', 'Flat wins');
+  for (const [k] of CARD_STYLES) assert.equal(cardStyle({ borders: 2, ...cardPatch(k) }), k, k + ' round-trips');
+  assert.equal('borders' in cardPatch('flat'), false, 'Flat keeps the line strength for later');
+  for (const t of THEMES) assert.ok(CARD_STYLES.some(([k]) => k === cardStyle(t.look)), t.id);
+  console.log('card style: ok');
+}
