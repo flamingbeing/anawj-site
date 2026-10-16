@@ -1419,10 +1419,13 @@ export function openAutofill(app) {
   let worker = null, stopped = false, t0 = 0, tick = 0;
   let timeMs = 6000;
   let redo = false;   // also redo the calls already typed in the sheet (they come in as hand-entered)
+  // every draft made in this dialog (Try again, Try 5 more), so their scores can be compared and any one applied
+  let attempts = [], pickedN = null, batch = 0;
   // what to fill: some of the auto-fill codes (cardiac and ICU today); the others are left exactly as they are
   const fillable = autoDuties.filter(d => d.kind === 'shift');
-  let chosen = new Set(fillable.map(d => d.code));
-  try { const saved = JSON.parse(localStorage.getItem('nuhjm-af-codes') || 'null'); if (Array.isArray(saved)) { const keep = fillable.map(d => d.code).filter(c => saved.includes(c)); if (keep.length) chosen = new Set(keep); } } catch (e) { /* all */ }
+  // R1 to R3 can be ticked too; they start unticked (cardiac and ICU stay the default)
+  const OFF_BY_DEFAULT = ['R1', 'R2', 'R3'];
+  let chosen = new Set(M.fillCodes(state));
   const picked = () => autoDuties.filter(d => d.kind !== 'shift' || chosen.has(d.code));
   try { timeMs = +localStorage.getItem('nuhjm-af-time') || 6000; } catch (e) { /* ignore */ }
 
@@ -1473,6 +1476,7 @@ export function openAutofill(app) {
 
   function stageOptions() {
     stopped = false;
+    attempts = []; pickedN = null; batch = 0;
     const n = counts(state);
     wrap.innerHTML = '';
     wrap.append(
@@ -1496,6 +1500,10 @@ export function openAutofill(app) {
         what.append(h('label', { class: 'af-opt', for: id }, cb, h('span', { class: 'af-opt-l' }, d.code), h('span', { class: 'af-opt-s' }, d.name)));
       }
       wrap.append(what, h('p', { class: 'muted af-what-note' }, 'Calls you do not tick are not changed, but the rules around them (post call, gaps, who is already on call) still apply.'));
+      if (OFF_BY_DEFAULT.some(c => chosen.has(c))) {
+        const off = (state.rules || []).filter(r => M.R13_RULE.test(r.id)).some(r => r.enabled === false);
+        if (off) wrap.append(h('p', { class: 'muted af-what-note' }, 'Ticking R1, R2 or R3 turns the R1 to R3 rules on (every night needs one of each, who may do which call, gaps and sharing). Turn them off again on the Rules tab.'));
+      }
     }
     // upper bounds: the search usually ends sooner, once it stops finding a better roster
     const times = [[3000, 'Quick', '3 s'], [6000, 'Normal', '6 s'], [15000, 'Thorough', '15 s']];
@@ -1511,7 +1519,7 @@ export function openAutofill(app) {
       const cb = h('input', { type: 'checkbox', id: 'af-redo', checked: redo });
       cb.addEventListener('change', () => { redo = cb.checked; });
       wrap.append(h('label', { class: 'af-redo', for: 'af-redo' }, cb,
-        h('span', null, ` Also redo the ${autoDuties.map(d => d.code).join(' and ')} calls already in the sheet (${n.manual}). For trying Auto-fill on a month that is already filled; Apply can be undone.`)));
+        h('span', null, ` Also redo the ${picked().map(d => d.code).join(' and ')} calls already in the sheet (${n.manual}). For trying Auto-fill on a month that is already filled; Apply can be undone.`)));
     }
     if (!autoDuties.length) wrap.append(h('p', { class: 'warn-box' }, 'No duty is marked "auto-fill" yet. Mark codes under People › Duty codes.'));
     const nothing = fillable.length > 0 && !chosen.size;
@@ -1525,13 +1533,13 @@ export function openAutofill(app) {
     wrap.innerHTML = '';
     const bar = h('div', { class: 'af-bar', role: 'progressbar', 'aria-label': 'Auto-fill progress', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': '0' }, h('span', { class: 'af-bar-fill' }));
     wrap.append(
-      h('p', { class: 'af-status', 'aria-live': 'polite' }, 'Building a first draft…'),
+      h('p', { class: 'af-status', 'aria-live': 'polite' }, attempts.length ? `Attempt ${attempts.length + 1}: building a draft…` : 'Building a first draft…'),
       bar,
       h('div', { class: 'af-live' },
         h('div', { class: 'af-num' }, h('span', { class: 'af-n af-hard' }, '–'), h('span', null, 'must-fix')),
         h('div', { class: 'af-num' }, h('span', { class: 'af-n af-soft' }, '–'), h('span', null, 'to improve')),
         h('div', { class: 'af-num' }, h('span', { class: 'af-n af-time-n' }, '0 s'), h('span', null, 'elapsed'))),
-      h('div', { class: 'af-actions' }, h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => { stopWorker(); stageOptions(); }, html: `${app.icon('stop')}<span>Stop</span>` })));
+      h('div', { class: 'af-actions' }, h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => { stopWorker(); batch = 0; if (attempts.length) { stopped = false; showAttempts(); } else stageOptions(); }, html: `${app.icon('stop')}<span>Stop</span>` })));
     t0 = performance.now();
     shownPct = 0;
     tick = setInterval(() => {
@@ -1562,6 +1570,10 @@ export function openAutofill(app) {
   function run() {
     runCount++;
     const seed = runCount;
+    // R1 to R3 ticked: the rules that make those calls work have to be on (they are off until the rosterer starts using them here)
+    if (OFF_BY_DEFAULT.some(c => chosen.has(c)) && (app.store.get().rules || []).some(r => M.R13_RULE.test(r.id) && r.enabled === false)) {
+      app.store.commit('Turn on the R1 to R3 rules', draft => { for (const r of draft.rules) if (M.R13_RULE.test(r.id)) r.enabled = true; });
+    }
     const snapshot = redo ? JSON.parse(JSON.stringify(app.store.get())) : app.store.get();
     if (redo) markAuto(snapshot);
     stageProgress();
@@ -1620,20 +1632,53 @@ export function openAutofill(app) {
     return { added, removed };
   }
 
+  // a finished draft: keep it with its scores, then show the comparison (or run the next of a batch)
   function done(result, snapshot) {
     if (stopped) return;
     clearInterval(tick);
-    if (!result) { stageOptions(); return; }
+    if (!result) { if (attempts.length) showAttempts(); else stageOptions(); return; }
+    const after = result.after || { hard: 0, soft: 0, score: 0 };
+    const unf = result.unfilled || [];
+    attempts.push({ n: attempts.length + 1, result, snapshot, ch: diff(snapshot, result), hard: after.hard, soft: after.soft, score: Number(after.score) || 0, short: unf.reduce((a, u) => a + (u.need || 1), 0) });
+    if (batch > 0) { batch--; run(); return; }
+    showAttempts();
+  }
+  // best first: fewest must-fix, then the lowest score (the weighted total of every problem)
+  const byBest = (a, b) => a.hard - b.hard || a.short - b.short || a.score - b.score;
+
+  function showAttempts() {
+    const best = attempts.slice().sort(byBest)[0];
+    if (!attempts.some(a => a.n === pickedN)) pickedN = best.n;
+    const cur = attempts.find(a => a.n === pickedN);
+    const { result, snapshot } = cur;
     const now = app.evaluation();
-    const ch = diff(snapshot, result);
+    const ch = cur.ch;
     const after = result.after || { hard: 0, soft: 0 };
     wrap.innerHTML = '';
     const changedTxt = ch.added + ch.removed ? `${ch.added} shift${ch.added === 1 ? '' : 's'} added, ${ch.removed} removed` : 'No changes: the current roster is already the best found';
     wrap.append(
-      h('p', { class: 'af-headline' }, changedTxt, h('span', { class: 'muted' }, ` · ${((result.ms || 0) / 1000).toFixed(1)} s${result.iterations ? `, ${Number(result.iterations).toLocaleString()} tries` : ''}`)),
+      h('p', { class: 'af-headline' }, attempts.length > 1 ? `Attempt ${cur.n}: ` : '', changedTxt, h('span', { class: 'muted' }, ` · ${((result.ms || 0) / 1000).toFixed(1)} s${result.iterations ? `, ${Number(result.iterations).toLocaleString()} tries` : ''}`)),
       h('div', { class: 'af-compare' },
         cmp('Must-fix problems', now.hard, after.hard),
         cmp('To improve (soft)', now.soft, after.soft)));
+    if (attempts.length > 1) {
+      // the drafts side by side: each is a different random start, so the scores differ a little; pick the one you like
+      const tb = h('tbody');
+      for (const a of attempts) {
+        const id = `af-pick-${a.n}`;
+        const r = h('input', { type: 'radio', name: 'af-pick', id, checked: a.n === pickedN, 'aria-label': `Use attempt ${a.n}` });
+        r.addEventListener('change', () => { pickedN = a.n; showAttempts(); });
+        tb.append(h('tr', { class: a.n === pickedN ? 'sel' : '' },
+          h('td', null, r),
+          h('th', { scope: 'row' }, h('label', { for: id }, `Attempt ${a.n}`), a === best ? h('span', { class: 'af-best' }, 'Best') : null),
+          h('td', null, String(a.hard)), h('td', null, String(a.soft)), h('td', null, String(Math.round(a.score * 10) / 10)), h('td', null, String(a.short)),
+          h('td', null, `${a.ch.added + a.ch.removed}`)));
+      }
+      wrap.append(h('table', { class: 'af-attempts' },
+        h('caption', null, 'Drafts compared. Lower is better in every column; the score is the weighted total of all problems.'),
+        h('thead', null, h('tr', null, h('th', null, h('span', { class: 'sr-only' }, 'Use')), h('th', null, 'Draft'), h('th', null, 'Must-fix'), h('th', null, 'To improve'), h('th', null, 'Score'), h('th', null, 'Short nights'), h('th', null, 'Changes'))),
+        tb));
+    }
     const unf = result.unfilled || [];
     if (unf.length) {
       wrap.append(h('div', { class: 'af-unf' },
@@ -1653,6 +1698,7 @@ export function openAutofill(app) {
     wrap.append(h('div', { class: 'af-actions' },
       h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => close() }, 'Discard'),
       h('button', { type: 'button', class: 'btn btn-ghost', onclick: run }, 'Try again'),
+      h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => { batch = 4; run(); }, title: 'Five more drafts from different random starts, then compare their scores' }, 'Try 5 more'),
       h('button', {
         type: 'button', class: 'btn btn-primary', autofocus: true,
         onclick: () => {
@@ -1660,7 +1706,7 @@ export function openAutofill(app) {
           close();
           app.toast(`Auto-fill applied: ${changedTxt.toLowerCase()}`, { action: { label: 'Undo', fn: () => app.store.undo() } });
         },
-      }, 'Apply')));
+      }, attempts.length > 1 ? `Apply attempt ${cur.n}` : 'Apply')));
     wrap.querySelector('.btn-primary')?.focus();
   }
 

@@ -1087,7 +1087,7 @@ body.has-taskcard .sheet { max-height: calc(100vh - var(--task-h, 0px) - 64px); 
 #cloudbtn[data-state="newer"] { border-color: var(--blue, #178fd7); color: #0b5f94; }
 #cloudbtn .cl-dot { position: absolute; top: 3px; right: 3px; width: 9px; height: 9px; border-radius: 50%; background: #e57200; }
 #cloudbtn[data-state="newer"] .cl-dot { background: var(--blue, #178fd7); }
-body:not([data-tab="roster"]) #autofill, body.month-locked #autofill, body.month-locked .r-banner .rb-act { display: none; }   /* Fill only where it can work: the Roster tab, in a month that is not locked */
+body:not([data-tab="roster"]):not([data-tab="check"]) #autofill, body.month-locked #autofill, body.month-locked .r-banner .rb-act { display: none; }   /* Fill only where it can work: the Roster and Check tabs (Check is where the problems show), in a month that is not locked */
 @media (max-width: 720px) {
   #cloudbtn { min-height: 44px; padding: 0 8px; max-width: 120px; }
   #cloudbtn .cl-long { display: none; }
@@ -1229,3 +1229,14 @@ body:not([data-tab="roster"]) #autofill, body.month-locked #autofill, body.month
 .wl-note { margin: 0; font-size: 13px; }
 @media (min-width: 721px) { .wl-legend-long { display: inline; font-weight: 400; font-size: 12px; } .wl-leg .wl-chip { flex: 1 1 260px; } }
 .view-more > .link-card:not(:last-of-type) { border-radius: var(--radius); }
+
+/* Fill: the drafts side by side (Try again / Try 5 more) */
+.af-attempts { width: 100%; border-collapse: collapse; margin: 12px 0 4px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.af-attempts caption { text-align: left; color: var(--muted); font-size: 12px; padding-bottom: 6px; }
+.af-attempts th, .af-attempts td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line, #e3e5e9); }
+.af-attempts th[scope="row"], .af-attempts thead th:nth-child(2) { text-align: left; font-weight: 600; }
+.af-attempts thead th { font-size: 12px; color: var(--muted); font-weight: 600; }
+.af-attempts tr.sel { background: var(--field); }
+.af-attempts input[type="radio"] { width: 18px; height: 18px; accent-color: var(--navy, #002f6c); }
+.af-best { margin-left: 6px; padding: 1px 6px; border-radius: 8px; font-size: 11px; background: #d9efe0; color: #1b5e32; }
+@media (max-width: 720px) { .af-attempts th, .af-attempts td { padding: 6px 4px; font-size: 13px; } }

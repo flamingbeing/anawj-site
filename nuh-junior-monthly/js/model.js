@@ -54,9 +54,9 @@ const other = (code, name) => duty(code, name, 'other', '#e0e0e0', '#333');
 const BASE_DUTIES = [
   call('C3', 'Cardiac call', '#b71c1c', { auto: true }),
   call('R1B', 'ICU call (SICU)', '#0d47a1', { auto: true, rest2: true }),
-  call('R1', 'MO1 call', '#c62828'),
-  call('R2', 'MO2 call', '#ad1457'),
-  call('R3', 'MO3 call', '#6a1b9a'),
+  call('R1', 'MO1 call', '#c62828', { auto: true }),
+  call('R2', 'MO2 call', '#ad1457', { auto: true }),
+  call('R3', 'MO3 call', '#6a1b9a', { auto: true }),
   call('S1', 'Registrar call (S1)', '#4e342e'),
   call('S1B', 'Stay-in S1 (S1B)', '#5d4037'),
   call('OGC', 'Obstetric call', '#00695c'),
@@ -144,6 +144,20 @@ export const DEFAULT_DUTIES = BASE_DUTIES.map(d => (PALETTE[d.code] ? { ...d, co
 // roster guide and past rosters, some off until the rosterer confirms them. The rosterer tunes them in the app.
 // every group except RES3 and senior residents (R): the day-1 cardiac call rule is for the others
 const C3_D1_GROUPS = ['ac', 'res2', 'res1', 'nhg', 'rp', 'loc', 'mopex', 'rr', 'fellow'];
+// the rules that make the R1 to R3 calls work (Rules tab: "Turn on all the R1 to R3 rules"; Fill turns them on when R1 to R3 are ticked)
+export const R13_RULE = /^r-(r1|r2|r3)-|^r-mo-|^r-fair$|^r-gap$/;
+// The calls Fill drafts (the Fill dialog's ticks, kept on the device): cardiac and ICU until the rosterer ticks R1 to R3.
+// Check's "only what Fill places" filter reads the same list.
+export function fillCodes(state) {
+  const all = (state.duties || []).filter(d => d.auto && d.kind === 'shift').map(d => d.code);
+  let chosen = all.filter(c => !['R1', 'R2', 'R3'].includes(c));
+  if (!chosen.length) chosen = all.slice();
+  try {
+    const saved = JSON.parse(localStorage.getItem('nuhjm-af-codes') || 'null');
+    if (Array.isArray(saved)) { const keep = all.filter(c => saved.includes(c)); if (keep.length) chosen = keep; }
+  } catch (e) { /* no saved choice */ }
+  return chosen;
+}
 export const CALLS = ['R1', 'R2', 'R3', 'S1', 'S1B', 'R1B', 'C3', 'OGC', 'OGN'];
 const R = (id, type, name, params, o = {}) => ({
   id, type, name, enabled: o.enabled !== false, hard: o.hard !== false, weight: o.weight ?? 10,
@@ -294,9 +308,9 @@ export function cleanRule(r) {
 // One-time updates to rules that were already saved (the owner's rulings of 16 Oct 2026): requests and blocks become
 // preferences, "new to ICU" is strict only for rotating residents and MOPEXes. Only a rule still in its old form changes.
 function updateRules(s) {
-  if ((s.rulesVersion || 1) >= 19) return;
+  if ((s.rulesVersion || 1) >= 20) return;
   const from2 = (s.rulesVersion || 1) < 2;
-  s.rulesVersion = 19;
+  s.rulesVersion = 20;
   const find = id => s.rules.find(r => r.id === id);
   if (from2) for (const [id, w] of [['r-req-x', 60], ['r-req-xx', 80]]) { const r = find(id); if (r && r.hard) { r.hard = false; r.weight = w; } }
   const n = from2 && find('r-r1b-new');
@@ -365,6 +379,8 @@ function updateRules(s) {
   if (!(s.tags || []).some(x => x.id === 'fsscap')) (s.tags = s.tags || []).push(clone(DEFAULT_TAGS.find(t => t.id === 'fsscap')));
   for (const id of ['r-mo-icusat1', 'r-mo-icusat2', 'r-mo-fss', 'r-mo-pool-r1', 'r-mo-pool-rh1', 'r-mo-pool-r2', 'r-mo-pool-rh2', 'r-mo-pool-r3', 'r-mo-pool-rh3']) add(id);
   for (const id of ['r-mo-nogo', 'r-mo-weak', 'r-mo-satfri', 'r-mo-res', 'r-mo-fellow', 'r-mo-mopex']) add(id);
+  // R1 to R3 can be filled (a tick in the Fill dialog, off until ticked)
+  for (const code of ['R1', 'R2', 'R3']) { const du = (s.duties || []).find(d => d.code === code); if (du) du.auto = true; }
   // strong / weak pools and the request screening (the R1 to R3 rosterer's rules, 16 Oct 2026)
   for (const t of DEFAULT_TAGS.filter(t => /^mo[123][sw]$/.test(t.id))) if (!(s.tags || []).some(x => x.id === t.id)) (s.tags = s.tags || []).push(clone(t));
   add('r-req-load'); add('r-req-npload'); add('r-pool-1'); add('r-pool-2'); add('r-pool-3');
