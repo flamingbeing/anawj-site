@@ -31,8 +31,8 @@ check `evals/` work in progress too.
    roster app names people. The roster app **pulls** it (it opens People, which sends after the user taps Send): the
    roster app's side is noted in `nuh-junior-monthly/NOTES.md`, "Rotations from People". The sheet reader should be a standalone module with no screen of its own, so People can reuse
    it. Code meanings and the sheet's layout: the owner's private notes (code key, 66 codes).
-2. **Rotations store with access control** (owner, 16 Oct 2026; the project is being created through firetop): see the
-   decisions log. Not needed for stage 1.
+2. **Rotations store with access control** (owner, 16 Oct 2026; the empty project `apmes-rotations` exists, locked, with the owner as
+   its only member): see the decisions log. Not needed for stage 1.
 3. Later, and only with the rotation planner's say: editing rotations in the app (stage 2), then retiring the sheet.
 
 ## Recently done
@@ -86,7 +86,9 @@ check `evals/` work in progress too.
   Rosterers are not in People's lists (adding them means a change to the protected logbook project's rules, which we avoid), so
   until the shared store exists an admin or PD sends the critical postings to the roster app (the pull above) and the
   rosterer sees only those.
-- 16 Oct 2026: **a separate Firebase project for rotations**, `apmes-rotations` (owner; requested from firetop the same day;
+- 16 Oct 2026: **a separate Firebase project for rotations**, `apmes-rotations` (owner; created through firetop the same day, locked
+  until rules are deployed, on the free plan for now because billing could not be linked; the owner decides that, details in his
+  private notes;
   never the logbook's project). It copies the roster app's pattern: a member list with roles (admin, rosterer, viewer) that
   admins manage inside the app, so only the very first admin is added by hand in the console, once. The owner does not want to
   open Firebase to add rosterers. Rules (member-only read; deploy on merge via the rules workflow) and the app's sign-in
