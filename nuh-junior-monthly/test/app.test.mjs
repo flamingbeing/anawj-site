@@ -296,6 +296,20 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(CSm.headerState().kind === 'newer', 'a newer cloud copy says so');
   delete globalThis.localStorage;
 }
+// request importance: X! must have, X? nice to have, next to X (and an older saved roster gains them)
+{
+  const s = team();
+  const dm = M.dutyMap(s), up = new Map([...dm.keys()].map(c => [c.toUpperCase(), c]));
+  ok(S.codesFromText('X!', dm, up).r.join() === 'X!' && S.codesFromText('X?', dm, up).r.join() === 'X?', 'the sheet reads X! and X? as requests');
+  const w = id => s.rules.find(r => r.id === id).weight;
+  ok(w('r-req-xh') > w('r-req-xx') && w('r-req-xx') > w('r-req-x') && w('r-req-x') > w('r-req-xl'), 'must have outweighs a block, which outweighs X, which outweighs nice to have');
+  const old = JSON.parse(JSON.stringify(s));
+  old.rulesVersion = 3; old.duties = old.duties.filter(d => d.code !== 'X!' && d.code !== 'X?'); old.rules = old.rules.filter(r => r.id !== 'r-req-xh' && r.id !== 'r-req-xl');
+  const m = M.migrate(old);
+  ok(m.duties.some(d => d.code === 'X!') && m.duties.some(d => d.code === 'X?') && m.rules.some(r => r.id === 'r-req-xh') && m.rules.some(r => r.id === 'r-req-xl'), 'a saved roster gains the two request codes and their rules');
+  M.setCell(s, days[5], 'i0', { a: ['C3'], r: ['X!'] }); M.setCell(s, days[6], 'i0', { a: ['C3'], r: ['X?'] });
+  ok(S.cellText(s, days[5], 'i0').includes('X!') && S.cellText(s, days[6], 'i0').includes('X?'), 'and they are written back to the sheet as typed');
+}
 // people the imported sheet leaves out are hidden from the month and not in post for the rules
 {
   const st = M.defaultState();

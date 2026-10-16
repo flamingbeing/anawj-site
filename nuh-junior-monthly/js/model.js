@@ -93,6 +93,8 @@ export const DEFAULT_DUTIES = [
   leave('NS', 'NS (reservist)'),
   leave('0.5', 'Half day leave'),
   request('X', 'No call'),
+  request('X!', 'No call: must have (e.g. going on holiday)'),
+  request('X?', 'No call: nice to have (e.g. clearing leave)'),
   request('XX', 'Call blocked by the planner'),
   request('NP', 'No premed'),
   request('R', 'Call request'),
@@ -154,6 +156,8 @@ export const DEFAULT_RULES = [
   R('r-preleave', 'sequence', 'No post call into leave', { ifCodes: CALLS, thenCodes: ['@leave'], mode: 'forbid', from: 1, to: 1 }, soft(50, { note: PREDICTED })),
   // call requests and blocks are softer than the rules above: kept when there is room, given up first when a night would be empty (owner, 16 Oct 2026)
   R('r-req-x', 'requests', 'No call when asked (X)', { request: 'X', codes: CALLS, mode: 'avoid', span: 'day' }, soft(60)),
+  R('r-req-xh', 'requests', 'No call, must have (X!)', { request: 'X!', codes: CALLS, mode: 'avoid', span: 'day' }, soft(150)),
+  R('r-req-xl', 'requests', 'No call, nice to have (X?)', { request: 'X?', codes: CALLS, mode: 'avoid', span: 'day' }, soft(20)),
   R('r-req-xx', 'requests', 'No call when blocked by the planner', { request: 'XX', codes: CALLS, mode: 'avoid', span: 'day' }, soft(80)),
   R('r-req-r', 'requests', 'Call when asked (R)', { request: 'R', codes: CALLS, mode: 'want', span: 'day' }, soft(10)),
   R('r-req-np', 'requests', 'No premed when asked (NP)', { request: 'NP', codes: ['P', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6'], mode: 'avoid', span: 'day' }, soft(30)),
@@ -231,9 +235,9 @@ export function cleanRule(r) {
 // One-time updates to rules that were already saved (the owner's rulings of 16 Oct 2026): requests and blocks become
 // preferences, "new to ICU" is strict only for rotating residents and MOPEXes. Only a rule still in its old form changes.
 function updateRules(s) {
-  if ((s.rulesVersion || 1) >= 3) return;
+  if ((s.rulesVersion || 1) >= 4) return;
   const from2 = (s.rulesVersion || 1) < 2;
-  s.rulesVersion = 3;
+  s.rulesVersion = 4;
   const find = id => s.rules.find(r => r.id === id);
   if (from2) for (const [id, w] of [['r-req-x', 60], ['r-req-xx', 80]]) { const r = find(id); if (r && r.hard) { r.hard = false; r.weight = w; } }
   const n = from2 && find('r-r1b-new');
@@ -253,6 +257,15 @@ function updateRules(s) {
   if (g1 && g1.params && +g1.params.from === 1 && +g1.params.to === 2) g1.params.to = 1;
   const g3 = find('r-c3-gap');
   if (g3 && g3.params && +g3.params.from === 1 && +g3.params.to === 2) { g3.params.to = 1; add('r-c3-eod'); }
+  // request importance (owner, 16 Oct 2026): X! must have, X? nice to have, next to X
+  for (const code of ['X!', 'X?']) {
+    if (!(s.duties || []).some(d => d.code === code)) {
+      const at = (s.duties || []).findIndex(d => d.code === 'X');
+      const du = cleanDuty(clone(DEFAULT_DUTIES.find(d => d.code === code)));
+      if (at >= 0) s.duties.splice(at + 1, 0, du); else s.duties.push(du);
+    }
+  }
+  add('r-req-xh'); add('r-req-xl');
 }
 
 export function migrate(s) {

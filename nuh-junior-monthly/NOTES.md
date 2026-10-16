@@ -165,3 +165,25 @@ Day, Check, exports and, through `act` in `rules.js`, Auto-fill and the rules). 
 `known`, so they stay visible. The roster toolbar says "N not in the sheet" and shows them again (setting
 `hideNotInSheet`, default on). Months with no imported sheet hide nobody. `sheets` is not part of the cloud copy, so a device
 that has not imported the month shows everyone. Group headers in the roster fold (`ui.collapsed`, kept per device).
+
+## Request importance (owner, 16 Oct 2026)
+
+Requests come from the sheet as plain codes, so importance is a code, not a per-cell setting (it would be lost on every
+import and export). No-call requests: **`X!` must have** (going on holiday, weight 150), `XX` blocked by the planner (80),
+`X` asked (60), **`X?` nice to have** (clearing leave, 20). `R` (call wanted, 10) stays the low "wants more calls" request.
+All are soft: a night is never left empty for them. Saved rosters gain the codes and rules once (`rulesVersion` 4).
+
+## Beyond cardiac and ICU: things to remember (owner, 16 Oct 2026; the department's own words are in the owner's private notes)
+
+Not built; recorded so the next session designs for them.
+- **Leave approval is a different problem** from filling calls: it needs how many junior staff each theatre day requires.
+  Associate consultants count towards the senior side. Green MOs (baby MOs included) cannot be left alone in theatre but
+  still count for something. The department's sheet has a second "actual manpower" row and a formula for this; read it
+  before designing. Cardiac and ICU juniors do not count towards OT cover (they are not in OT and cannot cover lists).
+- **R1 to R3 calls** (junior residents, year 3 and below; SRs and ACs have their own calls, managed by another rosterer):
+  a chronic pain junior takes no calls during their posting week and cannot be post call into it (weekends are fair game);
+  OG float people take no calls; none of these people may be post call into their posting, and nobody should be post call
+  into annual leave.
+- Per-person ability is a ladder (R1 most senior, R3 most junior, cumulative); the default is the highest call a person can do,
+  a step-down call needs explicit approval; baby MOs take no calls until they pass the test; very new people are not given
+  calls (a per-person "no calls until" date is the planned home for both).
