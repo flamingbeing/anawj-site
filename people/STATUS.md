@@ -31,7 +31,9 @@ check `evals/` work in progress too.
    roster app names people. The roster app **pulls** it (it opens People, which sends after the user taps Send): the
    roster app's side is noted in `nuh-junior-monthly/NOTES.md`, "Rotations from People". The sheet reader should be a standalone module with no screen of its own, so People can reuse
    it. Code meanings and the sheet's layout: the owner's private notes (code key, 66 codes).
-2. Later, and only with the rotation planner's say: editing rotations in the app (stage 2), then retiring the sheet.
+2. **Rotations store with access control** (owner, 16 Oct 2026; the project is being created through firetop): see the
+   decisions log. Not needed for stage 1.
+3. Later, and only with the rotation planner's say: editing rotations in the app (stage 2), then retiring the sheet.
 
 ## Recently done
 
@@ -78,3 +80,17 @@ check `evals/` work in progress too.
 - 16 Oct 2026: the rotation planner's sheet and workflow stay as they are; nothing here edits the sheet, and the planner is
   not involved until the owner says so. The monthly roster's rosterer writes only the critical postings by hand today; the
   export replaces that.
+- 16 Oct 2026: **who may see rotations** (owner): PDs, PCs (admins) and rosterers only; faculty and juniors never. No shared
+  password: Google sign-in against a named list, as the other apps. Stage 1 stores nothing on a server (it shows what the
+  signed-in person's own Google access opens, or a file on their device), and People already lets in only admins and PDs.
+  Rosterers are not in People's lists (adding them means a change to the protected logbook project's rules, which we avoid), so
+  until the shared store exists an admin or PD sends the critical postings to the roster app (the pull above) and the
+  rosterer sees only those.
+- 16 Oct 2026: **a separate Firebase project for rotations**, `apmes-rotations` (owner; requested from firetop the same day;
+  never the logbook's project). It copies the roster app's pattern: a member list with roles (admin, rosterer, viewer) that
+  admins manage inside the app, so only the very first admin is added by hand in the console, once. The owner does not want to
+  open Firebase to add rosterers. Rules (member-only read; deploy on merge via the rules workflow) and the app's sign-in
+  come when stage 2 is built; reusing the roster app's own project was the other option (its rosterers are already members),
+  but signing in from People's address to it needs extra setup that is not yet checked. Where the rotations screen lives
+  (People or the roster app) decides this; not decided.
+
