@@ -91,6 +91,21 @@ const noSideScroll = async (page, label) => {
   await page.waitForTimeout(600);
   const after = await hard(page);
   ok(after <= 3 && after < before, `auto-fill fixes the cover (${before} -> ${after} must-fix problems)`);
+  // the staff list for APMES People: More › Export copies it
+  await go(page, '#more');
+  await page.getByRole('button', { name: 'Copy the staff list for APMES People' }).click();
+  await page.waitForTimeout(200);
+  ok(/^NUH Junior Monthly staff, roster month \d{4}-\d{2}.*\nGrade\tName\tFrom\tUntil\n/.test(await page.evaluate(() => navigator.clipboard.readText())), 'APMES People list copied');
+  // opened by APMES People (?send=apmes) but without the tab that asked: it offers the copy instead; the link forgets the ask
+  await page.goto(BASE + '?demo&send=apmes#people');
+  await ready(page);
+  const dlg = page.getByRole('dialog', { name: 'Send the staff list to APMES People?' });
+  await dlg.waitFor();
+  ok(await dlg.getByRole('button', { name: 'Copy the list' }).isVisible(), 'send sheet without its opener offers the copy');
+  await axe(page, 'desktop send to APMES People');
+  await dlg.getByRole('button', { name: 'Cancel' }).click();
+  await page.waitForTimeout(300);
+  ok(!/send=apmes/.test(page.url()), 'the link forgets send=apmes');
   await page.close();
 }
 // ---------- phone ----------
@@ -136,6 +151,17 @@ const noSideScroll = async (page, label) => {
     }
     return route.fulfill({ status: 404, headers: CORS, body: '{"error":{"message":"no"}}' });
   });
+  // a device with nothing on it: the welcome screen offers sign in first, and its steps can be hidden
+  await page.goto(BASE + '#roster');
+  await ready(page);
+  ok(await page.getByRole('button', { name: "Sign in and pull the team's roster" }).count() === 1, 'an empty device offers to sign in and pull the team roster');
+  ok(await page.locator('.gs').count() === 1, 'the getting started steps show at first');
+  await axe(page, 'the welcome screen with sign in');
+  await page.getByRole('button', { name: 'Hide the getting started steps' }).click();
+  ok(await page.locator('.gs').count() === 0 && await page.getByRole('button', { name: "Sign in and pull the team's roster" }).count() === 1, 'the steps can be hidden, sign in stays');
+  await page.getByRole('button', { name: 'Show the getting started steps' }).click();
+  ok(await page.locator('.gs').count() === 1, 'and shown again');
+  await page.getByRole('button', { name: 'Hide the getting started steps' }).click();
   await page.goto(BASE + '#more');
   await ready(page);
   await page.evaluate(async () => { (await import('./js/gsheets.js')).hooks.getToken = async () => 'test-token'; });

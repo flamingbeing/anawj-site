@@ -49,6 +49,12 @@ the scripts that read them are in the owner's private repo `flamingbeing/life` (
   another group (the July change-over, RES1 → RES2) moves to the end of that group on Import. The review lists each move,
   ticked; untick anyone who should stay. Only from the newest month imported so far (`latestImported`): an older month
   never moves anyone back (the review says who differs). Someone listed twice moves to the grade of the row that is kept.
+- **Staff list for APMES People** (`js/apmes.js`; 16 Oct 2026): APMES People (`apmes.anawj.com/people/` › Import from
+  roster) opens this app with `?send=apmes`; a sheet asks, then sends Grade, Name, From, Until for everyone in post (no
+  roster, no notes) to the tab that opened it by `postMessage` (to `apmes.anawj.com` or this origin only) and closes.
+  More › Export › Copy the staff list for APMES People gives the same text to paste there. The grade is the group's
+  first sheet grade (RES2, R, AC…); the first line names the last month imported from the sheet. People's side:
+  `people/NOTES.md`.
 - **Put it back** (More): the block from day 1 of the first person row to the 1st of next month of the last row, as
   tab-separated text to paste at that top-left cell. Cells whose meaning didn't change go back exactly as typed;
   seniors' rows come back untouched; the list of changed cells is shown. Import again just before pasting if others edit.
@@ -106,6 +112,11 @@ and says why; unlocking asks first. Undo/redo and Restore are not blocked.
 the first working day before it, at least two days; on to the first working day after it), so you can see where people come from,
 where they go next and who is post call. They show what is in the app for those dates (so import last month too). "Days around"
 in the toolbar turns them off (per device). They are not part of editing, Auto-fill or the copy back to the sheet.
+
+**Team copy of a month = one JSON string** (16 Oct 2026): Save to team failed with "too many index entries for entity /months/…/versions/…":
+Firestore indexes every field of a map, and a month's days (days × people × codes) went over its limit of 40,000 index entries a
+document. `cells` is now saved as one JSON string (`cloud.js` `cellsFromDoc` reads either form; the rules accept a map or a string
+up to 900,000 characters). More shows Team sharing first, with Save to team and Pull from team.
 
 How to add a rule type: as in `ntf-roster/NOTES.md` ("How to add a new rule type"); the engine is the same file.
 
