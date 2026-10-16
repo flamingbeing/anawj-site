@@ -417,6 +417,8 @@ async function run(label, ctxOpts) {
       await p.locator('dialog[open]').getByRole('button', { name: 'Move to the bin' }).click();
       await nap(800);
       assert(/2 reflections moved to the recycle bin/.test(await toastText()), 'toast ' + await toastText());
+      // (selecting ends after the move; counted with every heading open, as before)
+      if (await editBtn().innerText() === 'Select') { await editBtn().click(); await nap(300); }
       assert(await p.locator('li.refl-row').count() === n0 - 2, 'rows not removed');
       if (await editBtn().innerText() === 'Done') await editBtn().click();
       await nap(300);
