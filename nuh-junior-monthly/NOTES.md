@@ -236,3 +236,10 @@ the owner's call (live changes go through the owner's home-computer session).
   counts people on `C` days only (`among: ['C']`), and so does the C3 posting filter (it reads that rule's `among`). A week of
   perfusion plus a couple of `C` days in a month is below the share threshold (15% of the month), so that person is not compared.
   Saved rosters in the old form are updated once (`rulesVersion` 8).
+
+## Choosing what Fill drafts (owner, 16 Oct 2026)
+
+The Fill dialog lists the auto-fill calls (C3 and R1B today) with a tick each (the choice is remembered on the device). Only the
+ticked calls are drafted (`solve(..., { only: [...] })`, `applyAssignments(..., only)`); every other call, posting, leave and
+request stays exactly as it is, but the solver still counts them for all rules (post call, gaps, who is already on call,
+cover), so a cardiac-only fill respects the ICU calls already there. Start is off until something is ticked.

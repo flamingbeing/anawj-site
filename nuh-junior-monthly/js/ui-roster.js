@@ -1392,6 +1392,11 @@ export function openAutofill(app) {
   let worker = null, stopped = false, t0 = 0, tick = 0;
   let timeMs = 6000;
   let redo = false;   // also redo the calls already typed in the sheet (they come in as hand-entered)
+  // what to fill: some of the auto-fill codes (cardiac and ICU today); the others are left exactly as they are
+  const fillable = autoDuties.filter(d => d.kind === 'shift');
+  let chosen = new Set(fillable.map(d => d.code));
+  try { const saved = JSON.parse(localStorage.getItem('nuhjm-af-codes') || 'null'); if (Array.isArray(saved)) { const keep = fillable.map(d => d.code).filter(c => saved.includes(c)); if (keep.length) chosen = new Set(keep); } } catch (e) { /* all */ }
+  const picked = () => autoDuties.filter(d => d.kind !== 'shift' || chosen.has(d.code));
   try { timeMs = +localStorage.getItem('nuhjm-af-time') || 6000; } catch (e) { /* ignore */ }
 
   const close = app.sheet({
@@ -1408,7 +1413,7 @@ export function openAutofill(app) {
   // Existing auto vs manual entries in the month
   function counts(s) {
     let auto = 0, manual = 0, locked = 0;
-    const autoSet = new Set(autoDuties.map(d => d.code));
+    const autoSet = new Set(picked().map(d => d.code));
     for (const d of days) {
       const day = s.cells?.[d];
       if (!day) continue;
@@ -1426,7 +1431,7 @@ export function openAutofill(app) {
 
   // Treat the auto-fill codes typed by hand (the sheet's own calls) as auto-filled, so Auto-fill may change them.
   function markAuto(s) {
-    const autoSet = new Set(autoDuties.map(d => d.code));
+    const autoSet = new Set(picked().map(d => d.code));
     for (const d of days) {
       const day = s.cells?.[d];
       if (!day) continue;
@@ -1444,12 +1449,27 @@ export function openAutofill(app) {
     const n = counts(state);
     wrap.innerHTML = '';
     wrap.append(
-      h('p', null, 'Drafts ', h('strong', null, autoDuties.map(d => d.code).join(', ') || 'no codes'), ` for ${M.fmtMonth(app.month)} from your rules (cover, limits, requests, pairings), then improves it while you watch.`),
+      h('p', null, 'Drafts ', h('strong', null, picked().map(d => d.code).join(', ') || 'no codes'), ` for ${M.fmtMonth(app.month)} from your rules (cover, limits, requests, pairings), then improves it while you watch.`),
       h('ul', { class: 'af-keep' },
-        h('li', null, 'Kept as they are: leave, requests, notes and anything entered by hand', n.manual ? ` (${n.manual} hand-entered shift${n.manual > 1 ? 's' : ''})` : '', '.'),
+        h('li', null, 'Kept as they are: leave, requests, notes, other postings and calls, and anything entered by hand', n.manual ? ` (${n.manual} hand-entered shift${n.manual > 1 ? 's' : ''})` : '', '.'),
         n.locked ? h('li', null, `${n.locked} locked cell${n.locked > 1 ? 's are' : ' is'} left alone.`) : null,
         n.auto ? h('li', null, `${n.auto} earlier auto-filled shift${n.auto > 1 ? 's' : ''} may change.`) : null,
         h('li', null, 'Nothing changes until you press Apply, and Apply can be undone.')));
+    // what to fill: tick the calls to draft; the rest stay as they are, and every rule still counts them
+    if (fillable.length > 1) {
+      const what = h('fieldset', { class: 'af-what' }, h('legend', null, 'Fill'));
+      for (const d of fillable) {
+        const id = 'af-c-' + d.code;
+        const cb = h('input', { type: 'checkbox', id, checked: chosen.has(d.code) });
+        cb.addEventListener('change', () => {
+          if (cb.checked) chosen.add(d.code); else chosen.delete(d.code);
+          try { localStorage.setItem('nuhjm-af-codes', JSON.stringify([...chosen])); } catch (e) { /* ignore */ }
+          stageOptions();
+        });
+        what.append(h('label', { class: 'af-opt', for: id }, cb, h('span', { class: 'af-opt-l' }, d.code), h('span', { class: 'af-opt-s' }, d.name)));
+      }
+      wrap.append(what, h('p', { class: 'muted af-what-note' }, 'Calls you do not tick are not changed, but the rules around them (post call, gaps, who is already on call) still apply.'));
+    }
     // upper bounds: the search usually ends sooner, once it stops finding a better roster
     const times = [[3000, 'Quick', '3 s'], [6000, 'Normal', '6 s'], [15000, 'Thorough', '15 s']];
     const fs = h('fieldset', { class: 'af-time' }, h('legend', null, 'Search for at most'));
@@ -1467,9 +1487,11 @@ export function openAutofill(app) {
         h('span', null, ` Also redo the ${autoDuties.map(d => d.code).join(' and ')} calls already in the sheet (${n.manual}). For trying Auto-fill on a month that is already filled; Apply can be undone.`)));
     }
     if (!autoDuties.length) wrap.append(h('p', { class: 'warn-box' }, 'No duty is marked "auto-fill" yet. Mark codes under People › Duty codes.'));
+    const nothing = fillable.length > 0 && !chosen.size;
+    if (nothing) wrap.append(h('p', { class: 'warn-box' }, 'Tick at least one call to fill.'));
     wrap.append(h('div', { class: 'af-actions' },
       h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => close() }, 'Cancel'),
-      h('button', { type: 'button', class: 'btn btn-primary', disabled: !autoDuties.length, onclick: run, html: `${app.icon('spark')}<span>Start</span>` })));
+      h('button', { type: 'button', class: 'btn btn-primary', disabled: !autoDuties.length || nothing, onclick: run, html: `${app.icon('spark')}<span>Start</span>` })));
   }
 
   function stageProgress() {
@@ -1516,7 +1538,7 @@ export function openAutofill(app) {
     const snapshot = redo ? JSON.parse(JSON.stringify(app.store.get())) : app.store.get();
     if (redo) markAuto(snapshot);
     stageProgress();
-    const opts = { from, to, seed, timeMs };
+    const opts = { from, to, seed, timeMs, only: fillable.length ? [...chosen] : undefined };
     let fellBack = false;
     const fallback = async (why) => {
       if (fellBack || stopped) return;
@@ -1552,6 +1574,7 @@ export function openAutofill(app) {
     } catch (e) { fallback(e); }
   }
 
+  const inScope = c => !fillable.length || chosen.has(c);   // a code this run may change
   function diff(snapshot, result) {
     const asg = result.assignments || {};
     let added = 0, removed = 0;
@@ -1560,9 +1583,9 @@ export function openAutofill(app) {
       for (const sid of ids) {
         const cell = snapshot.cells?.[d]?.[sid];
         if (cell?.lock) continue;
-        const before = new Set(cell?.auto || []);
+        const before = new Set((cell?.auto || []).filter(c => inScope(c)));
         const manual = (cell?.a || []).filter(c => !before.has(c));
-        const after = new Set((asg[d]?.[sid] || []).filter(c => !manual.includes(c)));
+        const after = new Set((asg[d]?.[sid] || []).filter(c => inScope(c) && !manual.includes(c)));
         for (const c of after) if (!before.has(c)) added++;
         for (const c of before) if (!after.has(c)) removed++;
       }
@@ -1606,7 +1629,7 @@ export function openAutofill(app) {
       h('button', {
         type: 'button', class: 'btn btn-primary', autofocus: true,
         onclick: () => {
-          app.store.commit(`Auto-fill ${M.fmtMonth(app.month)}`, draft => { if (redo) markAuto(draft); applyAssignments(draft, result, days); });
+          app.store.commit(`Auto-fill ${M.fmtMonth(app.month)}`, draft => { if (redo) markAuto(draft); applyAssignments(draft, result, days, fillable.length ? [...chosen] : null); });
           close();
           app.toast(`Auto-fill applied: ${changedTxt.toLowerCase()}`, { action: { label: 'Undo', fn: () => app.store.undo() } });
         },
@@ -1624,18 +1647,21 @@ export function openAutofill(app) {
 }
 
 // Set each cell's auto codes from the solver result, keeping every non-auto code. Locked cells are skipped.
-export function applyAssignments(draft, result, days) {
+export function applyAssignments(draft, result, days, only = null) {
   const asg = result.assignments || {};
   for (const d of days) {
     const ids = new Set([...Object.keys(draft.cells?.[d] || {}), ...Object.keys(asg[d] || {})]);
     for (const sid of ids) {
       const cell = M.getCell(draft, d, sid);
       if (cell?.lock) continue;
-      const oldAuto = cell?.auto || [];
+      // only the codes this run was asked to fill are replaced; every other code (auto-filled earlier or not) stays
+      const inRun = c => !only || only.includes(c);
+      const oldAuto = (cell?.auto || []).filter(inRun);
       const keep = (cell?.a || []).filter(c => !oldAuto.includes(c));
-      const newAuto = (asg[d]?.[sid] || []).filter(c => !keep.includes(c));
+      const newAuto = (asg[d]?.[sid] || []).filter(c => inRun(c) && !keep.includes(c));
       if (!cell && !newAuto.length) continue;
-      M.setCell(draft, d, sid, { a: [...keep, ...newAuto], auto: newAuto });
+      const otherAuto = (cell?.auto || []).filter(c => !inRun(c));
+      M.setCell(draft, d, sid, { a: [...keep, ...newAuto], auto: [...otherAuto, ...newAuto] });
     }
   }
 }

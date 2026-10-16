@@ -143,6 +143,15 @@ const noSideScroll = async (page, label) => {
   const before = await hard(page);
   ok(before > 30, 'next month starts without calls');
   await page.evaluate(() => window.jmApp.openAutofill());
+  // choose what to fill: the calls ticked are drafted, the others stay as they are
+  ok(await page.locator('.af-what input[type=checkbox]').count() === 2, 'the Fill dialog offers cardiac and ICU calls to pick');
+  await page.locator('#af-c-R1B').uncheck();
+  ok((await page.locator('.af strong').first().innerText()).trim() === 'C3' && await page.getByRole('button', { name: 'Start' }).isEnabled(), 'with ICU unticked it drafts C3 only');
+  await page.locator('#af-c-C3').uncheck();
+  ok(await page.getByRole('button', { name: 'Start' }).isDisabled(), 'with nothing ticked Start is off');
+  await page.locator('#af-c-C3').check();
+  await page.locator('#af-c-R1B').check();
+  ok((await page.locator('.af strong').first().innerText()).trim() === 'C3, R1B', 'both ticked drafts both again');
   await page.getByRole('button', { name: /^Fill|^Start|^Auto-fill$/ }).last().click().catch(() => {});
   await page.waitForFunction(() => document.querySelector('.af-result, .af-apply, [data-af="apply"]') || /Apply/.test(document.body.innerText), null, { timeout: 30000 });
   const apply = page.getByRole('button', { name: /^Apply/ });
