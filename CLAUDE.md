@@ -26,6 +26,14 @@ Exception: the **local Firestore emulator** with fake accounts and the demo proj
 touches the live projects. Commands that sign in, deploy or talk to `apmes-logbook` / `nuh-roster` still need the
 owner's OK.
 
+## Cloudflare plugin
+
+Cloud sessions also install Cloudflare's official plugin (`cloudflare@cloudflare` from the `cloudflare/skills`
+marketplace, via `.claude/hooks/session-start.sh`; owner, 16 Oct 2026): Cloudflare's skills (Wrangler, Workers best
+practices and more) and the Cloudflare MCP server, which signs in with OAuth the first time a Cloudflare tool is used.
+The site's Workers still deploy only through Workers Builds on merge (PREVIEWS.md); never deploy or change Cloudflare
+settings through the plugin without the owner's OK.
+
 ## context-nudge mod
 
 Cloud sessions also install `tools/context-nudge` (a small Claude Code mod, via `.claude/hooks/session-start.sh`).
