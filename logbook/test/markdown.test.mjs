@@ -160,3 +160,28 @@ console.log('markdown tests passed');
   assert.ok(files.find(x => x.path.startsWith('Reflections/')).text.includes('Case: [[Cases/2026-10/20261010|10 Oct 2026]]'));
 }
 console.log('markdown styles and dates: ok');
+
+// under each case (log2 15): reflections None / Link / Embed / Full text, linked notes None / Full text
+{
+  const c = { id: 'u1', date: '2026-10-10', initials: 'ZZ', details: 'fake case', createdAt: 1 };
+  const r = { id: 'ur', caseId: 'u1', date: '2026-10-10', title: 'Fake title', summary: 'Fake summary.', status: 'complete', points: [{ heading: 'Point', text: 'Fake text.' }] };
+  const n = { id: 'un', date: '2026-10-10', title: 'Fake linked', body: 'fake body', caseId: 'u1', createdAt: 2 };
+  const day = { id: 'ud', date: '2026-10-10', title: 'Fake day note', body: 'day body', createdAt: 3 };
+  const ctx = { reflectionsOf: x => (x.id === 'u1' ? [r] : []), notesOf: x => (x.id === 'u1' ? [n] : []), reflPath: () => 'Reflections/2026-10/Fake.md' };
+  assert.equal(mdDay('2026-10-10', [c], null, ctx), '2026-10-10\n1. ZZ\nfake case', 'None by default');
+  assert.equal(mdDay('2026-10-10', [c], { reflInDay: 'link' }, ctx), '2026-10-10\n1. ZZ\nfake case\n\nReflection: [[Reflections/2026-10/Fake|Fake title]]');
+  assert.equal(mdCase(c, { reflInDay: 'embed' }, ctx), '2026-10-10\nZZ\nfake case\n\n![[Reflections/2026-10/Fake]]');
+  assert.equal(mdCase(c, { reflInDay: 'embed', links: 'md' }, ctx), '2026-10-10\nZZ\nfake case\n\nReflection: [Fake title](Reflections/2026-10/Fake.md)', 'Markdown links cannot embed');
+  const full = mdCase(c, { reflInDay: 'link' }, { ...ctx, reflPath: () => '' });
+  assert.ok(full.includes('\n\n### Fake title\n\n') && full.includes('#### Point\n\nFake text.') && !full.includes('---'), 'no note: the full text, headings down two, no front matter: ' + full);
+  // linked notes: under the case, and out of the day's Notes
+  const withNotes = mdDay('2026-10-10', [c], { notesInDay: 'full' }, ctx, [n, day]);
+  assert.ok(withNotes.startsWith('2026-10-10\n1. ZZ\nfake case\n\n##### Fake linked\nfake body'), withNotes);
+  assert.equal((withNotes.match(/Fake linked/g) || []).length, 1, 'once');
+  assert.ok(withNotes.includes('## Notes\n\n### Fake day note'), 'the day note stays in Notes');
+  // the export links each case's reflection to its note
+  const files = exportNotes({ cases: [c], reflections: [r], notes: [], m: { reflInDay: 'embed' } });
+  const month = files.find(x => x.path === 'Cases/2026-10.md').text, rp = files.find(x => x.path.startsWith('Reflections/')).path;
+  assert.ok(month.includes(`![[${rp.replace(/\.md$/, '')}]]`), month);
+}
+console.log('markdown under case: ok');
