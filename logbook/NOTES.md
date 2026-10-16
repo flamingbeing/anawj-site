@@ -651,6 +651,9 @@ portfolio content.
   overwriting change's button says how many. Save goes through `updateMany` (a case changed elsewhere keeps that
   version); Undo in the toast puts back only cases nobody has changed since. The old "Tag N cases…" is now "Edit N
   cases…" (Filter → More): every case in the search, selected, into Bulk edit. Not in the grid (it has its own editing).
+- **Notes: a bin on each note while selecting** (owner, 16 Oct 2026): press and hold (or Select), then the red bin at a
+  note's right moves just that note to the recycle bin (`moveToBin`, Undo in the message); the selection stays. The
+  bin icon is `trash` in ui-core.js. e2e: `notes-select.mjs`.
 - **Notes: Select and Bulk edit** (log2 9b): the same bar and popup (`ui-bulk.js` bulkDialog; the notes' fields in
   `ui-bulk-notes.js`, the rules in `note-bulk.js`). Change: date (set or clear; a daily note keeps its day, its id is the
   date), title (replace / add in front / find and replace), text (add to the end / find and replace), unlink from the

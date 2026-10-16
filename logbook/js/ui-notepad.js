@@ -13,7 +13,7 @@
 // app's "Today's note" shortcut (#today), and (Settings → Notes, off by default) a small box on the Case tab. They
 // don't count towards the 100 notes.
 
-import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal, emptyState, download } from './ui-core.js';
+import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal, emptyState, download, ic } from './ui-core.js';
 import { uid, fmtDate, caseParts } from './engine.js';
 import { barTabs, arrangeTabs, display, setDisplay, setTabOnBar } from './display.js';
 import { toggle, help, resetLink } from './settings-rows.js';
@@ -389,7 +389,14 @@ function noteRow(n) {
     h('span', { class: 'd' }, n.date ? fmtDate(n.date) : 'No date'),
     h('span', { class: 'note-main' }, h('b', {}, noteTitle(n)), preview ? h('span', { class: 'muted note-preview' }, preview.slice(0, 160)) : null,
       c ? h('button', { class: 'flag note-case', type: 'button', title: 'Open the linked case', 'aria-label': 'Open the linked case: ' + caseLabel(c),
-        onclick: e => { e.stopPropagation(); openCase(n.caseId); } }, '↗ ' + caseLabel(c)) : null));
+        onclick: e => { e.stopPropagation(); openCase(n.caseId); } }, '↗ ' + caseLabel(c)) : null),
+    // while selecting (a press and hold starts it), each note has its own bin: one tap, Undo in the message (owner, 16 Oct 2026)
+    picking ? h('button', { type: 'button', class: 'small icon-btn note-del', title: 'Move to the recycle bin', 'aria-label': `Delete ${noteTitle(n)}`,
+      onclick: async e => {
+        e.stopPropagation();
+        try { const { moveToBin } = await import('./bin.js'); await moveToBin('note', { ...n }, { toast: true }); nsel.ids.delete(n.id); nsel.paint?.(); }
+        catch (err) { toast('Could not delete: ' + err.message); }
+      } }, ic('trash')) : null);
   holdToSelect(li, () => !nsel.on && nsel.start?.(n));
   return li;
 }
