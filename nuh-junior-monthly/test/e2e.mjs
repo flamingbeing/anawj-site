@@ -32,10 +32,10 @@ const ready = page => page.waitForFunction(() => document.body.classList.contain
 const stored = (page, key = 'nuhjm-demo') => page.evaluate(k => JSON.parse(localStorage.getItem(k)), key);
 const hard = page => page.evaluate(() => window.jmApp.evaluation().hard);
 const go = async (page, hash) => { await page.evaluate(h => { location.hash = h; }, hash); await page.waitForTimeout(300); };
-async function axe(page, label) {
+async function axe(page, label, scope = null) {   // scope: a selector (a dialog: the page behind its backdrop is not checked)
   if (!(await page.evaluate(() => !!window.axe))) await page.addScriptTag({ path: AXE });
-  const v = await page.evaluate(async () => (await window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa'] })).violations
-    .map(x => `${x.id} ${x.nodes.length}x ${x.nodes[0]?.target}`));
+  const v = await page.evaluate(async sel => (await window.axe.run((sel && document.querySelector(sel)) || document, { runOnly: ['wcag2a', 'wcag2aa'] })).violations
+    .map(x => `${x.id} ${x.nodes.length}x ${x.nodes[0]?.target}`), scope);
   ok(!v.length, `axe on ${label}: ${v.join('; ')}`);
 }
 const noSideScroll = async (page, label) => {
@@ -153,7 +153,7 @@ const noSideScroll = async (page, label) => {
   await page.waitForSelector('text=Write 2 cells to Google?');
   ok(await page.locator('.ask-list td', { hasText: 'X8' }).count() === 1 && await page.locator('.ask-list td', { hasText: 'Y8' }).count() === 1 && await page.locator('.ask-list td', { hasText: 'Cardiac Example' }).count() === 2, 'the confirmation lists every cell that will change');
   ok(writes.length === 0, 'nothing is written before the confirmation');
-  await axe(page, 'the confirmation of what will be written');
+  await axe(page, 'the confirmation of what will be written', '[role="dialog"]');
   await page.getByRole('button', { name: /^Write 2 cells$/ }).click();
   await page.waitForSelector('text=read them back: all match');
   ok(writes.join(',') === 'X8,Y8' && sheet[7][3 + 20] === 'C3' && sheet[7][3 + 21] === 'PC', `only the two changed cells were written (${writes.join(',')})`);
