@@ -141,6 +141,44 @@ month with no entry yet gets a locked one when it is opened (`store.ensureLocked
 sheet unlocks that one month (it is deliberate). Not in Practice. A month the cloud copy holds as unlocked comes in unlocked
 and is locked again at the next close or start. The stored status values are unchanged (`published` = locked), so no rules change.
 
+## Cell marks (owner, 16 Oct 2026)
+
+The orange corner means a **note**, as in Google Sheets (it used to mark problems, which people read as comments). A problem is a
+**ring inside the cell**: must fix is a solid red ring with a soft inner glow, to improve is a thin dashed amber ring. They differ in
+shape as well as colour (colour-blind readers), nothing animates, the glow stays inside the cell so it never bleeds into a
+neighbour, and in forced-colours (high contrast) mode they become plain solid and dashed borders. The dot after a name (a problem
+about the whole month) is unchanged.
+
+## A call on the posting's own day (owner, 16 Oct 2026)
+
+On the sheet a C3 replaces the C that day, so the cell holds no posting code. For the rules (`buildContext` in `js/rules.js`) a C3
+(or R1B) day with no posting of its own counts as on that posting when the person has the posting (C, ICU) within three days either
+side, in the saved cells too, past the edge of the month. Nothing is written to the roster. So "cardiac call only on a cardiac day"
+no longer flags the call itself; a C3 nowhere near a cardiac day still does. The cardiac posting filter and the fair share also count
+C3 days (R1B for ICU). The soft preference "no cardiac call on day 1 of the posting" (`r-c3-d1`) does not apply to RES3 and senior
+residents (a group limit on the rule; saved rosters get it once).
+
+## Carry-over from earlier months (owner, 16 Oct 2026)
+
+Fairness is judged over a person's run of postings, not one calendar month: on the real rosters (Jan 2025 to Aug 2026) the median
+cardiac stint is 11 days and the median ICU stint 15, and 45 to 60% of stints run across a month end, so a month cuts most of them in
+half. The "Share fairly" rules for cardiac and ICU therefore add what each person was over (+) or under (-) their share in the months
+before: their points minus their posting days times the pool's rate for that month, the last month counting fully and each month
+before a quarter less (`carryBalances` in `js/rules.js`; settings "Carry over" 0 to 1, default 0.5, and "Months to look back", default
+4). Past months only: next month is not rostered yet, so a symmetric +/- 1 month window was not built. A call day counts as a day on
+the posting. Set Carry over to 0 on the rule to switch it off. Backtest (July and August 2026, one real month back): Fill's
+single-month spread is slightly worse with it (cardiac 8 against 6, ICU 7 against 5, summed over the two months), because some of
+this month's evenness repays last month; the benefit shows over several months, which that backtest cannot show. The analysis is in
+the private notes (`data/nuh-junior-monthly/fairwindow-2026-10-16.txt`, `scripts/fairwindow.mjs`).
+
+## Fewer alerts about equal calls (owner, 16 Oct 2026)
+
+The "Share fairly" rules keep aiming for an even share (allowed difference 1 point, so Fill still pushes), but Check and the dot
+after a name only mention a gap that is over **Only point it out above** (1 point) **and** over **this % of the average** (40%;
+`alert` and `alertPct` on the rule). So a person with few calls, like an MO3, shows up sooner than with a fixed number (1 against an
+average of 2 is 50%), and a gap of 2 on an average of 10 does not. Set the percentage to 0 for points only. The R1 to R3 share (off
+until confirmed) compares each grade with itself (`byGroup`). Saved rosters get this once (`rulesVersion` 16).
+
 ## Colours follow the department sheet (owner, 16 Oct 2026)
 
 People work on the sheet and this app side by side, so a code keeps the sheet's colour family (softened, same hue): calls orange
