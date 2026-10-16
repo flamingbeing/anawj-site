@@ -99,6 +99,11 @@ was written. It acts as the signed-in person, so the sheet's sharing and protect
 stores (no rules change). While locked, `store.commit` refuses any change to that month's days (calls, Auto-fill, import, copy back)
 and says why; unlocking asks first. Undo/redo and Restore are not blocked.
 
+**Days around the month** (owner, 16 Oct 2026): the Roster grid shows greyed, read-only columns before and after the month (back to
+the first working day before it, at least two days; on to the first working day after it), so you can see where people come from,
+where they go next and who is post call. They show what is in the app for those dates (so import last month too). "Days around"
+in the toolbar turns them off (per device). They are not part of editing, Auto-fill or the copy back to the sheet.
+
 How to add a rule type: as in `ntf-roster/NOTES.md` ("How to add a new rule type"); the engine is the same file.
 
 ## Tests
