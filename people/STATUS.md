@@ -6,7 +6,7 @@ list, filtered by the `people` label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-16 by Claude Code, NUH Junior Monthly grade moves session (also touches People).
+Last updated: 2026-10-16 by Claude Code, People app (people); the line before it was the NUH Junior Monthly grade moves session.
 
 ## Now
 
@@ -23,13 +23,23 @@ check `evals/` work in progress too.
 
 ## Next (agreed queue)
 
-Nothing queued. Ideas: `NOTES.md`, "Ideas for later".
+1. **Rotations, stage 1: read-only** (owner, 16 Oct 2026; waits on the owner's go). Read the department's master block
+   rotation sheet (from Google with the owner's own sign-in, or an uploaded file) in the browser and show rotations,
+   who has done what, and manpower. No Firebase, nothing written to the sheet. First import hand-linked (sheet name to
+   person), the links kept in the browser. Plus a one-way hand-off of the postings the monthly roster needs (ICU, cardiac,
+   the OG floats) in the layout NUH Junior Monthly's Paste rotations takes (names down, Mondays across), named as the
+   roster app names people. The roster app **pulls** it (it opens People, which sends after the user taps Send): the
+   roster app's side is noted in `nuh-junior-monthly/NOTES.md`, "Rotations from People". The sheet reader should be a standalone module with no screen of its own, so People can reuse
+   it. Code meanings and the sheet's layout: the owner's private notes (code key, 66 codes).
+2. Later, and only with the rotation planner's say: editing rotations in the app (stage 2), then retiring the sheet.
 
 ## Recently done
 
 - #699 Import from the monthly roster: NUH Junior Monthly's staff list (one tap, or pasted; the department sheet's grid
   tab works too) gives year changes, graduations, new residents and residents not on the roster, each ticked or not,
   saved only after Apply and a confirm. The roster app's side: `nuh-junior-monthly/js/apmes.js`, More › Export.
+- #709 Notes: People becomes the source of truth for grade and postings; match by email; change-of-email merge later.
+- #704 Status notes for People and NUH Junior Monthly after #699.
 - 13 Oct: APMES People built (new-intake paste, year check, PDs, CSV export; Logbook 3 session).
 
 - #703 (nuh-junior-monthly) The roster app's sheet import now moves people to the group their new grade shows (ticked in
@@ -54,3 +64,17 @@ Nothing queued. Ideas: `NOTES.md`, "Ideas for later".
   never automatic: copy the logbook to the new email (old kept as backup), rewrite the emails on evaluations, keep previous
   emails; faculty and PDs have no permanent ID yet (give them one or keep a previous-emails list). It touches live data
   (logbook): full tests, emulator, preview, owner approval and probably a job to firetop. Not started.
+- 16 Oct 2026: **rotations will live with People** (owner): the master block rotation sheet is both the plan (who is where,
+  week by week) and the record (who has done what), and rosters and APMES both need it. Model: a person has an identity
+  (ID, name, email, kind), a home (permanent staff belong to one institution; residents belong to the programme) and
+  placements (institution, from, to; a rotation is a new placement). Each roster asks "who is placed here this month".
+  Grid cells are placements; "who has done what" and manpower are worked out from them, never typed twice.
+- 16 Oct 2026: **stage 1 is read-only, in the browser, no Firebase** (owner: the live logbook's data is protected). Shared
+  storage (its own Firebase project, never the logbook's) comes only when others need to see the same rotations.
+- 16 Oct 2026: the sheet's notation (owner): a `-E` suffix is the elective version of a posting (an elective is not always at
+  the base code's place and mostly doesn't count toward manpower); a `KIV` prefix means provisional; a slash joins two
+  codes in one week and is ad hoc (resolve each by hand). Some codes are origin tags in the External Residents column
+  (where a rotating resident comes from), not postings. The reader must tell those rows apart.
+- 16 Oct 2026: the rotation planner's sheet and workflow stay as they are; nothing here edits the sheet, and the planner is
+  not involved until the owner says so. The monthly roster's rosterer writes only the critical postings by hand today; the
+  export replaces that.
