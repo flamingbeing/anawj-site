@@ -217,3 +217,10 @@ People for a future month's sheet.
 The roster toolbar has a posting dropdown (all postings; "C3 postings" and "R1B postings", the postings the fairness rules
 count people on; or one posting), and the C3 and R1B column headers at the top right of the grid are buttons that do the same
 (press again for everyone). It shows people with that posting on any day of the month (`ui-roster.js` `postingSet`).
+
+## Roles in the cloud (owner, 16 Oct 2026)
+
+Admin: everything a rosterer can do, plus adding and removing members, changing roles, approving people who ask to join, and
+deleting a month from the cloud (an admin cannot demote or remove themselves, so one always remains). Rosterer: reads and saves
+the roster, rules and months; every save is kept in Earlier saves. Viewer: reads and pulls only. Changing the member list is
+the owner's call (live changes go through the owner's home-computer session).
