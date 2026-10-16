@@ -596,8 +596,14 @@ portfolio content.
   colours, corners and type only, never logos, paid fonts or brand names beyond "-style") are a searchable list.
   No celebrity or brand palettes (owner). New ideas come in through "Suggest a theme" (private feedback).
 - Display keeps layout (compact, start tab, header and tab bar, rows); Themes holds looks: light or dark, colour
-  swatches (NUH, muted, pastel, Custom), Colourful, background tint, Top band, borders, corners, shadows, spacing, tab
-  bar style, heading font, fonts, line spacing.
+  swatches (NUH, muted, pastel, Custom), Colourful, background tint, Top band, card style, corners, spacing, tab
+  bar style, heading font, fonts, line spacing. Advanced display keeps the fine controls (line strength, button style).
+- **Your themes** (owner, 16 Oct 2026; `my-themes.js`, unit-tested; e2e `my-themes.mjs`): once the look is Custom, the
+  "Your themes" card says so and offers Save this look under a name (`display().myThemes`, this device, up to 12, a
+  name already there is replaced; light or dark is kept with it). Saved looks are picked like any theme ("Now: Night
+  shift (yours)"), × deletes with Undo. **Export…** writes `my-logbook-themes.json` (`kind: apmes-logbook-themes`);
+  **Import…** adds a file's themes, only known look keys with checked values. The Themes reset leaves them alone; the
+  settings file carries them.
 - **Top band: only the NUHS theme keeps the NUH stripe; other themes bring their own four colours** (owner, 15 Oct
   2026; an exception to AGENTS.md's four-quarter band, for the logbook only). The Top band setting overrides it: the
   theme's colours (default), shades of my colour, the NUH stripe, or none.

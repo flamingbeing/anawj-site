@@ -10,6 +10,7 @@ import { cleanExportOpts } from './export-opts.js';
 import { cleanDestinations } from './destinations.js';
 import { SWITCH_KEYS } from './profiles.js';
 import { cleanSync } from './sync-md.js';
+import { cleanMine } from './my-themes.js';
 import { cleanLayout } from './analytics.js';
 import { cleanLabels, cleanCaseTemplate } from './parts.js';
 
@@ -30,6 +31,7 @@ const OBJECTS = {
   partLabels: v => (v == null ? null : cleanLabels(v)),
   caseTpl: v => (v == null ? null : cleanCaseTemplate(v)),
   catOrder: strs,
+  myThemes: v => { const l = cleanMine(v); return l.length ? l : null; },   // your themes (Themes; this device)
   // the Grid's column widths (px, this device; log2 10)
   gridCols: v => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([k, x]) => ['date', 'ini', 'details', 'cats'].includes(k) && Number.isFinite(x)).map(([k, x]) => [k, Math.max(40, Math.min(1200, Math.round(x)))])) : null),
   anLayout: v => cleanLayout(v),   // Analytics Edit mode: the cards' order and the hidden ones

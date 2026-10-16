@@ -1759,3 +1759,8 @@ ul.cases li.lb-planned a { display: block; padding: 8px 4px; }
 .yc-table th, .yc-table td { text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 .yc-table td:nth-child(2) { font-variant-numeric: tabular-nums; }
 .yc-table tr.yc-behind td:first-child { font-weight: 600; }
+
+/* Themes → Your themes (16 Oct 2026): a saved look per row, with × to delete */
+.my-themes .my-theme { display: flex; align-items: stretch; gap: 6px; }
+.my-themes .my-theme .theme-row { flex: 1; min-width: 0; }
+.my-themes .bar input[type=text] { flex: 1; min-width: 0; }
