@@ -136,6 +136,12 @@ const SCREENS = [
     await p.locator('.gs-group').first().waitFor();
     await p.getByRole('button', { name: 'Search operators' }).click();
   }, true],
+  ['Search selecting', async p => {
+    await hash('search')(p); await p.getByLabel('Search everything').fill('lap');
+    await p.locator('.gs-group').first().waitFor();
+    await p.locator('.gs-selbtn').click(); await p.locator('.gs-item').first().click();
+    await p.locator('.gs-chips button', { hasText: /^Dates$/ }).click();
+  }, false],
   ['Notes', hash('notes'), true],
   ['Notes selecting', async p => {
     await p.evaluate(async () => { const D = await import('./js/demo-backend.js'), t = Date.now(); for (const i of [1, 2]) D.saveNote('demo@example.com', { id: 'fake-a11y-' + i, date: '2020-03-0' + i, title: 'Fake a11y note ' + i, body: 'Fake', createdAt: t + i, updatedAt: t + i }); });

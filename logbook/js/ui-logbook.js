@@ -41,10 +41,10 @@ hooks.showCases = ({ tag = null, from = '', to = '' } = {}) => {
   Object.assign(view, { q: '', has: tag ? [tag] : [], not: [], from, to, flag: '', limit: 150, mode: 'list' });
 };
 const hasTag = (c, k) => (k.startsWith('c:') ? (c.cats || []).includes(k.slice(2)) : (c.tags || []).includes(k));
-const keyName = k => (k.startsWith('c:') ? catShort(k.slice(2)) : tagName(k));
+export const keyName = k => (k.startsWith('c:') ? catShort(k.slice(2)) : tagName(k));
 // Every tag to filter or bulk-tag by: the tag list, then tags taken off it that cases still carry
 // (so they can be found and removed). -> [{ k, depth, label }]
-function tagChoices() {
+export function tagChoices() {
   const set = tagSet();
   const out = flatTree(tagTree(set)).filter(n => n.kind !== 'head').map(n => ({ k: n.e.k, depth: n.depth, label: keyName(n.e.k) }));
   const known = new Set(set.map(e => e.k)), gone = new Map();
@@ -261,13 +261,15 @@ export function renderLogbook() {
   const savedRow = h('div', { class: 'chips lb-saved' });
   const paintSaved = () => {
     const list = settings().savedSearches || [];
-    fill(savedRow, ...list.map(x => h('span', { class: 'chip tmpl', role: 'button', tabindex: '0', title: 'Run this search' + (x.q ? `: “${x.q}”` : ''), onclick: () => {
+    fill(savedRow, ...list.map(x => h('span', { class: 'chip tmpl', role: 'button', tabindex: '0', title: (x.global ? 'Run this search in Search' : 'Run this search') + (x.q ? `: “${x.q}”` : ''), onclick: async () => {
+      // saved on the Search page (cases, reflections and notes): it runs there
+      if (x.global) { const { searchFor } = await import('./ui-search.js'); return searchFor(x.q); }
       Object.assign(view, { q: x.q || '', has: [...(x.has || [])], not: [...(x.not || [])], from: x.from || '', to: x.to || '', flag: x.flag || '' });
       setBox(view.q);
       if (x.scope) setOpts(x.scope, !!settings().lbFuzzy);
       const [f, t] = filters.querySelectorAll('input[type=date]'); if (f) f.value = view.from; if (t) t.value = view.to;
       filters.hidden = false; refresh();
-    } }, ic('star'), x.name, h('span', { class: 'x', role: 'button', tabindex: '0', 'aria-label': 'Delete saved search', onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); e.target.click(); } }, onclick: async e => {
+    } }, x.global ? '🔍 ' : ic('star'), x.name, h('span', { class: 'x', role: 'button', tabindex: '0', 'aria-label': 'Delete saved search', onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); e.target.click(); } }, onclick: async e => {
       e.stopPropagation();
       if (!(await confirmBox('Delete saved search', `Delete “${x.name}”?`, 'Delete', true))) return;
       await patchLogbook({ settings: { savedSearches: (settings().savedSearches || []).filter(y => y.id !== x.id) } }); paintSaved();

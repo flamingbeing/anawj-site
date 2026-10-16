@@ -11,7 +11,7 @@
 // Pure (test/global-search.test.mjs). buildIndex once per change of the lists, then search(index, q, opts).
 import { parseQuery } from './search-ops.js';
 
-export const GS_FIELDS = ['in', 'initials', 'title', 'case', 'tag', 'heading', 'diagnosis', 'status', 'is', 'has', 'no', 'linked'];
+export const GS_FIELDS = ['in', 'initials', 'title', 'case', 'tag', 'heading', 'diagnosis', 'status', 'is', 'has', 'no', 'linked', 'after', 'before'];
 export const GS_HELP = [
   ['in:reflections', 'only that kind: in:cases, in:reflections, in:notes', 'in:', 3],
   ['initials:AB', 'those initials (cases and reflections)', 'initials:', 9],
@@ -22,6 +22,7 @@ export const GS_HELP = [
   ['has:reflection', 'cases with a reflection (has:note: with a note)', 'has:', 4],
   ['no:tag', 'cases with no tag, reflections with no heading', 'no:tag', 6],
   ['linked:yes', 'reflections and notes linked to a case (linked:no: not linked)', 'linked:', 7],
+  ['after:2026-01-01', 'dated on or after that day (before:2026-06-30: on or before)', 'after:', 6],
   ['"lap chole"', 'that exact phrase', '""', 1],
   ['-paeds', 'leave out (works with the others: -in:notes)', '-', 1],
   ['spinal OR epidural', 'either one', 'OR ', 3],
@@ -78,6 +79,9 @@ function hit(d, t) {
     case 'has': return d.type === 'case' && (/^refl/.test(v) ? d.flags.reflection : /^note/.test(v) ? d.flags.note : false);
     case 'no': return /^(tag|tags|heading)$/.test(v) && d.type !== 'note' && d.flags.notag;
     case 'linked': return d.type !== 'case' && (/^(no|n|false|none)$/.test(v) ? !d.flags.linked : d.flags.linked);
+    // dates: a day (2026-03-01) or a month (2026-03: after its first day, before its last)
+    case 'after': return !!d.date && d.date >= v;
+    case 'before': return !!d.date && d.date.slice(0, v.length) <= v;
     default: return (d.f[t.field || 'all'] || '').includes(v);
   }
 }
@@ -116,3 +120,22 @@ export function snippet(text, words, width = 90) {
   if (last < piece.length) out.push([piece.slice(last), false]);
   return out;
 }
+
+// ---- the filter chips (Search) and the box kept in step: the box is the source, a chip adds or takes out its operator
+const ANY = '(?:"[^"]*"|\\S+)';
+const opRe = (field, value = ANY) => new RegExp(`(^|\\s)${field}:${value}(?=\\s|$)`, 'gi');
+const tidy = q => q.replace(/\s+/g, ' ').trim();
+const esc = v => String(v).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// is field:value in the box (not left out with -)?  value '' : any value
+export const hasOp = (q, field, value = '') => opRe(field, value ? esc(value) : ANY).test(String(q || ''));
+// the value of field: in the box ('' when none)
+export function opValue(q, field) { const m = new RegExp(`(?:^|\\s)${field}:("[^"]*"|\\S+)`, 'i').exec(String(q || '')); return m ? m[1].replace(/^"|"$/g, '') : ''; }
+// field: set to value (every other one of that field taken out); '' takes it out
+export function setOp(q, field, value) {
+  const out = tidy(String(q || '').replace(opRe(field), ' '));
+  if (!value) return out;
+  const v = /\s/.test(value) ? `"${value}"` : value;
+  return tidy(`${out} ${field}:${v}`);
+}
+// a chip: on → off (taken out), off → on (the only one of its field)
+export const toggleOp = (q, field, value) => (hasOp(q, field, value) ? tidy(String(q || '').replace(opRe(field, esc(value)), ' ')) : setOp(q, field, value));

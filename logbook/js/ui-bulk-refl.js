@@ -19,7 +19,7 @@ const summary = r => [r.date ? fmtDate(r.date) : 'No date', r.initials || '??', 
   r.status === 'complete' ? 'complete' : 'draft', r.export === false ? 'not exported' : '', r.jr ? 'JR' : ''].filter(Boolean).join(' · ');
 const same = (a, b) => ['headingId', 'subId', 'status', 'export', 'jr', 'date'].every(k => JSON.stringify(a?.[k] ?? null) === JSON.stringify(b?.[k] ?? null));
 
-async function saveAll(list) {
+export async function saveAll(list) {
   const me = S.user && S.user.email;
   let saved = 0, error = null;
   for (const r of list) {
@@ -82,7 +82,7 @@ export function reflBulkDialog(refls, { onDone = () => {} } = {}) {
   });
 }
 
-async function undo(pairs) {
+export async function undo(pairs) {
   const now = Date.now(), back = [];
   let moved = 0;
   for (const p of pairs) {

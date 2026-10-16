@@ -16,7 +16,7 @@ const summary = n => [n.date ? fmtDate(n.date) : 'No date', noteTitle(n).slice(0
 const same = (a, b) => ['date', 'title', 'body', 'caseId'].every(k => (a?.[k] ?? null) === (b?.[k] ?? null));
 
 // Save notes: each through the write queue with its base; this device's list changes at once. -> { saved, failed, error }
-async function saveNotes(pairs) {
+export async function saveNotes(pairs) {
   const me = S.user && S.user.email;
   if (!me) return { saved: 0, failed: pairs.length, error: new Error('Not signed in') };
   const r = await Promise.allSettled(pairs.map(p => writes.save('note', me, cleanNote(p.next, p.next.updatedAt), p.base)));
@@ -74,7 +74,7 @@ export function notesBulkDialog(notes, { onDone = () => {} } = {}) {
     },
   });
 }
-async function undo(pairs) {
+export async function undo(pairs) {
   const now = Date.now(), back = [];
   let moved = 0;
   for (const p of pairs) {
