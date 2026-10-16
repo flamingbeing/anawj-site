@@ -141,6 +141,31 @@ month with no entry yet gets a locked one when it is opened (`store.ensureLocked
 sheet unlocks that one month (it is deliberate). Not in Practice. A month the cloud copy holds as unlocked comes in unlocked
 and is locked again at the next close or start. The stored status values are unchanged (`published` = locked), so no rules change.
 
+## Growing beyond cardiac and ICU calls (owner, 16 Oct 2026)
+
+The owner wants the app to take over the department's other monthly sheet tabs one at a time, so the move off the sheet is smooth:
+the **leave waitlist**, the **WR / premed roster**, the **junior call roster** (EOT calls: emergency theatre calls manned by R1 to R3
+and S1) and later more. Each new area is a module of its own (data, a reader for its Google Sheet tab, a screen, rules, and later
+a write-back of just its cells), not a special case in the main grid. The terms follow the NUH daily roster app
+(`nuh-roster/NOTES.md`); the ICU call is R1B.
+
+Built so far (step 1): `js/waitlist.js` (pure: reads the Leave Waitlist tab's rows of `{ v, bg }` into entries with a status, matches
+names to the staff list), `gsheets.js` `readColoured` (text plus fill colour only, read only) and `findTab`, `ui-leave.js` (the
+**Leave** tab, `#leave`; on phones a card in More). Stored per month in `state.waitlist[month]` on the device (not in the cloud
+copy yet). Nothing is written to the sheet from it.
+
+The leave waitlist's **status is only a cell colour** in the sheet (orange waitlisted from an application, no fill ad hoc, green
+expedited approved, blue approved, red bad day or rejected, cyan roster drafted and closed). The app reads the nearest legend colour
+and writes the status on every chip (colour is never the only sign).
+
+Decided for the next steps: the **daily rosterers** (who run the NUH daily roster, a different group from the monthly rosterers)
+change a waitlist status, letting waitlisted people go when manpower is good, so there will be a separate member **role** for them
+(waitlist status only; read everything else), kept in its own cloud collection so the rules can allow just that. Late requests
+(within 5 working days of the leave date) get a flag. Real tab contents, names and screenshots stay in the private repo.
+Order: (1) the shared structure and the read-only leave tab (done), (2) status changes with write-back and the role,
+(3) the WR / premed roster, (4) the junior call roster and EOT calls, (5) their rules and Fill. Open question for the owner: what
+the columns of the headerless Junior Call Roster tab are.
+
 ## Phone header has no gap (owner, 16 Oct 2026)
 
 On phones the second header row is the month, Today, the lock and Fill. Fill shows on the Roster tab only, so on the other tabs

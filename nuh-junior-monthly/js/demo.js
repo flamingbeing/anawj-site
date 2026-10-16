@@ -3,6 +3,7 @@
 // with a simple pattern; next month's are left empty so Auto-fill can be tried. Every name here is invented.
 // Deterministic: the same `today` always gives the same department (seeded random numbers).
 import * as M from './model.js';
+import { matchStaff } from './waitlist.js';
 
 // Singapore public holidays 2026 and 2027 (Ministry of Manpower list; a Sunday holiday gives the Monday off).
 // 2027 dates for the lunar and Islamic holidays and Deepavali follow MOM's announced list as far as known:
@@ -154,7 +155,35 @@ export function demoState(today = M.iso(new Date())) {
   // Not on the roster: the AC rows (seniors) are there only for their S1 calls
   // ---- cardiac and ICU calls already done for last month and this month (next month is left for Auto-fill) ----
   for (const m of [prevM, thisM]) fillCalls(s, m);
+  // ---- a made-up leave waitlist for this month (the Leave tab): the same shape the sheet's tab reads into ----
+  s.waitlist = { [thisM]: demoWaitlist(s, thisM, rng(hash('nuhjm-demo-waitlist-' + thisM))) };
   return s;
+}
+
+function demoWaitlist(s, month, rand) {
+  const days = M.monthDays(month);
+  const pool = s.staff.filter(p => !['ac', 'fellow'].includes(p.group));
+  const ORDER = ['waitlisted', 'adhoc', 'approved', 'expedited', 'rejected', 'closed', 'waitlisted', 'adhoc'];
+  const REMARKS = ['', '', '', 'PM', 'medical appt', 'AM'];
+  const entries = [];
+  const cellRow = {};
+  let k = 0;
+  for (const d of days) {
+    if (M.isWeekend(d)) continue;
+    const n = rand() < 0.35 ? 0 : rand() < 0.7 ? 1 : 2;
+    for (let slot = 1; slot <= n; slot++) {
+      const p = pool[Math.floor(rand() * pool.length)];
+      const first = p.name.split(' ')[0];
+      const text = rand() < 0.8 ? p.name.replace(/\s*\(.*\)$/, '') : first;
+      const remark = REMARKS[Math.floor(rand() * REMARKS.length)];
+      const m = matchStaff(text, s.staff);
+      const row = d.slice(8) * 1 + 1;
+      cellRow[d] = row;
+      entries.push({ date: d, slot, cell: `${String.fromCharCode(66 + slot)}${row}`, text: remark ? `${text} (${remark})` : text, name: text, remark,
+        status: ORDER[k++ % ORDER.length], exact: true, staffId: m && m.id ? m.id : '', ambiguous: m && m.ambiguous ? m.ambiguous : null });
+    }
+  }
+  return { entries, readAt: '', source: null, columns: 6 };
 }
 
 // A simple rota like the real ones: each night, of the people on the posting that night and the next, the one who has

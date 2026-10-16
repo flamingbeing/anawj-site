@@ -11,6 +11,7 @@ let CS = null;     // cloudstate.js: what the header's cloud button shows (null 
 const TABS = {
   roster: { label: 'Roster', icon: 'grid', mod: './ui-roster.js' },
   day: { label: 'Day', icon: 'day', mod: './ui-day.js' },
+  leave: { label: 'Leave', icon: 'leave', mod: './ui-leave.js' },
   postings: { label: 'Postings', icon: 'day', mod: './ui-postings.js' },
   people: { label: 'People', icon: 'people', mod: './ui-people.js' },
   rules: { label: 'Rules', icon: 'rules', mod: './ui-rules.js' },
@@ -18,7 +19,7 @@ const TABS = {
   more: { label: 'More', icon: 'more', mod: './ui-more.js' },
 };
 // the month's work (Roster, Check, Day), then the set-up screens after a separator (Postings, People, Rules, More)
-const DESKTOP_TABS = ['roster', 'check', 'day', 'postings', 'people', 'rules', 'more'];
+const DESKTOP_TABS = ['roster', 'check', 'day', 'leave', 'postings', 'people', 'rules', 'more'];
 const PHONE_TABS = ['roster', 'check', 'day', 'rules', 'more'];
 const PHONE_MQ = '(max-width: 720px)';
 
@@ -29,6 +30,7 @@ const ICON_PATHS = {
   check: '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
   rules: '<path d="M4 6h9M19 6h1M4 12h3M13 12h7M4 18h11M21 18h-1"/><circle cx="16" cy="6" r="2.2"/><circle cx="10" cy="12" r="2.2"/><circle cx="18" cy="18" r="2.2"/>',
   more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+  leave: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8 14.5h8M8 17.5h5"/>',
   people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 010 6.8M18 14.8c2 .7 3.2 2.5 3.5 5.2"/>',
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/>',
   redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 000 11H13"/>',
@@ -508,10 +510,13 @@ function placeholder(tab, err) {
 }
 
 function phoneMoreLinks() {
-  return h('a', { href: '#people', class: 'card link-card' },
-    h('span', { class: 'lc-ic', html: icon('people') }),
-    h('span', { class: 'lc-text' }, h('strong', null, 'People'), h('span', null, 'Staff, groups, tags and duty codes')),
+  const link = (href, ic, title, text) => h('a', { href, class: 'card link-card' },
+    h('span', { class: 'lc-ic', html: icon(ic) }),
+    h('span', { class: 'lc-text' }, h('strong', null, title), h('span', null, text)),
     h('span', { class: 'lc-go', html: icon('right') }));
+  const frag = document.createDocumentFragment();
+  frag.append(link('#leave', 'leave', 'Leave', 'The leave waitlist and where each request stands'), link('#people', 'people', 'People', 'Staff, groups, tags and duty codes'));
+  return frag;
 }
 
 function welcomeCard() {

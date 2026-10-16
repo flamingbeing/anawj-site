@@ -40,6 +40,7 @@ Last updated: 2026-10-16 by Claude Code (jm1).
 - #710 Paint cells with Lock; the lock at the top of the cell popup.
 - #724 Save and Pull cover every month and its sheet layout (rules deployed). (this PR) Colours follow the sheet's legend.
 - (this PR) Carry-over from earlier months in the cardiac and ICU fair-share rules. #727 a call that replaced its posting counts as on it; no day-1 preference for RES3 and SR. #726 notes are an orange corner, problems rings. #725 colours follow the sheet.
+- (this PR) Step 1 of growing past cardiac and ICU: the read-only Leave tab (the sheet's Leave Waitlist) and the shared tab-reading structure.
 - #708 The cloud (Save and Pull to cloud) with a header button showing when it was last saved.
 - #707 Every month starts locked. #705 Earlier saves (restore from the cloud history).
 - #703 The import moves people to their new grade. #702 A month is saved as one JSON string (index-entry limit).

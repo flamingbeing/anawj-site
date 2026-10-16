@@ -96,6 +96,26 @@ export async function readGrid(id, tab) {
   return pad(j.values);
 }
 
+// A tab's cells with their fill colours: rows of [{ v: text, bg: '#rrggbb' or '' for no fill }] (what the Leave Waitlist's status
+// colours are read from). Read only: it asks for the text and the background colour of each cell, nothing else.
+export async function readColoured(id, tab) {
+  const rng = `${quoteTab(tab.title)}!A1:${colName(Math.max(0, Math.min(tab.cols, 40) - 1))}${Math.min(tab.rows, 400)}`;
+  const fields = 'sheets.data.rowData.values(formattedValue,effectiveFormat.backgroundColor)';
+  const j = await call(`${API}${id}?includeGridData=true&ranges=${encodeURIComponent(rng)}&fields=${encodeURIComponent(fields)}`);
+  const data = ((j.sheets || [])[0] || {}).data || [];
+  const rows = ((data[0] || {}).rowData) || [];
+  const hex = c => {
+    if (!c) return '';
+    const ch = v => Math.max(0, Math.min(255, Math.round((v || 0) * 255)));
+    const r = ch(c.red), g = ch(c.green), b = ch(c.blue);
+    return r >= 254 && g >= 254 && b >= 254 ? '' : '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+  };
+  return rows.map(r => (r.values || []).map(v => ({ v: v.formattedValue == null ? '' : String(v.formattedValue), bg: hex(v.effectiveFormat && v.effectiveFormat.backgroundColor) })));
+}
+
+// A tab whose name matches (the Leave Waitlist, the WR/ Premed Roster...), else null.
+export function findTab(tabs, re) { return (tabs || []).find(t => re.test(t.title)) || null; }
+
 async function readCells(id, tab, cells, render = 'FORMATTED_VALUE') {
   const out = new Map();
   for (let i = 0; i < cells.length; i += 100) {
