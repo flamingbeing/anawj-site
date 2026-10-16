@@ -1007,7 +1007,8 @@ export const RULE_TYPES = {
       if (m.empty) return null;
       const ww = num(p.weekendWeight, 2), hw = num(p.holidayWeight, 2), tol = num(p.tolerance, 1);
       const offdays = p.scheme !== 'fixed', ob = num(p.offBonus, 0.5), eb = num(p.eveBonus, 0.5);
-      const ma = (p.among || []).length ? X.codes(p.among) : null;
+      // the call itself counts as a day on the posting (C3 on a cardiac week, R1B on an ICU week): on the sheet the call replaces the posting code
+      const ma = (p.among || []).length ? X.codes([...p.among, ...(p.codes || [])]) : null;
       const { ctx, u } = X, n = ctx.n, ok = X.when, act = ctx.act, list = X.W.list, inWho = X.W.inWho;
       const periods = p.period === 'range' ? ctx.periods.range : ctx.periods.month;
       const K = periods.length;

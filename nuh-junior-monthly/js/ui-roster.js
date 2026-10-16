@@ -130,7 +130,7 @@ export function postingSet(state, token) {
   if (token[0] !== '@') return new Set([token]);
   const code = token.slice(1);
   const rule = (state.rules || []).find(r => r.type === 'spread' && (r.params.codes || []).includes(code) && (r.params.among || []).length);
-  return new Set(rule ? rule.params.among : []);
+  return new Set(rule ? [...rule.params.among, ...(rule.params.codes || [])] : []);   // the call counts as a day on the posting (C3 for C)
 }
 
 // What painting with `code` does to this cell: 'del' removes the code (or unlocks, or clears), 'add' adds it (or locks)

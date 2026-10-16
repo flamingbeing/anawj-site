@@ -10,7 +10,7 @@ import { apmesList } from '../js/apmes.js';
 import * as G from '../js/gsheets.js';
 import * as C from '../js/cloud.js';
 import { relevanceOf } from '../js/ui-check.js';
-import { applyAssignments } from '../js/ui-roster.js';
+import { applyAssignments, postingSet } from '../js/ui-roster.js';
 
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -508,5 +508,17 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(md('ICU').color === '#123456', 'colours: a colour the rosterer chose is kept');
   const df = c => M.DEFAULT_DUTIES.find(d => d.code === c).color;
   ok(df('ICU') === '#ffee3a' && df('X') === '#c62828' && df('R') === '#1f5fd0' && df('AL') === '#2c5fc6' && df('Z') === '#d0d0d0', 'colours: ICU yellow, blocked red, requests blue, leave blue, grey');
+}
+{
+  // a C3 call counts as a day on the cardiac posting (the call replaces the posting code on the sheet); R1B for ICU
+  const s = M.defaultState();
+  ok(postingSet(s, '@C3').has('C3') && postingSet(s, '@C3').has('C') && !postingSet(s, '@C3').has('C-e'), 'the cardiac posting filter includes C3');
+  ok(postingSet(s, '@R1B').has('R1B') && postingSet(s, '@R1B').has('ICU'), 'the ICU posting filter includes R1B');
+  // fairness: someone whose cardiac days are all calls (C3, no C) still counts in the share
+  const t = team();
+  t.rules = [JSON.parse(JSON.stringify(M.DEFAULT_RULES.find(r => r.id === 'r-c3-fair')))];
+  for (const d of days) M.setCell(t, d, 'c3', { a: ['C3'] });
+  const v = evaluate(t, { from: days[0], to: days[days.length - 1] }).violations.filter(x => x.ruleId === 'r-c3-fair');
+  ok(v.some(x => x.staffId === 'c3'), 'a person whose cardiac days are all C3 calls is counted in the share (so they are over it)');
 }
 console.log(`nuh-junior-monthly: ${n} checks passed`);
