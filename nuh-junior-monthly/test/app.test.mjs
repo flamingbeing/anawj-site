@@ -10,6 +10,7 @@ import { apmesList } from '../js/apmes.js';
 import * as G from '../js/gsheets.js';
 import * as W from '../js/waitlist.js';
 import * as Pools from '../js/pools.js';
+import { topicOf } from '../js/ui-rules.js';
 import * as C from '../js/cloud.js';
 import { relevanceOf } from '../js/ui-check.js';
 import { applyAssignments, postingSet } from '../js/ui-roster.js';
@@ -691,5 +692,13 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const old = M.defaultState(); old.rulesVersion = 16; old.tags = old.tags.filter(t => !/^mo\d[sw]$/.test(t.id)); old.rules = old.rules.filter(r => !/^r-(req-load|req-npload|pool-\d)$/.test(r.id));
   const mg = M.migrate(JSON.parse(JSON.stringify(old)));
   ok(mg.rulesVersion === 17 && mg.tags.some(t => t.id === 'mo3w') && mg.rules.some(r => r.id === 'r-pool-3' && !r.enabled), 'pools: a saved roster gains the tags and rules once');
+}
+
+// the Rules tab groups rules by topic
+{
+  const by = {};
+  for (const r of M.defaultState().rules) (by[topicOf(r)] ||= []).push(r.id);
+  ok(by.c3.includes('r-c3-fair') && by.r1b.includes('r-r1b-fair') && by.mo.includes('r-r1-cover') && by.requests.includes('r-req-x') && by.requests.includes('r-pool-1') && by.everyone.includes('r-leave'), 'rules tab: topics follow the duties a rule names');
+  ok(!(by.everyone || []).some(id => /^r-(c3|r1b)-/.test(id)), 'rules tab: no cardiac or ICU rule is left under Everyone');
 }
 console.log(`nuh-junior-monthly: ${n} checks passed`);

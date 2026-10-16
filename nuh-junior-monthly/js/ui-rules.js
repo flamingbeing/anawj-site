@@ -79,10 +79,50 @@ const COMBO_TEMPLATES = [
 let nid = 0;
 const fid = p => `${p}-${++nid}`;
 
+
+// ---------- the rules, in plain words ----------
+// Rules are shown by topic (which calls they are about) or by strength. A rule's topic follows the duties it names.
+const TOPICS = [
+  ['everyone', 'Everyone', 'Rules for every call: leave, post call, gaps, weekends.'],
+  ['c3', 'Cardiac calls (C3)', 'Who covers the cardiac call, and how it is shared.'],
+  ['r1b', 'ICU calls (R1B)', 'Who covers the ICU call, and how it is shared.'],
+  ['mo', 'R1 to R3 calls (MO1 to MO3)', 'The junior resident calls: cover, who may do which, pools and sharing.'],
+  ['requests', 'Requests', 'What people ask for in the sheet: no call (X), call (R), no premed (NP), and how many they may ask for.'],
+];
+export function topicOf(r) {
+  const p = r.params || {};
+  if (r.type === 'requests' || /^r-req-|^r-pool-/.test(r.id || '')) return 'requests';
+  const codes = [].concat(p.codes || [], p.ifCodes || [], p.thenCodes || [], p.codesA || [], p.codesB || []);
+  const has = c => codes.includes(c);
+  const onlyOne = list => codes.length && codes.every(c => list.includes(c));
+  if (onlyOne(['C3', 'C', 'C-e', 'C-p'])) return 'c3';
+  if (onlyOne(['R1B', 'ICU'])) return 'r1b';
+  if (codes.some(c => ['R1', 'R2', 'R3'].includes(c)) && !has('C3') && !has('R1B')) return 'mo';
+  if (/^r-(r1|r2|r3)-|^r-fair$|^r-gap$|^r-sat/.test(r.id || '')) return 'mo';
+  return 'everyone';
+}
+
+// The short "how it works" panel at the top: the order things happen in. Keep in step with solver.js and rules.js.
+function how(h) {
+  const li = (t, d) => h('li', null, h('strong', null, t), ' ', d);
+  return h('details', { class: 'card rv-how' },
+    h('summary', null, 'How the rules work, in order'),
+    h('ol', { class: 'rv-how-list' },
+      li('The sheet comes first.', 'What is already on the roster (postings, leave, calls you typed, requests) is kept as it is. The sheet is the truth; rules never rewrite it.'),
+      li('Requests are read as wishes.', 'X (no call), R (call), NP (no premed) and their strong versions (X!, R!) are preferences with a weight, not orders. X! and XX outrank a plain X.'),
+      li('Every rule is checked all the time.', 'Each rule looks at the roster and counts its problems. That is the Check tab, and the "problems" count on each rule below.'),
+      li('Must hold or preference.', 'A "Must hold" rule is never given up if there is any other way. A preference has a number: the higher it is, the more it matters. When two preferences clash, the one with the higher number wins.'),
+      li('Fill makes a draft.', 'It clears only its own earlier calls, works out how many calls each night needs (from the "cover" rules), places the hardest nights first, then keeps improving by swapping people and days until nothing gets better. It never touches your cells, leave or requests.'),
+      li('You decide.', 'The draft shows what it changed and what is still a problem. Apply it, change it by hand, or undo. Locking the month stops Fill.'),
+      li('Then the sheet.', 'Save to the cloud keeps every month for the team. Writing to the Google Sheet changes only the day cells that differ, after checking nobody edited the sheet meanwhile.')),
+    h('p', { class: 'bx-help rv-how-note' }, 'Turn a rule off with its switch to see what it was doing; the problems come back if you turn it on again.'));
+}
+
 export function mount(el, app) {
   const { h } = app;
   let q = '';
   let filter = 'all';
+  let by = (() => { try { return localStorage.getItem('nuhjm-rules-by') === 'strength' ? 'strength' : 'topic'; } catch (e) { return 'topic'; } })();
 
   const root = h('div', { class: 'rv' });
   const head = h('div', { class: 'bx-head' },
@@ -98,13 +138,18 @@ export function mount(el, app) {
     options: [['all', 'All'], ['hard', 'Must hold'], ['soft', 'Preferences'], ['bad', 'Problems'], ['off', 'Off']],
     onChange: v => { filter = v; renderList(); },
   });
+  const grouping = seg(h, {
+    name: fid('rvg'), label: 'Group by', value: by, compact: true,
+    options: [['topic', 'Topic'], ['strength', 'Strength']],
+    onChange: v => { by = v; try { localStorage.setItem('nuhjm-rules-by', v); } catch (e) { /* kept for this visit only */ } renderList(); },
+  });
   const tools = h('div', { class: 'rv-tools' },
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => openLog(), html: `${app.icon('list')}<span>Rules log</span>` }),
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => exportRules(), html: `${dlIcon()}<span>Export</span>` }),
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => importRules(), html: `${app.icon('upload')}<span>Import</span>` }));
-  const bar = h('div', { class: 'rv-bar' }, h('div', { class: 'rv-search' }, h('span', { class: 'bx-search-ic', html: app.icon('search') }), search), filters, tools);
+  const bar = h('div', { class: 'rv-bar' }, h('div', { class: 'rv-search' }, h('span', { class: 'bx-search-ic', html: app.icon('search') }), search), filters, grouping, tools);
   const list = h('div', { class: 'rv-list' });
-  root.append(head, bar, list);
+  root.append(head, how(h), bar, list);
   el.append(root);
 
   // ---------- list ----------
@@ -135,10 +180,12 @@ export function mount(el, app) {
       return;
     }
     const isHard = r => r.hard && !(RULE_TYPES[r.type] && RULE_TYPES[r.type].soft_only);
-    const groups = [
-      ['Must hold', 'Hard rules: auto-fill never breaks them if it can help it.', shown.filter(isHard)],
-      ['Preferences', 'Soft rules: weighed against each other; a higher weight matters more.', shown.filter(r => !isHard(r))],
-    ];
+    const groups = by === 'strength'
+      ? [
+        ['Must hold', 'Hard rules: auto-fill never breaks them if it can help it.', shown.filter(isHard)],
+        ['Preferences', 'Soft rules: weighed against each other; a higher number matters more.', shown.filter(r => !isHard(r))],
+      ]
+      : TOPICS.map(([id, title, sub]) => [title, sub, shown.filter(r => topicOf(r) === id)]);
     for (const [title, sub, rs] of groups) {
       if (!rs.length) continue;
       const sec = h('section', { class: 'rv-sec', 'aria-label': title },

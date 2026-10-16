@@ -413,3 +413,8 @@ button.bx-tag:hover { border-color: currentColor; }
 .more-tbl th, .more-tbl td { border-bottom: .5px solid var(--a-sep); padding: 3px 8px; text-align: left; }
 .more-list { margin: 8px 0 8px 20px; }
 .sheet-return .muted, .postv .muted, .more-sec .muted, .bx-form .muted { color: #4b5563; }
+
+.rv-how { margin: 10px 0 12px; padding: 10px 14px; }
+.rv-how summary { cursor: pointer; font-weight: 600; color: var(--navy, #002f6c); }
+.rv-how-list { margin: 10px 0 6px; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+.rv-how-note { margin: 6px 0 0; }
