@@ -1,12 +1,12 @@
 // NUH Junior Monthly: the Team sharing panel (inside More). Sign in with Google, see your role, Save to cloud (the staff list,
-// rules, codes and settings, plus the month on screen), Pull from cloud, who saved last and when, a prompt when
+// rules, codes and settings, plus every month that changed), Pull from cloud, who saved last and when, a prompt when
 // someone else saved first, and for admins the members list and people asking to join.
 // Off (a short note instead) until js/firebase-config.js is filled in, and always off in practice mode (?demo).
 import * as cloud from './cloud.js';
 import * as CS from './cloudstate.js';
 
 // The team copy's updatedAt this browser last loaded or saved, per device (not part of the roster):
-// { team: ms | null, months: { 'YYYY-MM': ms } }. A save that finds a different updatedAt there stops (conflict).
+// { team: ms | null, months: { 'YYYY-MM': ms }, sig: { 'YYYY-MM': fingerprint of the month as last saved or pulled } }. A save that finds a different updatedAt there stops (conflict).
 const SEEN_KEY = 'nuhjm-team-seen';
 const ROLE_LABEL = { admin: 'Admin', rosterer: 'Rosterer', viewer: 'Viewer' };
 const ROLE_HELP = {
@@ -18,11 +18,26 @@ const ROLE_HELP = {
 function readSeen() {
   try {
     const s = JSON.parse(localStorage.getItem(SEEN_KEY) || 'null');
-    if (s && typeof s === 'object') return { team: s.team ?? null, months: (s.months && typeof s.months === 'object') ? s.months : {} };
+    if (s && typeof s === 'object') return { team: s.team ?? null, months: (s.months && typeof s.months === 'object') ? s.months : {}, sig: (s.sig && typeof s.sig === 'object') ? s.sig : {} };
   } catch { /* private window or damaged: start fresh */ }
-  return { team: null, months: {} };
+  return { team: null, months: {}, sig: {} };
 }
 function writeSeen(s) { try { localStorage.setItem(SEEN_KEY, JSON.stringify(s)); } catch { /* ignore */ } }
+
+// A short fingerprint of a month's content, to tell which months changed since the last save or pull.
+function sigOf(state, m) {
+  const t = JSON.stringify(cloud.pickMonth(state, m));
+  let x = 5381;
+  for (let i = 0; i < t.length; i++) x = ((x * 33) ^ t.charCodeAt(i)) >>> 0;
+  return t.length + ':' + x.toString(36);
+}
+// Bring every cloud month into the state; remember what the cloud holds so only later changes are saved.
+function mergeAllMonths(state, docs, seen) {
+  let next = state;
+  for (const d of docs) next = cloud.mergeMonth(next, d.month, d);
+  for (const d of docs) { seen.months[d.month] = d.updatedAt ?? null; seen.sig[d.month] = sigOf(next, d.month); }
+  return next;
+}
 
 function when(ms) {
   if (!ms) return '';
@@ -33,19 +48,27 @@ const byName = b => (b ? (b.name && b.email && b.name !== b.email ? `${b.name} (
 
 // The cloud's last save of the staff list/rules or of this month, whichever is later: { at, by } (at 0 when nothing is saved)
 function latestOf(status) {
-  const a = status && status.team && status.team.updatedAt ? status.team : null, b = status && status.month && status.month.updatedAt ? status.month : null;
-  const best = a && b ? (a.updatedAt >= b.updatedAt ? a : b) : (a || b);
+  const all = [status && status.team, ...Object.values((status && status.months) || {})].filter(x => x && x.updatedAt);
+  const best = all.sort((x, y) => y.updatedAt - x.updatedAt)[0];
   return best ? { at: best.updatedAt, by: byName(best.updatedBy) } : { at: 0, by: '' };
 }
+// One status line for the months other than the one on screen: how many the cloud holds and how many are newer than here
+function otherMonths(status, seen, month, h) {
+  const all = Object.entries((status && status.months) || {}).filter(([m, x]) => m !== month && x);
+  if (!all.length) return null;
+  const newer = all.filter(([m, x]) => x.updatedAt !== (seen.months[m] ?? null)).length;
+  return h('li', { class: 'team-p' }, `${all.length} other ${all.length === 1 ? 'month is' : 'months are'} in the cloud` + (newer ? `; ${newer} newer than the copy in this browser.` : ', all matching this browser.'));
+}
+
 // Does the cloud hold a save this browser has not loaded or made?
-const newerThanHere = (status, seen, month) => !!status && ((status.team && status.team.updatedAt !== seen.team) || (status.month && status.month.updatedAt !== (seen.months[month] ?? null)));
+const newerThanHere = (status, seen) => !!status && ((status.team && status.team.updatedAt !== seen.team) || Object.entries(status.months || {}).some(([m, x]) => x && x.updatedAt !== (seen.months[m] ?? null)));
 
 // Ask the cloud, quietly, whether it is ahead of this browser (for the header's cloud button). Does nothing when signed out.
 export async function checkCloud(app) {
   try {
     if (!(await cloud.currentUser()) || !(await cloud.myMember())) return;
     const st = await cloud.lastSaved(app.month), seen = readSeen(), last = latestOf(st);
-    CS.noteCloud(last.at, last.by, newerThanHere(st, seen, app.month));
+    CS.noteCloud(last.at, last.by, newerThanHere(st, seen));
   } catch (e) { console.warn('cloud check failed', e); }
 }
 
@@ -63,17 +86,17 @@ export async function joinAndLoad(app) {
       return;
     }
     const m = app.month;
-    const [t, mo] = await Promise.all([cloud.loadTeam(), cloud.loadMonth(m)]);
-    if (!t && !mo) { app.toast('Signed in, but nothing has been saved to the cloud yet. Save it first from a device that has the roster.', { kind: 'warn', ms: 9000 }); app.go('more'); return; }
+    const [t, docs] = await Promise.all([cloud.loadTeam(), cloud.loadAllMonths()]);
+    const mo = docs.find(d => d.month === m) || null;
+    if (!t && !docs.length) { app.toast('Signed in, but nothing has been saved to the cloud yet. Save it first from a device that has the roster.', { kind: 'warn', ms: 9000 }); app.go('more'); return; }
     let next = app.store.get();
     if (t) next = cloud.mergeTeam(next, t);
-    if (mo) next = cloud.mergeMonth(next, m, mo);
-    app.store.replace(next, 'Pull from cloud');
     const seen = readSeen();
+    next = mergeAllMonths(next, docs, seen);
+    app.store.replace(next, 'Pull from cloud');
     if (t) seen.team = t.updatedAt ?? null;
-    if (mo) seen.months[m] = mo.updatedAt ?? null;
     writeSeen(seen);
-    CS.noteSynced(Math.max(t ? t.updatedAt || 0 : 0, mo ? mo.updatedAt || 0 : 0), byName(((mo || t) || {}).updatedBy));
+    CS.noteSynced(Math.max(t ? t.updatedAt || 0 : 0, ...docs.map(d => d.updatedAt || 0)), byName(([...docs].sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0))[0] || t || {}).updatedBy));
     app.toast(mo ? `Pulled the cloud roster and ${fmt(m)}.` : `Pulled the cloud roster. ${fmt(m)} is not in the cloud yet.`, { action: { label: 'Undo', fn: () => app.store.undo() } });
   } catch (e) {
     console.error(e);
@@ -116,7 +139,7 @@ export function mountTeam(el, app, opts = {}) {
         request = await cloud.myAccessRequest().catch(() => null);
       } else {
         status = await cloud.lastSaved(month).catch(e => { console.warn(e); return null; });
-        if (status) { const last = latestOf(status); CS.noteCloud(last.at, last.by, newerThanHere(status, readSeen(), month)); changed(); }
+        if (status) { const last = latestOf(status); CS.noteCloud(last.at, last.by, newerThanHere(status, readSeen())); changed(); }
         if (member.role === 'admin') {
           [members, requests] = await Promise.all([cloud.listMembers(), cloud.listAccessRequests()]);
         } else { members = null; requests = null; }
@@ -142,37 +165,42 @@ export function mountTeam(el, app, opts = {}) {
   const signIn = () => work('Signing in…', async () => { await cloud.signIn(); });
   const signOut = () => work('Signing out…', async () => { await cloud.signOut(); });
 
+  // Saves the staff list, rules and settings plus every month that changed since this browser last saved or pulled.
   function save(force = false) {
     return work('Saving…', async () => {
-      const st = app.store.get(), m = month, seen = readSeen();
-      const { cells, meta } = cloud.pickMonth(st, m);
-      const { at, by } = await cloud.saveAll({ team: st, month: { m, cells, meta } },
-        { teamAt: seen.team, monthAt: seen.months[m] ?? null, force });
-      seen.team = at; seen.months[m] = at; writeSeen(seen);
-      status = { team: { updatedAt: at, updatedBy: by }, month: { updatedAt: at, updatedBy: by } };
+      const st = app.store.get(), seen = readSeen();
+      const todo = cloud.monthsWithContent(st).filter(m => force || seen.sig[m] !== sigOf(st, m) || seen.months[m] == null);
+      const months = todo.map(m => ({ m, ...cloud.pickMonth(st, m) }));
+      const { at, by } = await cloud.saveAll({ team: st, months }, { teamAt: seen.team, monthsAt: seen.months, force });
+      seen.team = at;
+      for (const m of todo) { seen.months[m] = at; seen.sig[m] = sigOf(st, m); }
+      writeSeen(seen);
+      status = { team: { updatedAt: at, updatedBy: by }, month: todo.includes(month) ? { updatedAt: at, updatedBy: by } : (status && status.month) || null,
+        months: { ...((status && status.months) || {}), ...Object.fromEntries(todo.map(m => [m, { updatedAt: at, updatedBy: by }])) } };
       CS.noteSynced(at, byName(by)); changed();
-      app.toast(`Saved to the cloud: the staff list, rules and ${fmtMonth(m)}.`);
+      app.toast(todo.length ? `Saved to the cloud: the staff list, rules and ${todo.length === 1 ? fmtMonth(todo[0]) : todo.length + ' months'}.` : 'Saved to the cloud: the staff list and rules. The months had not changed.');
     });
   }
 
   async function load() {
     const m = month;
-    const ok = await app.confirm(`Pull the cloud copy? It replaces the staff list, rules, duty codes, settings and ${fmtMonth(m)} in this browser. Other months stay as they are. Undo brings yours back.`, { ok: 'Pull from cloud' });
+    const ok = await app.confirm(`Pull the cloud copy? It replaces the staff list, rules, duty codes, settings and every month the cloud holds in this browser. Months only this browser has stay as they are. Undo brings yours back.`, { ok: 'Pull from cloud' });
     if (!ok) return;
     return work('Pulling…', async () => {
-      const [t, mo] = await Promise.all([cloud.loadTeam(), cloud.loadMonth(m)]);
-      if (!t && !mo) { app.toast('Nothing has been saved to the cloud yet.', { kind: 'warn' }); return; }
+      const [t, docs] = await Promise.all([cloud.loadTeam(), cloud.loadAllMonths()]);
+      const mo = docs.find(d => d.month === m) || null;
+      if (!t && !docs.length) { app.toast('Nothing has been saved to the cloud yet.', { kind: 'warn' }); return; }
       let next = app.store.get();
       if (t) next = cloud.mergeTeam(next, t);
-      if (mo) next = cloud.mergeMonth(next, m, mo);
-      app.store.replace(next, 'Pull from cloud');
       const seen = readSeen();
+      next = mergeAllMonths(next, docs, seen);
+      app.store.replace(next, 'Pull from cloud');
       if (t) seen.team = t.updatedAt ?? null;
-      if (mo) seen.months[m] = mo.updatedAt ?? null;
       writeSeen(seen);
-      status = { team: t ? { updatedAt: t.updatedAt, updatedBy: t.updatedBy } : null, month: mo ? { updatedAt: mo.updatedAt, updatedBy: mo.updatedBy } : null };
+      status = { team: t ? { updatedAt: t.updatedAt, updatedBy: t.updatedBy } : null, month: mo ? { updatedAt: mo.updatedAt, updatedBy: mo.updatedBy } : null,
+        months: Object.fromEntries(docs.map(d => [d.month, { updatedAt: d.updatedAt, updatedBy: d.updatedBy }])) };
       CS.noteSynced(latestOf(status).at, latestOf(status).by); changed();
-      app.toast(mo ? `Pulled the cloud copy and ${fmtMonth(m)}.` : `Pulled the cloud copy. ${fmtMonth(m)} isn't in the cloud yet, so yours is kept.`,
+      app.toast(docs.length ? `Pulled the cloud copy and ${docs.length === 1 ? fmtMonth(docs[0].month) : docs.length + ' months'}.` : 'Pulled the cloud copy. No months are in the cloud yet, so yours are kept.',
         { action: { label: 'Undo', fn: () => app.store.undo() } });
     });
   }
@@ -310,6 +338,7 @@ export function mountTeam(el, app, opts = {}) {
       status ? [
         line('Staff list, rules and settings', status.team, seen.team, 'not saved to the cloud yet.'),
         line(fmtMonth(month), status.month, seen.months[month] ?? null, 'not saved to the cloud yet.'),
+        otherMonths(status, seen, month, h),
       ] : h('li', { class: 'team-p' }, 'Could not check the cloud copy just now.')));
     const mine = CS.read();
     root.append(h('p', { class: 'team-p' },

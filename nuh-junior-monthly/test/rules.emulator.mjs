@@ -108,6 +108,10 @@ await t('month version with an unknown field', assertFails(addDoc(collection(ros
 await t('month versions cannot change', assertFails(setDoc(doc(adm, 'months', '2026-11', 'versions', 'v1'), mver('2026-11', ADMIN))));
 await t('month versions cannot be deleted', assertFails(deleteDoc(doc(adm, 'months', '2026-11', 'versions', 'v1'))));
 
+await t('a month with a sheet layout (a JSON string)', assertSucceeds(setDoc(doc(ros, 'months', '2027-04'), month('2027-04', ROSTERER, { layout: JSON.stringify({ rows: {} }) }))));
+await t('a layout too long', assertFails(setDoc(doc(ros, 'months', '2027-05'), month('2027-05', ROSTERER, { layout: 'x'.repeat(200001) }))));
+await t('a version with a layout', assertSucceeds(addDoc(collection(ros, 'months', '2026-11', 'versions'), mver('2026-11', ROSTERER, { layout: '{}' }))));
+
 // the app's save: team, month and both copies in one transaction (as cloud.js saveAll does)
 await t('rosterer saves team and month together', assertSucceeds(runTransaction(ros, async tx => {
   await tx.get(doc(ros, 'team', 'main')); await tx.get(doc(ros, 'months', '2026-11'));

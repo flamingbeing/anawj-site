@@ -15,9 +15,8 @@ Last updated: 2026-10-16 by Claude Code (jm1).
 - Reminders set for the owner: 23 Oct (balance over a posting that straddles two months), 16 Dec (thinning old saves).
 
 ## Next (agreed order)
-1. **Share the sheet layout in the cloud copy.** `sheets[month]` (which sheet and rows a month came from, who the sheet
-   lists, grades) lives only on the device that imported, so a second device cannot write back to Google or hide people
-   the sheet leaves out.
+1. ~~Share the sheet layout in the cloud copy~~ done with Save/Pull covering every month (see Recently done). Needs a
+   firetop check that the "Deploy Firestore rules" run succeeded (months got an optional `layout` field).
 2. ~~A per-person "no calls until" date~~ done (see Recently done). Still to do: a suggested date for new people read from the
    sheet (first month they appear).
 3. **Highest call per person** (R1 most senior, R3 most junior, cumulative; default the highest, a lower one is a
@@ -40,6 +39,7 @@ Last updated: 2026-10-16 by Claude Code (jm1).
 - #712 Request importance: `X!` must have, `X?` nice to have.
 - #711 People the imported sheet leaves out are hidden and left out of Auto-fill; group headers fold.
 - #710 Paint cells with Lock; the lock at the top of the cell popup.
+- (this PR) Save and Pull cover every month and its sheet layout; rules: optional `layout` on months and versions.
 - #708 The cloud (Save and Pull to cloud) with a header button showing when it was last saved.
 - #707 Every month starts locked. #705 Earlier saves (restore from the cloud history).
 - #703 The import moves people to their new grade. #702 A month is saved as one JSON string (index-entry limit).
@@ -58,6 +58,7 @@ Last updated: 2026-10-16 by Claude Code (jm1).
   to have (20); call requests `R!` (100), `R` (10), `R?` (3). They are codes so they survive the sheet (owner).
 - 16 Oct 2026: every month is locked whenever the app opens or closes; an unlock lasts one visit; reading a month in
   unlocks that month (owner).
+- 16 Oct 2026: Save to cloud and Pull from cloud cover all data: the staff list, rules and every month (days, status and the imported sheet layout); a save writes only months changed since the last save or pull (owner).
 - 16 Oct 2026: "Team sharing" is "the cloud"; no autosync (the roster is one rosterer's, with the owner looking); the header
   button says Saved, Not saved or Cloud is newer (owner).
 - 16 Oct 2026: Check shows only preferences that bear on what Fill places (C3, R1B), with a switch for the rest; equal calls
