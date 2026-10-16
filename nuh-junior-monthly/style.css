@@ -1130,3 +1130,7 @@ body:not([data-tab="roster"]) #autofill { display: none; }
 .sh-btn:hover { background: #e6e9f0; }
 .sh-btn[aria-pressed="true"] { background: var(--navy, #002f6c); color: #fff; }
 .sh-btn:focus-visible { outline: 2px solid var(--navy, #002f6c); outline-offset: 1px; }
+
+.af-what { border: 0; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.af-what legend { padding: 0; margin-bottom: 6px; font-weight: 600; }
+.af-what-note { margin: 4px 0 0; font-size: 13px; }

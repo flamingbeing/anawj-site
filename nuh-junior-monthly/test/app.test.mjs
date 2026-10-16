@@ -10,6 +10,7 @@ import { apmesList } from '../js/apmes.js';
 import * as G from '../js/gsheets.js';
 import * as C from '../js/cloud.js';
 import { relevanceOf } from '../js/ui-check.js';
+import { applyAssignments } from '../js/ui-roster.js';
 
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -310,6 +311,24 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(on.keep(ev.violations[0]) && !on.keep(ev.violations[1]), 'a preference is kept when its cell holds C3 and hidden when it only holds another call');
   ok(on.keep(ev.violations[2]) && !on.keep(ev.violations[3]), 'a rule about C3 with no cell is kept; one about other calls is hidden');
   ok(on.keep(ev.violations[4]) && off.keep(ev.violations[1]) && on.hidden === 2 && off.hidden === 0, 'must-fix problems always show, and the switch off shows everything');
+}
+// Fill only what was picked: other calls stay as they are but still count for the rules
+{
+  const st = team();
+  const dd = days;
+  const run = only => solve(st, { from: dd[0], to: dd[dd.length - 1], timeMs: 400, seed: 3, only });
+  const all = run(undefined), onlyC = run(['C3']);
+  const codes = r => new Set(Object.values(r.assignments).flatMap(row => Object.values(row).flat()));
+  ok(codes(all).has('R1B') && codes(all).has('C3'), 'filling everything places cardiac and ICU calls');
+  ok(codes(onlyC).has('C3') && !codes(onlyC).has('R1B'), 'filling only cardiac places no ICU calls');
+  // an ICU call placed earlier by Fill survives a cardiac-only run
+  const before = JSON.parse(JSON.stringify(st));
+  const icu = Object.entries(all.assignments).flatMap(([d, row]) => Object.entries(row).filter(([, v]) => v.includes('R1B')).map(([sid]) => [d, sid]))[0];
+  M.setCell(before, icu[0], icu[1], { a: [...(M.getCell(before, icu[0], icu[1])?.a || []), 'R1B'], auto: ['R1B'] });
+  const after = JSON.parse(JSON.stringify(before));
+  applyAssignments(after, solve(before, { from: dd[0], to: dd[dd.length - 1], timeMs: 400, seed: 3, only: ['C3'] }), dd, ['C3']);
+  const cell = M.getCell(after, icu[0], icu[1]);
+  ok(cell.a.includes('R1B') && cell.auto.includes('R1B'), 'an ICU call already there is left alone by a cardiac-only fill');
 }
 // the rosterer's points for a shared call: a weekday 1, Friday 1.5, Saturday 2, Sunday 1.5, a public holiday 1.5 (2 when the day after is off too)
 {

@@ -45,7 +45,8 @@ export function solve(state, opts = {}) {
   const ctx = buildContext(state, { from, to, rules });
   const { n, P, lo, hi, act } = ctx;
   const dm = ctx.dm;
-  const autoCodes = (state.duties || []).filter(d => d.auto && d.kind === 'shift').map(d => d.code);
+  // opts.only: fill just these codes; every other call stays as it is but still counts for the rules (post call, spacing, cover…)
+  const autoCodes = (state.duties || []).filter(d => d.auto && d.kind === 'shift' && (!Array.isArray(opts.only) || opts.only.includes(d.code))).map(d => d.code);
   const autoSet = new Set(autoCodes);
   const K = autoCodes.length;
   const fixed = ctx.codes.slice();
@@ -59,7 +60,7 @@ export function solve(state, opts = {}) {
       const locked = !!(cell && cell.lock);
       if (cell && !locked) {
         const au = cell.auto || [], a = Array.isArray(cell.a) ? cell.a : [];
-        fixed[i] = au.length ? a.filter(c => !au.includes(c)) : a;
+        fixed[i] = au.length ? a.filter(c => !(au.includes(c) && autoSet.has(c))) : a;
         ctx.codes[i] = fixed[i];
       }
       free[i] = !locked && act[i] && !fixed[i].some(c => autoSet.has(c)) ? 1 : 0;
