@@ -135,6 +135,8 @@ export const DEFAULT_DUTIES = BASE_DUTIES.map(d => (PALETTE[d.code] ? { ...d, co
 // Default rules live here (data only) so defaultState() needs no import from rules.js (no circular import);
 // rules.js re-exports them as DEFAULT_RULES. Cardiac and ICU are on; the rest are predictions from the department's
 // roster guide and past rosters, some off until the rosterer confirms them. The rosterer tunes them in the app.
+// every group except RES3 and senior residents (R): the day-1 cardiac call rule is for the others
+const C3_D1_GROUPS = ['ac', 'res2', 'res1', 'nhg', 'rp', 'loc', 'mopex', 'rr', 'fellow'];
 export const CALLS = ['R1', 'R2', 'R3', 'S1', 'S1B', 'R1B', 'C3', 'OGC', 'OGN'];
 const R = (id, type, name, params, o = {}) => ({
   id, type, name, enabled: o.enabled !== false, hard: o.hard !== false, weight: o.weight ?? 10,
@@ -153,7 +155,7 @@ export const DEFAULT_RULES = [
   R('r-c3-gap', 'sequence', 'No cardiac call the day after a cardiac call (post call)', { ifCodes: ['C3'], thenCodes: ['C3'], mode: 'forbid', from: 1, to: 1 }),
   // an EOD call (a call right after the post call day) is the last resort when a night would otherwise be empty (owner, 16 Oct 2026)
   R('r-c3-eod', 'sequence', 'No EOD cardiac call (2 days after a cardiac call): only to cover a night', { ifCodes: ['C3'], thenCodes: ['C3'], mode: 'forbid', from: 2, to: 2 }, soft(500, { note: 'EOD call: a call right after the post call day. Used only when no one else can cover the night.' })),
-  R('r-c3-d1', 'postingStart', 'No cardiac call on day 1 of the posting', { codes: ['C3'], posting: 'C', days: 1 }, soft(20)),
+  R('r-c3-d1', 'postingStart', 'No cardiac call on day 1 of the posting', { codes: ['C3'], posting: 'C', days: 1 }, soft(20, { who: { onlyGroups: C3_D1_GROUPS }, note: 'Not for RES3 and senior residents, who may take a call on day 1 (owner, 16 Oct 2026).' })),
   R('r-c3-fair', 'spread', 'Share cardiac calls fairly', { codes: ['C3'], period: 'month', scheme: 'offdays', offBonus: 0.5, eveBonus: 0.5, weekendWeight: 2, holidayWeight: 1.5, tolerance: 1, among: ['C'] }, soft(40, { note: 'Echo and perfusion weeks (C-e, C-p) take no calls, so they do not count towards the share (owner, 16 Oct 2026).' })),
   R('r-c3-sat', 'limit', 'At most 1 Saturday cardiac call a month', { codes: ['C3'], period: 'month', window: 7, min: null, max: 1, fte: false, prorate: false }, soft(20, { when: { days: [6] } })),
   // ICU (R1B): call, post call, a day off (PPC), back to ICU
@@ -262,9 +264,9 @@ export function cleanRule(r) {
 // One-time updates to rules that were already saved (the owner's rulings of 16 Oct 2026): requests and blocks become
 // preferences, "new to ICU" is strict only for rotating residents and MOPEXes. Only a rule still in its old form changes.
 function updateRules(s) {
-  if ((s.rulesVersion || 1) >= 10) return;
+  if ((s.rulesVersion || 1) >= 11) return;
   const from2 = (s.rulesVersion || 1) < 2;
-  s.rulesVersion = 10;
+  s.rulesVersion = 11;
   const find = id => s.rules.find(r => r.id === id);
   if (from2) for (const [id, w] of [['r-req-x', 60], ['r-req-xx', 80]]) { const r = find(id); if (r && r.hard) { r.hard = false; r.weight = w; } }
   const n = from2 && find('r-r1b-new');
@@ -308,6 +310,9 @@ function updateRules(s) {
   // blocked by the planner is already decided, so it outranks every request (owner, 16 Oct 2026): 80 -> 200
   const xx = find('r-req-xx');
   if (xx && !xx.hard && Number(xx.weight) === 80) xx.weight = 200;
+  // no day-1 cardiac call rule for RES3 and senior residents (owner, 16 Oct 2026); a rule still without a group limit changes
+  const c3d1 = find('r-c3-d1');
+  if (c3d1 && c3d1.who && !(Array.isArray(c3d1.who.onlyGroups) && c3d1.who.onlyGroups.length)) c3d1.who.onlyGroups = [...C3_D1_GROUPS];
   // the sheet's colours (owner, 16 Oct 2026): a duty still in its old default colours takes the new ones
   for (const b of BASE_DUTIES) {
     const pal = PALETTE[b.code], du = (s.duties || []).find(d => d.code === b.code);
