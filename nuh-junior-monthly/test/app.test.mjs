@@ -8,6 +8,7 @@ import { solve } from '../js/solver.js';
 import { demoState } from '../js/demo.js';
 import { apmesList } from '../js/apmes.js';
 import * as G from '../js/gsheets.js';
+import * as C from '../js/cloud.js';
 
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -223,6 +224,14 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   try { await G.writeChanges({ id: SID }, s.sheets[MONTH], [{ cell: 'X8', row: 8, k: 20, from: 'C', to: 'C3' }]); } catch (e) { refused = e.message; }
   globalThis.fetch = realFetch;
   ok(/holds a formula/.test(refused), 'a cell holding a formula is not overwritten'); 
+}
+// the team copy stores a month's days as one JSON string (as a map Firestore made too many index entries): both forms read back
+{
+  const days0 = { '2026-12-03': { s1: { a: ['ICU', 'R1B'] } }, '2026-12-04': { s1: { a: ['ICU'], auto: ['R1B'] } } };
+  ok(JSON.stringify(C.cellsFromDoc(JSON.stringify(days0))) === JSON.stringify(days0) && JSON.stringify(C.cellsFromDoc(days0)) === JSON.stringify(days0), 'the days read back from a JSON string or from a map');
+  ok(Object.keys(C.cellsFromDoc('not json')).length === 0 && Object.keys(C.cellsFromDoc(null)).length === 0 && Object.keys(C.cellsFromDoc('[1]')).length === 0, 'a damaged or empty value gives no days');
+  const st = C.mergeMonth(M.defaultState(), '2026-12', { cells: JSON.stringify(days0), status: 'draft' });
+  ok(M.getCell(st, '2026-12-03', 's1').a.includes('R1B') && M.getCell(st, '2026-12-04', 's1').auto[0] === 'R1B', 'a month pulled from the team (days as a string) lands in the roster');
 }
 // locking a month: nothing in it can change until it is unlocked
 {

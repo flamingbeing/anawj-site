@@ -603,7 +603,7 @@ export function mount(el, app) {
     if (out instanceof Node && !out.parentNode) foot.append(out);
   }).catch(() => { /* version helper not there yet: show nothing */ });
 
-  root.append(importSec, exportSheetSec, exportSec, backupSec, settingsSec, teamSec, helpSec, startSec, foot);
+  root.append(teamSec, importSec, exportSheetSec, exportSec, backupSec, settingsSec, helpSec, startSec, foot);
 
   return {
     update(state) {
