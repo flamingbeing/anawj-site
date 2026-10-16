@@ -116,19 +116,19 @@ const BASE_DUTIES = [
 // requests blue, postings away from NUH and the obstetric / Alexandra postings plain. Softened a little, the same hues.
 // BASE_DUTIES above holds the colours before that change: a saved duty still in its old colours is brought across once
 // (updateRules); one the rosterer changed is left alone.
-const CALL_OR = ['#ff9f1a', '#2b1700'], PEACH = ['#fcd2a8', '#4d2b08'], LEAVE = ['#2c5fc6', '#ffffff'], PLAIN = ['#e9ecf1', '#1f2937'], GREY = ['#c3c6cc', '#1f2937'], RED_REQ = ['#c62828', '#ffffff'], BLUE_REQ = ['#1f5fd0', '#ffffff'];
+const CALL_OR = ['#bf5600', '#ffffff'], PEACH = ['#ffdfc2', '#4d2b08'], LEAVE = ['#aecbfa', '#0b2a66'], PLAIN = ['#f1f3f6', '#1f2937'], GREY = ['#d5d8de', '#1f2937'], RED_REQ = ['#c62828', '#ffffff'], BLUE_REQ = ['#1f5fd0', '#ffffff'];
 const PALETTE = {
   ...Object.fromEntries(['C3', 'R1B', 'R1', 'R2', 'R3', 'S1', 'S1B', 'OGC', 'AHC'].map(c => [c, CALL_OR])),
-  OGN: ['#e53935', '#ffffff'], OGD: ['#e53935', '#ffffff'],
+  OGN: ['#b71c1c', '#ffffff'], OGD: ['#b71c1c', '#ffffff'],
   ...Object.fromEntries(['WR', 'P', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6'].map(c => [c, PEACH])),
-  C: ['#e85de0', '#34082f'], 'C-e': ['#f3b6ee', '#34082f'], 'C-p': ['#f3b6ee', '#34082f'],
-  ICU: ['#ffe81a', '#1f2937'], CP: ['#3cb862', '#0d2415'], AP: ['#4fe36b', '#0d2a14'],
-  LI: ['#b98cff', '#25104a'], LivOT: ['#dcc8ff', '#25104a'],
+  C: ['#f8c2f4', '#1f2937'], 'C-e': ['#fce4fa', '#1f2937'], 'C-p': ['#fce4fa', '#1f2937'],
+  ICU: ['#fff59d', '#1f2937'], CP: ['#a5d6a7', '#1f2937'], AP: ['#c8f7c5', '#1f2937'],
+  LI: ['#e1c8ff', '#1f2937'], LivOT: ['#f1e8ff', '#1f2937'],
   ...Object.fromEntries(['OG1', 'OG2', 'AH', 'AH1', 'AH2', 'AH3', 'KKH', 'TTSH'].map(c => [c, PLAIN])), NTF: GREY,
   ...Object.fromEntries(['AL', 'SL', 'TL', 'MC', 'ML', 'PL', 'HL', 'FCL', 'CCL', 'NS', '0.5'].map(c => [c, LEAVE])),
   ...Object.fromEntries(['X', 'X!', 'X?', 'XX', 'NP'].map(c => [c, RED_REQ])),
   ...Object.fromEntries(['R', 'R!', 'R?'].map(c => [c, BLUE_REQ])),
-  Z: GREY, PC: GREY, PPC: GREY, x: ['#cfd2d8', '#444b57'],
+  Z: GREY, PC: GREY, PPC: GREY, x: ['#e3e5e9', '#444b57'],
 };
 export const DEFAULT_DUTIES = BASE_DUTIES.map(d => (PALETTE[d.code] ? { ...d, color: PALETTE[d.code][0], ink: PALETTE[d.code][1] } : d));
 
@@ -264,9 +264,9 @@ export function cleanRule(r) {
 // One-time updates to rules that were already saved (the owner's rulings of 16 Oct 2026): requests and blocks become
 // preferences, "new to ICU" is strict only for rotating residents and MOPEXes. Only a rule still in its old form changes.
 function updateRules(s) {
-  if ((s.rulesVersion || 1) >= 14) return;
+  if ((s.rulesVersion || 1) >= 15) return;
   const from2 = (s.rulesVersion || 1) < 2;
-  s.rulesVersion = 14;
+  s.rulesVersion = 15;
   const find = id => s.rules.find(r => r.id === id);
   if (from2) for (const [id, w] of [['r-req-x', 60], ['r-req-xx', 80]]) { const r = find(id); if (r && r.hard) { r.hard = false; r.weight = w; } }
   const n = from2 && find('r-r1b-new');
@@ -323,7 +323,7 @@ function updateRules(s) {
   // no day-1 cardiac call rule for RES3 and senior residents (owner, 16 Oct 2026); a rule still without a group limit changes
   const c3d1 = find('r-c3-d1');
   if (c3d1 && c3d1.who && !(Array.isArray(c3d1.who.onlyGroups) && c3d1.who.onlyGroups.length)) c3d1.who.onlyGroups = [...C3_D1_GROUPS];
-  // the sheet's colours, made easier to see (owner, 16 Oct 2026): every duty with a palette colour takes it once. (An earlier
+  // the sheet's colours on the original soft look (owner, 16 Oct 2026; stronger fills made the text hard to read): every duty with a palette colour takes it once. (An earlier
   // step moved only duties still in the very first defaults, and missed ones saved with older defaults, such as S1 and OGD.)
   for (const [code, pal] of Object.entries(PALETTE)) {
     const du = (s.duties || []).find(d => d.code === code);
