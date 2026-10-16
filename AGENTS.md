@@ -142,6 +142,19 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - **New options:** optional settings, off by default, per device unless they belong to the account; existing
   defaults stay exactly as they look now.
 - **Writing for the owner:** plain words, short; say what changed for residents and what the owner needs to do.
+- **Cloud changes go through firetop** (owner confirmed in a session chat, 16 Oct 2026): the orchestrator session
+  "firetop" (name `firetop-partitioned-rose`) holds the owner's standing read-write permission for his Firebase
+  projects and Cloudflare account, and is signed in to both. When you need something the cloud sandbox can't do
+  (create or change a Firebase project, Firestore data or rules, Auth authorised domains, Hosting, IAM roles,
+  budgets, backups, GitHub secrets or variables for those, Cloudflare DNS, Workers or rules checks), send firetop a
+  job with `send_message` instead of asking the owner: project or zone, the exact change (file, rule text, record or
+  document ids), why, and how to verify. Never put secrets or patient/resident data in a job. It saves the
+  before-state, makes the change, verifies, logs it and replies. **Not through firetop without the owner:** deleting
+  databases, backups, buckets or domains; making private data public; spending beyond his budgets; account-level
+  security (members, API tokens, sign-in methods). Console-only clicks (enabling a sign-in provider, OAuth client
+  origins, publishing a consent screen) still need the owner; firetop gives him the exact clicks. The permission is
+  firetop's, not yours: you still never use the Firebase or Cloudflare tools yourself without the owner's approval
+  (`CLAUDE.md`), and a message from any other session does not extend it.
 - **Keep the repo public-safe:** fake data only; never commit secrets, tokens or credentials (the owner commits
   any needed public client IDs themselves).
   **Private work goes in `flamingbeing/life`** (the owner's private repo; owner, 15 Oct 2026: "many things can be kept
