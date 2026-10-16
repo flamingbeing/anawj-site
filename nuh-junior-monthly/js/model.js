@@ -98,6 +98,8 @@ export const DEFAULT_DUTIES = [
   request('XX', 'Call blocked by the planner'),
   request('NP', 'No premed'),
   request('R', 'Call request'),
+  request('R!', 'Call request: must have (e.g. needs the call money)'),
+  request('R?', 'Call request: nice to have'),
   other('Z', 'Not on the roster'),
   other('Adm', 'Admin day'),
   other('Pain', 'Pain clinic'),
@@ -158,8 +160,10 @@ export const DEFAULT_RULES = [
   R('r-req-x', 'requests', 'No call when asked (X)', { request: 'X', codes: CALLS, mode: 'avoid', span: 'day' }, soft(60)),
   R('r-req-xh', 'requests', 'No call, must have (X!)', { request: 'X!', codes: CALLS, mode: 'avoid', span: 'day' }, soft(150)),
   R('r-req-xl', 'requests', 'No call, nice to have (X?)', { request: 'X?', codes: CALLS, mode: 'avoid', span: 'day' }, soft(20)),
-  R('r-req-xx', 'requests', 'No call when blocked by the planner', { request: 'XX', codes: CALLS, mode: 'avoid', span: 'day' }, soft(80)),
+  R('r-req-xx', 'requests', 'No call when blocked by the planner', { request: 'XX', codes: CALLS, mode: 'avoid', span: 'day' }, soft(200)),
   R('r-req-r', 'requests', 'Call when asked (R)', { request: 'R', codes: CALLS, mode: 'want', span: 'day' }, soft(10)),
+  R('r-req-rh', 'requests', 'Call when asked, must have (R!)', { request: 'R!', codes: CALLS, mode: 'want', span: 'day' }, soft(100)),
+  R('r-req-rl', 'requests', 'Call when asked, nice to have (R?)', { request: 'R?', codes: CALLS, mode: 'want', span: 'day' }, soft(3)),
   R('r-req-np', 'requests', 'No premed when asked (NP)', { request: 'NP', codes: ['P', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6'], mode: 'avoid', span: 'day' }, soft(30)),
   R('r-sat2', 'limit', 'At most 2 Saturday calls a month', { codes: CALLS, period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(20, { when: { days: [6] }, note: PREDICTED })),
   R('r-sat-run', 'sequence', 'No Saturday calls two weeks running', { ifCodes: CALLS, thenCodes: CALLS, mode: 'forbid', from: 7, to: 7 }, soft(30, { when: { days: [6] }, note: 'MedHub (the guide\'s first rule). ' + PREDICTED })),
@@ -235,9 +239,9 @@ export function cleanRule(r) {
 // One-time updates to rules that were already saved (the owner's rulings of 16 Oct 2026): requests and blocks become
 // preferences, "new to ICU" is strict only for rotating residents and MOPEXes. Only a rule still in its old form changes.
 function updateRules(s) {
-  if ((s.rulesVersion || 1) >= 4) return;
+  if ((s.rulesVersion || 1) >= 6) return;
   const from2 = (s.rulesVersion || 1) < 2;
-  s.rulesVersion = 4;
+  s.rulesVersion = 6;
   const find = id => s.rules.find(r => r.id === id);
   if (from2) for (const [id, w] of [['r-req-x', 60], ['r-req-xx', 80]]) { const r = find(id); if (r && r.hard) { r.hard = false; r.weight = w; } }
   const n = from2 && find('r-r1b-new');
@@ -258,14 +262,17 @@ function updateRules(s) {
   const g3 = find('r-c3-gap');
   if (g3 && g3.params && +g3.params.from === 1 && +g3.params.to === 2) { g3.params.to = 1; add('r-c3-eod'); }
   // request importance (owner, 16 Oct 2026): X! must have, X? nice to have, next to X
-  for (const code of ['X!', 'X?']) {
+  for (const code of ['X!', 'X?', 'R!', 'R?']) {
     if (!(s.duties || []).some(d => d.code === code)) {
-      const at = (s.duties || []).findIndex(d => d.code === 'X');
+      const at = (s.duties || []).findIndex(d => d.code === code[0]);
       const du = cleanDuty(clone(DEFAULT_DUTIES.find(d => d.code === code)));
       if (at >= 0) s.duties.splice(at + 1, 0, du); else s.duties.push(du);
     }
   }
-  add('r-req-xh'); add('r-req-xl');
+  add('r-req-xh'); add('r-req-xl'); add('r-req-rh'); add('r-req-rl');
+  // blocked by the planner is already decided, so it outranks every request (owner, 16 Oct 2026): 80 -> 200
+  const xx = find('r-req-xx');
+  if (xx && !xx.hard && Number(xx.weight) === 80) xx.weight = 200;
 }
 
 export function migrate(s) {

@@ -300,13 +300,15 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
 {
   const s = team();
   const dm = M.dutyMap(s), up = new Map([...dm.keys()].map(c => [c.toUpperCase(), c]));
-  ok(S.codesFromText('X!', dm, up).r.join() === 'X!' && S.codesFromText('X?', dm, up).r.join() === 'X?', 'the sheet reads X! and X? as requests');
+  ok(S.codesFromText('X!', dm, up).r.join() === 'X!' && S.codesFromText('X?', dm, up).r.join() === 'X?' && S.codesFromText('R!/R?', dm, up).r.join() === 'R!,R?', 'the sheet reads X!, X?, R! and R? as requests');
   const w = id => s.rules.find(r => r.id === id).weight;
-  ok(w('r-req-xh') > w('r-req-xx') && w('r-req-xx') > w('r-req-x') && w('r-req-x') > w('r-req-xl'), 'must have outweighs a block, which outweighs X, which outweighs nice to have');
+  ok(w('r-req-rh') > w('r-req-r') && w('r-req-r') > w('r-req-rl') && w('r-req-rl') > 0, 'call requests have the same three levels: R! must have, R, R? nice to have');
+  ok(w('r-req-xx') > w('r-req-xh') && w('r-req-xh') > w('r-req-x') && w('r-req-x') > w('r-req-xl'), 'blocked by the planner outranks must have, which outranks X, which outranks nice to have');
   const old = JSON.parse(JSON.stringify(s));
-  old.rulesVersion = 3; old.duties = old.duties.filter(d => d.code !== 'X!' && d.code !== 'X?'); old.rules = old.rules.filter(r => r.id !== 'r-req-xh' && r.id !== 'r-req-xl');
+  old.rulesVersion = 3; old.rules.find(r => r.id === 'r-req-xx').weight = 80; old.duties = old.duties.filter(d => !['X!', 'X?', 'R!', 'R?'].includes(d.code)); old.rules = old.rules.filter(r => !['r-req-xh', 'r-req-xl', 'r-req-rh', 'r-req-rl'].includes(r.id));
   const m = M.migrate(old);
-  ok(m.duties.some(d => d.code === 'X!') && m.duties.some(d => d.code === 'X?') && m.rules.some(r => r.id === 'r-req-xh') && m.rules.some(r => r.id === 'r-req-xl'), 'a saved roster gains the two request codes and their rules');
+  ok(m.duties.some(d => d.code === 'X!') && m.duties.some(d => d.code === 'X?') && m.rules.some(r => r.id === 'r-req-xh') && m.rules.some(r => r.id === 'r-req-xl') && m.duties.some(d => d.code === 'R!') && m.duties.some(d => d.code === 'R?') && m.rules.some(r => r.id === 'r-req-rh') && m.rules.some(r => r.id === 'r-req-rl'), 'a saved roster gains the four request codes and their rules');
+  ok(m.rules.find(r => r.id === 'r-req-xx').weight === 200, 'and a block already saved at the old weight is raised to the top');
   M.setCell(s, days[5], 'i0', { a: ['C3'], r: ['X!'] }); M.setCell(s, days[6], 'i0', { a: ['C3'], r: ['X?'] });
   ok(S.cellText(s, days[5], 'i0').includes('X!') && S.cellText(s, days[6], 'i0').includes('X?'), 'and they are written back to the sheet as typed');
 }
