@@ -233,6 +233,16 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const st = C.mergeMonth(M.defaultState(), '2026-12', { cells: JSON.stringify(days0), status: 'draft' });
   ok(M.getCell(st, '2026-12-03', 's1').a.includes('R1B') && M.getCell(st, '2026-12-04', 's1').auto[0] === 'R1B', 'a month pulled from the team (days as a string) lands in the roster');
 }
+// the restore list: what an earlier save holds, and restoring one month leaves the other months alone
+{
+  const v = { cells: JSON.stringify({ '2026-12-03': { s1: { a: ['ICU'] } }, '2026-12-04': {} }), status: 'published', savedAt: 5, savedBy: { email: 'a@x.sg' } };
+  ok(C.describeVersion('month', v) === '1 day filled, locked', 'a month save is described by its filled days and lock');
+  ok(C.describeVersion('team', { team: { staff: [1, 2], rules: [1], duties: [] } }) === '2 staff, 1 rules, 0 duty codes', 'a team save is described by its lists');
+  let st = C.mergeMonth(M.defaultState(), '2026-11', { cells: { '2026-11-03': { s1: { a: ['ICU'] } } }, status: 'draft' });
+  st = C.mergeMonth(st, '2026-12', v);
+  st = C.mergeMonth(st, '2026-12', { cells: {}, status: 'draft' });
+  ok(M.getCell(st, '2026-11-03', 's1').a.includes('ICU') && !(M.getCell(st, '2026-12-03', 's1') || {}).a, 'restoring a month replaces only that month');
+}
 // locking a month: nothing in it can change until it is unlocked
 {
   const mem = {};
