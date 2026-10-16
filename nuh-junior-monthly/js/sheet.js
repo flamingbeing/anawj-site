@@ -100,7 +100,16 @@ export function groupForGrade(state, grade) {
 
 const nameKey = s => norm(s).toLowerCase().replace(/[^a-z]/g, '');
 
-// What an import would do: people matched / new / skipped (seniors' rows), unknown codes, cells.
+// The newest month imported from the sheet so far ('' before the first import).
+export function latestImported(state) {
+  return Object.keys((state && state.sheets) || {}).filter(m => /^\d{4}-\d{2}$/.test(m)).sort().pop() || '';
+}
+// How a group's grade reads in the review ("RES1"): its first sheet grade.
+const gradeLabel = (state, gid) => { const g = (state.groups || []).find(x => x.id === gid); return (g && (g.grades || [])[0]) || String(gid || '?').toUpperCase(); };
+
+// What an import would do: people matched / new / skipped (seniors' rows), unknown codes, cells, and who moves to
+// another group because the sheet shows a new grade (the July change-over). Moves only from the newest month imported
+// so far (or a newer one): an older month never moves anyone back (those are in `olderMoves`, for the review to say).
 export function planImport(state, grid, month) {
   const dmap = M.dutyMap(state);
   const upper = new Map([...dmap.keys()].map(c => [c.toUpperCase(), c]));
@@ -126,7 +135,14 @@ export function planImport(state, grid, month) {
     drop.skip = true; drop.why = 'listed twice: this row is left as it is';
     if (drop === other) seen.set(k, p);
   }
-  return { month, people, unknown };
+  // grade changes, from the row that is kept (someone listed twice moves to that row's grade)
+  const staff = new Map((state.staff || []).map(p => [p.id, p]));
+  const changes = people.filter(p => !p.skip && p.match && staff.get(p.match).group !== p.group).map(p => {
+    const was = staff.get(p.match);
+    return { id: was.id, name: was.name, row: p.row, from: was.group, to: p.group, fromGrade: gradeLabel(state, was.group), toGrade: norm(p.grade) };
+  });
+  const latest = latestImported(state), newest = !latest || month >= latest;
+  return { month, people, unknown, latest, moves: newest ? changes : [], olderMoves: newest ? [] : changes };
 }
 
 // The calls (shifts) found in the rows that will be imported, by code: Map code -> count. For the import review, so a missing
@@ -141,13 +157,28 @@ export function countCalls(state, plan) {
   return new Map([...out.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
 }
 
-// Apply a planned import (inside a store commit): add new people, replace this month's cells for everyone in the
-// sheet, remember the sheet layout and each cell's original text (for the copy back). Unknown codes are added as
-// kind "other" when addUnknown is true, else kept as cell notes.
-export function applyImport(draft, plan, grid, { addUnknown = true, tab = '', source = null } = {}) {
+// Apply a planned import (inside a store commit): move people whose grade changed, add new people, replace this
+// month's cells for everyone in the sheet, remember the sheet layout and each cell's original text (for the copy
+// back). Unknown codes are added as kind "other" when addUnknown is true, else kept as cell notes. `moves`: the staff
+// ids of the planned grade moves to make (the ones left ticked in the review); all of them when not given.
+export function applyImport(draft, plan, grid, { addUnknown = true, tab = '', source = null, moves = null } = {}) {
   const month = plan.month;
   const days = M.monthDays(month);
   if (addUnknown) for (const code of plan.unknown.keys()) if (!draft.duties.some(d => d.code.toUpperCase() === code.toUpperCase())) draft.duties.push(M.cleanDuty({ code, name: code, kind: 'other' }));
+  // a new grade: to the end of the new group, as People › Staff adds people, so the sheet order stays grouped
+  const take = moves == null ? null : new Set(moves);
+  let moved = 0;
+  for (const mv of plan.moves || []) {
+    if (take && !take.has(mv.id)) continue;
+    const i = draft.staff.findIndex(p => p.id === mv.id);
+    if (i < 0 || draft.staff[i].group === mv.to) continue;
+    const [p] = draft.staff.splice(i, 1);
+    p.group = mv.to;
+    let at = -1;
+    draft.staff.forEach((x, k) => { if (x.group === mv.to) at = k; });
+    if (at >= 0) draft.staff.splice(at + 1, 0, p); else draft.staff.push(p);
+    moved++;
+  }
   const dmap = M.dutyMap(draft);
   const upper = new Map([...dmap.keys()].map(c => [c.toUpperCase(), c]));
   // source: { id, gid, title } when it was read straight from a Google Sheet; names: the name in each row as read (to check the rows haven't moved)
@@ -204,7 +235,7 @@ export function applyImport(draft, plan, grid, { addUnknown = true, tab = '', so
   }
   if (!draft.sheets || typeof draft.sheets !== 'object') draft.sheets = {};
   draft.sheets[month] = layout;
-  return { added, cells };
+  return { added, cells, moved };
 }
 
 // The text the sheet should show for one person-day: a call first, then PC / PPC, leave, other, the posting; requests

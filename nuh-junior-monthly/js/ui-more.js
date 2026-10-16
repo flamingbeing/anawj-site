@@ -1,5 +1,6 @@
 // NUH Junior Monthly: the More screen. Import the department's Excel sheet (with a review before anything changes),
-// export (Excel in the department layout, PDF through the print dialog, CSV, a calendar file for one person),
+// export (Excel in the department layout, PDF through the print dialog, CSV, the staff list for APMES People, a
+// calendar file for one person),
 // backup and restore, settings (department name, public holidays), the team sharing panel, starting again,
 // and the two app-version lines at the very end.
 import * as M from './model.js';
@@ -102,6 +103,19 @@ export function mount(el, app) {
     if (!grid) { app.toast('No roster grid found: it needs the header row with S/N, Grade, Name and the days 1, 2, 3…', { kind: 'error', ms: 9000 }); return; }
     const sel = h('select', { 'aria-label': 'Month' }, monthOptions(grid.month && S.monthFits(grid, grid.month) ? grid.month : app.month));
     const body = h('div', { class: 'bx-form' });
+    const unticked = new Set();   // grade moves the rosterer unticked (kept when the month is changed)
+    const movesBox = plan => {
+      const n = plan.moves.length;
+      if (!n) return null;
+      const row = mv => {
+        const cb = h('input', { type: 'checkbox', checked: !unticked.has(mv.id), onchange: () => { if (cb.checked) unticked.delete(mv.id); else unticked.add(mv.id); } });
+        return h('li', null, h('label', { class: 'ri-row' }, cb, h('span', null, h('strong', null, mv.name), ` ${mv.fromGrade} → ${mv.toGrade}`)));
+      };
+      return h('div', { class: 'bx-field' },
+        h('p', { class: 'bx-label', id: 'imp-moves' }, `${n} ${n === 1 ? 'person moves' : 'people move'} grade`),
+        h('p', { class: 'more-p' }, 'The sheet shows a new grade. Ticked ones move to the end of that group on People › Staff; untick anyone who should stay where they are.'),
+        h('ul', { class: 'ri-list', 'aria-labelledby': 'imp-moves' }, plan.moves.map(row)));
+    };
     const paint = () => {
       body.innerHTML = '';
       const month = sel.value;
@@ -109,16 +123,19 @@ export function mount(el, app) {
       const fits = S.monthFits(grid, month);
       const ok = plan.people.filter(p => !p.skip), matched = ok.filter(p => p.match).length;
       const skipped = plan.people.filter(p => p.skip);
+      const older = plan.olderMoves.length;
       body.append(
         h('label', { class: 'bx-field' }, h('span', null, 'Month'), sel),
         ...(fits ? [] : [h('p', { class: 'warn' }, `This grid has ${grid.nDays} days starting on a ${grid.firstWd || '?'}: check the month.`)]),
         h('ul', { class: 'more-list' },
           h('li', null, `${ok.length} juniors: ${matched} already on People, ${ok.length - matched} new`),
-          h('li', null, `${skipped.length} rows left alone (${[...new Set(skipped.map(p => p.grade || '?'))].join(', ')}: grades not on People › Groups)`),
+          skipped.length ? h('li', null, `${skipped.length} rows left alone (${[...new Set(skipped.map(p => p.grade || '?'))].join(', ')}: grades not on People › Groups)`) : null,
           h('li', null, `Rows ${plan.people[0]?.row}–${plan.people[plan.people.length - 1]?.row}, days in columns ${S.colName(grid.firstCol)} to ${S.colName(grid.nextCol - 1)}`),
           (() => { const c = S.countCalls(store.get(), plan); return h('li', null, c.size ? `Calls found: ${[...c].map(([k, v]) => `${k} ${v}`).join(', ')}` : 'No calls found in the sheet yet'); })(),
           prevMissing(grid, month) ? h('li', { class: 'warn' }, `${M.fmtMonth(M.addMonths(month, -1))} isn't in the app yet, so everyone on ICU or cardiac looks like they start on day 1. Import last month's tab first, then this one.`) : null,
-          plan.unknown.size ? h('li', null, `Codes the app didn't know (added as "other"): ${[...plan.unknown.keys()].join(', ')}`) : null),
+          plan.unknown.size ? h('li', null, `Codes the app didn't know (added as "other"): ${[...plan.unknown.keys()].join(', ')}`) : null,
+          older ? h('li', null, `${older} ${older === 1 ? 'person has' : 'people have'} another grade here than on People, but ${M.fmtMonth(plan.latest)} is already imported: an older month doesn't move anyone's grade.`) : null),
+        movesBox(plan),
         h('p', { class: 'muted' }, `${M.fmtMonth(month)} for these people is replaced by the sheet (Undo puts it back).`));
       return { plan, month };
     };
@@ -128,10 +145,12 @@ export function mount(el, app) {
       title: `Import ${from}`, body, actions: [{ label: 'Cancel' }, {
         label: 'Import', primary: true, fn: () => {
           const { plan, month } = paint();
+          const moves = plan.moves.filter(mv => !unticked.has(mv.id)).map(mv => mv.id);
           let res;
-          store.commit(`Imported ${M.fmtMonth(month)} from the sheet`, draft => { res = S.applyImport(draft, plan, grid, { tab, source }); });
+          store.commit(`Imported ${M.fmtMonth(month)} from the sheet`, draft => { res = S.applyImport(draft, plan, grid, { tab, source, moves }); });
           app.setMonth(month);
-          app.toast(`${M.fmtMonth(month)} imported: ${res.added} new people, ${res.cells} cells`, { action: { label: 'Undo', fn: () => store.undo() }, ms: 8000 });
+          const moved = res.moved ? `${res.moved} moved grade, ` : '';
+          app.toast(`${M.fmtMonth(month)} imported: ${res.added} new people, ${moved}${res.cells} cells`, { action: { label: 'Undo', fn: () => store.undo() }, ms: 8000 });
         },
       }],
     });
@@ -429,6 +448,9 @@ export function mount(el, app) {
       io.download(new Blob([io.csvForMonth(store.get(), app.month)], { type: 'text/csv;charset=utf-8' }), `nuhjm-${io.fileStamp(app.month)}.csv`);
       app.onboard?.('shared');
     })),
+    h('h3', { class: 'more-sub' }, 'Staff list for APMES People'),
+    h('p', { class: 'more-p' }, 'APMES People (the resident list the logbook and evals share) can bring its residents’ years up to date from this list: names and grades only. There, Import from roster gets it in one tap; if that doesn’t work, copy it here and paste it there.'),
+    h('div', { class: 'more-row' }, btn('Copy the staff list for APMES People', () => import('./apmes.js').then(m => m.copyForApmes(app)))),
     h('h3', { class: 'more-sub' }, 'Calendar for one person'),
     h('p', { class: 'more-p' }, 'Their shifts this month as all-day events (.ics). Open the file on a phone to add it to the calendar.'),
     h('div', { class: 'more-row' }, h('label', { class: 'more-lbl', for: 'more-person' }, 'Person'), personSel,

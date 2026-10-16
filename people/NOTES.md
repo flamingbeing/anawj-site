@@ -22,6 +22,19 @@ missing was one obvious screen to keep them, and an easy way to add the yearly b
     disagrees with the intake, a set year with no intake (never moves up), no year at all, or an intake that puts them
     past R5 (graduated?). Each has a one-tap fix where the answer is clear.
   - **Export CSV** (`peopleCSV`): everyone on one sheet with a `list` column (resident / faculty / pd).
+  - **Import from the monthly roster** (`#roster`; `parseRosterList`, `rosterChanges`, `itemPatch`; owner, 16 Oct 2026):
+    NUH Junior Monthly keeps every resident's grade month by month, so its staff list brings the years here up to date.
+    "Get the list" opens it in a new tab with `?send=apmes`; it asks there, then sends names, grades and start/leave
+    dates back by `postMessage` (only from `nuhjuniormonthly.anawj.com` or this origin) and closes. Fallback: its More ›
+    Export › Copy the staff list for APMES People, pasted here; the department sheet's whole grid tab pastes too.
+    Grades: RES1–RES3 are R1–R3, R/SR is R4 or R5 (the user picks; R3 now suggests R4), AC means graduated; other
+    grades (MOPEX, RR, NHG, Fellow, consultants) are ignored. Years are compared on the 1st of the roster month and
+    fixed through the intake (`rYear` cleared), so they keep moving up each July.
+    Matching is by name (the roster has no emails): the same words in any order, or one name's words (two or more) all
+    in the other, and only when there is one candidate both ways. Anyone else on the roster is listed as new: the user
+    says who they are (similar names first) or adds them with their email. Ticked by default: year changes and
+    graduations; not ticked: back from Graduated/SMO, SMO years, R4 or R5 not picked. Active residents not on the
+    roster are listed for information only. Nothing is saved until Apply and its confirm.
 - **PDs:** admins add and remove (`pds/{email}` → `{ name }`); PDs see the list. `cloud.listPDs / savePD / removePD`.
 - No rules change: everything here was already allowed for admins and PDs (`logbook/firestore.rules`).
 - No service worker (an online admin tool). `anawj.com/people/` redirects to `apmes.anawj.com/people/`.
@@ -34,6 +47,7 @@ missing was one obvious screen to keep them, and an easy way to add the yearly b
 ## Not in it (on purpose)
 
 - NUH roster staff: a different Firebase project and a wider set of people (its juniors come from the contact list).
+- Faculty from the monthly roster: it has no consultants (they're left off the junior roster) and no emails.
 - Prewarm study team: joins by code.
 
 ## Ideas for later
