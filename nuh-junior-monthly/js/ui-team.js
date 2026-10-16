@@ -1,8 +1,9 @@
-// NUH Junior Monthly: the Team sharing panel (inside More). Sign in with Google, see your role, Save to team (the staff list,
-// rules, codes and settings, plus the month on screen), Pull from team, who saved last and when, a prompt when
+// NUH Junior Monthly: the Team sharing panel (inside More). Sign in with Google, see your role, Save to cloud (the staff list,
+// rules, codes and settings, plus the month on screen), Pull from cloud, who saved last and when, a prompt when
 // someone else saved first, and for admins the members list and people asking to join.
 // Off (a short note instead) until js/firebase-config.js is filled in, and always off in practice mode (?demo).
 import * as cloud from './cloud.js';
+import * as CS from './cloudstate.js';
 
 // The team copy's updatedAt this browser last loaded or saved, per device (not part of the roster):
 // { team: ms | null, months: { 'YYYY-MM': ms } }. A save that finds a different updatedAt there stops (conflict).
@@ -30,6 +31,24 @@ function when(ms) {
 // the name is whatever the saver's account says; the email is checked by the rules, so show it too
 const byName = b => (b ? (b.name && b.email && b.name !== b.email ? `${b.name} (${b.email})` : b.email || b.name) : '') || 'someone';
 
+// The cloud's last save of the staff list/rules or of this month, whichever is later: { at, by } (at 0 when nothing is saved)
+function latestOf(status) {
+  const a = status && status.team && status.team.updatedAt ? status.team : null, b = status && status.month && status.month.updatedAt ? status.month : null;
+  const best = a && b ? (a.updatedAt >= b.updatedAt ? a : b) : (a || b);
+  return best ? { at: best.updatedAt, by: byName(best.updatedBy) } : { at: 0, by: '' };
+}
+// Does the cloud hold a save this browser has not loaded or made?
+const newerThanHere = (status, seen, month) => !!status && ((status.team && status.team.updatedAt !== seen.team) || (status.month && status.month.updatedAt !== (seen.months[month] ?? null)));
+
+// Ask the cloud, quietly, whether it is ahead of this browser (for the header's cloud button). Does nothing when signed out.
+export async function checkCloud(app) {
+  try {
+    if (!(await cloud.currentUser()) || !(await cloud.myMember())) return;
+    const st = await cloud.lastSaved(app.month), seen = readSeen(), last = latestOf(st);
+    CS.noteCloud(last.at, last.by, newerThanHere(st, seen, app.month));
+  } catch (e) { console.warn('cloud check failed', e); }
+}
+
 // The one-tap start on a device with an empty roster (the welcome screen): sign in (if not already), and when the account is on
 // the team list, bring down the team's staff list, rules and the month on screen. Nothing local is lost: the roster was empty.
 export async function joinAndLoad(app) {
@@ -39,29 +58,31 @@ export async function joinAndLoad(app) {
     if (!user) user = await cloud.signIn();
     const member = await cloud.myMember();
     if (!member) {
-      app.toast(`Signed in as ${user.email}, but that account is not on the team list yet. Team sharing in More lets you ask to join.`, { kind: 'warn', ms: 10000 });
+      app.toast(`Signed in as ${user.email}, but that account is not on the members list yet. Cloud in More lets you ask to join.`, { kind: 'warn', ms: 10000 });
       app.go('more');
       return;
     }
     const m = app.month;
     const [t, mo] = await Promise.all([cloud.loadTeam(), cloud.loadMonth(m)]);
-    if (!t && !mo) { app.toast('Signed in, but nothing has been saved to the team yet. Save it first from a device that has the roster.', { kind: 'warn', ms: 9000 }); app.go('more'); return; }
+    if (!t && !mo) { app.toast('Signed in, but nothing has been saved to the cloud yet. Save it first from a device that has the roster.', { kind: 'warn', ms: 9000 }); app.go('more'); return; }
     let next = app.store.get();
     if (t) next = cloud.mergeTeam(next, t);
     if (mo) next = cloud.mergeMonth(next, m, mo);
-    app.store.replace(next, 'Pull from team');
+    app.store.replace(next, 'Pull from cloud');
     const seen = readSeen();
     if (t) seen.team = t.updatedAt ?? null;
     if (mo) seen.months[m] = mo.updatedAt ?? null;
     writeSeen(seen);
-    app.toast(mo ? `Pulled the team's roster and ${fmt(m)}.` : `Pulled the team's roster. ${fmt(m)} is not on the team yet.`, { action: { label: 'Undo', fn: () => app.store.undo() } });
+    CS.noteSynced(Math.max(t ? t.updatedAt || 0 : 0, mo ? mo.updatedAt || 0 : 0), byName(((mo || t) || {}).updatedBy));
+    app.toast(mo ? `Pulled the cloud roster and ${fmt(m)}.` : `Pulled the cloud roster. ${fmt(m)} is not in the cloud yet.`, { action: { label: 'Undo', fn: () => app.store.undo() } });
   } catch (e) {
     console.error(e);
     app.toast(cloud.friendly(e), { kind: 'error', ms: 9000 });
   }
 }
 
-export function mountTeam(el, app) {
+export function mountTeam(el, app, opts = {}) {
+  const changed = () => { try { if (opts.onChange) opts.onChange(); } catch (e) { console.warn(e); } };
   const h = app.h;
   const M = app.model;
   const fmtMonth = m => (M && M.fmtMonth ? M.fmtMonth(m) : m);
@@ -70,11 +91,11 @@ export function mountTeam(el, app) {
   const note = text => root.append(h('p', { class: 'team-p' }, text));
 
   if (cloud.isDemo || (app.store && app.store.isDemo)) {
-    note('Team sharing is off in the practice department: nothing here is signed in or shared.');
+    note('The cloud is off in the practice department: nothing here is signed in or saved.');
     return { update() {}, unmount() {} };
   }
   if (!cloud.enabled) {
-    note("Team sharing isn't switched on yet: until then this roster lives in this browser; use Backup to move it.");
+    note("The cloud isn't switched on yet: until then this roster lives in this browser; use Backup to move it.");
     return { update() {}, unmount() {} };
   }
 
@@ -95,6 +116,7 @@ export function mountTeam(el, app) {
         request = await cloud.myAccessRequest().catch(() => null);
       } else {
         status = await cloud.lastSaved(month).catch(e => { console.warn(e); return null; });
+        if (status) { const last = latestOf(status); CS.noteCloud(last.at, last.by, newerThanHere(status, readSeen(), month)); changed(); }
         if (member.role === 'admin') {
           [members, requests] = await Promise.all([cloud.listMembers(), cloud.listAccessRequests()]);
         } else { members = null; requests = null; }
@@ -128,33 +150,35 @@ export function mountTeam(el, app) {
         { teamAt: seen.team, monthAt: seen.months[m] ?? null, force });
       seen.team = at; seen.months[m] = at; writeSeen(seen);
       status = { team: { updatedAt: at, updatedBy: by }, month: { updatedAt: at, updatedBy: by } };
-      app.toast(`Saved to the team: the staff list, rules and ${fmtMonth(m)}.`);
+      CS.noteSynced(at, byName(by)); changed();
+      app.toast(`Saved to the cloud: the staff list, rules and ${fmtMonth(m)}.`);
     });
   }
 
   async function load() {
     const m = month;
-    const ok = await app.confirm(`Pull the team's copy? It replaces the staff list, rules, duty codes, settings and ${fmtMonth(m)} in this browser. Other months stay as they are. Undo brings yours back.`, { ok: 'Pull from team' });
+    const ok = await app.confirm(`Pull the cloud copy? It replaces the staff list, rules, duty codes, settings and ${fmtMonth(m)} in this browser. Other months stay as they are. Undo brings yours back.`, { ok: 'Pull from cloud' });
     if (!ok) return;
     return work('Pulling…', async () => {
       const [t, mo] = await Promise.all([cloud.loadTeam(), cloud.loadMonth(m)]);
-      if (!t && !mo) { app.toast('Nothing has been saved to the team yet.', { kind: 'warn' }); return; }
+      if (!t && !mo) { app.toast('Nothing has been saved to the cloud yet.', { kind: 'warn' }); return; }
       let next = app.store.get();
       if (t) next = cloud.mergeTeam(next, t);
       if (mo) next = cloud.mergeMonth(next, m, mo);
-      app.store.replace(next, 'Pull from team');
+      app.store.replace(next, 'Pull from cloud');
       const seen = readSeen();
       if (t) seen.team = t.updatedAt ?? null;
       if (mo) seen.months[m] = mo.updatedAt ?? null;
       writeSeen(seen);
       status = { team: t ? { updatedAt: t.updatedAt, updatedBy: t.updatedBy } : null, month: mo ? { updatedAt: mo.updatedAt, updatedBy: mo.updatedBy } : null };
-      app.toast(mo ? `Pulled the team's copy and ${fmtMonth(m)}.` : `Pulled the team's copy. ${fmtMonth(m)} isn't on the team yet, so yours is kept.`,
+      CS.noteSynced(latestOf(status).at, latestOf(status).by); changed();
+      app.toast(mo ? `Pulled the cloud copy and ${fmtMonth(m)}.` : `Pulled the cloud copy. ${fmtMonth(m)} isn't in the cloud yet, so yours is kept.`,
         { action: { label: 'Undo', fn: () => app.store.undo() } });
     });
   }
 
   // Earlier saves: every save keeps a copy; pick one to bring into this browser (Undo brings back what was here). Nothing
-  // changes on the team until Save to team.
+  // changes in the cloud until Save to cloud.
   async function history() {
     const m = month;
     let months, teams;
@@ -168,8 +192,8 @@ export function mountTeam(el, app) {
       else next = cloud.mergeMonth(next, m, v);
       app.store.replace(next, 'Restore an earlier save');
       if (dlg) dlg(); 
-      app.toast(kind === 'team' ? `Restored the staff list and rules saved ${when(v.savedAt)}. Save to team to share it.`
-        : `Restored ${fmtMonth(m)} as saved ${when(v.savedAt)}. Save to team to share it.`,
+      app.toast(kind === 'team' ? `Restored the staff list and rules saved ${when(v.savedAt)}. Save to cloud to share it.`
+        : `Restored ${fmtMonth(m)} as saved ${when(v.savedAt)}. Save to cloud to share it.`,
       { action: { label: 'Undo', fn: () => app.store.undo() }, ms: 10000 });
     };
     const draw = () => {
@@ -178,7 +202,7 @@ export function mountTeam(el, app) {
       const tabs = h('div', { class: 'team-row', role: 'group', 'aria-label': 'What to restore' },
         h('button', { type: 'button', class: which === 'month' ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm', 'aria-pressed': String(which === 'month'), onclick: () => { which = 'month'; draw(); } }, fmtMonth(m)),
         h('button', { type: 'button', class: which === 'team' ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm', 'aria-pressed': String(which === 'team'), onclick: () => { which = 'team'; draw(); } }, 'Staff list and rules'));
-      body.append(tabs, h('p', { class: 'team-p' }, 'Each Save to team keeps a copy. Restoring brings that copy into this browser only (Undo puts yours back); it reaches the team when you Save to team.'));
+      body.append(tabs, h('p', { class: 'team-p' }, 'Each Save to cloud keeps a copy. Restoring brings that copy into this browser only (Undo puts yours back); it reaches the cloud when you Save to cloud.'));
       if (!list.length) { body.append(h('p', { class: 'team-p' }, 'No earlier saves yet.')); return; }
       body.append(h('ul', { class: 'team-list', 'aria-label': 'Earlier saves' }, list.map((v, i) => h('li', { class: 'team-item' },
         h('span', { class: 'team-who' }, `${when(v.savedAt)}${i === 0 ? ' (latest)' : ''}`,
@@ -195,8 +219,8 @@ export function mountTeam(el, app) {
     app.sheet({
       title: 'Someone else saved first',
       body: h('div', { class: 'team' },
-        h('p', { class: 'team-p' }, `${byName(e.current && e.current.updatedBy)} saved ${what} to the team ${when(e.current && e.current.updatedAt)}, after this browser last loaded or saved it.`),
-        h('p', { class: 'team-p' }, 'Pull theirs to see it first (undo brings yours back), or save yours over it. Their save stays in the team history either way.')),
+        h('p', { class: 'team-p' }, `${byName(e.current && e.current.updatedBy)} saved ${what} to the cloud ${when(e.current && e.current.updatedAt)}, after this browser last loaded or saved it.`),
+        h('p', { class: 'team-p' }, 'Pull theirs to see it first (undo brings yours back), or save yours over it. Their save stays in the cloud history either way.')),
       actions: [
         { label: 'Cancel' },
         { label: 'Pull theirs', fn: () => { load(); } },
@@ -221,7 +245,7 @@ export function mountTeam(el, app) {
   }
 
   async function remove(m) {
-    const ok = await app.confirm(`Remove ${m.name || m.email} from the team? They will no longer see the roster.`, { ok: 'Remove', danger: true });
+    const ok = await app.confirm(`Remove ${m.name || m.email} from the members list? They will no longer see the roster.`, { ok: 'Remove', danger: true });
     if (!ok) return;
     return work('Removing…', async () => {
       await cloud.removeMember(m.email);
@@ -253,7 +277,7 @@ export function mountTeam(el, app) {
     root.textContent = '';
     if (!ready) { note('Checking sign-in…'); return; }
     if (!user) {
-      note('Sign in with your Google account to share this roster with the team: save it for others to see, and load what they saved.');
+      note('Sign in with your Google account to keep this roster in the cloud: save it from one device and pull it on another.');
       root.append(h('div', { class: 'team-row' }, btn(busy || 'Sign in with Google', signIn, 'btn btn-primary')));
       return;
     }
@@ -282,28 +306,32 @@ export function mountTeam(el, app) {
         fresh ? h('span', { class: 'team-p' }, '(the copy in this browser)')
           : h('span', { class: 'team-new' }, seenAt == null ? 'Not loaded in this browser yet.' : 'Newer than the copy in this browser.'));
     };
-    root.append(h('ul', { class: 'team-status', 'aria-label': 'Team copy' },
+    root.append(h('ul', { class: 'team-status', 'aria-label': 'Cloud copy' },
       status ? [
-        line('Staff list, rules and settings', status.team, seen.team, 'not saved to the team yet.'),
-        line(fmtMonth(month), status.month, seen.months[month] ?? null, 'not saved to the team yet.'),
-      ] : h('li', { class: 'team-p' }, 'Could not check the team copy just now.')));
+        line('Staff list, rules and settings', status.team, seen.team, 'not saved to the cloud yet.'),
+        line(fmtMonth(month), status.month, seen.months[month] ?? null, 'not saved to the cloud yet.'),
+      ] : h('li', { class: 'team-p' }, 'Could not check the cloud copy just now.')));
+    const mine = CS.read();
+    root.append(h('p', { class: 'team-p' },
+      mine.changed ? `This browser: last changed ${when(mine.changed)}.` : 'This browser: no changes yet.',
+      mine.synced ? ` Last saved to or pulled from the cloud ${when(mine.synced)}.` : ' Not saved to the cloud from here yet.'));
 
     const editor = cloud.canEdit(member);
     root.append(h('div', { class: 'team-row' },
-      editor ? btn(busy === 'Saving…' ? busy : 'Save to team', () => save(false), 'btn btn-primary') : null,
-      btn(busy === 'Pulling…' ? busy : 'Pull from team', load),
+      editor ? btn(busy === 'Saving…' ? busy : 'Save to cloud', () => save(false), 'btn btn-primary') : null,
+      btn(busy === 'Pulling…' ? busy : 'Pull from cloud', load),
       btn('Earlier saves', history, 'btn btn-ghost'),
       btn('Refresh', () => refresh(), 'btn btn-ghost btn-sm')));
     root.append(h('p', { class: 'team-p' }, editor
-      ? `Save to team sends the staff list, rules, duty codes, settings and ${fmtMonth(month)}; change month to save another.`
-      : `Pull from team brings in the staff list, rules and ${fmtMonth(month)}.`));
+      ? `Save to cloud sends the staff list, rules, duty codes, settings and ${fmtMonth(month)}; change month to save another.`
+      : `Pull from cloud brings in the staff list, rules and ${fmtMonth(month)}.`));
 
     if (member.role === 'admin') renderAdmin(email);
   }
 
   function renderOutsider(email, signOutBtn) {
     root.append(h('div', { class: 'team-row' }, h('span', null, 'Signed in as ', h('strong', null, email)), signOutBtn));
-    note("This account isn't on the team yet. Ask to join, and an admin can add you.");
+    note("This account isn't on the members list yet. Ask to join, and an admin can add you.");
     if (request) note(`You asked on ${when(request.requestedAt)}${request.name ? ` as ${request.name}` : ''}. An admin will add you; you can ask again to change your name.`);
     const nameIn = h('input', { type: 'text', id: 'team-ask-name', maxlength: '100', autocomplete: 'name', value: (request && request.name) || user.displayName || '' });
     root.append(h('div', { class: 'team-row' },
@@ -348,7 +376,7 @@ export function mountTeam(el, app) {
   render();
   cloud.watchUser(u => { ready = true; user = u; status = null; members = null; requests = null; request = null; refresh(); })
     .then(fn => { unwatch = fn; if (!alive && fn) fn(); })
-    .catch(e => { ready = true; console.warn(e); root.textContent = ''; note('Team sharing could not start: ' + cloud.friendly(e)); });
+    .catch(e => { ready = true; console.warn(e); root.textContent = ''; note('The cloud could not start: ' + cloud.friendly(e)); });
 
   return {
     update() {

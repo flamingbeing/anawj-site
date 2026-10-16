@@ -276,6 +276,26 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const demo = createStore({ demo: true, fallback: () => M.defaultState() });
   ok(demo.ensureLocked('2026-10') === false && demo.lockAllOnce() === false && !M.isMonthLocked(demo.get(), '2026-10'), 'Practice is never locked');
 }
+// the header's cloud button: what it says
+{
+  const mem = {};
+  globalThis.localStorage = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: k => { delete mem[k]; } };
+  const CSm = await import('../js/cloudstate.js');
+  ok(CSm.headerState().kind === 'none', 'a browser that never used the cloud says just Cloud');
+  CSm.noteChange(1000); 
+  ok(CSm.headerState().kind === 'unsaved' || CSm.headerState().kind === 'none', 'a change with nothing synced yet is not called saved');
+  CSm.noteSynced(5000, 'A');
+  ok(CSm.headerState().kind === 'saved' && /^Saved/.test(CSm.headerState().label), 'after a save it says Saved');
+  const at = CSm.read().synced;
+  CSm.noteChange(at + 10);
+  ok(CSm.headerState().kind === 'unsaved', 'a change after the save says Not saved');
+  CSm.noteCloud(9000, 'B', true);
+  ok(CSm.headerState().kind === 'both', 'unsaved changes and a newer cloud say the two differ');
+  CSm.noteChange(at - 10);
+  CSm.noteCloud(12000, 'B', true);
+  ok(CSm.headerState().kind === 'newer', 'a newer cloud copy says so');
+  delete globalThis.localStorage;
+}
 // import fixes found by the backtest: leave inside a posting keeps the posting; someone listed twice
 {
   const head = ['S/N', 'Grade', 'Name', ...days.map((d, i) => String(i + 1)), '1-Jan'];

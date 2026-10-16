@@ -1069,3 +1069,23 @@ body.has-taskcard .sheet { max-height: calc(100vh - var(--task-h, 0px) - 64px); 
   body.has-taskcard .toasts { bottom: calc(12px + var(--a-tab-h) + var(--task-h, 0px) + 10px + var(--a-safe-b)); }
 }
 @media print { .tour, .tour-spot, .task-card, .guide-slot { display: none !important; } }
+
+
+/* ---------- the cloud button (header) and the Auto-fill button, which only the Roster tab uses ---------- */
+#cloudbtn { position: relative; gap: 6px; max-width: 190px; }
+#cloudbtn .cl-short { display: none; }
+#cloudbtn .cl-long { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#cloudbtn[data-state="unsaved"], #cloudbtn[data-state="both"] { border-color: #b26a00; color: #7a4a00; }
+#cloudbtn[data-state="newer"] { border-color: var(--blue, #178fd7); color: #0b5f94; }
+#cloudbtn .cl-dot { position: absolute; top: 3px; right: 3px; width: 9px; height: 9px; border-radius: 50%; background: #e57200; }
+#cloudbtn[data-state="newer"] .cl-dot { background: var(--blue, #178fd7); }
+body:not([data-tab="roster"]) #autofill { display: none; }
+@media (max-width: 720px) {
+  #cloudbtn { min-height: 44px; padding: 0 8px; max-width: 120px; }
+  #cloudbtn .cl-long { display: none; }
+  #cloudbtn .cl-short { display: inline; font-size: 12px; }
+  #lockm { min-height: 44px; }
+}
+.lock-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 8px; padding: 6px 12px; border-radius: 8px; background: var(--a-tint-soft, #e8f0f8); color: var(--navy, #002f6c); font-size: 14px; }
+.lock-note span { flex: 1 1 auto; }
+#autofill { white-space: nowrap; }

@@ -154,11 +154,11 @@ const noSideScroll = async (page, label) => {
   // a device with nothing on it: the welcome screen offers sign in first, and its steps can be hidden
   await page.goto(BASE + '#roster');
   await ready(page);
-  ok(await page.getByRole('button', { name: "Sign in and pull the team's roster" }).count() === 1, 'an empty device offers to sign in and pull the team roster');
+  ok(await page.getByRole('button', { name: "Sign in and pull the cloud roster" }).count() === 1, 'an empty device offers to sign in and pull the cloud roster');
   ok(await page.locator('.gs').count() === 1, 'the getting started steps show at first');
   await axe(page, 'the welcome screen with sign in');
   await page.getByRole('button', { name: 'Hide the getting started steps' }).click();
-  ok(await page.locator('.gs').count() === 0 && await page.getByRole('button', { name: "Sign in and pull the team's roster" }).count() === 1, 'the steps can be hidden, sign in stays');
+  ok(await page.locator('.gs').count() === 0 && await page.getByRole('button', { name: "Sign in and pull the cloud roster" }).count() === 1, 'the steps can be hidden, sign in stays');
   await page.getByRole('button', { name: 'Show the getting started steps' }).click();
   ok(await page.locator('.gs').count() === 1, 'and shown again');
   await page.getByRole('button', { name: 'Hide the getting started steps' }).click();
@@ -181,6 +181,19 @@ const noSideScroll = async (page, label) => {
   });
   await page.waitForTimeout(300);
   ok(await page.getByRole('button', { name: /Check, then write 2 cells/ }).count() === 1, 'two cells to write: the call and its post call');
+  // the cloud button in the header: shows whether this browser's changes are saved; Auto-fill is only on the Roster tab
+  ok(await page.locator('#cloudbtn').isVisible(), 'the header has a cloud button');
+  ok((await page.locator('#cloudbtn').getAttribute('data-state')) === 'unsaved' && /Not saved/.test(await page.locator('#cloudbtn').innerText()), 'after a change it says Not saved');
+  ok(!(await page.locator('#autofill').isVisible()), 'Auto-fill is not in the header on More');
+  await page.locator('#cloudbtn').click();
+  await page.waitForSelector('.sheet [aria-label], .sheet .team');
+  ok(await page.locator('.sheet-title', { hasText: 'Cloud' }).count() === 1, 'the cloud button opens the cloud panel');
+  await axe(page, 'the cloud panel', '.sheet');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(250);
+  await go(page, 'roster');
+  ok(await page.locator('#autofill').isVisible(), 'Auto-fill shows on the Roster tab');
+  await go(page, 'more');
   await page.getByRole('button', { name: 'Only check the sheet is unchanged' }).click();
   await page.waitForSelector('text=exactly as you read it');
   ok(writes.length === 0, 'checking writes nothing');
