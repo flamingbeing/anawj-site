@@ -158,7 +158,7 @@ export const DEFAULT_RULES = [
   R('r-req-x', 'requests', 'No call when asked (X)', { request: 'X', codes: CALLS, mode: 'avoid', span: 'day' }, soft(60)),
   R('r-req-xh', 'requests', 'No call, must have (X!)', { request: 'X!', codes: CALLS, mode: 'avoid', span: 'day' }, soft(150)),
   R('r-req-xl', 'requests', 'No call, nice to have (X?)', { request: 'X?', codes: CALLS, mode: 'avoid', span: 'day' }, soft(20)),
-  R('r-req-xx', 'requests', 'No call when blocked by the planner', { request: 'XX', codes: CALLS, mode: 'avoid', span: 'day' }, soft(80)),
+  R('r-req-xx', 'requests', 'No call when blocked by the planner', { request: 'XX', codes: CALLS, mode: 'avoid', span: 'day' }, soft(200)),
   R('r-req-r', 'requests', 'Call when asked (R)', { request: 'R', codes: CALLS, mode: 'want', span: 'day' }, soft(10)),
   R('r-req-np', 'requests', 'No premed when asked (NP)', { request: 'NP', codes: ['P', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6'], mode: 'avoid', span: 'day' }, soft(30)),
   R('r-sat2', 'limit', 'At most 2 Saturday calls a month', { codes: CALLS, period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(20, { when: { days: [6] }, note: PREDICTED })),
@@ -235,9 +235,9 @@ export function cleanRule(r) {
 // One-time updates to rules that were already saved (the owner's rulings of 16 Oct 2026): requests and blocks become
 // preferences, "new to ICU" is strict only for rotating residents and MOPEXes. Only a rule still in its old form changes.
 function updateRules(s) {
-  if ((s.rulesVersion || 1) >= 4) return;
+  if ((s.rulesVersion || 1) >= 5) return;
   const from2 = (s.rulesVersion || 1) < 2;
-  s.rulesVersion = 4;
+  s.rulesVersion = 5;
   const find = id => s.rules.find(r => r.id === id);
   if (from2) for (const [id, w] of [['r-req-x', 60], ['r-req-xx', 80]]) { const r = find(id); if (r && r.hard) { r.hard = false; r.weight = w; } }
   const n = from2 && find('r-r1b-new');
@@ -266,6 +266,9 @@ function updateRules(s) {
     }
   }
   add('r-req-xh'); add('r-req-xl');
+  // blocked by the planner is already decided, so it outranks every request (owner, 16 Oct 2026): 80 -> 200
+  const xx = find('r-req-xx');
+  if (xx && !xx.hard && Number(xx.weight) === 80) xx.weight = 200;
 }
 
 export function migrate(s) {

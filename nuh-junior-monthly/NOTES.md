@@ -169,9 +169,9 @@ that has not imported the month shows everyone. Group headers in the roster fold
 ## Request importance (owner, 16 Oct 2026)
 
 Requests come from the sheet as plain codes, so importance is a code, not a per-cell setting (it would be lost on every
-import and export). No-call requests: **`X!` must have** (going on holiday, weight 150), `XX` blocked by the planner (80),
-`X` asked (60), **`X?` nice to have** (clearing leave, 20). `R` (call wanted, 10) stays the low "wants more calls" request.
-All are soft: a night is never left empty for them. Saved rosters gain the codes and rules once (`rulesVersion` 4).
+import and export). No-call requests, strongest first: `XX` blocked by the planner (200: it is already decided, so it
+outranks everything), **`X!` must have** (going on holiday, 150), `X` asked (60), **`X?` nice to have** (clearing leave, 20). `R` (call wanted, 10) stays the low "wants more calls" request.
+All are soft: a night is never left empty for them. Saved rosters gain the codes and rules once (`rulesVersion` 5; a block saved at the old weight 80 becomes 200).
 
 ## Beyond cardiac and ICU: things to remember (owner, 16 Oct 2026; the department's own words are in the owner's private notes)
 
