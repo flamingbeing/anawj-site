@@ -181,6 +181,15 @@ export function openNotes({ day = '', caseId = '', create = false, body = '', fr
   hooks.navigate ? hooks.navigate('notes') : (location.hash = '#notes');
 }
 
+// open one note in the editor from elsewhere (Search): Done goes back to the page it came from
+// (to Notes first: a step to another page closes an editor already open, as Back would)
+export async function openNote(n, back = S.tab) {
+  leaveNotes();
+  Object.assign(nv, { day: '', caseId: '', kind: '', q: '' });
+  if (S.tab !== 'notes') await (hooks.navigate ? hooks.navigate('notes') : (location.hash = '#notes'));
+  openEditor(n, false, { back: back === 'notes' ? '' : back });
+}
+
 // ---------- saving ----------
 
 const sessions = new Map();   // note object → { base, timer, saving, dirty, status?, onMerge? }
