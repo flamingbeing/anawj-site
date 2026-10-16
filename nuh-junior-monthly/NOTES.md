@@ -166,6 +166,23 @@ Order: (1) the shared structure and the read-only leave tab (done), (2) status c
 (3) the WR / premed roster, (4) the junior call roster and EOT calls, (5) their rules and Fill. Open question for the owner: what
 the columns of the headerless Junior Call Roster tab are.
 
+### The Junior Call Roster tab (columns worked out from the November sheet, 16 Oct 2026)
+
+One row per day of the month, no header row, no formulas (typed or pasted names). Each column was identified by looking at what
+the people in it hold in the main grid that day (it matched on all 30 days for every column below):
+
+| Column | What it is | Main-grid code of the person that day |
+|---|---|---|
+| A, B, C | the three EOT calls (emergency theatre): R1, R2, R3 | R1, R2, R3. Some names carry a tag such as `(GA)` |
+| D | a divider (orange fill), empty | |
+| E | obstetric day: OGD on weekdays, OGC on weekends and holidays | OGD or OGC |
+| F | obstetric night: OGN on weekdays, OGC on weekends and holidays | OGN or OGC |
+| G | the ICU call (R1B) with the person's specialty in brackets: `(ICU)`, `(ED)`, `(Uro)`, `(ENT)`, `(Ortho)` | R1B |
+| H and on | an orange block, empty | |
+
+Weekend and public holiday rows are filled (green in A to C, red in E and F). S1 and S1B are not on this tab (S1 is only in the main
+grid). So the EOT calls (R1 to R3) are the MO team's calls, and the tab can be rebuilt from the main grid.
+
 ## Phone header has no gap (owner, 16 Oct 2026)
 
 On phones the second header row is the month, Today, the lock and Fill. Fill shows on the Roster tab only, so on the other tabs
