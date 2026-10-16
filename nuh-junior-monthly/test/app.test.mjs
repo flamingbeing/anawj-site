@@ -501,13 +501,13 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   // the sheet's colours: a saved duty in its old colour moves across once; one the rosterer changed stays
   const old = M.defaultState(); old.rulesVersion = 9;
   const dd = c => old.duties.find(d => d.code === c);
-  Object.assign(dd('C3'), { color: '#b71c1c', ink: '#fff' }); Object.assign(dd('ICU'), { color: '#123456', ink: '#fff' });
+  Object.assign(dd('C3'), { color: '#b71c1c', ink: '#fff' }); Object.assign(dd('S1'), { color: '#6d4c41', ink: '#fff' });
   const mig = M.migrate(JSON.parse(JSON.stringify(old)));
   const md = c => mig.duties.find(d => d.code === c);
-  ok(md('C3').color === '#ffab2e', 'colours: calls are orange like the sheet');
-  ok(md('ICU').color === '#123456', 'colours: a colour the rosterer chose is kept');
+  ok(md('C3').color === '#ff9f1a', 'colours: calls are orange like the sheet');
+  ok(md('S1').color === '#ff9f1a', 'colours: a duty saved with older defaults also moves across');
   const df = c => M.DEFAULT_DUTIES.find(d => d.code === c).color;
-  ok(df('ICU') === '#ffee3a' && df('X') === '#c62828' && df('R') === '#1f5fd0' && df('AL') === '#2c5fc6' && df('Z') === '#d0d0d0', 'colours: ICU yellow, blocked red, requests blue, leave blue, grey');
+  ok(df('ICU') === '#ffe81a' && df('X') === '#c62828' && df('R') === '#1f5fd0' && df('AL') === '#2c5fc6' && df('Z') === '#c3c6cc', 'colours: ICU yellow, blocked red, requests blue, leave blue, grey');
 }
 {
   // a C3 call counts as a day on the cardiac posting (the call replaces the posting code on the sheet); R1B for ICU

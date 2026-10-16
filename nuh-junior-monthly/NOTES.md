@@ -148,7 +148,7 @@ People work on the sheet and this app side by side, so a code keeps the sheet's 
 liver transplant purple, leave blue, premed and Saturday ward round peach, post call, PPC, Z and NTF grey, blocked, no-call and
 no-premed requests red (outlined and tinted), call requests blue, KKH, TTSH, OG1/2 and AH plain. `PALETTE` in `js/model.js`; the
 colours before the change are in `BASE_DUTIES`, and a saved duty still in its old colours moves across once (`rulesVersion` 10);
-a colour the rosterer chose is kept. Text must still pass axe contrast (the e2e checks), so some are a shade darker than the sheet.
+a colour the rosterer chose is kept (until `rulesVersion` 14, which sets every palette colour once; later changes stay). Easier to see (owner, 16 Oct 2026): a little stronger than the sheet's pastel ones, same hues. Text must still pass axe contrast (the e2e checks), so some are a shade darker than the sheet.
 The sheet's cyan "leave requested, not yet approved" is not in the app yet. The screenshots the palette came from are in the
 private repo (`data/nuh-junior-monthly/docs/sheet-screenshots/`: real names).
 

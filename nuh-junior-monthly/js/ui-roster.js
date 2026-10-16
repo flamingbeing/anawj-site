@@ -205,10 +205,10 @@ export function mount(el, app) {
     app.sheet({
       title: 'Key', actions: [{ label: 'Close', primary: true }],
       body: h('ul', { class: 'gk' },
-        row('<span class="chip" style="--c:#ffab2e;--i:#3b2300">C3</span>', 'A duty, leave or other code (filled chip)'),
-        row('<span class="chip au" style="--c:#ffab2e;--i:#3b2300">C3</span>', 'Placed by Auto-fill (light line under the chip); re-running Auto-fill may change it'),
+        row('<span class="chip" style="--c:#ff9f1a;--i:#2b1700">C3</span>', 'A duty, leave or other code (filled chip)'),
+        row('<span class="chip au" style="--c:#ff9f1a;--i:#2b1700">C3</span>', 'Placed by Auto-fill (light line under the chip); re-running Auto-fill may change it'),
         row('<span class="chip rq" style="--c:#c62828">X</span>', 'A request (outlined chip, tinted): what someone asked for, not what they are doing'),
-        row('<span class="gk-cell" style="background:#ffee3a"></span>', 'Tinted cell: that day\'s posting (planned by the week on Postings)'),
+        row('<span class="gk-cell" style="background:#ffe81a"></span>', 'Tinted cell: that day\'s posting (planned by the week on Postings)'),
         row('<span class="chip dx">PC</span>', 'Post call: the day after a call (worked out, never typed)'),
         row('<span class="chip dx">PPC</span>', 'The day off after an ICU post call (worked out when the person is still in ICU)'),
         row('<span class="gk-cell"><span class="vx vh"></span></span>', 'Solid red ring with a glow: a must-fix problem in that cell (tap the cell to see it)'),
