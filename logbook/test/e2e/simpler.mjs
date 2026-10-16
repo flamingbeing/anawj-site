@@ -180,6 +180,9 @@ try { for (const width of [390, 1280]) {
   assert.ok(moreIds.slice(4, 6).includes('reflect'), 'their Reflections too (after Notes, in the tab bar’s order): ' + moreIds);
   await p.locator('.more-list a[data-go=progress]').click();
   await p.getByRole('heading', { name: 'Programme analytics' }).waitFor();
+  // the Year comparison: each target tag's median in the year (log2 5b)
+  await p.getByRole('heading', { name: 'Year comparison' }).waitFor();
+  assert.ok(await p.locator('.yc-table tbody tr').count() > 10, 'a row per target tag');
   assert.equal(await p.getByRole('heading', { name: 'Programme totals' }).count(), 0, 'no totals in Analytics');
   await pickProfile('advanced');
   await p.waitForFunction(() => !document.body.classList.contains('faculty-profile'));
