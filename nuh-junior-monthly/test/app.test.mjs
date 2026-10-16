@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import * as M from '../js/model.js';
 import * as S from '../js/sheet.js';
-import { evaluate, describeRule, buildContext } from '../js/rules.js';
+import { evaluate, describeRule, buildContext, dayOffWeight } from '../js/rules.js';
 import { solve } from '../js/solver.js';
 import { demoState } from '../js/demo.js';
 import { apmesList } from '../js/apmes.js';
@@ -310,6 +310,20 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(on.keep(ev.violations[0]) && !on.keep(ev.violations[1]), 'a preference is kept when its cell holds C3 and hidden when it only holds another call');
   ok(on.keep(ev.violations[2]) && !on.keep(ev.violations[3]), 'a rule about C3 with no cell is kept; one about other calls is hidden');
   ok(on.keep(ev.violations[4]) && off.keep(ev.violations[1]) && on.hidden === 2 && off.hidden === 0, 'must-fix problems always show, and the switch off shows everything');
+}
+// the rosterer's points for a shared call: a weekday 1, Friday 1.5, Saturday 2, Sunday 1.5, a public holiday 1.5 (2 when the day after is off too)
+{
+  const wk = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 1], [1, 1], [1, 0]].map(([off, next]) => dayOffWeight(!!off, !!next));   // Mon..Sun
+  ok(wk.join() === '1,1,1,1,1.5,2,1.5', `Monday to Sunday count ${wk.join(', ')}`);
+  ok(dayOffWeight(true, false) === 1.5 && dayOffWeight(true, true) === 2 && dayOffWeight(false, true) === 1.5, 'a public holiday counts 1.5, or 2 when the next day is off too; the day before a day off 1.5');
+  const f = M.DEFAULT_RULES.find(r => r.id === 'r-c3-fair');
+  ok(f.params.scheme === 'offdays' && f.params.among.join() === 'C', 'cardiac sharing uses those points and counts C days only (not echo or perfusion weeks)');
+  ok(/Fri 1\.5, Sat 2, Sun 1\.5/.test(describeRule(f, M.defaultState())), 'the rule says so in words');
+  const old = M.defaultState();
+  old.rulesVersion = 7;
+  const oc = old.rules.find(r => r.id === 'r-c3-fair'); delete oc.params.scheme; oc.params.among = ['C', 'C-e', 'C-p'];
+  const mig = M.migrate(old).rules.find(r => r.id === 'r-c3-fair');
+  ok(mig.params.scheme === 'offdays' && mig.params.among.join() === 'C', 'a saved roster still in the old form gets the new points and C days only');
 }
 // request importance: X! must have, X? nice to have, next to X (and an older saved roster gains them)
 {

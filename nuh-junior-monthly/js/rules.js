@@ -42,6 +42,11 @@ const NONE = Object.freeze([]);
 
 // How many days either side of the range the rules look at: at least 7, more for long rolling windows, far
 // day-after offsets and long runs (so a rule never misses last month's cells it needs).
+// What one call is worth in "share fairly" under the day-off scheme (the rosterer's points): 1, plus `ob` when the day is a day off
+// (weekend or public holiday) and plus `eb` when the day after is one too: Friday 1.5, Saturday 2, Sunday 1.5, a public holiday
+// 1.5, or 2 when the day after is also off.
+export function dayOffWeight(isOff, nextOff, ob = 0.5, eb = 0.5) { return 1 + (isOff ? ob : 0) + (nextOff ? eb : 0); }
+
 export function ruleReach(rules) {
   let reach = 7;
   for (const r of rules || []) {
@@ -980,21 +985,28 @@ export const RULE_TYPES = {
     params: [
       P.codes('codes', 'Duty'),
       P.sel('period', 'Over', [['month', 'Each month'], ['range', 'The dates checked']]),
-      P.num('weekendWeight', 'Weekend counts as', { min: 0, max: 10 }),
-      P.num('holidayWeight', 'Public holiday counts as', { min: 0, max: 10 }),
+      P.sel('scheme', 'A call counts', [['offdays', 'More on a day off, and the day before one'], ['fixed', 'By weekend and public holiday weights']],
+        'Days off are weekends and public holidays. The first way is the rosterer\'s points: a weekday 1, Friday 1.5, Saturday 2, Sunday 1.5, a public holiday 1.5 (2 when the day after is also off).'),
+      P.num('offBonus', 'Day off adds (first way)', { min: 0, max: 5 }),
+      P.num('eveBonus', 'Day before a day off adds (first way)', { min: 0, max: 5 }),
+      P.num('weekendWeight', 'Weekend counts as (second way)', { min: 0, max: 10 }),
+      P.num('holidayWeight', 'Public holiday counts as (second way)', { min: 0, max: 10 }),
       P.num('tolerance', 'Allowed difference from average', { min: 0, max: 10 }),
       { key: 'among', label: 'Only people on (their days on it set the share)', kind: 'codes', optional: true, help: 'A posting, e.g. ICU: only people in ICU count, and someone in ICU for half the month gets half a share.' },
     ],
-    defaults: () => ({ codes: [], period: 'month', weekendWeight: 2, holidayWeight: 2, tolerance: 1, among: [] }),
+    defaults: () => ({ codes: [], period: 'month', scheme: 'offdays', offBonus: 0.5, eveBonus: 0.5, weekendWeight: 2, holidayWeight: 2, tolerance: 1, among: [] }),
     describe(r, T) {
       const p = r.params;
       const among = (p.among || []).length ? `people on ${T.codes(p.among)}` : T.who(r.who);
-      return withWhen(`Share ${T.codes(p.codes)} fairly among ${among} (weekends x${num(p.weekendWeight, 2)}, holidays x${num(p.holidayWeight, 2)})`, r, T);
+      const how = p.scheme === 'fixed' ? `weekends x${num(p.weekendWeight, 2)}, holidays x${num(p.holidayWeight, 2)}`
+        : `a day off adds ${num(p.offBonus, 0.5)} and so does the day before one: Fri ${1 + num(p.eveBonus, 0.5)}, Sat ${1 + num(p.offBonus, 0.5) + num(p.eveBonus, 0.5)}, Sun ${1 + num(p.offBonus, 0.5)}`;
+      return withWhen(`Share ${T.codes(p.codes)} fairly among ${among} (${how})`, r, T);
     },
     compile(r, X) {
       const p = r.params, m = X.codes(p.codes);
       if (m.empty) return null;
       const ww = num(p.weekendWeight, 2), hw = num(p.holidayWeight, 2), tol = num(p.tolerance, 1);
+      const offdays = p.scheme !== 'fixed', ob = num(p.offBonus, 0.5), eb = num(p.eveBonus, 0.5);
       const ma = (p.among || []).length ? X.codes(p.among) : null;
       const { ctx, u } = X, n = ctx.n, ok = X.when, act = ctx.act, list = X.W.list, inWho = X.W.inWho;
       const periods = p.period === 'range' ? ctx.periods.range : ctx.periods.month;
@@ -1002,7 +1014,12 @@ export const RULE_TYPES = {
       const val = new Float64Array(ctx.P * K).fill(NaN);   // weighted count per FTE, NaN = not in this period
       const raw = new Float64Array(ctx.P * K);
       // a public holiday on a weekend counts as the larger of the two weights
-      const wOf = d => { const wk = ctx.wd[d] === 0 || ctx.wd[d] === 6; return ctx.hol[d] ? (wk ? Math.max(hw, ww) : hw) : wk ? ww : 1; };
+      const isOff = d => ctx.wd[d] === 0 || ctx.wd[d] === 6 || !!ctx.hol[d];
+      const nextOff = d => (d + 1 < n ? isOff(d + 1) : (ctx.wd[d] + 1) % 7 === 0 || (ctx.wd[d] + 1) % 7 === 6);   // past the window: weekends only
+      const wOf = d => {
+        if (offdays) return dayOffWeight(isOff(d), nextOff(d), ob, eb);
+        const wk = ctx.wd[d] === 0 || ctx.wd[d] === 6; return ctx.hol[d] ? (wk ? Math.max(hw, ww) : hw) : wk ? ww : 1;
+      };
       const touch = pi => {
         if (!inWho[pi]) return;
         const base = pi * n, fte = Number(ctx.people[pi].fte) > 0 ? Number(ctx.people[pi].fte) : 1;

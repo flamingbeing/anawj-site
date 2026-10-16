@@ -224,3 +224,15 @@ Admin: everything a rosterer can do, plus adding and removing members, changing 
 deleting a month from the cloud (an admin cannot demote or remove themselves, so one always remains). Rosterer: reads and saves
 the roster, rules and months; every save is kept in Earlier saves. Viewer: reads and pulls only. Changing the member list is
 the owner's call (live changes go through the owner's home-computer session).
+
+## Shared calls: the rosterer's points, and what counts as cardiac (owner, 16 Oct 2026)
+
+- **Points for "share fairly"** (`scheme: 'offdays'`, the default for cardiac, ICU and R1 to R3): a weekday 1, Friday 1.5, Saturday 2,
+  Sunday 1.5, a public holiday 1.5 and 2 when the day after is also a day off. In general: 1, plus 0.5 when the day is a day off
+  (weekend or public holiday), plus 0.5 when the day after is one (`rules.js` `dayOffWeight`; the two 0.5s are editable on the rule).
+  The older fixed weights (weekend x2, holiday x1.5) stay available as `scheme: 'fixed'`. To be confirmed with the rosterer on a
+  public holiday that follows a day off.
+- **Echo and perfusion weeks (`C-e`, `C-p`) take no calls, so they do not count towards the cardiac share**: the cardiac fairness rule
+  counts people on `C` days only (`among: ['C']`), and so does the C3 posting filter (it reads that rule's `among`). A week of
+  perfusion plus a couple of `C` days in a month is below the share threshold (15% of the month), so that person is not compared.
+  Saved rosters in the old form are updated once (`rulesVersion` 8).
