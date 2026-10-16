@@ -1746,3 +1746,9 @@ table.grid.sheet .grid-cats { border: 0; background: transparent; padding: 2px; 
 .lb-pager.bottom { justify-content: center; margin: 12px 0 0; }
 .lb-pager select { width: auto; max-width: 100%; }
 .lb-pagesel { flex: 0 1 auto; min-width: 0; }
+
+/* Logbook List: Group by and Sort (log2 14; in the Filter panel); a group's heading folds it */
+ul.cases li.monthhead.lb-ghead { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
+.lb-gfold { flex: 1; min-width: 0; min-height: 36px; display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 0 6px; background: none; border: 0; padding: 2px 0; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; text-align: left; cursor: pointer; box-shadow: none; }
+.lb-gfold .muted { font-weight: 600; text-transform: none; letter-spacing: 0; }
+ul.cases li.lb-planned a { display: block; padding: 8px 4px; }

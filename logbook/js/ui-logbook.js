@@ -1,7 +1,7 @@
 // Logbook screen: every case, newest first (list) or by day (calendar). Search, filter, flags, edit; a grid view for bulk edits
 // and pasting rows from Excel; Excel download and upload (round trip with a preview of the changes).
 
-import { duplicates, fmtDate, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow, nth, cleanInitials, procedureText, textHas, guessMapping, rowsFromGrid, IMPORT_FIELDS, caseFromRow, weekLead, weekdayNames } from './engine.js';
+import { duplicates, fmtDate, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow, nth, cleanInitials, procedureText, textHas, guessMapping, rowsFromGrid, IMPORT_FIELDS, caseFromRow, weekLead, weekdayNames, finalTarget } from './engine.js';
 import { flagCase } from './importer.js';
 import { exportWorkbook, readSheetGrid } from './xlsxio.js';
 import { cleanExportOpts, exportTables, rangeText, CASE_COLS, REFL_COLS } from './export-opts.js';
@@ -10,7 +10,7 @@ import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator, FIELDS, FIELDS_N
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
-  updateCase, updateMany, updatedToast, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, confirmBox, hooks, rowIcon, ic, ib, emptyState, reveal, basicHides } from './ui-core.js';
+  updateCase, updateMany, updatedToast, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, confirmBox, hooks, rowIcon, ic, ib, emptyState, reveal, basicHides, effectiveIntake, residentSmo } from './ui-core.js';
 import { dayHasNotes, caseHasNotes, openNotes, ensureNotes, dayNoteCard } from './ui-notepad.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
@@ -25,9 +25,12 @@ import { cloud, shows } from './ui-core.js';
 import { evalRequestUrl, evalsBase } from './eval-link.js';
 import { bulkEditDialog } from './ui-bulk.js';
 import { pagesOf, pageSize, clampPage, PAGE_SIZES } from './paging.js';
+import { GROUPS, SORTS, groupBy, sortBy, sortCases, groupCases, entriesOf } from './lb-group.js';
+import { caseRYear } from './portfolio.js';
+import { yearName } from './categories.js';
 
 // has: tags a case must all have; not: tags it must have none of ('c:16' or a personal tag key); from/to: dates
-const FRESH = () => ({ q: '', has: [], not: [], from: '', to: '', flag: '', mode: null, page: 0, month: null, day: null });
+const FRESH = () => ({ q: '', has: [], not: [], from: '', to: '', flag: '', mode: null, page: 0, month: null, day: null, fold: new Set() });
 const view = FRESH();
 resetters.push(() => Object.assign(view, FRESH()));   // next user starts unfiltered
 // Select (List and the calendar's day list): press and hold a row, or the Select button; the bar at the bottom says
@@ -151,6 +154,7 @@ export function renderLogbook() {
     counter.textContent = rows.length === S.cases.length ? `${S.cases.length} cases` : `${rows.length} of ${S.cases.length} cases`;
     bulkBtn.textContent = `Edit ${rows.length === S.cases.length ? 'all ' : ''}${rows.length} case${rows.length === 1 ? '' : 's'}…`; bulkBtn.disabled = !rows.length;
     selectBtn.hidden = view.mode === 'grid' || !S.cases.length;
+    groupRow.hidden = view.mode !== 'list';
     paintSel();
   };
   // the selection: cases since deleted drop out; the grid has its own editing, so selecting stops there
@@ -233,8 +237,11 @@ export function renderLogbook() {
     // a fold in use opens (a saved search with tags or dates); closing is left to the toggle
     for (const [b, body, on] of [[dateBtn, datePanel, view.from || view.to], [tagBtn, tagPanel, n]]) if (on && body.hidden) { body.hidden = false; b.setAttribute('aria-expanded', 'true'); }
   };
+  const [groupSel, sortSel] = groupSelects(() => paint());
+  const groupRow = h('div', { class: 'lb-grid lb-grouprow', hidden: view.mode !== 'list' }, cell('Group by', groupSel), cell('Sort', sortSel));
   const filters = h('div', { class: 'lb-filters', hidden: !(view.showFilters || active()) },
     h('div', { class: 'lb-grid' }, cell('Show', flagSel), cell('Search in', searchIn)),
+    groupRow,
     h('div', { class: 'bar lb-folds' }, dateBtn, tagBtn, moreBtn, resetBtn),
     datePanel, tagPanel, morePanel,
     labelList.length ? h('p', { class: 'lb-points' }, h('a', { href: '#points' }, 'All learning points ›')) : null);
@@ -355,15 +362,67 @@ function monthHead(label, ul) {
 function listView(rows, flagsOf, repaint) {
   if (!S.cases.length) return emptyState('logbook', 'No cases yet', 'Cases you log show here, newest first.', h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
   if (!rows.length) return emptyState('search', 'No cases match', 'Try fewer words, or clear the filters.');
+  const by = groupBy(display().lbGroup), sort = sortBy(display().lbSort);
   const ul = h('ul', { class: 'cases' });
-  const pg = pager(rows, repaint);
-  let month = '';
-  for (const c of pg.rows) {
-    const m = c.date ? fmtDate(c.date).replace(/^\d+ /, '') : 'No date';
-    if (m !== month) { month = m; add(ul, monthHead(m, ul)); }
-    add(ul, caseRow(c, flagsOf));
+  // the default (Month, Newest): as it always was, with Jump to a date on each month
+  if (by === 'month' && sort === 'newest') {
+    const pg = pager(rows, repaint);
+    let month = '';
+    for (const c of pg.rows) {
+      const m = c.date ? fmtDate(c.date).replace(/^\d+ /, '') : 'No date';
+      if (m !== month) { month = m; add(ul, monthHead(m, ul)); }
+      add(ul, caseRow(c, flagsOf));
+    }
+    return h('div', {}, pg.bar(), ul, pg.bar(true));
+  }
+  const groups = groupCases(sortCases(rows, sort, groupCtx()), by, sort, groupCtx());
+  // a folded group is one heading on its page; the pages count the cases shown (a case under two tags counts twice)
+  const folded = g => view.fold.has(`${by}:${g.key}`);
+  const all = groups.flatMap(g => (folded(g) ? [{ g, c: null, first: true, fold: true }] : entriesOf([g])));
+  const pg = pager(all.map(e => ({ ...e, date: e.c ? e.c.date : '' })), repaint);
+  let cur = null;
+  for (const e of pg.rows) {
+    if (e.g !== cur) { cur = e.g; add(ul, groupHead(e.g, by, !e.first, folded(e.g), repaint)); }
+    if (e.fold) continue;
+    if (e.g.planned) { add(ul, ...e.g.planned.map(p => h('li', { class: 'lb-planned' }, h('a', { href: '#log' }, `${p.date ? fmtDate(p.date) + ' · ' : ''}${caseText(p).slice(0, 80) || 'Planned case'}`)))); continue; }
+    add(ul, caseRow(e.c, flagsOf));
   }
   return h('div', {}, pg.bar(), ul, pg.bar(true));
+}
+
+// Group by and Sort (log2 14; this device), in the Filter panel while the List shows: Month (the default) / Day / Week /
+// Residency year / APMES tag / Your tags / Flags / None; Newest / Oldest / Initials A–Z / Most tags. Groups fold.
+function groupSelects(repaint) {
+  const pick = (label, key, opts, val) => h('select', { 'aria-label': label, onchange: e => { const v = e.target.value; setDisplay({ [key]: v === opts[0][0] ? null : v }); view.page = 0; repaint(); } },
+    opts.map(([v, t]) => h('option', { value: v, selected: v === val }, t)));
+  const groups = GROUPS.filter(([k]) => !(k === 'year' && basicHides('year')));
+  return [pick('Group by', 'lbGroup', groups, groupBy(display().lbGroup)), pick('Sort', 'lbSort', SORTS, sortBy(display().lbSort))];
+}
+
+// what the grouping needs from the app: names, residency years, targets and counts, the planned cases
+function groupCtx() {
+  const intake = effectiveIntake(), smo = residentSmo(S.resident);
+  const order = new Map(PICKER_ORDER.map((c, i) => [c.code, i]));
+  const targets = !basicHides('targets');
+  return {
+    initials: c => caseParts(c).initials || '', tagCount: c => (c.cats || []).length + (c.tags || []).length,
+    weekStart: settings().weekStart == null || settings().weekStart === '' ? 1 : Number(settings().weekStart),
+    year: d => (intake ? caseRYear(d, intake, smo) : null), yearName,
+    day: iso => fmtDate(iso), catName, order: k => (order.has(k) ? order.get(k) : 999),
+    target: k => (targets ? finalTarget(k) : null), count: k => (S.counts || {})[k] || 0, tagName,
+    plan: S.logbook && Array.isArray(S.logbook.plan) ? S.logbook.plan : [],
+  };
+}
+
+// A group's heading: tap to fold or unfold it; while selecting, "Select these" ticks the whole group
+function groupHead(g, by, cont, isFolded, repaint) {
+  const id = `${by}:${g.key}`, n = g.planned ? g.planned.length : g.items.length;
+  const toggle = h('button', { type: 'button', class: 'lb-gfold', 'aria-expanded': String(!isFolded), onclick: () => { if (view.fold.has(id)) view.fold.delete(id); else view.fold.add(id); repaint(); } },
+    h('span', { class: 'lb-gfold-i', 'aria-hidden': 'true' }, isFolded ? '▸' : '▾'), ' ',
+    h('span', { class: 'mh-name' }, g.label + (cont ? ' (continued)' : '')), ' ',
+    h('span', { class: 'muted' }, [`${n} ${g.planned ? 'planned' : n === 1 ? 'case' : 'cases'}`, g.note].filter(Boolean).join(' · ')));
+  const pickAll = sel.on && !g.planned && n ? h('button', { type: 'button', class: 'small', onclick: () => { for (const c of g.items) sel.ids.add(c.id); repaint(); } }, `Select these ${n}`) : null;
+  return h('li', { class: 'monthhead lb-ghead' }, toggle, pickAll);
 }
 
 // Pages (log2 11; owner, 15 Oct 2026): 100 cases a page by default (25 / 50 / 100 / 300 / All, this device);
