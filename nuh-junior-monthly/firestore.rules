@@ -1,7 +1,7 @@
 rules_version = '2';
 
-// NUH Junior Monthly (Firebase project nuh-junior-monthly). Deployed by .github/workflows/deploy-firestore-rules.yml on merge to main,
-// once the project exists and has a matrix entry there. Tests: tools/test-rules.sh (nuh-junior-monthly/test/rules.emulator.mjs).
+// NUH Junior Monthly (Firebase project nuh-junior-monthly, created 16 Oct 2026). Deployed by .github/workflows/deploy-firestore-rules.yml
+// on merge to main (when this file changes). Tests: tools/test-rules.sh (nuh-junior-monthly/test/rules.emulator.mjs).
 // Only signed-in Google accounts listed in /members can read anything; admins and rosterers write, viewers only read.
 // Every write is stamped with the signed-in account's email, and saved copies (versions) never change.
 service cloud.firestore {

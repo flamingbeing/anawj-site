@@ -1,6 +1,6 @@
 // Firebase web app config for team sharing (sign-in and the shared roster in Cloud Firestore).
-// Empty for now: the owner creates the Firebase project "nuh-junior-monthly" later. Until apiKey and projectId are filled in,
-// the app runs without sign-in and everything stays in this browser (move it with Backup).
+// Filled in 16 Oct 2026 (project "nuh-junior-monthly" created). Without apiKey and projectId the app runs without sign-in and
+// everything stays in this browser (move it with Backup); with them, Team sharing in More is on and local use still works.
 //
 // To switch team sharing on:
 //   1. Firebase console: create project "nuh-junior-monthly", add a Web app, turn on Authentication > Google, and add
@@ -12,4 +12,11 @@
 //      .github/workflows/deploy-firestore-rules.yml and the rules deployer has Firebase Rules Admin on it.
 // These values are public by design (they only name the project); access is controlled by firestore.rules and the
 // members list.
-export const FIREBASE_CONFIG = {};
+export const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyBug_gM5CTOJ0OCF_3h_q1164HlhPIQbzY',
+  authDomain: 'nuh-junior-monthly.firebaseapp.com',
+  projectId: 'nuh-junior-monthly',
+  storageBucket: 'nuh-junior-monthly.firebasestorage.app',
+  messagingSenderId: '283183622299',
+  appId: '1:283183622299:web:bf6ef90b6522752d6dbe3e',
+};
