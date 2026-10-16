@@ -1,9 +1,9 @@
 # Now: Claude Code, Logbook 2 (log2)
 
 **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): the 15 Oct batch is merged (#651–#664). Owner said
-go on the next queue (15 Oct): #665 Select and Bulk edit on the Logbook (9 / 9d) merged; **now building 9b, Notes** (one PR); then 9c Reflections
-(the same bar and popup), then 9e global search.
-Not started: 9c bulk select in Reflections, 9e global search, 10–14, Markdown.
+go on the next queue (15 Oct): #665 Select and Bulk edit on the Logbook (9 / 9d) and #667 Notes (9b) merged; **now building 9c, Reflections** (one
+PR); then 9e global search.
+Not started: 9e global search, 10–14, Markdown.
 Waiting on the owner: a real-phone check of sign-in (installed app and Firefox for Android).
 
 Agreed queue (one PR each, in order, once he says go):
@@ -80,7 +80,7 @@ Agreed queue (one PR each, in order, once he says go):
    (Select all / none, Bulk edit…, Done). Bulk edit: date (set or clear), title (replace / find and replace / add in
    front), text (add to the end / find and replace), unlink from case, merge the selected notes into one (in date
    order), share or export just these, move to the bin. Same warning, 20+ second step and Undo as cases.
-9c. **Select and bulk edit in Reflections too** (owner): the same press and hold / Select and bar. Bulk edit: heading,
+9c. **Built (Reflections select PR; Word export of just these left out: tick in / out instead).** **Select and bulk edit in Reflections too** (owner): the same press and hold / Select and bar. Bulk edit: heading,
    status (draft / complete), in the portfolio export (tick on / off), JR flag, date; export just these (Word portfolio
    or Markdown); move to the bin. Same warning, 20+ second step and Undo.
 9d. **Bulk edit popup holds the actions too** (owner): while selecting, the bar is only "N selected · Select all ·

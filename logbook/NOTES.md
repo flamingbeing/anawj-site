@@ -628,6 +628,13 @@ portfolio content.
   case. Actions: Merge into one (a new note, each selected one under its title in date order, the earliest date, the
   case if they all share it; the originals go to the bin, Undo brings them back), Copy, Share, Send to, Download (zip),
   Move to the bin.
+- **Reflections: Select and Bulk edit** (log2 9c): the header's Edit is now **Select** (press and hold a row starts it
+  too); dragging between headings stays in it. The old Select all / Clear / Mark complete / Delete selected toolbar is
+  the shared bar and popup (`ui-bulk-refl.js`, rules in `refl-bulk.js`). Change: heading (a sub-type stays where the
+  new heading has it), status (complete only when nothing is missing, as one at a time: the review says what the
+  others still need), portfolio export in / out, JR, date. Actions: Copy, Share, Send to (Markdown, as Settings →
+  Markdown makes it), Move to the bin. Word export of just these is not built: the portfolio export takes the ticked
+  ones (use Portfolio export: in / out).
 
 ## Data, roles and photos (`firestore.rules`)
 

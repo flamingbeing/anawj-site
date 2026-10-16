@@ -47,6 +47,19 @@ const SCREENS = [
     await p.locator('dialog[open]').getByLabel('Tags', { exact: true }).selectOption('replace');
   }, true],
   ['Reflections', hash('reflect'), true],
+  ['Reflections selecting', async p => {
+    await hash('reflect')(p); await p.locator('li.refl-row').first().waitFor();
+    await p.locator('main button', { hasText: /^Select$/ }).first().click();
+    await p.locator('li.refl-row').first().click();
+    await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  }, true],
+  ['Reflections bulk edit', async p => {
+    await hash('reflect')(p); await p.locator('li.refl-row').first().waitFor();
+    await p.locator('main button', { hasText: /^Select$/ }).first().click();
+    await p.locator('li.refl-row').first().click();
+    await p.locator('.sel-bar').getByRole('button', { name: 'Bulk edit…' }).click();
+    await p.locator('dialog[open]').getByLabel('Heading', { exact: true }).selectOption('move');
+  }, false],
   ['Analytics', hash('progress'), true],
   ['Totals', hash('totals'), false],
   ['More', hash('more'), true],
