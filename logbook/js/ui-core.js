@@ -197,6 +197,7 @@ const ICON_PATHS = {
   search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4',
   share: 'M12 3v12M8 7l4-4 4 4M5 11v9h14v-9',   // a box with an arrow out of it
   filter: 'M4 6h16M7 12h10M10 18h4',
+  trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6',   // a bin
 };
 const svgIcon = (k, cls) => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

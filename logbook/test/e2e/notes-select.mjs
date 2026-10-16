@@ -1,6 +1,6 @@
 // Fake data only. More → Notes → Select and Bulk edit… (log2 9b, 15 Oct 2026): press and hold (or Select) starts
 // selecting; Bulk edit adds in front of titles and unlinks, with Undo; a daily note keeps its day; Merge into one (in
-// date order; Undo brings the originals back); Move to the bin.
+// date order; Undo brings the originals back); Move to the bin; a note's own bin while selecting.
 import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 const base = `http://localhost:${process.env.PORT || 8080}/logbook/`;
@@ -38,6 +38,13 @@ try { for (const width of [390, 1280]) {
   }
   await bar.waitFor();
   assert.match(await bar.innerText(), /1 selected/);
+  // each note has its own bin while selecting: one tap moves it to the bin, Undo brings it back (16 Oct 2026)
+  await row('Fakenote three').getByRole('button', { name: 'Delete Fakenote three' }).click();
+  await toastSays(/Note moved to the recycle bin/);
+  await poll(async () => (await rows().count()) === 3, 'the binned note gone');
+  assert.match(await bar.innerText(), /1 selected/, 'the selection stays');
+  await p.locator('#toast').getByRole('button', { name: 'Undo' }).click();
+  await poll(async () => (await rows().count()) === 4, 'Undo brings it back');
   assert.equal(await p.locator('.note-editor').count(), 0, 'no editor opened');
   await row('Fakenote two').click();
   assert.match(await bar.innerText(), /2 selected/);
