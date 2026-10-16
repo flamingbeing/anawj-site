@@ -702,7 +702,9 @@ export const RULE_TYPES = {
       const { ctx, u } = X, n = ctx.n, ok = X.when, act = ctx.act, inWho = X.W.inWho;
       // two different codes of the day, one matching A and the other B (so "@shift + @shift" means two shifts)
       const pair = i => {
-        const els = ctx.post[i] ? [...ctx.codes[i], ...ctx.req[i], 'x'] : [...ctx.codes[i], ...ctx.req[i]];
+        const els = [...ctx.codes[i], ...ctx.req[i]];
+        if (ctx.post[i]) els.push('x');
+        if (ctx.post2[i]) els.push('PPC');   // the day off after an ICU post call counts as a thing of the day too
         const pres = (ctx.flags[i] & F.PRESENT) !== 0;
         const pa = mA.present && pres, pb = mB.present && pres;
         if (pa && pb) return ['at work', 'at work'];

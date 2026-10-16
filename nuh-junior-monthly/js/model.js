@@ -124,7 +124,9 @@ export const DEFAULT_RULES = [
   R('r-c3-onc', 'sameDay', 'Cardiac call only on a cardiac day', { codesA: ['C3'], codesB: ['C', 'C-e', 'C-p'], mode: 'require' }),
   R('r-c3-echo', 'sameDay', 'Avoid cardiac calls in echo or perfusion weeks', { codesA: ['C3'], codesB: ['C-e', 'C-p'], mode: 'forbid' }, soft(30, { note: 'Real rosters: now and then, when the cardiac team is short.' })),
   R('r-c3-next', 'sequence', 'Post call falls inside the cardiac posting', { ifCodes: ['C3'], thenCodes: ['C', 'C-e', 'C-p'], mode: 'require', from: 1, to: 1 }, soft(40)),
-  R('r-c3-gap', 'sequence', 'At least 3 days between cardiac calls', { ifCodes: ['C3'], thenCodes: ['C3'], mode: 'forbid', from: 1, to: 2 }),
+  R('r-c3-gap', 'sequence', 'No cardiac call the day after a cardiac call (post call)', { ifCodes: ['C3'], thenCodes: ['C3'], mode: 'forbid', from: 1, to: 1 }),
+  // an EOD call (a call right after the post call day) is the last resort when a night would otherwise be empty (owner, 16 Oct 2026)
+  R('r-c3-eod', 'sequence', 'No EOD cardiac call (2 days after a cardiac call): only to cover a night', { ifCodes: ['C3'], thenCodes: ['C3'], mode: 'forbid', from: 2, to: 2 }, soft(500, { note: 'EOD call: a call right after the post call day. Used only when no one else can cover the night.' })),
   R('r-c3-d1', 'postingStart', 'No cardiac call on day 1 of the posting', { codes: ['C3'], posting: 'C', days: 1 }, soft(20)),
   R('r-c3-fair', 'spread', 'Share cardiac calls fairly', { codes: ['C3'], period: 'month', weekendWeight: 2, holidayWeight: 1.5, tolerance: 1, among: ['C', 'C-e', 'C-p'] }, soft(10)),
   R('r-c3-sat', 'limit', 'At most 1 Saturday cardiac call a month', { codes: ['C3'], period: 'month', window: 7, min: null, max: 1, fte: false, prorate: false }, soft(20, { when: { days: [6] } })),
@@ -132,7 +134,7 @@ export const DEFAULT_RULES = [
   R('r-r1b-cover', 'cover', 'One ICU call every night', { codes: ['R1B'], min: 1, max: 1 }),
   R('r-r1b-on', 'sameDay', 'ICU call only on an ICU day', { codesA: ['R1B'], codesB: ['ICU'], mode: 'require' }),
   R('r-r1b-next', 'sequence', 'Post call falls inside the ICU posting', { ifCodes: ['R1B'], thenCodes: ['ICU'], mode: 'require', from: 1, to: 1 }, soft(40)),
-  R('r-r1b-gap', 'sequence', 'No ICU call on post call or the day off', { ifCodes: ['R1B'], thenCodes: ['R1B'], mode: 'forbid', from: 1, to: 2 }),
+  R('r-r1b-gap', 'sequence', 'No ICU call on the post call day', { ifCodes: ['R1B'], thenCodes: ['R1B'], mode: 'forbid', from: 1, to: 1 }),
   R('r-r1b-gap4', 'sequence', 'An ICU day between the day off and the next call', { ifCodes: ['R1B'], thenCodes: ['R1B'], mode: 'forbid', from: 3, to: 3 }, soft(15)),
   R('r-r1b-d1', 'postingStart', 'No ICU call on day 1 in ICU', { codes: ['R1B'], posting: 'ICU', days: 1 }),
   // strict only for non-anaesthesia residents (rotating residents) and MOPEXes; anaesthesia residents new to ICU: a preference (owner, 16 Oct 2026)
@@ -145,7 +147,8 @@ export const DEFAULT_RULES = [
   R('r-r1b-sat', 'limit', 'At most 2 Saturday ICU calls a month', { codes: ['R1B'], period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(20, { when: { days: [6] } })),
   // everyone
   R('r-leave', 'sameDay', 'No calls on leave', { codesA: ['@leave'], codesB: ['@shift'], mode: 'forbid' }),
-  R('r-postcall', 'sameDay', 'Post call is a day off', { codesA: ['x', 'PC', 'PPC'], codesB: ['@shift'], mode: 'forbid' }),
+  R('r-postcall', 'sameDay', 'Post call is a day off', { codesA: ['x', 'PC'], codesB: ['@shift'], mode: 'forbid' }),
+  R('r-ppc', 'sameDay', 'No EOD call: nothing on the day off after an ICU post call (PPC), unless a night would be empty', { codesA: ['PPC'], codesB: ['@shift'], mode: 'forbid' }, soft(500, { note: 'EOD call: a call right after the post call day. Used only when no one else can cover the night.' })),
   R('r-notroster', 'sameDay', 'No calls when not on the roster (Z)', { codesA: ['Z'], codesB: ['@shift'], mode: 'forbid' }),
   R('r-preleave', 'sequence', 'No post call into leave', { ifCodes: CALLS, thenCodes: ['@leave'], mode: 'forbid', from: 1, to: 1 }, soft(50, { note: PREDICTED })),
   // call requests and blocks are softer than the rules above: kept when there is room, given up first when a night would be empty (owner, 16 Oct 2026)
@@ -227,17 +230,28 @@ export function cleanRule(r) {
 // One-time updates to rules that were already saved (the owner's rulings of 16 Oct 2026): requests and blocks become
 // preferences, "new to ICU" is strict only for rotating residents and MOPEXes. Only a rule still in its old form changes.
 function updateRules(s) {
-  if ((s.rulesVersion || 1) >= 2) return;
-  s.rulesVersion = 2;
+  if ((s.rulesVersion || 1) >= 3) return;
+  const from2 = (s.rulesVersion || 1) < 2;
+  s.rulesVersion = 3;
   const find = id => s.rules.find(r => r.id === id);
-  for (const [id, w] of [['r-req-x', 60], ['r-req-xx', 80]]) { const r = find(id); if (r && r.hard) { r.hard = false; r.weight = w; } }
-  const n = find('r-r1b-new');
+  if (from2) for (const [id, w] of [['r-req-x', 60], ['r-req-xx', 80]]) { const r = find(id); if (r && r.hard) { r.hard = false; r.weight = w; } }
+  const n = from2 && find('r-r1b-new');
   if (n && !(n.who && n.who.onlyGroups) && n.who && n.who.tags.length === 1 && n.who.tags[0] === 'icunew' && !n.who.groups.length) {
     n.who.onlyGroups = ['rr', 'mopex'];
     n.name = 'New to ICU: calls from day 4 (rotating residents, MOPEX)';
     if (!find('r-r1b-new-res')) s.rules.push(cleanRule(clone(DEFAULT_RULES.find(r => r.id === 'r-r1b-new-res'))));
   }
+  // EOD calls (owner, 16 Oct 2026): the day off after an ICU post call and the 3-day cardiac gap give way, as a last resort,
+  // to covering a night; the post call day itself never does
+  const add = id => { if (!find(id)) s.rules.push(cleanRule(clone(DEFAULT_RULES.find(r => r.id === id)))); };
+  const pc = find('r-postcall');
+  if (pc && pc.params && Array.isArray(pc.params.codesA) && pc.params.codesA.includes('PPC')) { pc.params.codesA = pc.params.codesA.filter(c => c !== 'PPC'); add('r-ppc'); }
+  const g1 = find('r-r1b-gap');
+  if (g1 && g1.params && +g1.params.from === 1 && +g1.params.to === 2) g1.params.to = 1;
+  const g3 = find('r-c3-gap');
+  if (g3 && g3.params && +g3.params.from === 1 && +g3.params.to === 2) { g3.params.to = 1; add('r-c3-eod'); }
 }
+
 export function migrate(s) {
   if (!isObj(s)) return defaultState();
   s.v = 1;
