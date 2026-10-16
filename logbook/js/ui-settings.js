@@ -475,7 +475,7 @@ export function renderMarkdownSettings() {
       fillins(CASE_FILLINS),
       lbl('A day’s notes (More → Notes)', area('dayNotes', 'A day’s notes', 2), 'Follows the cases when the day has notes. {{notes}} is each note (### title, then its text). Or put {{notes}} in the day heading to place them there.'),
       pick('reflInDay', 'Reflections under their case', [['none', 'None (default)'], ['link', 'Link to the reflection note'], ['embed', 'Embed it (Obsidian ![[…]])'], ['full', 'Full text']]),
-      h('p', { class: 'hint help', style: 'margin:4px 0 0' }, 'Link and Embed point to the reflection’s own note in the Markdown export. Copy, Share and Send to have no such note, so they give the full text.'),
+      h('p', { class: 'hint help', style: 'margin:4px 0 0' }, 'Link and Embed point to the reflection’s own note: in the Markdown export, and in Sync where “Also sync reflection notes” is on. Copy, Share and Send to have no such note, so they give the full text.'),
       pick('notesInDay', 'Linked notes under their case', [['none', 'None (default)'], ['full', 'Full text']]),
       h('div', { class: 'hint', style: 'margin:8px 0 2px' }, latest ? 'Preview (your latest day)' : 'Preview'), dayOut,
       lbl('One case', oneBox),
