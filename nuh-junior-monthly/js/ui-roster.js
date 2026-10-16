@@ -12,11 +12,11 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<'
 const key = (d, s) => d + '|' + s;
 
 function loadUi() {
-  const def = { group: '', tag: '', q: '', showReq: true, showCtx: true, hi: '', paint: false, paintCode: '' };
+  const def = { group: '', tag: '', q: '', showReq: true, showCtx: true, hi: '', paint: false, paintCode: '', collapsed: [] };
   try { return { ...def, ...JSON.parse(localStorage.getItem(UI_KEY) || '{}'), q: '', paint: false }; } catch (e) { return def; }
 }
 function saveUi(ui) {
-  try { localStorage.setItem(UI_KEY, JSON.stringify({ group: ui.group, tag: ui.tag, showReq: ui.showReq, showCtx: ui.showCtx, hi: ui.hi, paintCode: ui.paintCode })); } catch (e) { /* ignore */ }
+  try { localStorage.setItem(UI_KEY, JSON.stringify({ group: ui.group, tag: ui.tag, showReq: ui.showReq, showCtx: ui.showCtx, hi: ui.hi, paintCode: ui.paintCode, collapsed: ui.collapsed })); } catch (e) { /* ignore */ }
 }
 
 // ---------- small shared helpers (also used by ui-day.js) ----------
@@ -162,7 +162,9 @@ export function mount(el, app) {
   paintBtn.innerHTML = `${icon('brush')}<span>Paint</span>`;
   // the grid's marks explained (they are small and otherwise unexplained)
   const keyBtn = h('button', { type: 'button', class: 'tbtn', title: 'What the marks in the grid mean', onclick: showKey, 'data-tour': 'layers' }, 'Key');
-  tb.append(paintBtn, searchWrap, groupSel, tagSel, hiSel, reqBtn, ctxBtn, keyBtn);
+  // people on the staff list that this month's imported sheet leaves out: hidden (and left out of Auto-fill) until shown
+  const absentBtn = h('button', { type: 'button', class: 'tbtn', hidden: true });
+  tb.append(paintBtn, searchWrap, groupSel, tagSel, hiSel, reqBtn, ctxBtn, absentBtn, keyBtn);
   function showKey() {
     const row = (mark, text) => h('li', { class: 'gk-row' }, h('span', { class: 'gk-mark', html: mark }), h('span', null, text));
     app.sheet({
@@ -268,6 +270,17 @@ export function mount(el, app) {
     ui.showReq = !ui.showReq; saveUi(ui); reqBtn.setAttribute('aria-pressed', String(ui.showReq));
     scroll.querySelector('table')?.classList.toggle('no-req', !ui.showReq);
     prevRender = null;
+  });
+  absentBtn.addEventListener('click', () => {
+    const hidden = app.store.get().settings.hideNotInSheet !== false;
+    app.store.commit(hidden ? 'Show people not in the sheet' : 'Hide people not in the sheet', d => { d.settings.hideNotInSheet = !hidden; });
+  });
+  scroll.addEventListener('click', e => {
+    const t = e.target.closest('.grp-toggle');
+    if (!t) return;
+    const gid = t.dataset.g, i = ui.collapsed.indexOf(gid);
+    if (i >= 0) ui.collapsed.splice(i, 1); else ui.collapsed.push(gid);
+    saveUi(ui); prevRender = null; renderGrid();
   });
   ctxBtn.addEventListener('click', () => {
     ui.showCtx = !ui.showCtx; saveUi(ui); ctxBtn.setAttribute('aria-pressed', String(ui.showCtx));
@@ -483,6 +496,15 @@ export function mount(el, app) {
     dutyStyles(state);
     const staff = filteredStaff(state);
     const all = M.staffInMonth(state, app.month);
+    {
+      const away = M.notInSheet(state, app.month, true).size, on = state.settings.hideNotInSheet !== false;
+      absentBtn.hidden = !away;
+      if (away) {
+        absentBtn.setAttribute('aria-pressed', String(!on));
+        absentBtn.innerHTML = `${icon('eye')}<span>${on ? `${away} not in the sheet` : 'Showing all'}</span>`;
+        absentBtn.title = on ? `${away} ${away === 1 ? 'person on the staff list is' : 'people on the staff list are'} not in ${M.fmtMonth(app.month)}'s sheet, so hidden and left out of Auto-fill. Press to show them.` : 'Everyone on the staff list is shown, including people the sheet leaves out. Press to hide them again.';
+      }
+    }
     // summary columns: auto codes used this month (C always) + weekend/holiday calls
     const used = new Set();
     for (const d of c.days) {
@@ -544,8 +566,10 @@ export function mount(el, app) {
       const people = byGroup.get(gid);
       if (!people || !people.length) continue;
       const g = c.gmap.get(gid);
-      rows.push(`<tr class="grp-row"><th colspan="${nCols}" scope="colgroup" class="grp"><span class="grp-label">${esc(g ? g.name : 'No group')}<span class="grp-n">${people.length}</span></span></th></tr>`);
-      keys.push('g:' + gid); parts.push(null);
+      const folded = ui.collapsed.includes(gid);
+      rows.push(`<tr class="grp-row"><th colspan="${nCols}" scope="colgroup" class="grp"><button type="button" class="grp-toggle" data-g="${esc(gid)}" aria-expanded="${folded ? 'false' : 'true'}" title="${folded ? 'Show' : 'Hide'} this group"><span class="grp-chev" aria-hidden="true">${folded ? '▸' : '▾'}</span><span class="grp-label">${esc(g ? g.name : 'No group')}<span class="grp-n">${people.length}</span></span></button></th></tr>`);
+      keys.push('g:' + gid + (folded ? ':f' : '')); parts.push(null);
+      if (folded) continue;
       for (const p of people) {
         const pv = c.personV.get(p.id) || [];
         const sig = rowSig(c, p, pv, sel && sel.staffId === p.id ? sel.date : '');

@@ -156,3 +156,12 @@ status is the safeguard (owner, 16 Oct 2026).
 
 A cell's lock (Auto-fill leaves it alone) is the first thing in the cell popup, and Paint has a **Lock** chip: tap or drag
 across cells to lock them, tap a locked cell to unlock it. Not to be confused with locking a month (header button).
+
+## People not in the imported sheet, and folding groups (owner, 16 Oct 2026)
+
+An import records who the sheet lists (`sheets[month].inSheet`) and who was on the staff list at that moment (`known`).
+Anyone known but not listed is **hidden from that month and treated as not in post** (`model.js` `notInSheet`: the roster,
+Day, Check, exports and, through `act` in `rules.js`, Auto-fill and the rules). Someone added after the import is not in
+`known`, so they stay visible. The roster toolbar says "N not in the sheet" and shows them again (setting
+`hideNotInSheet`, default on). Months with no imported sheet hide nobody. `sheets` is not part of the cloud copy, so a device
+that has not imported the month shows everyone. Group headers in the roster fold (`ui.collapsed`, kept per device).

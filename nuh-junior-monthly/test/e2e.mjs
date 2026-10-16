@@ -74,6 +74,13 @@ const noSideScroll = async (page, label) => {
     await page.waitForSelector('.ced-lockrow');
     ok(await page.evaluate(() => { const w = document.querySelector('.ced-lockrow').parentElement; return w.firstElementChild.classList.contains('ced-lockrow'); }), 'the lock is the first thing in the cell popup');
     await page.keyboard.press('Escape');
+    // a group header folds its people away
+    const rowsBefore = await page.locator('tbody tr:not(.grp-row)').count();
+    await page.locator('.grp-toggle').first().click();
+    ok(await page.locator('tbody tr:not(.grp-row)').count() < rowsBefore && (await page.locator('.grp-toggle').first().getAttribute('aria-expanded')) === 'false', 'a group header folds its people away');
+    await page.locator('.grp-toggle').first().click();
+    await page.waitForTimeout(600);   // rows are drawn a few at a time
+    ok(await page.locator('tbody tr:not(.grp-row)').count() === rowsBefore, 'and opens them again');
     await page.getByRole('button', { name: 'Days around' }).click();
     ok(await page.locator('thead th.dh.ctx').count() >= 4, 'and on again');
   }

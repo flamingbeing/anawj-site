@@ -381,13 +381,26 @@ export function staffActiveOn(person, s) {
   return !!person && person.active !== false && (!person.start || s >= person.start) && (!person.end || s <= person.end);
 }
 
+// People on the staff list when month m's sheet was read who are not in that sheet (left, rotated out, a typo): hidden from
+// the month and never given calls by Auto-fill. Someone added after the import is not in this set, and neither is anyone
+// when the month has no imported sheet, or the setting `hideNotInSheet` is switched off.
+const NOBODY = new Set();
+export function notInSheet(state, m, ignoreSetting = false) {
+  if (!ignoreSetting && state && state.settings && state.settings.hideNotInSheet === false) return NOBODY;
+  const lay = state && state.sheets && state.sheets[m];
+  if (!lay || !Array.isArray(lay.inSheet) || !Array.isArray(lay.known)) return NOBODY;
+  const here = new Set(lay.inSheet);
+  return new Set(lay.known.filter(id => !here.has(id)));
+}
+
 // Everyone in post at some point in the month, in sheet order (group order, then the order in state.staff).
 export function staffInMonth(state, m) {
   const days = monthDays(m), first = days[0], last = days[days.length - 1];
   const order = new Map((state.groups || []).map((g, i) => [g.id, i]));
+  const absent = notInSheet(state, m);
   return (state.staff || [])
     .map((p, i) => ({ p, i }))
-    .filter(({ p }) => p.active !== false && (!p.start || p.start <= last) && (!p.end || p.end >= first))
+    .filter(({ p }) => p.active !== false && !absent.has(p.id) && (!p.start || p.start <= last) && (!p.end || p.end >= first))
     .sort((a, b) => ((order.get(a.p.group) ?? 999) - (order.get(b.p.group) ?? 999)) || a.i - b.i)
     .map(({ p }) => p);
 }

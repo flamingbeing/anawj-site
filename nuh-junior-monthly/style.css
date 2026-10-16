@@ -1089,3 +1089,9 @@ body:not([data-tab="roster"]) #autofill { display: none; }
 .lock-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 8px; padding: 6px 12px; border-radius: 8px; background: var(--a-tint-soft, #e8f0f8); color: var(--navy, #002f6c); font-size: 14px; }
 .lock-note span { flex: 1 1 auto; }
 #autofill { white-space: nowrap; }
+
+/* group headers fold the group's people away */
+.grp-toggle { all: unset; box-sizing: border-box; position: sticky; left: 0; display: inline-flex; align-items: center; gap: 2px; min-height: 24px; padding-left: 6px; cursor: pointer; color: inherit; }
+.grp-toggle:focus-visible { outline: 2px solid var(--navy, #002f6c); outline-offset: -2px; }
+.grp-chev { width: 14px; text-align: center; font-size: 12px; }
+.grp-toggle .grp-label { position: static; padding-left: 4px; }
