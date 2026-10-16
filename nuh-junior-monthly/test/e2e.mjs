@@ -48,6 +48,19 @@ const noSideScroll = async (page, label) => {
   const page = await newPage({ width: 1366, height: 900 }, 'desktop', { permissions: ['clipboard-read', 'clipboard-write'] });
   await page.goto(BASE + '?demo#roster');
   await ready(page);
+  // the days around the month: greyed, read-only, with at least one working day on each side
+  {
+    const around = await page.evaluate(() => {
+      const hs = [...document.querySelectorAll('thead th.dh')], ix = hs.findIndex(t => !t.classList.contains('ctx'));
+      const last = hs.length - 1 - [...hs].reverse().findIndex(t => !t.classList.contains('ctx'));
+      return { before: ix, after: hs.length - 1 - last, cells: document.querySelectorAll('td.c.ctx button').length, ro: document.querySelectorAll('td.c.ctx .cro').length > 0 };
+    });
+    ok(around.before >= 2 && around.after >= 2 && around.cells === 0 && around.ro, `days around the month are shown and read-only (${around.before} before, ${around.after} after)`);
+    await page.getByRole('button', { name: 'Days around' }).click();
+    ok(await page.locator('thead th.dh.ctx').count() === 0, 'and can be switched off');
+    await page.getByRole('button', { name: 'Days around' }).click();
+    ok(await page.locator('thead th.dh.ctx').count() >= 4, 'and on again');
+  }
   for (const t of ['roster', 'postings', 'day', 'people', 'rules', 'check', 'more']) {
     await go(page, '#' + t);
     await page.waitForTimeout(400);
