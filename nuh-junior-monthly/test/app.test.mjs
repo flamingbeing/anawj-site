@@ -10,7 +10,7 @@ import { apmesList } from '../js/apmes.js';
 import * as G from '../js/gsheets.js';
 import * as W from '../js/waitlist.js';
 import * as Pools from '../js/pools.js';
-import { topicOf } from '../js/ui-rules.js';
+import { topicOf, isPredicted, confirmedNote } from '../js/ui-rules.js';
 import * as C from '../js/cloud.js';
 import { relevanceOf } from '../js/ui-check.js';
 import { applyAssignments, postingSet } from '../js/ui-roster.js';
@@ -758,5 +758,12 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const s = M.defaultState();
   ok(['R1', 'R2', 'R3', 'C3', 'R1B'].every(c => s.duties.find(d => d.code === c).auto), 'Fill: R1 to R3 are auto-fill codes');
   ok(M.fillCodes(s).join() === 'C3,R1B', 'Fill: cardiac and ICU are ticked by default, R1 to R3 are not');
+}
+
+// confirming a predicted rule drops its To confirm tag and keeps the rest of its note
+{
+  ok(isPredicted({ note: 'Predicted from the roster guide: confirm or change.' }) && !isPredicted({ note: 'Asked for by the rosterer.' }) && !isPredicted({}), 'To confirm: only a predicted note carries the tag');
+  ok(confirmedNote('Predicted from the roster guide: confirm or change.') === '' && confirmedNote('The guide: very hard to keep; real rosters break it often (1 in 3 cardiac calls). Predicted from the roster guide: confirm or change.') === 'The guide: very hard to keep; real rosters break it often (1 in 3 cardiac calls).', 'To confirm: confirming removes that sentence and keeps the rest of the note');
+  ok(!M.defaultState().rules.some(r => isPredicted({ note: confirmedNote(r.note) })), 'To confirm: no default note still reads as predicted once confirmed');
 }
 console.log(`nuh-junior-monthly: ${n} checks passed`);
