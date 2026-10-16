@@ -119,6 +119,19 @@ const SCREENS = [
     await p.waitForSelector('dialog[open]');
   }, true],
   ['Notes', hash('notes'), true],
+  ['Notes selecting', async p => {
+    await p.evaluate(async () => { const D = await import('./js/demo-backend.js'), t = Date.now(); for (const i of [1, 2]) D.saveNote('demo@example.com', { id: 'fake-a11y-' + i, date: '2020-03-0' + i, title: 'Fake a11y note ' + i, body: 'Fake', createdAt: t + i, updatedAt: t + i }); });
+    await hash('notes')(p); await p.locator('ul.notes-rows > li').first().waitFor();
+    await p.locator('button.notes-selbtn').click(); await p.locator('ul.notes-rows > li').first().click();
+    await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  }, true],
+  ['Notes bulk edit', async p => {
+    await p.evaluate(async () => { const D = await import('./js/demo-backend.js'), t = Date.now(); for (const i of [1, 2]) D.saveNote('demo@example.com', { id: 'fake-a11y-' + i, date: '2020-03-0' + i, title: 'Fake a11y note ' + i, body: 'Fake', createdAt: t + i, updatedAt: t + i }); });
+    await hash('notes')(p); await p.locator('ul.notes-rows > li').first().waitFor();
+    await p.locator('button.notes-selbtn').click(); await p.locator('ul.notes-rows > li').first().click();
+    await p.locator('.sel-bar').getByRole('button', { name: 'Bulk edit…' }).click();
+    await p.locator('dialog[open]').getByLabel('Title', { exact: true }).selectOption('find');
+  }, false],
   ['Note editor', async p => {
     await hash('notes')(p);
     await p.getByRole('button', { name: '+ New note' }).click();

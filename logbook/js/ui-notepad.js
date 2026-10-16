@@ -66,7 +66,9 @@ export function ensureNotes() {
 // the server's list (not the offline cache's), or after ms, whichever comes first
 const serverNotes = ms => Promise.race([serverIn || Promise.resolve(), new Promise(r => setTimeout(r, ms))]);
 function stopNotes() { if (stop) stop(); stop = null; owner = null; raw = []; ready = null; readyResolve = null; serverIn = null; serverResolve = null; S.notes = null; }
-resetters.push(() => { stopNotes(); Object.assign(nv, NV0()); inline = null; });
+resetters.push(() => { stopNotes(); Object.assign(nv, NV0()); inline = null; nsel.on = false; nsel.ids.clear(); });
+// Select (as on the Logbook): press and hold a note, or Select; the bar's Bulk edit… opens ui-bulk-notes.js
+const nsel = { on: false, ids: new Set() };
 writes.onChange(() => { if (owner) { apply(); if (synced) syncIndex(); } healDayNotes(); });
 // a conflict found after the save had already been accepted (a slow connection): merge it the same way, also when
 // the note is no longer open (typed, Done, then the answer came): otherwise the other copy shows, the lines typed
@@ -282,11 +284,37 @@ export function renderNotes() {
   const search = h('input', { type: 'search', class: 'grow', placeholder: 'Search notes', 'aria-label': 'Search notes', value: nv.q,
     oninput: e => { nv.q = e.target.value; shown = PAGE; paintList(); } });
   const listEl = h('div', { class: 'notes-list' });
+  const selBar = h('div', { class: 'sel-bar', role: 'region', 'aria-label': 'Selected notes', hidden: true });
+  const startSel = (ids = []) => { nsel.on = true; for (const id of ids) nsel.ids.add(id); paintList(); };
+  const endSel = () => { nsel.on = false; nsel.ids.clear(); paintList(); };
+  const selectBtn = h('button', { class: 'small notes-selbtn', title: 'Select notes to edit, merge, export or move to the bin together', onclick: () => (nsel.on ? endSel() : startSel()) }, 'Select');
+  const paintSel = rows => {
+    const have = new Set(list.map(n => n.id));
+    for (const id of nsel.ids) if (!have.has(id)) nsel.ids.delete(id);
+    el.classList.toggle('selecting', nsel.on);
+    selectBtn.hidden = !list.length;
+    selBar.hidden = !nsel.on;
+    if (!nsel.on) return fill(selBar);
+    const n = nsel.ids.size;
+    fill(selBar,
+      h('span', { class: 'sel-n', 'aria-live': 'polite' }, `${n} selected`),
+      h('button', { class: 'small', disabled: rows.length && rows.every(x => nsel.ids.has(x.id)), onclick: () => { for (const x of rows) nsel.ids.add(x.id); paintList(); } }, rows.length === list.length ? `Select all ${rows.length}` : `Select all ${rows.length} found`),
+      h('button', { class: 'small', disabled: !n, onclick: () => { nsel.ids.clear(); paintList(); } }, 'Select none'),
+      h('span', { class: 'grow' }),
+      h('button', { class: 'small primary', disabled: !n, onclick: async () => {
+        const { notesBulkDialog } = await import('./ui-bulk-notes.js');
+        notesBulkDialog(list.filter(x => nsel.ids.has(x.id)), { onDone: endSel });
+      } }, 'Bulk edit…'),
+      h('button', { class: 'small', onclick: endSel }, 'Done'));
+  };
+  nsel.start = n => startSel([n.id]);
+  nsel.paint = () => paintSel(filterNotes(list, nv));
   // a page of rows at a time (up to 2,000 notes), more on request
   let shown = PAGE;
   let list = loading ? [] : S.notes;   // (a live update swaps in the newer list: page.repaint)
   const paintList = () => {
     const rows = filterNotes(list, nv);
+    paintSel(rows);
     const more = rows.length - shown;
     fill(listEl, loading ? h('p', { class: 'empty' }, 'Loading…')
       : !list.length ? emptyState('notes', 'No notes yet', 'Writing about a case for your portfolio? Use Reflect instead.')
@@ -317,12 +345,13 @@ export function renderNotes() {
     // one note a day: today's (made the first time it's opened), and a chip for only the daily notes once there are some
     h('div', { class: 'bar notes-daily' },
       h('button', { class: 'small', disabled: loading, onclick: () => openDayNote(todayISO()) }, 'Today’s note'),
-      hasDaily || nv.kind ? h('button', { class: 'small chip-toggle', 'aria-pressed': String(nv.kind === 'day'), onclick: () => { nv.kind = nv.kind === 'day' ? '' : 'day'; hooks.render(); } }, 'Daily notes') : null),
+      hasDaily || nv.kind ? h('button', { class: 'small chip-toggle', 'aria-pressed': String(nv.kind === 'day'), onclick: () => { nv.kind = nv.kind === 'day' ? '' : 'day'; hooks.render(); } }, 'Daily notes') : null,
+      h('span', { class: 'grow' }), selectBtn),
     narrowed ? h('p', { class: 'notes-filter' }, h('span', {}, nv.day ? `Notes on ${fmtDate(nv.day)}` : nv.caseId ? `Notes on the case ${caseOf(nv.caseId) ? caseLabel(caseOf(nv.caseId)) : ''}` : 'Daily notes'),
       ' ', h('button', { class: 'small', onclick: () => { nv.day = ''; nv.caseId = ''; nv.kind = ''; hooks.render(); } }, 'Show all')) : null,
     full ? h('p', { class: 'tip' }, `You have ${MAX_NOTES} notes, the most allowed. Delete old ones (they stay in the recycle bin for 30 days) or keep them in a Markdown export.`) : null,
-    listEl,
-    list.length ? h('p', { class: 'notes-download' }, h('button', { class: 'small', onclick: downloadNoteFiles }, 'Download notes as files (zip)')) : null);
+    listEl, selBar,
+    list.length ? h('p', { class: 'notes-download' }, h('button', { class: 'small', onclick: () => downloadNoteFiles() }, 'Download notes as files (zip)')) : null);
   paintList();
   page = { el, shape: listShape(list, loading), repaint: next => {
     list = next;
@@ -336,11 +365,41 @@ export function renderNotes() {
 function noteRow(n) {
   const preview = plainLines(n.body).slice((n.title || '').trim() ? 0 : 1, 3).join(' · ');
   const c = n.caseId && caseOf(n.caseId);
-  return h('li', { tabindex: '0', onclick: () => openEditor(n), onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) openEditor(n); } },
+  const picking = nsel.on, picked = picking && nsel.ids.has(n.id);
+  const toggle = (setBox = true) => {
+    const on = !nsel.ids.has(n.id);
+    if (on) nsel.ids.add(n.id); else nsel.ids.delete(n.id);
+    li.classList.toggle('sel', on);
+    const box = li.querySelector('.sel-box'); if (box && setBox) box.checked = on;
+    nsel.paint?.();
+  };
+  const open = () => (picking ? toggle() : openEditor(n));
+  // while selecting, the checkbox takes the keyboard (one stop a row) and names the note
+  const li = h('li', { class: picked ? 'sel' : null, tabindex: picking ? '-1' : '0', onclick: open, onkeydown: e => { if ((e.key === 'Enter' || (picking && e.key === ' ')) && e.target === e.currentTarget) { e.preventDefault(); open(); } } },
+    picking ? h('input', { type: 'checkbox', class: 'sel-box', checked: picked, 'aria-label': `Select ${noteTitle(n)}${n.date ? ', ' + fmtDate(n.date) : ''}`, onclick: e => { e.stopPropagation(); toggle(false); } }) : null,
     h('span', { class: 'd' }, n.date ? fmtDate(n.date) : 'No date'),
     h('span', { class: 'note-main' }, h('b', {}, noteTitle(n)), preview ? h('span', { class: 'muted note-preview' }, preview.slice(0, 160)) : null,
       c ? h('button', { class: 'flag note-case', type: 'button', title: 'Open the linked case', 'aria-label': 'Open the linked case: ' + caseLabel(c),
         onclick: e => { e.stopPropagation(); openCase(n.caseId); } }, '↗ ' + caseLabel(c)) : null));
+  holdToSelect(li, () => !nsel.on && nsel.start?.(n));
+  return li;
+}
+// half a second's hold without moving starts selecting (the click that follows is swallowed); Android's long press
+// (contextmenu) may come a moment sooner and starts it then
+function holdToSelect(li, start) {
+  let t = 0, x = 0, y = 0, held = 0;
+  const stop = () => { clearTimeout(t); t = 0; };
+  const go = () => {
+    t = 0; held = Date.now();
+    const eat = e => { e.stopPropagation(); e.preventDefault(); window.removeEventListener('click', eat, true); };
+    window.addEventListener('click', eat, true); setTimeout(() => window.removeEventListener('click', eat, true), 700);
+    try { navigator.vibrate?.(10); } catch { /* not allowed */ }
+    start();
+  };
+  li.addEventListener('pointerdown', e => { if (e.button !== 0 || e.target.closest('button, a, input') || nsel.on) return; x = e.clientX; y = e.clientY; stop(); t = setTimeout(go, 500); });
+  li.addEventListener('pointermove', e => { if (t && Math.hypot(e.clientX - x, e.clientY - y) > 10) stop(); });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) li.addEventListener(ev, stop);
+  li.addEventListener('contextmenu', e => { if (t) { e.preventDefault(); stop(); go(); } else if (Date.now() - held < 1000) e.preventDefault(); });
 }
 
 function newNote() {
@@ -735,8 +794,8 @@ async function pickCase(n, done) {
 }
 
 // Download every note as its own .md or .txt file in a zip (the files hold only the notes: the linked case isn't named)
-export function downloadNoteFiles() {
-  const list = Array.isArray(S.notes) ? S.notes : [];
+export function downloadNoteFiles(only = null) {
+  const list = only || (Array.isArray(S.notes) ? S.notes : []);
   if (!list.length) return toast('No notes to download yet');
   const o = { fmt: 'md' };
   const radio = (v, label) => h('label', { class: 'check' }, h('input', { type: 'radio', name: 'notes-file-format', value: v, checked: v === o.fmt, onchange: () => { o.fmt = v; } }), label);
