@@ -111,6 +111,25 @@ export function createStore({ demo = false, fallback } = {}) {
       return true;
     },
 
+    // Every month starts locked (owner, 16 Oct 2026): a month with no entry yet gets a locked one, and, once per device,
+    // so does every month that already exists. Quiet like a Getting started tick (not an undo step); never in Practice.
+    ensureLocked(m) {
+      if (store.isDemo || !m || (state.months || {})[m]) return false;
+      state = { ...state, months: { ...(state.months || {}), [m]: { status: 'published', publishedAt: new Date().toISOString(), note: '' } } };
+      store.save();
+      notify('Lock ' + m, 'mark');
+      return true;
+    },
+    lockAllOnce() {
+      if (store.isDemo || (state.settings && state.settings.lockedByDefault)) return false;
+      const months = {};
+      for (const [m, v] of Object.entries(state.months || {})) months[m] = v && v.status === 'published' ? v : { ...(v || {}), status: 'published', publishedAt: new Date().toISOString(), note: (v && v.note) || '' };
+      state = { ...state, months, settings: { ...state.settings, lockedByDefault: true } };
+      store.save();
+      notify('Lock existing months', 'mark');
+      return true;
+    },
+
     // A Getting started tick or "hide the checklist" (merged into settings.onboarding): saved, backed up and shared
     // like any change, but not an undo step (it isn't an edit of the roster). Subscribers get source 'mark'.
     mark(patch, label = 'Getting started') {

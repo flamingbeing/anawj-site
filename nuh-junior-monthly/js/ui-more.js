@@ -147,7 +147,9 @@ export function mount(el, app) {
           const { plan, month } = paint();
           const moves = plan.moves.filter(mv => !unticked.has(mv.id)).map(mv => mv.id);
           let res;
-          store.commit(`Imported ${M.fmtMonth(month)} from the sheet`, draft => { res = S.applyImport(draft, plan, grid, { tab, source, moves }); });
+          // reading a month in is deliberate, so it opens that month (a locked one refuses every change)
+          if (M.isMonthLocked(store.get(), month)) store.commit(`Unlock ${M.fmtMonth(month)} to import`, draft => { M.setMonthLocked(draft, month, false); });
+          store.commit(`Imported ${M.fmtMonth(month)} from the sheet`, draft => { res = S.applyImport(draft, plan, grid, { tab, source, moves }); if (!M.isMonthLocked(draft, month)) M.setMonthLocked(draft, month, false); });
           app.setMonth(month);
           const moved = res.moved ? `${res.moved} moved grade, ` : '';
           app.toast(`${M.fmtMonth(month)} imported: ${res.added} new people, ${moved}${res.cells} cells`, { action: { label: 'Undo', fn: () => store.undo() }, ms: 8000 });
