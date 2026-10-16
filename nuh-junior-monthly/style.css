@@ -373,7 +373,7 @@ html body.a-app:has(.a-tabbar) .a-bar.top { margin-left: 0; }
 
 .grid {
   border-collapse: separate; border-spacing: 0; table-layout: fixed;
-  width: max(100%, calc(var(--nm-w) + var(--days) * var(--cw) + var(--sums) * var(--sw)));
+  width: max(100%, calc(var(--nm-w) + (var(--days) + var(--ctx, 0)) * var(--cw) + var(--sums) * var(--sw)));
   font-size: 12px;
 }
 .grid col.col-nm { width: var(--nm-w); }
@@ -388,6 +388,13 @@ html body.a-app:has(.a-tabbar) .a-bar.top { margin-left: 0; }
 .grid thead th { position: sticky; top: 0; z-index: 4; height: var(--head-h); background: #f7f7fa; border-bottom: 1px solid var(--line-strong); font-weight: 600; }
 .grid th.nh { left: 0; z-index: 6; text-align: left; padding: 0 10px; color: var(--muted); font-size: 12px; font-weight: 600; border-right: 1px solid var(--line-strong); }
 .grid th.dh { text-align: center; }
+/* the days around the month: greyed and read-only, so you can see where people come from and go next */
+.grid th.dh.ctx { background: #ececf1; color: var(--muted); }
+.grid th.dh.ctx .dh-in .mo { font-size: 9px; font-weight: 700; text-transform: uppercase; color: var(--navy); }
+.grid td.c.ctx { background: #f3f3f7; opacity: .82; }
+.grid td.c.ctx .cro { display: flex; align-items: center; justify-content: center; gap: 2px; height: 100%; }
+.grid td.cov.ctx { background: #f3f3f7; }
+.grid th.dh.ctx + th.dh:not(.ctx), .grid td.c.ctx + td.c:not(.ctx), .grid th.dh:not(.ctx) + th.dh.ctx, .grid td.c:not(.ctx) + td.c.ctx { border-left: 2px solid var(--navy); }
 .grid th.dh.we { background: var(--we-head); }
 .grid th.dh.hol { background: var(--hol-head); }
 .grid th.dh.td { background: var(--navy); color: #fff; }
@@ -884,6 +891,10 @@ td.c.pt.we, td.c.pt.hol { background-color: var(--pt); background-image: linear-
 .welcome .guide-slot { padding: 0; }
 .welcome-card.has-guide { max-width: 640px; }
 .welcome-intro { text-align: center; }
+.welcome-team { text-align: center; margin: 14px 0 6px; }
+.welcome-team p { margin: 0 0 10px; }
+.welcome-team-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.welcome-toggle { display: block; margin: 12px auto 0; }
 
 /* ---------- Getting started ---------- */
 .gs { background: var(--surface); border: 0; border-radius: var(--radius); overflow: hidden; text-align: left; }

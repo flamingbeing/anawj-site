@@ -48,6 +48,19 @@ const noSideScroll = async (page, label) => {
   const page = await newPage({ width: 1366, height: 900 }, 'desktop', { permissions: ['clipboard-read', 'clipboard-write'] });
   await page.goto(BASE + '?demo#roster');
   await ready(page);
+  // the days around the month: greyed, read-only, with at least one working day on each side
+  {
+    const around = await page.evaluate(() => {
+      const hs = [...document.querySelectorAll('thead th.dh')], ix = hs.findIndex(t => !t.classList.contains('ctx'));
+      const last = hs.length - 1 - [...hs].reverse().findIndex(t => !t.classList.contains('ctx'));
+      return { before: ix, after: hs.length - 1 - last, cells: document.querySelectorAll('td.c.ctx button').length, ro: document.querySelectorAll('td.c.ctx .cro').length > 0 };
+    });
+    ok(around.before >= 2 && around.after >= 2 && around.cells === 0 && around.ro, `days around the month are shown and read-only (${around.before} before, ${around.after} after)`);
+    await page.getByRole('button', { name: 'Days around' }).click();
+    ok(await page.locator('thead th.dh.ctx').count() === 0, 'and can be switched off');
+    await page.getByRole('button', { name: 'Days around' }).click();
+    ok(await page.locator('thead th.dh.ctx').count() >= 4, 'and on again');
+  }
   for (const t of ['roster', 'postings', 'day', 'people', 'rules', 'check', 'more']) {
     await go(page, '#' + t);
     await page.waitForTimeout(400);
@@ -138,6 +151,17 @@ const noSideScroll = async (page, label) => {
     }
     return route.fulfill({ status: 404, headers: CORS, body: '{"error":{"message":"no"}}' });
   });
+  // a device with nothing on it: the welcome screen offers sign in first, and its steps can be hidden
+  await page.goto(BASE + '#roster');
+  await ready(page);
+  ok(await page.getByRole('button', { name: "Sign in and load the team's roster" }).count() === 1, 'an empty device offers to sign in and load the team roster');
+  ok(await page.locator('.gs').count() === 1, 'the getting started steps show at first');
+  await axe(page, 'the welcome screen with sign in');
+  await page.getByRole('button', { name: 'Hide the getting started steps' }).click();
+  ok(await page.locator('.gs').count() === 0 && await page.getByRole('button', { name: "Sign in and load the team's roster" }).count() === 1, 'the steps can be hidden, sign in stays');
+  await page.getByRole('button', { name: 'Show the getting started steps' }).click();
+  ok(await page.locator('.gs').count() === 1, 'and shown again');
+  await page.getByRole('button', { name: 'Hide the getting started steps' }).click();
   await page.goto(BASE + '#more');
   await ready(page);
   await page.evaluate(async () => { (await import('./js/gsheets.js')).hooks.getToken = async () => 'test-token'; });

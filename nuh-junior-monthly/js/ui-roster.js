@@ -12,11 +12,11 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<'
 const key = (d, s) => d + '|' + s;
 
 function loadUi() {
-  const def = { group: '', tag: '', q: '', showReq: true, hi: '', paint: false, paintCode: '' };
+  const def = { group: '', tag: '', q: '', showReq: true, showCtx: true, hi: '', paint: false, paintCode: '' };
   try { return { ...def, ...JSON.parse(localStorage.getItem(UI_KEY) || '{}'), q: '', paint: false }; } catch (e) { return def; }
 }
 function saveUi(ui) {
-  try { localStorage.setItem(UI_KEY, JSON.stringify({ group: ui.group, tag: ui.tag, showReq: ui.showReq, hi: ui.hi, paintCode: ui.paintCode })); } catch (e) { /* ignore */ }
+  try { localStorage.setItem(UI_KEY, JSON.stringify({ group: ui.group, tag: ui.tag, showReq: ui.showReq, showCtx: ui.showCtx, hi: ui.hi, paintCode: ui.paintCode })); } catch (e) { /* ignore */ }
 }
 
 // ---------- small shared helpers (also used by ui-day.js) ----------
@@ -148,12 +148,14 @@ export function mount(el, app) {
   const hiSel = h('select', { class: 'input r-sel', 'aria-label': 'Highlight a code' });
   // (data-tour: what the first-time tour lights, tour.js)
   const reqBtn = h('button', { type: 'button', class: 'tbtn', 'aria-pressed': String(ui.showReq), title: 'Show or hide requests (Cr, Nc, Wr…)', 'data-tour': 'layers' });
+  const ctxBtn = h('button', { type: 'button', class: 'tbtn', 'aria-pressed': String(ui.showCtx), title: 'Show the days just before and after the month (greyed): where people come from and go next, and who is post call' });
+  ctxBtn.innerHTML = `${icon('eye')}<span>Days around</span>`;
   const paintBtn = h('button', { type: 'button', class: 'tbtn', 'aria-pressed': 'false', title: 'Paint mode: pick a code, then tap or drag across cells', 'data-tour': 'paint' });
   reqBtn.innerHTML = `${icon('eye')}<span>Requests</span>`;
   paintBtn.innerHTML = `${icon('brush')}<span>Paint</span>`;
   // the grid's marks explained (they are small and otherwise unexplained)
   const keyBtn = h('button', { type: 'button', class: 'tbtn', title: 'What the marks in the grid mean', onclick: showKey, 'data-tour': 'layers' }, 'Key');
-  tb.append(paintBtn, searchWrap, groupSel, tagSel, hiSel, reqBtn, keyBtn);
+  tb.append(paintBtn, searchWrap, groupSel, tagSel, hiSel, reqBtn, ctxBtn, keyBtn);
   function showKey() {
     const row = (mark, text) => h('li', { class: 'gk-row' }, h('span', { class: 'gk-mark', html: mark }), h('span', null, text));
     app.sheet({
@@ -255,6 +257,10 @@ export function mount(el, app) {
     scroll.querySelector('table')?.classList.toggle('no-req', !ui.showReq);
     prevRender = null;
   });
+  ctxBtn.addEventListener('click', () => {
+    ui.showCtx = !ui.showCtx; saveUi(ui); ctxBtn.setAttribute('aria-pressed', String(ui.showCtx));
+    prevRender = null; rowCache = new Map(); renderGrid();
+  });
   paintBtn.addEventListener('click', () => setPaint(!ui.paint));
 
   // ---------- grid ----------
@@ -341,10 +347,21 @@ export function mount(el, app) {
     const overnight = new Set((state.duties || []).filter(d => d.overnight).map(d => d.code));
     const ev = app.evaluation();
     const today = M.iso(new Date());
-    const dayMeta = days.map(d => {
+    const metaOf = (d, extra = {}) => {
       const hol = M.isHoliday(state, d) ? (M.holidayName(state, d) || 'Public holiday') : '';
-      return { d, wd: M.weekday(d), we: M.isWeekend(d), hol, num: +d.slice(8), today: d === today, label: M.fmtDay(d), prev: M.addDays(d, -1) };
-    });
+      return { d, wd: M.weekday(d), we: M.isWeekend(d), hol, num: +d.slice(8), today: d === today, label: M.fmtDay(d), prev: M.addDays(d, -1), ...extra };
+    };
+    const dayMeta = days.map(d => metaOf(d));
+    // days around the month, read-only, so you see where people come from and go next and who is post call: back to the first
+    // working day before the month (at least two days), and on to the first working day after it
+    const working = d => !M.isWeekend(d) && !M.isHoliday(state, d);
+    const ctxBefore = [], ctxAfter = [];
+    if (ui.showCtx) {
+      let d = M.addDays(days[0], -1);
+      for (let n = 0; n < 7; n++, d = M.addDays(d, -1)) { ctxBefore.unshift(metaOf(d, { ctx: true, mo: M.addDays(d, 1).slice(5, 7) !== d.slice(5, 7) })); if (working(d) && ctxBefore.length >= 2) break; }
+      d = M.addDays(days[days.length - 1], 1);
+      for (let n = 0; n < 7; n++, d = M.addDays(d, 1)) { ctxAfter.push(metaOf(d, { ctx: true, mo: n === 0 })); if (working(d) && ctxAfter.length >= 2) break; }
+    }
     const autoCodes = (state.duties || []).filter(d => d.auto && d.kind === 'shift').map(d => d.code);
     // problems about a person's whole month (fair share, a monthly minimum): a mark on the name, not on day 1
     const personV = new Map();
@@ -353,7 +370,7 @@ export function mount(el, app) {
       if (!personV.has(v.staffId)) personV.set(v.staffId, []);
       personV.get(v.staffId).push(v);
     }
-    return { state, days, dmap, dutyIdx, overnight, ev, today, dayMeta, autoCodes, personV, hasCodes: makeHasCodes(state), gmap: M.groupMap(state) };
+    return { state, days, dmap, dutyIdx, overnight, ev, today, dayMeta, ctxBefore, ctxAfter, autoCodes, personV, hasCodes: makeHasCodes(state), gmap: M.groupMap(state) };
   }
 
   let lastCss = null;
@@ -424,6 +441,7 @@ export function mount(el, app) {
     if (cell?.lock) { marks += '<span class="lk"></span>'; names.push('locked'); }
     if (vs.length) names.push(`${vs.length} problem${vs.length > 1 ? 's' : ''}: ` + vs.map(v => v.msg).join('; '));
     const label = `${person.name}, ${dm.label}: ${names.length ? names.join(', ') : 'empty'}`;
+    if (dm.ctx) return `<td class="${cls.replace(' td', '')} ctx${pt ? ' pt' : ''}"${pt ? ` style="--pt:${esc(pt)}"` : ''}><span class="cro" role="img" aria-label="${esc(label + ', not part of this month')}">${chips}</span></td>`;
     const title = vs.length || cell?.note ? ` title="${esc([cell?.note ? 'Note: ' + cell.note : '', ...vs.map(v => (v.hard ? '⛔ ' : '⚠ ') + v.msg)].filter(Boolean).join('\n'))}"` : '';
     return `<td class="${cls}${pt ? ' pt' : ''}"${pt ? ` style="--pt:${esc(pt)}"` : ''}><button class="cell" data-d="${d}" data-s="${esc(sid)}" tabindex="${focusable ? 0 : -1}" aria-label="${esc(label)}"${title}>${marks}${chips}</button></td>`;
   }
@@ -435,6 +453,7 @@ export function mount(el, app) {
     const cells = c.state.cells || {};
     let k = JSON.stringify([p.name, p.short, p.tags, p.note, p.start, p.end, p.active, focusDay,
       pv.map(v => [v.hard, v.msg]), (cells[c.dayMeta[0].prev] || {})[p.id] || 0]);
+    for (const dm of [...c.ctxBefore, ...c.ctxAfter]) { const cell = (cells[dm.d] || {})[p.id]; if (cell) k += '|c' + dm.d + JSON.stringify(cell); }
     for (const dm of c.dayMeta) {
       const cell = (cells[dm.d] || {})[p.id];
       if (cell) k += '|' + dm.num + JSON.stringify(cell);
@@ -462,7 +481,8 @@ export function mount(el, app) {
     const sumCodes = c.autoCodes.filter(code => used.has(code) || code === 'C');
     const hasC = c.dmap.has('C');
     const nSum = sumCodes.length + (hasC ? 1 : 0);
-    const nCols = 1 + c.days.length + nSum;
+    const nBefore = c.ctxBefore.length, nAfter = c.ctxAfter.length;
+    const nCols = 1 + nBefore + c.days.length + nAfter + nSum;
 
     if (!sel || !staff.some(p => p.id === sel.staffId) || !c.days.includes(sel.date)) {
       const d0 = c.days.includes(c.today) ? c.today : c.days[0];
@@ -470,10 +490,16 @@ export function mount(el, app) {
     }
 
     const tableClass = `grid${ui.showReq ? '' : ' no-req'}${ui.hi ? ' hi' : ''}`;
-    let open = `<table class="${tableClass}" style="--days:${c.days.length};--sums:${nSum}">`;
+    let open = `<table class="${tableClass}" style="--days:${c.days.length};--ctx:${nBefore + nAfter};--sums:${nSum}">`;
     open += `<caption class="sr-only">Roster for ${esc(M.fmtMonth(app.month))}. Rows are people, columns are days. Use the arrow keys to move, Enter to edit.</caption>`;
-    open += '<colgroup><col class="col-nm">' + c.days.map(() => '<col class="col-d">').join('') + sumCodes.map(() => '<col class="col-s">').join('') + (hasC ? '<col class="col-s">' : '') + '</colgroup>';
+    open += '<colgroup><col class="col-nm">' + c.ctxBefore.map(() => '<col class="col-d">').join('') + c.days.map(() => '<col class="col-d">').join('') + c.ctxAfter.map(() => '<col class="col-d">').join('') + sumCodes.map(() => '<col class="col-s">').join('') + (hasC ? '<col class="col-s">' : '') + '</colgroup>';
     let html = '<thead><tr><th scope="col" class="nh"><span class="nh-in">' + staff.length + (staff.length === all.length ? '' : ' of ' + all.length) + ' people</span></th>';
+    const ctxHead = dm => {
+      let cls = 'dh ctx' + (dm.we ? ' we' : '') + (dm.hol ? ' hol' : '');
+      const mo = dm.mo ? `<span class="mo">${esc(M.fmtMonth(dm.d.slice(0, 7)).slice(0, 3))}</span>` : '';
+      return `<th scope="col" class="${cls}" title="${esc(M.fmtDay(dm.d) + (dm.hol ? ', ' + dm.hol : '') + ' (outside this month, shown for context)')}"><abbr class="dh-in" title="${esc(M.fmtDay(dm.d))}">${mo}<span class="wd">${WD[dm.wd]}</span><span class="dn">${dm.num}</span></abbr></th>`;
+    };
+    for (const dm of c.ctxBefore) html += ctxHead(dm);
     for (const dm of c.dayMeta) {
       let cls = 'dh';
       if (dm.we) cls += ' we';
@@ -482,6 +508,7 @@ export function mount(el, app) {
       const t = dm.hol ? ` title="${esc(dm.hol)}"` : '';
       html += `<th scope="col" class="${cls}"${t} data-d="${dm.d}"><abbr class="dh-in" title="${esc(M.fmtDay(dm.d) + (dm.hol ? ', ' + dm.hol : ''))}"><span class="wd">${WD[dm.wd]}</span><span class="dn">${dm.num}</span></abbr></th>`;
     }
+    for (const dm of c.ctxAfter) html += ctxHead(dm);
     sumCodes.forEach((code, i) => { html += `<th scope="col" class="sh${i ? '' : ' s1'}" title="${esc(c.dmap.get(code)?.name || code)} this month"><abbr title="${esc(c.dmap.get(code)?.name || code)} this month">${esc(code)}</abbr></th>`; });
     if (hasC) html += `<th scope="col" class="sh${sumCodes.length ? '' : ' s1'}"><abbr title="Weekend and public holiday calls this month">Wk</abbr></th>`;
     html += '</tr></thead>';
@@ -497,7 +524,7 @@ export function mount(el, app) {
     const tagMap = new Map((state.tags || []).map(t => [t.id, t]));
     // what every row shares (month, today, duty codes, holidays, tag names, summary columns): when it changes, no
     // row's old HTML can be reused
-    const allKey = JSON.stringify([app.month, c.today, sumCodes, hasC, [...c.overnight], c.dayMeta.map(dm => dm.hol),
+    const allKey = JSON.stringify([app.month, c.today, sumCodes, hasC, [...c.overnight], c.dayMeta.map(dm => dm.hol), [...c.ctxBefore, ...c.ctxAfter].map(dm => [dm.d, dm.hol]),
       (state.duties || []).map(d => [d.code, d.name, d.kind]), (state.tags || []).map(t => [t.id, t.name])]);
     if (allKey !== rowCacheKey) { rowCache = new Map(); rowCacheKey = allKey; }
     const nextCache = new Map();
@@ -519,10 +546,12 @@ export function mount(el, app) {
         const pvMark = pv.length ? `<span class="vx-nm ${pv.some(v => v.hard) ? 'vh' : 'vs'}" aria-hidden="true"></span>` : '';
         const cellsOut = [];
         cellsOut.push(`<th scope="row" class="nm"><button type="button" class="nm-btn" data-p="${esc(p.id)}" title="${esc(p.name + (tagTxt.length ? ' · ' + tagTxt.join(', ') : '') + (p.note ? ' · ' + p.note : '') + pvTxt + '. Open their month')}"${pv.length ? ` aria-label="${esc(`${p.short || p.name}, ${pv.length} problem${pv.length > 1 ? 's' : ''} this month. Open their month`)}"` : ''}><span class="nm-txt">${esc(p.short || p.name)}</span>${tagBadge}${pvMark}</button></th>`);
+        for (const dm of c.ctxBefore) cellsOut.push(M.staffActiveOn(p, dm.d) ? cellHtml(c, p, dm, false) : `<td class="c off ctx${dm.we ? ' we' : ''}"><span class="sr-only">not in post</span></td>`);
         for (const dm of c.dayMeta) {
           const focusable = sel && sel.staffId === p.id && sel.date === dm.d;
           cellsOut.push(M.staffActiveOn(p, dm.d) ? cellHtml(c, p, dm, focusable) : `<td class="c off${dm.we ? ' we' : ''}"><span class="sr-only">not in post</span></td>`);
         }
+        for (const dm of c.ctxAfter) cellsOut.push(M.staffActiveOn(p, dm.d) ? cellHtml(c, p, dm, false) : `<td class="c off ctx${dm.we ? ' we' : ''}"><span class="sr-only">not in post</span></td>`);
         // counts
         const counts = {};
         let wk = 0;
@@ -554,6 +583,7 @@ export function mount(el, app) {
       covRules.forEach((rule, ri) => {
         const desc = safeDescribe(rule, state);
         const cells = [`<tr style="--b:${(covRules.length - 1 - ri) * 24}px">`, `<th scope="row" class="nm cov-nm" title="${esc(desc)}">${esc(coverLabel(rule, state))}</th>`];
+        for (let i = 0; i < nBefore; i++) cells.push('<td class="cov na ctx"></td>');
         c.days.forEach((d, di) => {
           const cv = covByDay[di].find(x => x.rule === rule);
           if (!cv) { cells.push('<td class="cov na"></td>'); return; }
@@ -561,6 +591,7 @@ export function mount(el, app) {
           const txt = need != null ? `${cv.n}/${need}` : String(cv.n);
           cells.push(`<td class="cov ${cv.status}" title="${esc(`${M.fmtDay(d)}: ${cv.n} on ${(rule.params?.codes || []).join('/')}${cv.min != null ? `, needs ${cv.min}` : ''}${cv.max != null ? `, at most ${cv.max}` : ''}`)}">${txt}</td>`);
         });
+        for (let i = 0; i < nAfter; i++) cells.push('<td class="cov na ctx"></td>');
         if (nSum) cells.push(`<td colspan="${nSum}" class="cov-sum s1"></td>`);
         footParts.push(cells);
       });

@@ -8,6 +8,7 @@
 // The interface tour itself is tour.js. Nothing here changes the roster except through the person's own taps.
 import * as M from './model.js';
 import { startTour, tourDone, showMe, hideShowMe, visibleTargets } from './tour.js';
+import * as cloud from './cloud.js';
 
 const UI_KEY = 'nuhjm-guide';   // per device: { collapsed } (the card folded or open)
 const isEmpty = app => !((app.store.get().staff || []).length);
@@ -63,7 +64,7 @@ let allSetTimer = 0;
 // can't be folded or hidden). Redrawn only when what it shows changes (it is asked after every edit).
 export function renderChecklist(app, slot, { welcome = false } = {}) {
   const st = checklistStatus(app.store.get());
-  const show = welcome || (!app.isDemo && !st.hidden && (!st.finished || keepOpen) && !(app.params && app.params.p));
+  const show = (welcome && !loadUi().welcomeHidden) || (!welcome && !app.isDemo && !st.hidden && (!st.finished || keepOpen) && !(app.params && app.params.p));
   if (!show) { slot.hidden = true; slot._sig = ''; slot.innerHTML = ''; return; }
   slot.hidden = false;
   const ui = loadUi();
@@ -148,6 +149,20 @@ function card(app, st, { welcome, collapsed, open }) {
 export function welcomeScreen(app) {
   const { h, icon } = app;
   const slot = h('div', { class: 'guide-slot' });
+  // a device with nothing on it yet: sign in and the team's roster comes down; or hide the steps and just import
+  const signInBtn = cloud.enabled
+    ? h('button', { type: 'button', class: 'btn btn-primary', 'data-gs': 'join', onclick: async () => { signInBtn.disabled = true; try { await (await import('./ui-team.js')).joinAndLoad(app); } finally { signInBtn.disabled = false; } } }, "Sign in and load the team's roster")
+    : null;
+  const toggle = h('button', { type: 'button', class: 'linkish welcome-toggle', 'data-gs': 'toggle-steps' }, loadUi().welcomeHidden ? 'Show the getting started steps' : 'Hide the getting started steps');
+  toggle.addEventListener('click', () => {
+    const u = loadUi(); u.welcomeHidden = !u.welcomeHidden; saveUi(u);
+    toggle.textContent = u.welcomeHidden ? 'Show the getting started steps' : 'Hide the getting started steps';
+    app.refreshGuide();
+  });
+  const team = h('div', { class: 'welcome-team' },
+    signInBtn ? h('p', null, 'Already using this with the team? Sign in and the roster comes down from the team.') : null,
+    h('div', { class: 'welcome-team-btns' }, signInBtn, h('button', { type: 'button', class: `btn ${signInBtn ? 'btn-ghost' : 'btn-primary'}`, onclick: () => app.go('more') }, 'Import from the Google Sheet')),
+    toggle);
   const el = h('div', { class: 'welcome' },
     h('div', { class: 'card welcome-card has-guide' },
       h('div', { class: 'welcome-intro' },
@@ -155,6 +170,7 @@ export function welcomeScreen(app) {
         h('h2', null, 'Welcome to NUH Junior Monthly'),
         h('p', null, 'Fill the cardiac (C3) and ICU (R1B) calls in the department\'s Google Sheet: bring the month in, plan postings by the week, check the rules, and let Auto-fill draft the calls.'),
         h('p', { class: 'muted' }, 'Everything stays in this browser until team sharing is set up.')),
+      team,
       slot));
   return { el, slot };
 }
