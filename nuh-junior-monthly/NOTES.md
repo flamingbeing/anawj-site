@@ -187,3 +187,13 @@ Not built; recorded so the next session designs for them.
 - Per-person ability is a ladder (R1 most senior, R3 most junior, cumulative); the default is the highest call a person can do,
   a step-down call needs explicit approval; baby MOs take no calls until they pass the test; very new people are not given
   calls (a per-person "no calls until" date is the planned home for both).
+
+## Grades come from the sheet, per month (owner, 16 Oct 2026)
+
+Each import records the grade (group) every person has in that month's sheet (`sheets[month].grades`). A month shows, and
+the rules and Auto-fill use, the grade its own sheet gave (`model.js` `gradeIn`, `personIn`, used by `staffInMonth` and the
+rule context), so a promotion changes only the months from then on and an old month keeps the grade it had. People
+and a month with no sheet use the current grade (`staff[].group`), which still moves only when the newest month is imported
+(the review's ticks); an unticked move stays in People but the month still shows what its sheet said. Someone listed twice
+takes the grade of the row that is kept. Not done: a dated change in the middle of a month, and showing "from February" in
+People for a future month's sheet.

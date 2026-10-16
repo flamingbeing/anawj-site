@@ -406,13 +406,26 @@ export function notInSheet(state, m, ignoreSetting = false) {
   return new Set(lay.known.filter(id => !here.has(id)));
 }
 
-// Everyone in post at some point in the month, in sheet order (group order, then the order in state.staff).
+// A person's grade (group) in month m: the one that month's imported sheet showed (the sheet is the source of truth for
+// grades, so an old month keeps the grade it had), else their current group.
+export function gradeIn(state, m, p) {
+  const g = state && state.sheets && state.sheets[m] && state.sheets[m].grades && state.sheets[m].grades[p.id];
+  return g && (state.groups || []).some(x => x.id === g) ? g : p.group;
+}
+// The person as they were in month m: the same object unless their grade that month differs.
+export function personIn(state, m, p) {
+  const g = gradeIn(state, m, p);
+  return g === p.group ? p : { ...p, group: g };
+}
+
+// Everyone in post at some point in the month, in sheet order (group order, then the order in state.staff), each with
+// the grade they had that month.
 export function staffInMonth(state, m) {
   const days = monthDays(m), first = days[0], last = days[days.length - 1];
   const order = new Map((state.groups || []).map((g, i) => [g.id, i]));
   const absent = notInSheet(state, m);
   return (state.staff || [])
-    .map((p, i) => ({ p, i }))
+    .map((p, i) => ({ p: personIn(state, m, p), i }))
     .filter(({ p }) => p.active !== false && !absent.has(p.id) && (!p.start || p.start <= last) && (!p.end || p.end >= first))
     .sort((a, b) => ((order.get(a.p.group) ?? 999) - (order.get(b.p.group) ?? 999)) || a.i - b.i)
     .map(({ p }) => p);
