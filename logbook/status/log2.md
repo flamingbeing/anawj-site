@@ -1,9 +1,9 @@
 # Now: Claude Code, Logbook 2 (log2)
 
 **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): the 15 Oct batch is merged (#651–#664). Owner said
-go on the next queue (15 Oct): #665 Logbook, #667 Notes and #669 Reflections Select and Bulk edit (9–9d) merged; #671 and #674 Search (9e) merged; **now building 10, the Grid as a spreadsheet**. Then 11 (paging), 12 (Send to
+go on the next queue (15 Oct): #665 Logbook, #667 Notes and #669 Reflections Select and Bulk edit (9–9d) merged; #671 and #674 Search (9e) merged; #677 the Grid as a spreadsheet (10) open; **11, paging, built on top** (its PR after #677 merges). Then 12 (Send to
 presets), 14 (Group by and Sort) and 15 (Markdown), in order.
-Not started: 11, 12, 14, 15 (Markdown).
+Not started: 12, 14, 15 (Markdown).
 Waiting on the owner: a real-phone check of sign-in (installed app and Firefox for Android).
 
 Agreed queue (one PR each, in order, once he says go):
@@ -115,7 +115,7 @@ Agreed queue (one PR each, in order, once he says go):
    and shadows cover it for now).
 10. **Built (Grid PR).** **Grid as a spreadsheet:** thin lines, no boxed inputs; drag to resize columns (per device, double-tap resets);
     lines per row 1 / 2 / 3 / Fit to content.
-11. **Paging by default** (owner's call, 15 Oct): 100 per page, 25 / 50 / 100 / 300 / All (per device); "‹ Page 2 of
+11. **Built (Paging PR).** **Paging by default** (owner's call, 15 Oct): 100 per page, 25 / 50 / 100 / 300 / All (per device); "‹ Page 2 of
     14 ›" with a jump list showing each page's dates; a search goes back to page 1; Calendar stays monthly.
 12. **More Send to presets** (iPhone users especially): Apple Notes via a Shortcut (setup steps or a shared Shortcut
     link), Email (mailto), Telegram, Drafts, Bear, Things, Day One; a line for apps with no link (Keep, Notion, OneNote):

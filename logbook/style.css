@@ -1741,3 +1741,8 @@ table.grid.sheet .grid-cats { border: 0; background: transparent; padding: 2px; 
 .col-grip::after { content: ''; position: absolute; right: 2px; top: 20%; bottom: 20%; width: 2px; border-radius: 1px; background: var(--muted); opacity: .35; }
 .col-grip:hover::after, .col-grip:focus-visible::after { opacity: 1; background: var(--accent); }
 .grid-opts { gap: 10px; margin: 0 0 8px; }
+/* Logbook pages (log2 11): ‹ Page 2 of 14 · dates › and how many a page */
+.lb-pager { gap: 6px; margin: 0 0 8px; flex-wrap: wrap; }
+.lb-pager.bottom { justify-content: center; margin: 12px 0 0; }
+.lb-pager select { width: auto; max-width: 100%; }
+.lb-pagesel { flex: 0 1 auto; min-width: 0; }

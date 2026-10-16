@@ -639,6 +639,10 @@ portfolio content.
   column (`display().gridCols`, this device; ← → on the focused edge too; a double-tap resets it, "Reset column
   widths" resets all); Lines per row 1 / 2 / 3 / Fit to text (`display().gridLines`; the summary is a textarea that
   grows to its text with Fit).
+- **Pages** (log2 11; owner's call, 15 Oct): the Logbook List and Grid show 100 cases a page (25 / 50 / 100 / 300 /
+  All, this device: `display().pageSize`, unset = 100); "‹ Page 2 of 14 ›" with a list of the pages and each page's
+  dates to jump to (`paging.js`, unit-tested); a new search, filter or view goes back to page 1; the Calendar stays
+  monthly. Replaces "Show more".
 - **Search** (log2 9e, first part): 🔍 in the header on every tab, or / on a computer (not while typing), opens
   `#search` (`ui-search.js`; the engine `global-search.js`, unit-tested). One box over cases (planned ones too),
   reflections and notes (loaded the first time Search opens; offline works on what is on the device). The Logbook's
