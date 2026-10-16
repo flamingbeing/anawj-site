@@ -98,7 +98,7 @@ export function topicOf(r) {
   if (onlyOne(['C3', 'C', 'C-e', 'C-p'])) return 'c3';
   if (onlyOne(['R1B', 'ICU'])) return 'r1b';
   if (codes.some(c => ['R1', 'R2', 'R3'].includes(c)) && !has('C3') && !has('R1B')) return 'mo';
-  if (/^r-(r1|r2|r3)-|^r-fair$|^r-gap$|^r-sat/.test(r.id || '')) return 'mo';
+  if (/^r-(r1|r2|r3)-|^r-mo-|^r-fair$|^r-gap$/.test(r.id || '')) return 'mo';
   return 'everyone';
 }
 
@@ -185,17 +185,30 @@ export function mount(el, app) {
         ['Must hold', 'Hard rules: auto-fill never breaks them if it can help it.', shown.filter(isHard)],
         ['Preferences', 'Soft rules: weighed against each other; a higher number matters more.', shown.filter(r => !isHard(r))],
       ]
-      : TOPICS.map(([id, title, sub]) => [title, sub, shown.filter(r => topicOf(r) === id)]);
-    for (const [title, sub, rs] of groups) {
+      : TOPICS.map(([id, title, sub]) => [title, sub, shown.filter(r => topicOf(r) === id), id]);
+    for (const [title, sub, rs, topic] of groups) {
       if (!rs.length) continue;
       const sec = h('section', { class: 'rv-sec', 'aria-label': title },
         h('h3', { class: 'rv-sec-h' }, title, h('span', { class: 'bx-count' }, String(rs.length))),
-        h('p', { class: 'rv-sec-sub' }, sub));
+        h('p', { class: 'rv-sec-sub' }, sub),
+        topic === 'mo' ? moSwitch(state) : null);
       const ul = h('ul', { class: 'rv-cards' });
       for (const r of rs) ul.append(h('li', null, ruleCard(r, state, count(r))));
       sec.append(ul);
       list.append(sec);
     }
+  }
+
+  // one button turns the whole R1 to R3 group on or off (they are off until the rosterer starts filling those calls here)
+  function moSwitch(state) {
+    const mine = (state.rules || []).filter(r => topicOf(r) === 'mo');
+    const on = mine.some(r => r.enabled !== false);
+    const allOn = mine.every(r => r.enabled !== false);
+    return h('p', { class: 'rv-sec-sub' },
+      h('button', { type: 'button', class: 'btn btn-sm', onclick: () => {
+        app.store.commit(allOn ? 'Turn off the R1 to R3 rules' : 'Turn on the R1 to R3 rules', d => { for (const r of d.rules) if (topicOf(r) === 'mo') r.enabled = !allOn; });
+        app.toast(allOn ? 'The R1 to R3 rules are off' : 'The R1 to R3 rules are on (the pool rules need the strong / weak list)', { ms: 5000 });
+      } }, allOn ? 'Turn off all the R1 to R3 rules' : on ? 'Turn on the rest of the R1 to R3 rules' : 'Turn on all the R1 to R3 rules'));
   }
 
   function ruleCard(r, state, n) {
