@@ -1261,6 +1261,7 @@ export function openAutofill(app) {
   const wrap = h('div', { class: 'af' });
   let worker = null, stopped = false, t0 = 0, tick = 0;
   let timeMs = 6000;
+  let redo = false;   // also redo the calls already typed in the sheet (they come in as hand-entered)
   try { timeMs = +localStorage.getItem('nuhjm-af-time') || 6000; } catch (e) { /* ignore */ }
 
   const close = app.sheet({
@@ -1293,6 +1294,21 @@ export function openAutofill(app) {
     return { auto, manual, locked };
   }
 
+  // Treat the auto-fill codes typed by hand (the sheet's own calls) as auto-filled, so Auto-fill may change them.
+  function markAuto(s) {
+    const autoSet = new Set(autoDuties.map(d => d.code));
+    for (const d of days) {
+      const day = s.cells?.[d];
+      if (!day) continue;
+      for (const sid in day) {
+        const c = day[sid];
+        if (c.lock) continue;
+        const mine = (c.a || []).filter(code => autoSet.has(code) && !(c.auto || []).includes(code));
+        if (mine.length) c.auto = [...(c.auto || []), ...mine];
+      }
+    }
+  }
+
   function stageOptions() {
     stopped = false;
     const n = counts(state);
@@ -1314,6 +1330,12 @@ export function openAutofill(app) {
       fs.append(h('label', { class: 'af-opt', for: id }, r, h('span', { class: 'af-opt-l' }, label), h('span', { class: 'af-opt-s' }, sub)));
     }
     wrap.append(fs);
+    if (n.manual) {
+      const cb = h('input', { type: 'checkbox', id: 'af-redo', checked: redo });
+      cb.addEventListener('change', () => { redo = cb.checked; });
+      wrap.append(h('label', { class: 'af-redo', for: 'af-redo' }, cb,
+        h('span', null, ` Also redo the ${autoDuties.map(d => d.code).join(' and ')} calls already in the sheet (${n.manual}). For trying Auto-fill on a month that is already filled; Apply can be undone.`)));
+    }
     if (!autoDuties.length) wrap.append(h('p', { class: 'warn-box' }, 'No duty is marked "auto-fill" yet. Mark codes under People › Duty codes.'));
     wrap.append(h('div', { class: 'af-actions' },
       h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => close() }, 'Cancel'),
@@ -1361,7 +1383,8 @@ export function openAutofill(app) {
   function run() {
     runCount++;
     const seed = runCount;
-    const snapshot = app.store.get();
+    const snapshot = redo ? JSON.parse(JSON.stringify(app.store.get())) : app.store.get();
+    if (redo) markAuto(snapshot);
     stageProgress();
     const opts = { from, to, seed, timeMs };
     let fellBack = false;
@@ -1453,7 +1476,7 @@ export function openAutofill(app) {
       h('button', {
         type: 'button', class: 'btn btn-primary', autofocus: true,
         onclick: () => {
-          app.store.commit(`Auto-fill ${M.fmtMonth(app.month)}`, draft => applyAssignments(draft, result, days));
+          app.store.commit(`Auto-fill ${M.fmtMonth(app.month)}`, draft => { if (redo) markAuto(draft); applyAssignments(draft, result, days); });
           close();
           app.toast(`Auto-fill applied: ${changedTxt.toLowerCase()}`, { action: { label: 'Undo', fn: () => app.store.undo() } });
         },
