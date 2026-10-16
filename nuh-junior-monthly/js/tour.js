@@ -63,8 +63,8 @@ export const TOUR_STEPS = [
     text: 'The staff list, junior and senior groups, and the duty codes with their colours. Add or import names here first.' },
   { id: 'backup', tab: 'more', target: ['backup', 'tab-more'], title: 'Backup and sharing',
     text: app => app.isDemo
-      ? 'Your own roster lives in its browser: download a backup now and then. Import and Export (Excel, calendar files, printing) are further up this screen. Team sharing is off in practice.'
-      : 'This roster lives in this browser: download a backup now and then. Import and Export (Excel, calendar files, printing) are further up this screen. Team sharing stays off until it is set up.',
+      ? 'Your own roster lives in its browser: download a backup now and then. Import and Export (Excel, calendar files, printing) are further up this screen. The cloud is off in practice.'
+      : 'This roster lives in this browser: download a backup now and then. Import and Export (Excel, calendar files, printing) are further up this screen. The cloud stays off until it is set up.',
     phone: { text: app => (app.isDemo ? 'Your own roster lives in its browser: download a backup now and then. ' : 'This roster lives in this browser: download a backup now and then. ')
       + 'Import and Export are further up this screen, and People (staff and duty codes) is at the top.' } },
   { id: 'end', count: false, target: 'help', title: 'That\'s the tour',

@@ -1,7 +1,7 @@
 // NUH Junior Monthly: help for a first-time user. Three parts, kept here so app.js stays small:
 // 1. "Getting started": a card at the top of Roster in your own roster (not practice) with six first steps that tick
 //    themselves off. Ticks come from the data where they can (staff, leave or requests, Auto-fill) and otherwise from
-//    state.settings.onboarding ({ codes, rules, shared, hidden, done }), which travels with backups and team sharing.
+//    state.settings.onboarding ({ codes, rules, shared, hidden, done }), which travels with backups and the cloud.
 // 2. The Help sheet (the "?" in the header): the tour, "Try it yourself", the checklist again, keyboard shortcuts.
 // 3. "Try it yourself" (practice only): three guided tasks in a small floating card, each ticked when the store shows
 //    it was done (leave added, a pairing rule added, Auto-fill applied), with "Show me" (tour.js showMe) and Stop.
@@ -149,9 +149,9 @@ function card(app, st, { welcome, collapsed, open }) {
 export function welcomeScreen(app) {
   const { h, icon } = app;
   const slot = h('div', { class: 'guide-slot' });
-  // a device with nothing on it yet: sign in and the team's roster comes down; or hide the steps and just import
+  // a device with nothing on it yet: sign in and the roster comes down from the cloud; or hide the steps and just import
   const signInBtn = cloud.enabled
-    ? h('button', { type: 'button', class: 'btn btn-primary', 'data-gs': 'join', onclick: async () => { signInBtn.disabled = true; try { await (await import('./ui-team.js')).joinAndLoad(app); } finally { signInBtn.disabled = false; } } }, "Sign in and pull the team's roster")
+    ? h('button', { type: 'button', class: 'btn btn-primary', 'data-gs': 'join', onclick: async () => { signInBtn.disabled = true; try { await (await import('./ui-team.js')).joinAndLoad(app); } finally { signInBtn.disabled = false; } } }, "Sign in and pull the cloud roster")
     : null;
   const toggle = h('button', { type: 'button', class: 'linkish welcome-toggle', 'data-gs': 'toggle-steps' }, loadUi().welcomeHidden ? 'Show the getting started steps' : 'Hide the getting started steps');
   toggle.addEventListener('click', () => {
@@ -160,7 +160,7 @@ export function welcomeScreen(app) {
     app.refreshGuide();
   });
   const team = h('div', { class: 'welcome-team' },
-    signInBtn ? h('p', null, 'Already using this with the team? Sign in and the roster comes down from the team.') : null,
+    signInBtn ? h('p', null, 'Already using this on another device? Sign in and the roster comes down from the cloud.') : null,
     h('div', { class: 'welcome-team-btns' }, signInBtn, h('button', { type: 'button', class: `btn ${signInBtn ? 'btn-ghost' : 'btn-primary'}`, onclick: () => app.go('more') }, 'Import from the Google Sheet')),
     toggle);
   const el = h('div', { class: 'welcome' },
@@ -169,7 +169,7 @@ export function welcomeScreen(app) {
         h('div', { class: 'empty-ic', html: icon('grid') }),
         h('h2', null, 'Welcome to NUH Junior Monthly'),
         h('p', null, 'Fill the cardiac (C3) and ICU (R1B) calls in the department\'s Google Sheet: bring the month in, plan postings by the week, check the rules, and let Auto-fill draft the calls.'),
-        h('p', { class: 'muted' }, 'Everything stays in this browser until team sharing is set up.')),
+        h('p', { class: 'muted' }, 'Everything stays in this browser until the cloud is set up.')),
       team,
       slot));
   return { el, slot };

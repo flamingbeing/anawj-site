@@ -6,6 +6,7 @@
 let M = null;      // model.js
 let R = null;      // rules.js (may be missing while it is being built)
 let G = null;      // guide.js: Getting started, Help, the tour (tour.js) and "Try it yourself"
+let CS = null;     // cloudstate.js: what the header's cloud button shows (null while the cloud is off)
 
 const TABS = {
   roster: { label: 'Roster', icon: 'grid', mod: './ui-roster.js' },
@@ -52,6 +53,7 @@ const ICON_PATHS = {
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.4a2.6 2.6 0 015 .9c0 1.8-2.5 2.3-2.5 4"/><path d="M12 17.3h.01"/>',
   tour: '<circle cx="12" cy="12" r="9"/><path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z"/>',
   task: '<path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6.2l1.3 1.3L7.3 5M3.5 12.2l1.3 1.3 2.5-2.5M3.5 18.2l1.3 1.3 2.5-2.5"/>',
+  cloud: '<path d="M7 18.5a4.5 4.5 0 01-.7-8.95A6 6 0 0117.9 10.3 4.1 4.1 0 0117.3 18.5z"/>',
   flag: '<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>',
 };
 function icon(name, cls = '') {
@@ -108,7 +110,7 @@ const app = {
   setMonth, go, toast, sheet, confirm: confirmBox, evaluation, isPhone,
   selectCell(date, staffId) { app.selectedCell = date && staffId ? { date, staffId } : null; },
   // first-time help (guide.js, tour.js)
-  onboard, refreshGuide: renderGuide, openAutofill, shortcuts: () => shortcutsSheet(), settled,
+  openCloud, refreshCloud: () => renderCloudBtn(), onboard, refreshGuide: renderGuide, openAutofill, shortcuts: () => shortcutsSheet(), settled,
   model: null,
   rules: null,
 };
@@ -318,6 +320,31 @@ function markTabs() {
 const headerSeen = new WeakMap();
 function setHTML(el, html) { if (headerSeen.get(el) !== html) { el.innerHTML = html; headerSeen.set(el, html); } }
 
+function renderCloudBtn() {
+  const b = $('#cloudbtn');
+  if (!b) return;
+  b.hidden = !CS;
+  if (!CS) return;
+  const st = CS.headerState();
+  b.dataset.state = st.kind;
+  setHTML(b, `${icon('cloud')}<span class="cl-long">${esc(st.label)}</span><span class="cl-short" aria-hidden="true">${esc(st.short)}</span>${st.kind === 'unsaved' || st.kind === 'newer' || st.kind === 'both' ? '<i class="cl-dot" aria-hidden="true"></i>' : ''}`);
+  b.title = st.title;
+  b.setAttribute('aria-label', `Cloud: ${st.label}. ${st.title}`);
+}
+
+// The cloud panel (sign in, Save to cloud, Pull from cloud, who saved last and when, Earlier saves, members)
+async function openCloud() {
+  if (!CS) return;
+  try {
+    const mod = await import('./ui-team.js');
+    const body = h('div');
+    let view = null;
+    const close = sheet({ title: 'Cloud', body, wide: true, actions: [{ label: 'Close', primary: true }], onClose: () => { if (view && view.unmount) view.unmount(); renderCloudBtn(); } });
+    view = mod.mountTeam(body, app, { onChange: renderCloudBtn });
+    void close;
+  } catch (e) { console.error(e); toast('The cloud panel did not load. Check your connection and reload the page.', { kind: 'error' }); }
+}
+
 function renderHeader() {
   const state = app.store.get();
   const dept = state.settings?.dept || '';
@@ -337,6 +364,7 @@ function renderHeader() {
   r.title = app.store.canRedo() ? `Redo ${app.store.redoLabel()} (Ctrl+Shift+Z)` : 'Nothing to redo';
   u.setAttribute('aria-label', app.store.canUndo() ? `Undo ${app.store.undoLabel()}` : 'Undo');
   r.setAttribute('aria-label', app.store.canRedo() ? `Redo ${app.store.redoLabel()}` : 'Redo');
+  renderCloudBtn();
   const hasStaff = !!(state.staff || []).length;
   const ev = hasStaff ? evaluation() : EMPTY_EVAL();
   const p = $('#problems');
@@ -491,7 +519,7 @@ function welcomeCard() {
       h('div', { class: 'empty-ic', html: icon('grid') }),
       h('h2', null, 'Welcome to NUH Junior Monthly'),
       h('p', null, 'Fill the cardiac (C3) and ICU (R1B) calls in the department\'s Google Sheet: bring the month in, plan postings by the week, check the rules, and let Auto-fill draft the calls.'),
-      h('p', { class: 'muted' }, 'Start by bringing in the department list. Everything stays in this browser until team sync is set up.'),
+      h('p', { class: 'muted' }, 'Start by bringing in the department list. Everything stays in this browser until the cloud is set up.'),
       // the next steps, in order; the default rules are already on, with numbers that are guesses
       h('ol', { class: 'welcome-steps' },
         h('li', null, 'Bring the month in: More › Import from the Google Sheet (people, postings, leave and requests come with it).'),
@@ -683,6 +711,11 @@ async function start() {
     fallback: () => (demo && typeof demoState === 'function' ? demoState(M.iso(new Date())) : M.defaultState()),
   });
   app.store.onSaveError = showSaveError;
+  // the cloud button in the header (not in Practice, and not until Firebase is set up)
+  try {
+    const cloudMod = await import('./cloud.js');
+    if (cloudMod.enabled && !demo) CS = await import('./cloudstate.js');
+  } catch (e) { console.warn('cloud.js not loaded; no cloud button', e); }
   app.store.onLocked = months => toast(`${M.fmtMonth(months[0])} is locked, so nothing was changed. Press Locked at the top to unlock it first.`, { kind: 'warn', ms: 7000 });
   if (app.store.damaged) showDamaged();
   if (demo) document.title = 'NUH Junior Monthly (practice)';
@@ -710,6 +743,7 @@ async function start() {
     toast(locked ? `${M.fmtMonth(m)} is unlocked.` : `${M.fmtMonth(m)} is locked: nothing in it can change until you unlock it.`, { kind: 'ok', ms: 4000 });
   });
   $('#autofill').addEventListener('click', openAutofill);
+  $('#cloudbtn').addEventListener('click', openCloud);
   document.addEventListener('keydown', onKeydown);
   window.addEventListener('hashchange', route);
 
@@ -731,6 +765,7 @@ async function start() {
       return;
     }
     evalCache = null;
+    if (CS && info && info.source !== 'external') CS.noteChange();
     clearErrorToasts();
     if (info && info.source === 'external') toast(info.label, { kind: /^Not saved/.test(info.label) ? 'error' : 'ok' });
     renderHeader();
@@ -743,6 +778,17 @@ async function start() {
 
   await route();
   document.body.classList.add('ready');
+  // has someone saved to the cloud since this browser last did? (quiet; only once the cloud has been used here)
+  if (CS && CS.read().synced) {
+    let lastCheck = 0;
+    const check = () => {
+      if (Date.now() - lastCheck < 60000) return;
+      lastCheck = Date.now();
+      import('./ui-team.js').then(m => m.checkCloud(app)).then(renderCloudBtn).catch(() => {});
+    };
+    setTimeout(check, 4000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+  }
   window.jmApp = app;   // handy in the console and for browser tests
 
   // Opened by APMES People (People › Import from the monthly roster): offer to send it the staff list (apmes.js)

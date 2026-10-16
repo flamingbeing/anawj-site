@@ -53,7 +53,7 @@ export function offerSend(app) {
   const body = h('div', { class: 'bx-form' },
     h('p', null, count
       ? `APMES People asked for this app's staff list: ${count} ${count === 1 ? 'person' : 'people'}, grades as in ${M.fmtMonth(month)}.`
-      : 'APMES People asked for the staff list, but there is nobody on People › Staff in this browser yet. Sign in under More › Team sharing to load the team’s roster, or ask the rosterer to copy the list (More › Export) and send it to you.'),
+      : 'APMES People asked for the staff list, but there is nobody on People › Staff in this browser yet. Sign in under More › Cloud to pull the roster, or ask the rosterer to copy the list (More › Export) and send it to you.'),
     h('p', { class: 'bx-help' }, 'It gets names, grades and start and leave dates only: no roster, no notes. Nothing changes there until you tick and apply the changes.'),
     opener ? null : h('p', { class: 'bx-help' }, 'This tab can’t reach APMES People (it was opened another way): copy the list, then paste it there.'));
   // the link forgets the ask straight away, so a reload doesn't ask again (before the sheet adds its history entry)

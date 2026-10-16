@@ -140,3 +140,14 @@ when it is opened (`store.ensureLocked`); the first time this version starts on 
 once (`settings.lockedByDefault`, `store.lockAllOnce`). Reading a month in from Google or the sheet unlocks that one month
 (it is deliberate). Not in Practice. A month the team copy holds as unlocked stays unlocked when pulled. The stored
 status values are unchanged (`published` = locked), so no rules change.
+
+## The cloud (owner, 16 Oct 2026)
+
+"Team sharing" became **the cloud** (Save to cloud, Pull from cloud): there is one shared copy, not a group. A **cloud button in
+the header** (hidden in Practice and until Firebase is set up) says Saved 2:14 pm, Not saved, Cloud is newer or Cloud differs,
+with a dot when something needs doing; it opens the cloud panel (the same panel as More > Cloud: sign in, Save, Pull, Earlier
+saves, who saved last and when, when this browser last changed). `js/cloudstate.js` keeps the three times per device
+(browser changed, last synced, cloud last known); `ui-team.js` `checkCloud` asks the cloud quietly (4 s after start and when the
+tab comes back, once the cloud has been used here). Auto-fill shows only on the Roster tab; a locked month says so on the
+roster with an Unlock button. After a verified write to the Google Sheet a toast offers to open the cloud. No autosync: the
+status is the safeguard (owner, 16 Oct 2026).

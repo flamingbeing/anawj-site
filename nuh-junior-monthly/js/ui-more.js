@@ -236,6 +236,8 @@ export function mount(el, app) {
         if (w.verified) showNote('ok', `Wrote ${w.written} cell${w.written === 1 ? '' : 's'} at ${clock(new Date())} and read them back: all match what was written.`);
         else showNote('warn', `Wrote ${w.written} cells, but ${w.mismatches.length} did not read back as written: ${w.mismatches.slice(0, 5).map(m => m.cell).join(', ')}. Check the sheet (its version history can undo this).`);
         app.onboard && app.onboard('shared');
+        // the roster now matches the sheet: a good moment to keep it in the cloud too
+        if (w.verified && app.openCloud && !app.isDemo && cloud.enabled) app.toast('Written to the sheet. Save the roster to the cloud too?', { action: { label: 'Open cloud', fn: () => app.openCloud() }, ms: 10000 });
       } catch (e) { console.error(e); showNote('warn', `${cloud.friendly(e)} Some cells may not have been written: read the sheet again to see.`); } finally { busy(false); }
     };
     const box = h('div', { class: 'sheet-google' },
@@ -544,21 +546,21 @@ export function mount(el, app) {
     h('div', { class: 'more-row' }, btn('Load Singapore public holidays (2026 to 2027)', loadSg)),
     holList);
 
-  // ---------- Team ----------
+  // ---------- Cloud ----------
   let teamView = null;
   const teamSlot = h('div');
-  const teamSec = section('more-team', 'Team sharing', null, teamSlot);
+  const teamSec = section('more-team', 'Cloud', null, teamSlot);
   if (store.isDemo) {
-    teamSlot.append(h('p', { class: 'more-p' }, 'Team sharing is off in the practice department.'));
+    teamSlot.append(h('p', { class: 'more-p' }, 'The cloud is off in the practice department.'));
   } else {
     teamSlot.append(h('p', { class: 'more-p' }, 'Loading…'));
     import('./ui-team.js').then(mod => {
       teamSlot.innerHTML = '';
       if (typeof mod.mountTeam !== 'function') throw new Error('no mountTeam');
-      teamView = mod.mountTeam(teamSlot, app) || null;
+      teamView = mod.mountTeam(teamSlot, app, { onChange: app.refreshCloud }) || null;
     }).catch(() => {
       teamSlot.innerHTML = '';
-      teamSlot.append(h('p', { class: 'more-p' }, 'Team sharing is not set up yet. Until then this roster lives in this browser only: download a backup now and then.'));
+      teamSlot.append(h('p', { class: 'more-p' }, 'The cloud is not set up yet. Until then this roster lives in this browser only: download a backup now and then.'));
     });
   }
 

@@ -180,11 +180,12 @@ export function mount(el, app) {
 
   const paintBar = h('div', { class: 'r-paintbar', hidden: true, role: 'group', 'aria-label': 'Paint with code' });
   const banner = h('div', { class: 'r-banner', hidden: true });
+  const lockNote = h('div', { class: 'lock-note', role: 'note', hidden: true });
   const body = h('div', { class: 'r-body', 'data-tour': 'grid' });
   const scroll = h('div', { class: 'r-scroll', tabindex: '-1' });
   const styleEl = h('style');
   body.append(scroll);
-  root.append(styleEl, tb, paintBar, banner, body);
+  root.append(styleEl, tb, paintBar, lockNote, banner, body);
   const personHost = h('div', { class: 'person-host', hidden: true });
   root.append(personHost);
 
@@ -670,6 +671,14 @@ export function mount(el, app) {
   }
 
   function renderBanner(state, c) {
+    // a locked month says so here, with the way out (the Lock button in the header does the same)
+    const locked = M.isMonthLocked(state, app.month);
+    lockNote.hidden = !locked;
+    if (locked) {
+      const text = `${M.fmtMonth(app.month)} is locked: nothing in it can change, so it cannot be edited by accident.`;
+      if (!lockNote.firstChild) lockNote.append(h('span', null, text), h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => document.getElementById('lockm').click() }, 'Unlock to edit'));
+      else lockNote.firstChild.textContent = text;
+    }
     // Offer auto-fill in the roster itself when nothing in this month was auto-filled or entered yet.
     let any = false;
     for (const d of c.days) {

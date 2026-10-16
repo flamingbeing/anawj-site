@@ -33,7 +33,7 @@ const MAX_DOC = 900000; // Firestore's limit is 1 MiB a document; stop well befo
 
 let fb = null;
 async function sdk() {
-  if (!enabled) throw new Error('Team sharing is not switched on.');
+  if (!enabled) throw new Error('The cloud is not switched on.');
   if (fb) return fb;
   const [app, auth, fs] = await Promise.all([
     import(SDK + 'firebase-app.js'),
