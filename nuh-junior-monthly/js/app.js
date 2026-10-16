@@ -324,6 +324,11 @@ function renderHeader() {
   const longM = M.fmtMonth(app.month);   // 'October 2026'; phones show 'Oct 2026'
   setHTML($('#month'), `<span class="m-long">${esc(longM)}</span><span class="m-short" aria-hidden="true">${esc(longM.slice(0, 3) + ' ' + app.month.slice(0, 4))}</span>`);
   $('#today').title = 'Go to today (' + M.fmtDay(M.iso(new Date())) + ')';
+  const lk = $('#lockm'), isLocked = M.isMonthLocked(state, app.month);
+  lk.textContent = isLocked ? 'Locked' : 'Lock';
+  lk.setAttribute('aria-pressed', String(isLocked));
+  lk.title = isLocked ? `${longM} is locked: nothing in it can change. Press to unlock.` : `Lock ${longM} so nothing in it can be changed by accident`;
+  document.body.classList.toggle('month-locked', isLocked);
   const u = $('#undo'), r = $('#redo');
   u.disabled = !app.store.canUndo();
   r.disabled = !app.store.canRedo();
@@ -626,6 +631,7 @@ function doRedo() {
 }
 
 async function openAutofill() {
+  if (M.isMonthLocked(app.store.get(), app.month)) { toast(`${M.fmtMonth(app.month)} is locked. Unlock it (the Locked button at the top) to use Auto-fill.`, { kind: 'warn', ms: 7000 }); return; }
   try {
     const mod = await import('./ui-roster.js');
     mod.openAutofill(app);
@@ -674,6 +680,7 @@ async function start() {
     fallback: () => (demo && typeof demoState === 'function' ? demoState(M.iso(new Date())) : M.defaultState()),
   });
   app.store.onSaveError = showSaveError;
+  app.store.onLocked = months => toast(`${M.fmtMonth(months[0])} is locked, so nothing was changed. Press Locked at the top to unlock it first.`, { kind: 'warn', ms: 7000 });
   if (app.store.damaged) showDamaged();
   if (demo) document.title = 'NUH Junior Monthly (practice)';
 
@@ -691,6 +698,12 @@ async function start() {
   $('#prevm').addEventListener('click', () => setMonth(M.addMonths(app.month, -1)));
   $('#nextm').addEventListener('click', () => setMonth(M.addMonths(app.month, 1)));
   $('#today').addEventListener('click', goToday);
+  $('#lockm').addEventListener('click', async () => {
+    const st = app.store.get(), m = app.month, locked = M.isMonthLocked(st, m);
+    if (locked && !(await confirmBox(`Unlock ${M.fmtMonth(m)}? Anyone using it can change it again.`, { ok: 'Unlock' }))) return;
+    app.store.commit(`${locked ? 'Unlock' : 'Lock'} ${M.fmtMonth(m)}`, draft => { M.setMonthLocked(draft, m, !locked); });
+    toast(locked ? `${M.fmtMonth(m)} is unlocked.` : `${M.fmtMonth(m)} is locked: nothing in it can change until you unlock it.`, { kind: 'ok', ms: 4000 });
+  });
   $('#autofill').addEventListener('click', openAutofill);
   document.addEventListener('keydown', onKeydown);
   window.addEventListener('hashchange', route);

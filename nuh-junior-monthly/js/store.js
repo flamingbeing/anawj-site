@@ -81,14 +81,27 @@ export function createStore({ demo = false, fallback } = {}) {
     isDemo: !!demo,
     key,
     onSaveError: null,   // set by the app: shows a bar with "Download backup"
+    onLocked: null,      // set by the app: a change to a locked month was refused (shows why)
     onConflict: null,    // set by the app: another tab saved first, this change was not saved
 
     get() { return state; },
+
+    // Months that are locked now and whose days this change would alter (none is allowed to).
+    lockedHit(next) {
+      const hit = [];
+      for (const m of Object.keys(state.months || {})) {
+        if (!M.isMonthLocked(state, m)) continue;
+        if (M.monthDays(m).some(d => JSON.stringify((state.cells || {})[d] || null) !== JSON.stringify((next.cells || {})[d] || null))) hit.push(m);
+      }
+      return hit;
+    },
 
     commit(label, fn) {
       const draft = structuredClone(state);
       const out = fn(draft);
       if (out === false) return false;   // fn can cancel by returning false
+      const locked = store.lockedHit(draft);
+      if (locked.length) { if (typeof store.onLocked === 'function') store.onLocked(locked, label); return false; }
       undo.push({ label, state });
       if (undo.length > MAX_UNDO) undo.shift();
       redo = [];

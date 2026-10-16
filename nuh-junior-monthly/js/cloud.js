@@ -112,6 +112,20 @@ export async function signIn() {
   return (await A.signInWithPopup(auth, provider)).user;
 }
 
+// An access token for the Google Sheets API (the person's own, valid about an hour, kept in memory by gsheets.js only).
+// Asks Google in a pop-up for the Sheets scope; works for any Google account, whether or not it is on the team list.
+export async function getSheetsToken() {
+  const { auth, A } = await sdk();
+  const provider = new A.GoogleAuthProvider();
+  provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+  const u = auth.currentUser;
+  provider.setCustomParameters(u && u.email ? { login_hint: u.email } : { prompt: 'select_account' });
+  const res = await A.signInWithPopup(auth, provider);
+  const cred = A.GoogleAuthProvider.credentialFromResult(res);
+  if (!cred || !cred.accessToken) throw new Error('Google did not give access to Sheets.');
+  return cred.accessToken;
+}
+
 export async function signOut() {
   const { auth, A } = await sdk();
   await A.signOut(auth);

@@ -91,6 +91,21 @@ nothing.) Saved states get this once (`rulesVersion` 3). A call on the first day
 be on day 1. Import last month's tab first so postings that carry over are not mistaken for new ones (the import review says
 so when last month is missing). A night with nobody eligible at all is still left empty and flagged.
 
+**Google Sheet in and out, straight from the browser** (owner, 16 Oct 2026; `js/gsheets.js`, `ui-more.js`). More has "Read from
+Google" (paste the sheet link, sign in; scope `spreadsheets` through Firebase Auth's Google pop-up, access token kept in memory
+only) and, for a month read that way, "Check, then write" and "Undo that write in Google". Safety, because the sheet must stay
+exactly as it is plus the calls: it writes only the changed cells, as plain values (RAW), after (1) re-reading the whole imported
+block and checking every name and day cell is still exactly what was read (a moved row or an edit stops it and names the cells),
+(2) refusing any cell that holds a formula, (3) a confirmation listing every cell (was, will become), and (4) reading the cells
+back. The write is recorded (`sheets[month].lastWrite`) so "Undo" puts back what was there, but only in cells that still hold what
+was written. It acts as the signed-in person, so the sheet's sharing and protected ranges still apply. A month read from a paste or
+.xlsx has no Google source and keeps the copy-and-paste way. Needs the Sheets API on the Google Cloud project and the scope on the consent screen
+(In production, unverified-app notice, 100-user limit): see `OPERATIONS.md`. Untested against real Google in CI (a fake Sheets API in the unit and browser tests).
+
+**Lock a month** (owner, 16 Oct 2026): the Lock button at the top sets the month's status to `published`, which the team copy already
+stores (no rules change). While locked, `store.commit` refuses any change to that month's days (calls, Auto-fill, import, copy back)
+and says why; unlocking asks first. Undo/redo and Restore are not blocked.
+
 How to add a rule type: as in `ntf-roster/NOTES.md` ("How to add a new rule type"); the engine is the same file.
 
 ## Tests
