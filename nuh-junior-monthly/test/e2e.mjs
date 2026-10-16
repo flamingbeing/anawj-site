@@ -24,7 +24,7 @@ async function newPage(viewport, tag, extra = {}) {
   await ctx.addInitScript(() => { try { localStorage.setItem('nuhjm-tour', JSON.stringify({ v: 1, done: true })); } catch (e) { /* ignore */ } });
   const page = await ctx.newPage();
   page.on('pageerror', e => errors.push(`[${tag}] ${e.message}`));
-  page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource.*gstatic/.test(m.text())) errors.push(`[${tag}] console: ${m.text()}`); });
+  page.on('console', m => { if (m.type() === 'error' && !(/Failed to load resource/.test(m.text()) && /gstatic/.test(m.text() + m.location().url))) errors.push(`[${tag}] console: ${m.text()}`); });
   return page;
 }
 const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: `${SHOTS}/${String(++n).padStart(2, '0')}-${name}.png` }); };
@@ -93,6 +93,91 @@ const noSideScroll = async (page, label) => {
     await shot(page, 'p-' + t);
   }
   ok(await page.getByText('App version').count() >= 0, 'more ends with the version lines');
+  await page.close();
+}
+// ---------- the Google Sheet: read it, check it is unchanged, write only the changes (a fake Sheets API; no Google account) ----------
+{
+  const page = await newPage({ width: 1280, height: 900 }, 'google');
+  const MONTHDAYS = 31, WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dow = i => WD[(new Date(Date.UTC(2026, 11, i + 1)).getUTCDay())];
+  const row = (sn, g, name, f) => [String(sn), g, name, ...Array.from({ length: MONTHDAYS }, (_, i) => f(i)), 'Z'];
+  const sheet = [['legend'], ['legend 2'], ['', '', '', 'DEPARTMENT OF ANAESTHESIA STAFF ROSTER'], ['Dept', '', '', '1 to 31 December 26'],
+    ['', '', '', ...Array.from({ length: MONTHDAYS }, (_, i) => dow(i)), ''],
+    ['S/N', 'Grade', 'Name', ...Array.from({ length: MONTHDAYS }, (_, i) => String(i + 1)), '1-Jan'],
+    row(1, 'RES2', 'Icu Example', () => 'ICU'), row(2, 'NHG', 'Cardiac Example', () => 'C')];
+  const colIdx = L => [...L].reduce((x, ch) => x * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+  const writes = [];
+  const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,OPTIONS' };
+  await page.context().route('https://sheets.googleapis.com/**', route => {
+    const req = route.request(), u = decodeURIComponent(req.url());
+    const json = o => route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify(o) });
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+    if (!/^Bearer test-token$/.test(req.headers().authorization || '')) return route.fulfill({ status: 401, headers: CORS, body: '{}' });
+    if (/\/spreadsheets\/SHEETID[^/]*\?fields/.test(u)) return json({ properties: { title: 'Test roster' }, sheets: [{ properties: { sheetId: 7, title: 'Request', gridProperties: { rowCount: 50, columnCount: 40 } } }] });
+    if (/values\/'Request'!A1:/.test(u)) return json({ values: sheet.map(r => r.slice()) });
+    if (/values:batchGet/.test(u)) return json({ valueRanges: [...u.matchAll(/ranges='Request'!([A-Z]+)(\d+)/g)].map(m => ({ values: [[(sheet[+m[2] - 1] || [])[colIdx(m[1])] ?? '']] })) });
+    if (/values:batchUpdate/.test(u)) {
+      const body = JSON.parse(req.postData());
+      for (const d of body.data) { const m = d.range.match(/!([A-Z]+)(\d+)$/); sheet[+m[2] - 1][colIdx(m[1])] = d.values[0][0]; writes.push(m[1] + m[2]); }
+      return json({});
+    }
+    return route.fulfill({ status: 404, headers: CORS, body: '{"error":{"message":"no"}}' });
+  });
+  await page.goto(BASE + '#more');
+  await ready(page);
+  await page.evaluate(async () => { (await import('./js/gsheets.js')).hooks.getToken = async () => 'test-token'; });
+  await page.fill('#sheet-link', 'https://docs.google.com/spreadsheets/d/SHEETID_0123456789abcdefghij/edit?gid=7#gid=7');
+  await page.getByRole('button', { name: 'Read from Google' }).click();
+  await page.waitForSelector('text=Import Google: Request');
+  ok(await page.getByText('2 juniors').count() === 1, 'reading from Google finds the people');
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
+  await page.waitForTimeout(500);
+  await axe(page, 'more with the Google Sheet buttons');
+  // an Auto-fill-like change: a cardiac call on day 21
+  await page.evaluate(async () => {
+    const M = await import('./js/model.js');
+    const st = window.jmApp.store, id = st.get().staff.find(x => x.name === 'Cardiac Example').id, d = M.monthDays('2026-12')[20];
+    st.commit('call', draft => { M.setCell(draft, d, id, { a: [...M.getCell(draft, d, id).a, 'C3'] }); });
+  });
+  await page.waitForTimeout(300);
+  ok(await page.getByRole('button', { name: /Check, then write 2 cells/ }).count() === 1, 'two cells to write: the call and its post call');
+  await page.getByRole('button', { name: 'Only check the sheet is unchanged' }).click();
+  await page.waitForSelector('text=exactly as you read it');
+  ok(writes.length === 0, 'checking writes nothing');
+  sheet[6][3 + 4] = 'AL';   // somebody edits the sheet meanwhile
+  await page.getByRole('button', { name: /Check, then write/ }).click();
+  await page.waitForSelector('text=has changed since you read it');
+  ok(writes.length === 0 && await page.getByText('H7').count() >= 1, 'a change in the sheet stops the write and names the cell');
+  sheet[6][3 + 4] = 'ICU';
+  await page.getByRole('button', { name: /Check, then write/ }).click();
+  await page.waitForSelector('text=Write 2 cells to Google?');
+  ok(await page.locator('.ask-list td', { hasText: 'X8' }).count() === 1 && await page.locator('.ask-list td', { hasText: 'Y8' }).count() === 1 && await page.locator('.ask-list td', { hasText: 'Cardiac Example' }).count() === 2, 'the confirmation lists every cell that will change');
+  ok(writes.length === 0, 'nothing is written before the confirmation');
+  await axe(page, 'the confirmation of what will be written');
+  await page.getByRole('button', { name: /^Write 2 cells$/ }).click();
+  await page.waitForSelector('text=read them back: all match');
+  ok(writes.join(',') === 'X8,Y8' && sheet[7][3 + 20] === 'C3' && sheet[7][3 + 21] === 'PC', `only the two changed cells were written (${writes.join(',')})`);
+  ok(await page.getByText('Nothing to write').count() === 1, 'after writing there is nothing left to write');
+  // undo the write in Google
+  await page.getByRole('button', { name: 'Undo that write in Google' }).click();
+  await page.waitForSelector('text=Undo the last write (2 cells)?');
+  await page.getByRole('button', { name: 'Put them back' }).click();
+  await page.waitForSelector('text=Put back 2 cells and read them back: all match');
+  ok(sheet[7][3 + 20] === 'C' && sheet[7][3 + 21] === 'C' && writes.length === 4, 'undo put the two cells back as they were');
+  ok(await page.getByRole('button', { name: /Check, then write 2 cells/ }).count() === 1, 'and the changes can be written again');
+  // lock the month
+  await page.locator('#lockm').click();
+  ok(await page.locator('#lockm').getAttribute('aria-pressed') === 'true', 'the month is locked');
+  const refused = await page.evaluate(async () => {
+    const M = await import('./js/model.js');
+    const st = window.jmApp.store, id = st.get().staff[0].id;
+    return st.commit('edit', draft => { M.setCell(draft, M.monthDays('2026-12')[3], id, { a: ['AL'] }); });
+  });
+  ok(refused === false && await page.getByText('is locked, so nothing was changed').count() >= 1, 'a locked month refuses a change and says why');
+  await page.locator('#lockm').click();
+  await page.getByRole('button', { name: 'Unlock', exact: true }).click();
+  await page.waitForTimeout(300);
+  ok(await page.locator('#lockm').getAttribute('aria-pressed') === 'false', 'unlocked again');
   await page.close();
 }
 await b.close();

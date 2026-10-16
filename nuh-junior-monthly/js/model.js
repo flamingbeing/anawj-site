@@ -321,6 +321,14 @@ export function addDays(s, n) {
   const [y, m, d] = String(s).split('-').map(Number);
   return iso(new Date(y, m - 1, d + n));
 }
+// A month is locked (finished) when its status is 'published': the team copy already stores that status, so locking is
+// shared with the team and needs no change to the rules. While locked, no change to that month's days goes through
+// (store.js), whoever tries it: calls, Auto-fill, import, copy back to the Google Sheet.
+export const isMonthLocked = (state, m) => !!(state && state.months && state.months[m] && state.months[m].status === 'published');
+export function setMonthLocked(draft, m, locked) {
+  if (!draft.months || typeof draft.months !== 'object') draft.months = {};
+  draft.months[m] = { ...(draft.months[m] || {}), status: locked ? 'published' : 'draft', publishedAt: locked ? new Date().toISOString() : '' };
+}
 export function monthDays(m) {
   const [y, mo] = String(m).split('-').map(Number);
   const last = new Date(y, mo, 0).getDate();

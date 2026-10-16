@@ -405,6 +405,10 @@ button.bx-tag:hover { border-color: currentColor; }
 .more-steps { margin: 8px 0 8px 20px; }
 .more-steps li { margin: 4px 0; }
 .more-changes { margin-top: 8px; }
+.ask-scroll { max-height: 46vh; overflow: auto; border: .5px solid var(--a-sep); border-radius: 8px; margin: 8px 0; }
+.ask-list .more-tbl { margin-top: 0; width: 100%; }
+.ask-list tr.is-left td { color: var(--muted); }
+.sheet-undo { margin-top: 12px; padding-top: 10px; border-top: .5px solid var(--a-sep); }
 .more-tbl { border-collapse: collapse; font-size: 13px; margin-top: 6px; }
 .more-tbl th, .more-tbl td { border-bottom: .5px solid var(--a-sep); padding: 3px 8px; text-align: left; }
 .more-list { margin: 8px 0 8px 20px; }

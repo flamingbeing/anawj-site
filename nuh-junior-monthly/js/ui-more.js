@@ -5,6 +5,8 @@
 import * as M from './model.js';
 import * as io from './io.js';
 import * as S from './sheet.js';
+import * as G from './gsheets.js';
+import * as cloud from './cloud.js';
 import { SG_HOLIDAYS } from './demo.js';
 
 const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'person';
@@ -40,12 +42,35 @@ export function mount(el, app) {
   // ---------- The department's Google Sheet: in, then the filled cells back ----------
   const pasteBox = h('textarea', { rows: '4', class: 'sheet-paste', 'aria-label': 'Paste the month\'s Request tab here',
     placeholder: 'In the Google Sheet: open the month\'s Request tab, click the box above row 1 and left of column A (selects everything), copy (Ctrl+C or Cmd+C), then paste here.' });
+  // Read straight from Google (the person's own sign-in; nothing is written until "Put the roster back"). Off in practice mode.
+  const LINK_KEY = 'nuhjm-sheet-link';
+  const lastLink = () => { try { return localStorage.getItem(LINK_KEY) || ''; } catch (e) { return ''; } };
+  const linkIn = h('input', { type: 'url', class: 'sheet-link', id: 'sheet-link', 'aria-label': 'Google Sheet link', placeholder: 'Paste the Google Sheet link', value: lastLink() });
+  const googleRead = cloud.enabled ? [
+    h('p', { class: 'more-p' }, 'Easiest: paste the link of the Google Sheet (open on the month\'s tab) and sign in with Google. It reads the sheet as you; it changes nothing.'),
+    h('div', { class: 'more-row' }, linkIn, btn('Read from Google', onGoogleRead, 'btn btn-primary')),
+    h('p', { class: 'more-p muted' }, 'Or copy and paste it yourself:'),
+  ] : [];
   const importSec = section('more-import', 'Import from the Google Sheet',
     'The month\'s grid tab ("1 - 30 Nov 26 Request"). People, postings, leave, requests and calls already typed come in; you see what was found before anything changes. Seniors\' rows are left alone.',
+    ...googleRead,
     pasteBox,
     h('div', { class: 'more-row' },
       btn('Read the paste', () => readSheetRows(S.rowsFromTSV(pasteBox.value), 'the paste'), 'btn btn-primary'),
       fileButton('Or a downloaded .xlsx', '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', onSheetFile)));
+
+  async function onGoogleRead() {
+    const p = G.parseSheetUrl(linkIn.value);
+    if (!p) { app.toast('That does not look like a Google Sheet link. Copy it from the address bar of the open sheet.', { kind: 'warn', ms: 6000 }); return; }
+    try { localStorage.setItem(LINK_KEY, linkIn.value.trim()); } catch (e) { /* ignore */ }
+    try {
+      const info = await G.getTabs(p.id);
+      const tab = G.chooseTab(info.tabs, p.gid);
+      if (!tab) throw new Error('That sheet has no tabs.');
+      const rows = await G.readGrid(p.id, tab);
+      readSheetRows(rows, `Google: ${tab.title}`, tab.title, { id: p.id, gid: tab.gid, title: tab.title });
+    } catch (e) { console.error(e); app.toast(cloud.friendly(e), { kind: 'error', ms: 9000 }); }
+  }
 
   async function onSheetFile(file) {
     try {
@@ -72,7 +97,7 @@ export function mount(el, app) {
     return !ids.some(id => (M.getCell(st, before, id)?.a || []).length);
   }
 
-  function readSheetRows(rows, from, tab = 'Request') {
+  function readSheetRows(rows, from, tab = 'Request', source = null) {
     const grid = S.parseGrid(rows);
     if (!grid) { app.toast('No roster grid found: it needs the header row with S/N, Grade, Name and the days 1, 2, 3…', { kind: 'error', ms: 9000 }); return; }
     const sel = h('select', { 'aria-label': 'Month' }, monthOptions(grid.month && S.monthFits(grid, grid.month) ? grid.month : app.month));
@@ -103,7 +128,7 @@ export function mount(el, app) {
         label: 'Import', primary: true, fn: () => {
           const { plan, month } = paint();
           let res;
-          store.commit(`Imported ${M.fmtMonth(month)} from the sheet`, draft => { res = S.applyImport(draft, plan, grid, { tab }); });
+          store.commit(`Imported ${M.fmtMonth(month)} from the sheet`, draft => { res = S.applyImport(draft, plan, grid, { tab, source }); });
           app.setMonth(month);
           app.toast(`${M.fmtMonth(month)} imported: ${res.added} new people, ${res.cells} cells`, { action: { label: 'Undo', fn: () => store.undo() }, ms: 8000 });
         },
@@ -134,6 +159,116 @@ export function mount(el, app) {
         h('table', { class: 'more-tbl' }, h('thead', null, h('tr', null, ['Cell', 'Name', 'Day', 'Was', 'Now'].map(t => h('th', { scope: 'col' }, t)))),
           h('tbody', null, ex.changes.slice(0, 400).map(c => h('tr', null, h('td', null, c.cell), h('td', null, c.name), h('td', null, M.fmtDay(c.date)), h('td', null, c.from || '·'), h('td', null, h('strong', null, c.to || '·'))))))) : null,
       h('p', { class: 'more-p' }, 'Import again just before pasting if others have been editing the sheet: the paste replaces those day cells.'));
+    const lay = state.sheets[app.month];
+    if (cloud.enabled && lay && lay.source) backBox.prepend(googleWriteBox(ex, lay));
+    if (M.isMonthLocked(state, app.month)) backBox.prepend(h('p', { class: 'warn-box', role: 'note' }, `${M.fmtMonth(app.month)} is locked: nothing in it can change, and nothing is written to the sheet. Unlock it first (the Locked button at the top).`));
+  }
+
+  // Write straight to the Google Sheet: first read the whole block again and check it is exactly what was read; only then write
+  // the changed cells (plain values) and read them back. Anything unexpected: nothing is written and the cells are listed.
+  let gNote = null;   // the last result shown under the buttons (kept when this section redraws)
+  const noteBox = h('div', { class: 'sheet-note', 'aria-live': 'polite' });
+  function showNote(kind, text, diffs) {
+    gNote = { kind, text, diffs };
+    paintNote();
+  }
+  function paintNote() {
+    noteBox.innerHTML = '';
+    if (!gNote) return;
+    noteBox.append(h('p', { class: gNote.kind === 'ok' ? 'ok-box' : 'warn-box', role: 'note' }, gNote.text));
+    if (gNote.diffs && gNote.diffs.length) noteBox.append(h('table', { class: 'more-tbl' },
+      h('thead', null, h('tr', null, ['Cell', 'Name', 'When read', 'Now in the sheet'].map(t => h('th', { scope: 'col' }, t)))),
+      h('tbody', null, gNote.diffs.slice(0, 40).map(d => h('tr', null, h('td', null, d.cell), h('td', null, d.name), h('td', null, d.then || '·'), h('td', null, h('strong', null, d.now || '·')))))),
+      gNote.diffs.length > 40 ? h('p', { class: 'muted' }, `and ${gNote.diffs.length - 40} more`) : null);
+  }
+  const clock = d => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  function googleWriteBox(ex, lay) {
+    const state = store.get(), locked = M.isMonthLocked(state, app.month), n = ex.changes.length;
+    const nDays = M.monthDays(app.month).length;
+    const busy = on => box.querySelectorAll('button').forEach(b => { b.disabled = on || (b.dataset.needs === 'changes' && (!n || locked)); });
+    const check = async () => {
+      busy(true);
+      try {
+        const r = await G.checkUnchanged(lay.source, lay, nDays);
+        if (r.ok) showNote('ok', `Checked just now (${clock(r.at)}): the Google Sheet is exactly as you read it. ${r.rows} rows and ${r.cells} cells compared, nothing has changed.`);
+        else showNote('warn', `The Google Sheet has changed since you read it (${r.diffs.length} cell${r.diffs.length === 1 ? '' : 's'}). Nothing was written. Read it again from Google, then redo your changes.`, r.diffs);
+        return r;
+      } catch (e) { console.error(e); showNote('warn', cloud.friendly(e)); return null; } finally { busy(false); }
+    };
+    const write = async () => {
+      if (locked) { app.toast(`${M.fmtMonth(app.month)} is locked. Unlock it first.`, { kind: 'warn' }); return; }
+      const r = await check();
+      if (!r || !r.ok) return;
+      const okd = await askList({
+        title: `Write ${n} cell${n === 1 ? '' : 's'} to Google?`,
+        intro: `Checked just now (${clock(r.at)}): the Google Sheet is exactly as you read it. These ${n} cell${n === 1 ? '' : 's'} in "${lay.source.title}" will be changed, and nothing else in the sheet is touched. Plain values only: no formulas, colours or other tabs.`,
+        rows: ex.changes.map(c => ({ cell: c.cell, name: c.name, day: M.fmtDay(c.date), was: c.from, now: c.to })),
+        cols: ['Cell', 'Name', 'Day', 'Now in the sheet', 'Will become'], ok: `Write ${n} cell${n === 1 ? '' : 's'}`, file: `nuhjm-${io.fileStamp(app.month)}-to-write.csv`,
+      });
+      if (!okd) return;
+      busy(true);
+      try {
+        const w = await G.writeChanges(lay.source, lay, ex.changes);
+        store.commit(`Wrote ${n} cells to the Google Sheet`, draft => { S.markWritten(draft, app.month, ex.changes); });
+        if (w.verified) showNote('ok', `Wrote ${w.written} cell${w.written === 1 ? '' : 's'} at ${clock(new Date())} and read them back: all match what was written.`);
+        else showNote('warn', `Wrote ${w.written} cells, but ${w.mismatches.length} did not read back as written: ${w.mismatches.slice(0, 5).map(m => m.cell).join(', ')}. Check the sheet (its version history can undo this).`);
+        app.onboard && app.onboard('shared');
+      } catch (e) { console.error(e); showNote('warn', `${cloud.friendly(e)} Some cells may not have been written: read the sheet again to see.`); } finally { busy(false); }
+    };
+    const box = h('div', { class: 'sheet-google' },
+      h('p', null, 'Or write straight to the Google Sheet. It first reads the sheet again and checks that nothing changed since you read it; then it writes only the changed cells, as plain values, and reads them back.'),
+      h('div', { class: 'more-row' },
+        h('button', { type: 'button', class: 'btn btn-primary', 'data-needs': 'changes', disabled: !n || locked, onclick: write }, n ? `Check, then write ${n} cell${n === 1 ? '' : 's'} to Google` : 'Nothing to write'),
+        h('button', { type: 'button', class: 'btn btn-ghost', onclick: check }, 'Only check the sheet is unchanged')),
+      lay.lastWrite ? h('div', { class: 'sheet-undo' },
+        h('p', null, `Last write to Google: ${lay.lastWrite.changes.length} cell${lay.lastWrite.changes.length === 1 ? '' : 's'} on ${new Date(lay.lastWrite.at).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}. You can put them back as they were: cells somebody has changed since are left alone.`),
+        h('div', { class: 'more-row' },
+          h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => undo() }, 'Undo that write in Google'),
+          btn('Download that list (.csv)', () => downloadList(lay.lastWrite.changes.map(c => [c.cell, c.name, M.fmtDay(c.date), c.from, c.to]), ['Cell', 'Name', 'Day', 'Was', 'Written'], `nuhjm-${io.fileStamp(app.month)}-last-write.csv`)))) : null,
+      noteBox);
+    const undo = async () => {
+      busy(true);
+      try {
+        const w = lay.lastWrite;
+        const peek = await G.checkCells(lay.source, lay, w.changes);   // what each cell holds now
+        const okd = await askList({
+          title: `Undo the last write (${w.changes.length} cell${w.changes.length === 1 ? '' : 's'})?`,
+          intro: `Cells that still hold what was written go back to what was there before. ${peek.skipped.length ? `${peek.skipped.length} cell${peek.skipped.length === 1 ? ' has' : 's have'} been changed by someone since and will be left alone.` : 'None has been changed since.'}`,
+          rows: w.changes.map(c => ({ cell: c.cell, name: c.name, day: M.fmtDay(c.date), was: peek.now.get(c.cell) ?? '', now: c.from, left: peek.skipped.some(s => s.cell === c.cell) })),
+          cols: ['Cell', 'Name', 'Day', 'Now in the sheet', 'Will go back to'], ok: 'Put them back',
+        });
+        if (!okd) return;
+        const res = await G.undoChanges(lay.source, lay, w.changes);
+        store.commit('Undid the write to the Google Sheet', draft => { S.markUndone(draft, app.month, res.restored, res.skipped); });
+        showNote(res.verified && !res.skipped.length ? 'ok' : 'warn',
+          `Put back ${res.restored.length} cell${res.restored.length === 1 ? '' : 's'} and read them back${res.verified ? ': all match.' : ', but some did not read back as expected: check the sheet.'}${res.skipped.length ? ` ${res.skipped.length} left alone because someone changed them since.` : ''}`, res.skipped.map(s => ({ cell: s.cell, name: '', then: s.expected, now: s.got })));
+      } catch (e) { console.error(e); showNote('warn', cloud.friendly(e)); } finally { busy(false); }
+    };
+    paintNote();
+    return box;
+  }
+
+  // CSV of a list of rows (for keeping a record of what was written)
+  function downloadList(rows, cols, name) {
+    const q = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+    io.download(new Blob([[cols, ...rows].map(r => r.map(q).join(',')).join('\r\n')], { type: 'text/csv' }), name);
+  }
+  // A dialog listing every cell that will change; resolves true on the main button, false on Cancel or close.
+  function askList({ title, intro, rows, cols, ok, file }) {
+    return new Promise(resolve => {
+      let answered = false;
+      const body = h('div', { class: 'ask-list' },
+        h('p', null, intro),
+        h('div', { class: 'ask-scroll' }, h('table', { class: 'more-tbl' },
+          h('thead', null, h('tr', null, cols.map(t => h('th', { scope: 'col' }, t)))),
+          h('tbody', null, rows.map(r => h('tr', { class: r.left ? 'is-left' : null }, h('td', null, r.cell), h('td', null, r.name), h('td', null, r.day), h('td', null, r.was || '·'), h('td', null, h('strong', null, r.left ? 'left alone' : (r.now || '·')))))))),
+        file ? h('div', { class: 'more-row' }, btn('Download this list (.csv)', () => downloadList(rows.map(r => [r.cell, r.name, r.day, r.was, r.now]), cols, file))) : null);
+      app.sheet({ title, body, wide: true, actions: [
+        { label: 'Cancel', fn: () => { answered = true; resolve(false); } },
+        { label: ok, primary: true, fn: () => { answered = true; resolve(true); } },
+      ], onClose: () => { if (!answered) resolve(false); } });
+    });
   }
   renderBack();
 
