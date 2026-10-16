@@ -569,7 +569,7 @@ export function mount(el, app) {
   const walk = iconBtn('Show the walkthrough', async () => (await guide()).takeTour(app), 'tour');
   walk.dataset.tourReturn = 'walkthrough';   // (focus comes back here when the tour ends)
   const helpSec = section('more-help', 'Help', 'A one-minute tour of the main controls, three short practice tasks, and the Getting started checklist.',
-    h('div', { class: 'more-row' }, walk,
+    h('div', { class: 'more-row' }, iconBtn('Help and shortcuts', async () => (await guide()).openHelp(app), 'help'), walk,
       store.isDemo ? iconBtn('Try it yourself', async () => (await guide()).startTasks(app), 'task')
         : h('a', { class: 'btn btn-ghost', href: './?demo&try', target: '_blank', rel: 'noopener', html: `${icon('task')}<span>Try it yourself</span><span class="sr-only"> (practice department, a new tab)</span>` }),
       store.isDemo ? null : iconBtn('Getting started checklist', async () => (await guide()).showChecklist(app), 'flag')));

@@ -52,8 +52,6 @@ export const TOUR_STEPS = [
       : 'Check lists the month\'s problems. Must-fix ones (hard rules that are broken) put a number on Check and a red corner on the cell; this month has none.' } },
   { id: 'autofill', tab: 'roster', target: 'autofill', title: 'Auto-fill',
     text: 'Drafts the calls and PM shifts around leave and requests, from your rules. You see a preview first, and Apply can be undone.' },
-  { id: 'rules', tab: 'rules', target: ['addrule', 'tab-rules'], title: 'Rules are yours to change',
-    text: 'Every rule is listed here, on or off. Add rule › Combination restriction covers what can\'t go together: Call and Clinic on one day, or two people never on call together.' },
   { id: 'check', tab: 'check', target: ['check', 'tab-check'], title: 'Check',
     text: 'How the month stands: problems by rule (Show finds the cell), who does how many (Fairness), and cover day by day.' },
   { id: 'day', tab: 'day', target: ['day', 'tab-day'], title: 'Day view',
@@ -61,16 +59,18 @@ export const TOUR_STEPS = [
     phone: { text: 'One day at a time: who is on what, who is away, requests and notes. Phones open here.' } },
   { id: 'people', tab: 'people', target: 'tab-people', only: 'laptop', title: 'People',
     text: 'The staff list, junior and senior groups, and the duty codes with their colours. Add or import names here first.' },
+  { id: 'rules', tab: 'rules', target: ['addrule', 'tab-rules'], title: 'Rules are yours to change',
+    text: 'Every rule is listed here, on or off. Add rule › Combination restriction covers what can\'t go together: Call and Clinic on one day, or two people never on call together.' },
   { id: 'backup', tab: 'more', target: ['backup', 'tab-more'], title: 'Backup and sharing',
     text: app => app.isDemo
       ? 'Your own roster lives in its browser: download a backup now and then. Import and Export (Excel, calendar files, printing) are further up this screen. The cloud is off in practice.'
       : 'This roster lives in this browser: download a backup now and then. Import and Export (Excel, calendar files, printing) are further up this screen. The cloud stays off until it is set up.',
     phone: { text: app => (app.isDemo ? 'Your own roster lives in its browser: download a backup now and then. ' : 'This roster lives in this browser: download a backup now and then. ')
       + 'Import and Export are further up this screen, and People (staff and duty codes) is at the top.' } },
-  { id: 'end', count: false, target: 'help', title: 'That\'s the tour',
+  { id: 'end', count: false, target: 'tab-more', title: 'That\'s the tour',
     text: app => app.isDemo
-      ? 'Try three short tasks next, or look around on your own. Help (?) has the tour again.'
-      : 'Help (?) has the tour again, three practice tasks and the keyboard shortcuts.' },
+      ? 'Try three short tasks next, or look around on your own. More › Help has the tour again.'
+      : 'More › Help has the tour again, three practice tasks and the keyboard shortcuts.' },
 ];
 
 // ---------- seen / skipped, per device ----------
@@ -444,7 +444,7 @@ export async function startTour(app, { steps = TOUR_STEPS, finish = null, onEnd 
       if (then && typeof then.fn === 'function') { then.fn(); return; }
       if (typeof onEnd === 'function') onEnd(reason);
       if (reason === 'replaced') return;
-      if (notNow && typeof app.toast === 'function') app.toast('The tour is in Help (?) whenever you want it.');
+      if (notNow && typeof app.toast === 'function') app.toast('The tour is under More › Help whenever you want it.');
       const t0 = performance.now();
       (function refocus() {
         // the person has moved on (opened a cell, say): leave their focus where it is

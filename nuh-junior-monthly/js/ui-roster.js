@@ -12,11 +12,11 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<'
 const key = (d, s) => d + '|' + s;
 
 function loadUi() {
-  const def = { group: '', tag: '', q: '', showReq: true, showCtx: true, hi: '', paint: false, paintCode: '', collapsed: [] };
+  const def = { group: '', tag: '', q: '', showReq: true, showCtx: true, hi: '', paint: false, paintCode: '', collapsed: [], post: '' };
   try { return { ...def, ...JSON.parse(localStorage.getItem(UI_KEY) || '{}'), q: '', paint: false }; } catch (e) { return def; }
 }
 function saveUi(ui) {
-  try { localStorage.setItem(UI_KEY, JSON.stringify({ group: ui.group, tag: ui.tag, showReq: ui.showReq, showCtx: ui.showCtx, hi: ui.hi, paintCode: ui.paintCode, collapsed: ui.collapsed })); } catch (e) { /* ignore */ }
+  try { localStorage.setItem(UI_KEY, JSON.stringify({ group: ui.group, tag: ui.tag, showReq: ui.showReq, showCtx: ui.showCtx, hi: ui.hi, paintCode: ui.paintCode, collapsed: ui.collapsed, post: ui.post })); } catch (e) { /* ignore */ }
 }
 
 // ---------- small shared helpers (also used by ui-day.js) ----------
@@ -123,6 +123,16 @@ function cellHas(state, d, sid, code) {
   return !!c && ((c.a || []).includes(code) || (c.r || []).includes(code));
 }
 
+// The posting codes a "show only people on this posting" choice stands for: '@C3' is the postings the cardiac fairness rule
+// counts people on (Cardiac, Cardiac early, Cardiac pending…), anything else is that one posting code.
+export function postingSet(state, token) {
+  if (!token) return null;
+  if (token[0] !== '@') return new Set([token]);
+  const code = token.slice(1);
+  const rule = (state.rules || []).find(r => r.type === 'spread' && (r.params.codes || []).includes(code) && (r.params.among || []).length);
+  return new Set(rule ? rule.params.among : []);
+}
+
 // What painting with `code` does to this cell: 'del' removes the code (or unlocks, or clears), 'add' adds it (or locks)
 function paintMode(state, d, sid, code) {
   if (code === '__clear') return 'del';
@@ -152,6 +162,7 @@ export function mount(el, app) {
   const searchWrap = h('label', { class: 'r-searchwrap' }, h('span', { class: 'r-search-ic', html: icon('search') }), search);
   const groupSel = h('select', { class: 'input r-sel', 'aria-label': 'Show group' });
   const tagSel = h('select', { class: 'input r-sel', 'aria-label': 'Show tag' });
+  const postSel = h('select', { class: 'input r-sel', 'aria-label': 'Show people on a posting' });
   const hiSel = h('select', { class: 'input r-sel', 'aria-label': 'Highlight a code' });
   // (data-tour: what the first-time tour lights, tour.js)
   const reqBtn = h('button', { type: 'button', class: 'tbtn', 'aria-pressed': String(ui.showReq), title: 'Show or hide requests (Cr, Nc, Wr…)', 'data-tour': 'layers' });
@@ -164,7 +175,11 @@ export function mount(el, app) {
   const keyBtn = h('button', { type: 'button', class: 'tbtn', title: 'What the marks in the grid mean', onclick: showKey, 'data-tour': 'layers' }, 'Key');
   // people on the staff list that this month's imported sheet leaves out: hidden (and left out of Auto-fill) until shown
   const absentBtn = h('button', { type: 'button', class: 'tbtn', hidden: true });
-  tb.append(paintBtn, searchWrap, groupSel, tagSel, hiSel, reqBtn, ctxBtn, absentBtn, keyBtn);
+  // sideways scrolling for a mouse (a touch screen swipes): week buttons, the wheel over the dates, dragging the dates
+  const panBtn = (dir) => h('button', { type: 'button', class: 'tbtn tbtn-pan', title: dir < 0 ? 'Scroll back a week' : 'Scroll forward a week', 'aria-label': dir < 0 ? 'Scroll back a week' : 'Scroll forward a week',
+    html: icon(dir < 0 ? 'left' : 'right'), onclick: () => { const w = scroll.querySelector('th.dh')?.offsetWidth || 32; scroll.scrollBy({ left: dir * 7 * w, behavior: 'smooth' }); } });
+    const clearBtn = h('button', { type: 'button', class: 'tbtn tbtn-clear', hidden: true, title: 'Show everyone again: clears the search, group, tag and posting' }, 'Clear filters');
+  tb.append(paintBtn, searchWrap, groupSel, tagSel, postSel, clearBtn, hiSel, reqBtn, ctxBtn, absentBtn, panBtn(-1), panBtn(1), keyBtn);
   function showKey() {
     const row = (mark, text) => h('li', { class: 'gk-row' }, h('span', { class: 'gk-mark', html: mark }), h('span', null, text));
     app.sheet({
@@ -192,6 +207,19 @@ export function mount(el, app) {
   const lockNote = h('div', { class: 'lock-note', role: 'note', hidden: true });
   const body = h('div', { class: 'r-body', 'data-tour': 'grid' });
   const scroll = h('div', { class: 'r-scroll', tabindex: '-1' });
+  scroll.addEventListener('wheel', e => {   // the wheel over the dates (or Shift anywhere) moves sideways
+    if (e.ctrlKey || !e.target.closest || !e.target.closest('thead')) return;
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? 0 : e.deltaY;
+    if (d) { scroll.scrollLeft += d; e.preventDefault(); }
+  }, { passive: false });
+  scroll.addEventListener('pointerdown', e => {   // drag the dates with a mouse to pan the grid
+    if (e.pointerType !== 'mouse' || e.button !== 0 || !e.target.closest('thead') || e.target.closest('button, a')) return;
+    const x0 = e.clientX, s0 = scroll.scrollLeft;
+    scroll.classList.add('panning');
+    const move = ev => { scroll.scrollLeft = s0 - (ev.clientX - x0); };
+    const up = () => { scroll.classList.remove('panning'); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  });
   const styleEl = h('style');
   body.append(scroll);
   root.append(styleEl, tb, paintBar, lockNote, banner, body);
@@ -207,12 +235,18 @@ export function mount(el, app) {
     const tags = state.tags || [];
     if (ui.group && !opts.some(([v]) => v === ui.group)) { ui.group = ''; saveUi(ui); }
     if (ui.tag && !tags.some(t => t.id === ui.tag)) { ui.tag = ''; saveUi(ui); }
-    const k = JSON.stringify([opts, tags.map(t => [t.id, t.name]), (state.duties || []).map(d => [d.code, d.name, d.kind]), ui.group, ui.tag, ui.hi]);
+    // postings: the cardiac and ICU groups the fairness rules count, then each posting on its own
+    const autoPost = (state.duties || []).filter(d => d.auto && postingSet(state, '@' + d.code).size).map(d => [`@${d.code}`, `${d.code} postings (${[...postingSet(state, '@' + d.code)].join(', ')})`]);
+    const posts = [['', 'All postings'], ...autoPost, ...(state.duties || []).filter(d => d.kind === 'posting').map(d => [d.code, `${d.code} · ${d.name}`])];
+    if (ui.post && !posts.some(([v]) => v === ui.post)) { ui.post = ''; saveUi(ui); }
+    const k = JSON.stringify([opts, posts, tags.map(t => [t.id, t.name]), (state.duties || []).map(d => [d.code, d.name, d.kind]), ui.group, ui.tag, ui.post, ui.hi]);
     if (k === selectsKey) return;
     selectsKey = k;
     groupSel.innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}"${v === ui.group ? ' selected' : ''}>${esc(l)}</option>`).join('');
     tagSel.innerHTML = [['', 'All tags'], ...tags.map(t => [t.id, t.name])].map(([v, l]) => `<option value="${esc(v)}"${v === ui.tag ? ' selected' : ''}>${esc(l)}</option>`).join('');
     tagSel.hidden = !tags.length;
+    postSel.innerHTML = posts.map(([v, l]) => `<option value="${esc(v)}"${v === ui.post ? ' selected' : ''}>${esc(l)}</option>`).join('');
+    postSel.hidden = posts.length < 2;
     const duties = (state.duties || []).filter(d => d.kind !== 'derived');
     hiSel.innerHTML = `<option value="">Highlight: none</option>` + KIND_ORDER.map(([k, label]) => {
       const list = duties.filter(d => d.kind === k);
@@ -265,6 +299,13 @@ export function mount(el, app) {
   search.addEventListener('input', () => { ui.q = search.value; renderGrid(); });
   groupSel.addEventListener('change', () => { ui.group = groupSel.value; saveUi(ui); renderGrid(); });
   tagSel.addEventListener('change', () => { ui.tag = tagSel.value; saveUi(ui); renderGrid(); });
+  const filtersOn = () => !!(ui.group || ui.tag || ui.post || ui.q.trim());
+  clearBtn.addEventListener('click', () => {
+    ui.group = ''; ui.tag = ''; ui.post = ''; ui.q = ''; search.value = '';
+    saveUi(ui); selectsKey = ''; fillSelects(app.store.get()); prevRender = null; renderGrid();
+    search.focus({ preventScroll: true });
+  });
+  postSel.addEventListener('change', () => { ui.post = postSel.value; saveUi(ui); prevRender = null; renderGrid(); });
   hiSel.addEventListener('change', () => { ui.hi = hiSel.value; saveUi(ui); applyHighlight(); });
   reqBtn.addEventListener('click', () => {
     ui.showReq = !ui.showReq; saveUi(ui); reqBtn.setAttribute('aria-pressed', String(ui.showReq));
@@ -276,6 +317,8 @@ export function mount(el, app) {
     app.store.commit(hidden ? 'Show people not in the sheet' : 'Hide people not in the sheet', d => { d.settings.hideNotInSheet = !hidden; });
   });
   scroll.addEventListener('click', e => {
+    const pb = e.target.closest('.sh-btn');
+    if (pb) { ui.post = ui.post === pb.dataset.post ? '' : pb.dataset.post; saveUi(ui); selectsKey = ''; fillSelects(app.store.get()); prevRender = null; renderGrid(); return; }
     const t = e.target.closest('.grp-toggle');
     if (!t) return;
     const gid = t.dataset.g, i = ui.collapsed.indexOf(gid);
@@ -360,6 +403,8 @@ export function mount(el, app) {
       list = list.filter(p => gmap.get(p.group)?.kind === kind);
     } else if (ui.group) list = list.filter(p => p.group === ui.group);
     if (ui.tag) list = list.filter(p => (p.tags || []).includes(ui.tag));
+    const onPost = postingSet(state, ui.post);
+    if (onPost) { const days = M.monthDays(app.month); list = list.filter(p => days.some(d => ((state.cells?.[d]?.[p.id]?.a) || []).some(c => onPost.has(c)))); }
     const q = ui.q.trim().toLowerCase();
     if (q) list = list.filter(p => (p.name || '').toLowerCase().includes(q) || (p.short || '').toLowerCase().includes(q));
     return list;
@@ -495,6 +540,7 @@ export function mount(el, app) {
     const c = ctx;
     dutyStyles(state);
     const staff = filteredStaff(state);
+    clearBtn.hidden = !filtersOn();
     const all = M.staffInMonth(state, app.month);
     {
       const away = M.notInSheet(state, app.month, true).size, on = state.settings.hideNotInSheet !== false;
@@ -543,7 +589,13 @@ export function mount(el, app) {
       html += `<th scope="col" class="${cls}"${t} data-d="${dm.d}"><abbr class="dh-in" title="${esc(M.fmtDay(dm.d) + (dm.hol ? ', ' + dm.hol : ''))}"><span class="wd">${WD[dm.wd]}</span><span class="dn">${dm.num}</span></abbr></th>`;
     }
     for (const dm of c.ctxAfter) html += ctxHead(dm);
-    sumCodes.forEach((code, i) => { html += `<th scope="col" class="sh${i ? '' : ' s1'}" title="${esc(c.dmap.get(code)?.name || code)} this month"><abbr title="${esc(c.dmap.get(code)?.name || code)} this month">${esc(code)}</abbr></th>`; });
+    sumCodes.forEach((code, i) => {
+      const nm = esc(c.dmap.get(code)?.name || code), posts = c.autoCodes.includes(code) ? postingSet(state, '@' + code) : null;
+      // a call's column: press to show only the people on its postings (again to show everyone)
+      html += posts && posts.size
+        ? `<th scope="col" class="sh${i ? '' : ' s1'}"><button type="button" class="sh-btn" data-post="@${esc(code)}" aria-pressed="${ui.post === '@' + code}" title="${nm} this month. Press to show only people on ${esc([...posts].join(', '))}, again for everyone"><abbr title="${nm} this month">${esc(code)}</abbr></button></th>`
+        : `<th scope="col" class="sh${i ? '' : ' s1'}" title="${nm} this month"><abbr title="${nm} this month">${esc(code)}</abbr></th>`;
+    });
     if (hasC) html += `<th scope="col" class="sh${sumCodes.length ? '' : ' s1'}"><abbr title="Weekend and public holiday calls this month">Wk</abbr></th>`;
     html += '</tr></thead>';
     const head = html;

@@ -26,7 +26,7 @@
 // ---------------------------------------------------------------------------------------------------------------
 
 import {
-  DEFAULT_RULES, dutyMap, addDays, monthDays, monthOf, fmtDay, fmtMonth, uid, isHoliday, getCell, TOKENS, notInSheet, personIn,
+  DEFAULT_RULES, dutyMap, addDays, monthDays, monthOf, fmtDay, fmtMonth, uid, isHoliday, getCell, TOKENS, notInSheet, personIn, CALLS,
 } from './model.js';
 
 const NO_ABSENT = new Set();
@@ -332,7 +332,16 @@ function textKit(state) {
   const codeName = c => TOKEN_WORDS[c] || (dm.get(c) && dm.get(c).name) || c;
   const T = {
     code: codeName,
-    codes: list => listOr((list || []).map(codeName)) || '…',   // '…' until codes are chosen ("Never … and … on the same day")
+    // '…' until codes are chosen ("Never … and … on the same day"); every call together is just "any call", and a long list is cut
+    codes: list => {
+      const l = list || [];
+      if (!l.length) return '…';
+      if (l.length === CALLS.length && CALLS.every(c => l.includes(c))) return 'any call';
+      if (l.length > 4) return `${l.slice(0, 3).map(codeName).join(', ')} or ${l.length - 3} more`;
+      return listOr(l.map(codeName));
+    },
+    // for a count in front ('at most 2 calls a month'): every call together is just "calls"
+    codesN: list => { const t = T.codes(list); return t === 'any call' ? 'calls' : t; },
     // "on Call", but "at work", "away", "on leave" for tokens that read better without "on"
     on: list => (list && list.length === 1 && ['@present', '@away', '@any'].includes(list[0]) ? codeName(list[0]) : `on ${T.codes(list)}`),
     // "juniors", "seniors", "everyone", or names
@@ -473,7 +482,7 @@ export const RULE_TYPES = {
       const p = r.params;
       const per = p.period === 'week' ? 'a week' : p.period === 'rolling' ? `in any ${num(p.window, 7)} days` : 'a month';
       const w = T.when(r.when);
-      let s = `${cap(T.who(r.who))}: ${T.amount(p.min, p.max)} ${T.codes(p.codes)} ${per}${w ? ` on ${w}` : ''}`;
+      let s = `${cap(T.who(r.who))}: ${T.amount(p.min, p.max)} ${T.codesN(p.codes)} ${per}${w ? ` on ${w}` : ''}`;
       const sc = [p.fte && 'scaled by FTE', p.prorate && 'pro rata'].filter(Boolean);
       if (sc.length) s += ` (${sc.join(', ')})`;
       return s;
@@ -1081,7 +1090,7 @@ export const RULE_TYPES = {
     defaults: () => ({ codes: [], posting: '', days: 1 }),
     describe(r, T) {
       const days = num(r.params.days, 1);
-      return withWhen(`${whoPrefix(r, T)}no ${T.codes(r.params.codes)} in the first ${days === 1 ? 'day' : days + ' days'} of ${T.codes([r.params.posting])} (from day ${days + 1})`, r, T);
+      return withWhen(`${whoPrefix(r, T)}no ${T.codes(r.params.codes).replace(/^any /, '')} in the first ${days === 1 ? 'day' : days + ' days'} of ${T.codes([r.params.posting])} (from day ${days + 1})`, r, T);
     },
     validate(r) { return !r.params.posting ? ['No posting chosen'] : !(num(r.params.days, 0) >= 1) ? ['Days must be 1 or more'] : []; },
     compile(r, X) {
@@ -1132,7 +1141,7 @@ export const RULE_TYPES = {
             const i = base + d;
             if (!ok[d] || !act[i] || (ctx.flags[i] & (F.LEAVE | F.OTHER | F.X)) || m(i)) continue;
             pen += u; ctx.n2++;
-            if (out) out.push(X.V(u, `${X.day(d)}: ${X.name(pi)} has no ${X.T.codes(r.params.codes)}`, { staffId: ctx.people[pi].id, date: X.iso(d) }));
+            if (out) out.push(X.V(u, `${X.day(d)}: ${X.name(pi)} has no ${X.T.codes(r.params.codes).replace(/^any /, '')}`, { staffId: ctx.people[pi].id, date: X.iso(d) }));
           }
           return pen;
         },

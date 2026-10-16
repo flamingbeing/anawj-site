@@ -230,8 +230,8 @@ html body.a-app:has(.a-tabbar) .a-bar.top { margin-left: 0; }
     border-top: 0; border-right: .5px solid var(--a-sep); background: var(--a-bar);
   }
   /* the set-up screens apart from the month's work */
-  .tabs .tab[data-tab="people"] { margin-top: 20px; position: relative; }
-  .tabs .tab[data-tab="people"]::before { content: ""; position: absolute; left: 12px; right: 12px; top: -11px; border-top: .5px solid var(--a-sep); }
+  .tabs .tab[data-tab="postings"] { margin-top: 20px; position: relative; }
+  .tabs .tab[data-tab="postings"]::before { content: ""; position: absolute; left: 12px; right: 12px; top: -11px; border-top: .5px solid var(--a-sep); }
 }
 /* laptops (1000-1599 px): the sidebar narrows to a rail of icons with their names underneath, so a whole month of
    the roster grid fits beside it; big screens (1600 px and wider) get the kit's full sidebar */
@@ -1095,3 +1095,38 @@ body:not([data-tab="roster"]) #autofill { display: none; }
 .grp-toggle:focus-visible { outline: 2px solid var(--navy, #002f6c); outline-offset: -2px; }
 .grp-chev { width: 14px; text-align: center; font-size: 12px; }
 .grp-toggle .grp-label { position: static; padding-left: 4px; }
+
+#lockm { display: inline-flex; align-items: center; gap: 5px; }
+/* the lock button is just the padlock (its name is still read out) */
+#lockm { padding: 0 10px; }
+#lockm .lk-t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* one header row from tablet width up: the app name gives way (shrinks to its mark) before the row would wrap onto a second one */
+.brand { min-width: 0; }
+.brand-text { min-width: 0; overflow: hidden; }
+@media (min-width: 821px) {
+  .top-row { flex-wrap: nowrap; min-height: 56px; padding: 0 10px 0 16px; gap: 12px; }
+  .brand, .ctx-row, .top-tools { order: 0; }
+  .brand { flex: 0 1 auto; min-width: 44px; }
+  .ctx-row { flex: 1 0 auto; padding-right: 0; }
+  .top-tools { flex: none; }
+}
+@media (min-width: 821px) and (max-width: 1179px) { .brand-dept { display: none; } }
+
+/* a mouse needs a scrollbar it can see and grab (classic bars, always shown) and a way to pan the dates */
+.r-scroll { scrollbar-width: auto; scrollbar-color: #8a94a6 #eef0f4; }
+.r-scroll::-webkit-scrollbar { width: 14px; height: 14px; }
+.r-scroll::-webkit-scrollbar-track { background: #eef0f4; }
+.r-scroll::-webkit-scrollbar-thumb { background: #8a94a6; border-radius: 8px; border: 3px solid #eef0f4; }
+.r-scroll::-webkit-scrollbar-thumb:hover { background: #5b6573; }
+.r-scroll thead { cursor: grab; }
+.r-scroll.panning, .r-scroll.panning thead { cursor: grabbing; user-select: none; }
+.tbtn-pan { padding: 0 8px; }
+@media (hover: none) { .tbtn-pan { display: none; } }
+
+/* a call's column header in the grid is a button: show only the people on its postings */
+.grid th.sh { cursor: default; }
+.sh-btn { all: unset; box-sizing: border-box; cursor: pointer; padding: 2px 6px; border-radius: 6px; font: inherit; color: inherit; }
+.sh-btn:hover { background: #e6e9f0; }
+.sh-btn[aria-pressed="true"] { background: var(--navy, #002f6c); color: #fff; }
+.sh-btn:focus-visible { outline: 2px solid var(--navy, #002f6c); outline-offset: 1px; }

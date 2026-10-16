@@ -111,8 +111,9 @@ export function createStore({ demo = false, fallback } = {}) {
       return true;
     },
 
-    // Every month starts locked (owner, 16 Oct 2026): a month with no entry yet gets a locked one, and, once per device,
-    // so does every month that already exists. Quiet like a Getting started tick (not an undo step); never in Practice.
+    // Every month is locked whenever the app opens (owner, 16 Oct 2026): a month with no entry yet gets a locked one, and
+    // lockAll locks every month that exists (at start, and again when the app is closed). Unlocking lasts one visit.
+    // Quiet like a Getting started tick (not an undo step); never in Practice.
     ensureLocked(m) {
       if (store.isDemo || !m || (state.months || {})[m]) return false;
       state = { ...state, months: { ...(state.months || {}), [m]: { status: 'published', publishedAt: new Date().toISOString(), note: '' } } };
@@ -120,13 +121,15 @@ export function createStore({ demo = false, fallback } = {}) {
       notify('Lock ' + m, 'mark');
       return true;
     },
-    lockAllOnce() {
-      if (store.isDemo || (state.settings && state.settings.lockedByDefault)) return false;
-      const months = {};
-      for (const [m, v] of Object.entries(state.months || {})) months[m] = v && v.status === 'published' ? v : { ...(v || {}), status: 'published', publishedAt: new Date().toISOString(), note: (v && v.note) || '' };
-      state = { ...state, months, settings: { ...state.settings, lockedByDefault: true } };
+    lockAll() {
+      if (store.isDemo) return false;
+      const open = Object.entries(state.months || {}).filter(([, v]) => !(v && v.status === 'published'));
+      if (!open.length) return false;
+      const months = { ...(state.months || {}) };
+      for (const [m, v] of open) months[m] = { ...(v || {}), status: 'published', publishedAt: new Date().toISOString(), note: (v && v.note) || '' };
+      state = { ...state, months };
       store.save();
-      notify('Lock existing months', 'mark');
+      notify('Lock every month', 'mark');
       return true;
     },
 

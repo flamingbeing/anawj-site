@@ -81,6 +81,42 @@ const noSideScroll = async (page, label) => {
     await page.locator('.grp-toggle').first().click();
     await page.waitForTimeout(600);   // rows are drawn a few at a time
     ok(await page.locator('tbody tr:not(.grp-row)').count() === rowsBefore, 'and opens them again');
+    // a mouse can move the grid sideways: week buttons, and the wheel over the dates
+    await page.setViewportSize({ width: 900, height: 700 });
+    await page.waitForTimeout(300);
+    const wide = await page.locator('.r-scroll').evaluate(el => el.scrollWidth > el.clientWidth + 50);
+    ok(wide, 'the grid is wider than a small window');
+    await page.getByRole('button', { name: 'Scroll forward a week' }).click();
+    await page.waitForTimeout(700);
+    const moved = await page.locator('.r-scroll').evaluate(el => el.scrollLeft);
+    ok(moved > 50, `the week button scrolls the grid (${moved}px)`);
+    await page.locator('.r-scroll thead th.nh').first().hover();
+    await page.mouse.wheel(0, 120);
+    await page.waitForTimeout(300);
+    ok(await page.locator('.r-scroll').evaluate((el, was) => el.scrollLeft > was, moved), 'the wheel over the dates moves it sideways too');
+    await page.setViewportSize({ width: 1366, height: 900 });
+    // show only the people on a posting (dropdown or the C3 / R1B column header), and clear the filters
+    const people = () => page.locator('tbody tr:not(.grp-row) .nm-btn').count();
+    await page.waitForTimeout(600);
+    const everyone = await people();
+    ok(!(await page.locator('.tbtn-clear').isVisible()), 'no Clear filters button while nothing is filtered');
+    const postVals = await page.locator('select[aria-label="Show people on a posting"] option').evaluateAll(o => o.map(x => x.value).filter(Boolean));
+    ok(postVals.length > 0, 'the posting dropdown lists postings');
+    await page.selectOption('select[aria-label="Show people on a posting"]', postVals[0]);
+    await page.waitForTimeout(600);
+    const some = await people();
+    ok(some < everyone, `the posting filter shows only people on it (${some} of ${everyone})`);
+    ok(await page.locator('.tbtn-clear').isVisible(), 'Clear filters appears');
+    await page.locator('.tbtn-clear').click();
+    await page.waitForTimeout(600);
+    ok((await people()) === everyone && !(await page.locator('.tbtn-clear').isVisible()), 'and brings everyone back');
+    if (await page.locator('.sh-btn').count()) {
+      await page.locator('.sh-btn').first().click();
+      await page.waitForTimeout(600);
+      ok((await people()) < everyone && (await page.locator('.sh-btn').first().getAttribute('aria-pressed')) === 'true', 'a call column header filters to its postings');
+      await page.locator('.tbtn-clear').click();
+      await page.waitForTimeout(400);
+    }
     await page.getByRole('button', { name: 'Days around' }).click();
     ok(await page.locator('thead th.dh.ctx').count() >= 4, 'and on again');
   }

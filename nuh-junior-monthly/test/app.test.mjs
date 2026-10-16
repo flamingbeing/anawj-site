@@ -9,6 +9,7 @@ import { demoState } from '../js/demo.js';
 import { apmesList } from '../js/apmes.js';
 import * as G from '../js/gsheets.js';
 import * as C from '../js/cloud.js';
+import { relevanceOf } from '../js/ui-check.js';
 
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -264,17 +265,16 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const old = M.defaultState();
   old.months['2026-09'] = { status: 'draft', publishedAt: '', note: '' };
   const store = createStore({ demo: false, fallback: () => old });
-  ok(!M.isMonthLocked(store.get(), '2026-09'), 'an existing month is open before the first start');
-  store.lockAllOnce();
-  ok(M.isMonthLocked(store.get(), '2026-09'), 'every existing month is locked once');
+  ok(!M.isMonthLocked(store.get(), '2026-09'), 'an existing month is open before the app starts');
+  store.lockAll();
+  ok(M.isMonthLocked(store.get(), '2026-09'), 'every existing month is locked when the app opens');
   store.commit('unlock', d => { M.setMonthLocked(d, '2026-09', false); });
-  store.lockAllOnce();
-  ok(!M.isMonthLocked(store.get(), '2026-09'), 'and not again: an unlocked month stays unlocked');
+  ok(!M.isMonthLocked(store.get(), '2026-09') && store.lockAll() === true && M.isMonthLocked(store.get(), '2026-09'), 'an unlock lasts one visit: closing (or reopening) locks it again');
   ok(store.ensureLocked('2026-10') && M.isMonthLocked(store.get(), '2026-10'), 'a new month starts locked');
   store.commit('unlock', d => { M.setMonthLocked(d, '2026-10', false); });
   ok(store.ensureLocked('2026-10') === false && !M.isMonthLocked(store.get(), '2026-10'), 'a month someone unlocked is left alone');
   const demo = createStore({ demo: true, fallback: () => M.defaultState() });
-  ok(demo.ensureLocked('2026-10') === false && demo.lockAllOnce() === false && !M.isMonthLocked(demo.get(), '2026-10'), 'Practice is never locked');
+  ok(demo.ensureLocked('2026-10') === false && demo.lockAll() === false && !M.isMonthLocked(demo.get(), '2026-10'), 'Practice is never locked');
 }
 // the header's cloud button: what it says
 {
@@ -296,18 +296,35 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(CSm.headerState().kind === 'newer', 'a newer cloud copy says so');
   delete globalThis.localStorage;
 }
+// the Check screen shows the things to improve that bear on what Fill places (C3, R1B), and says "any call" for every call
+{
+  const s = team();
+  const dm = M.dutyMap(s);
+  ok(describeRule(s.rules.find(r => r.id === 'r-req-r'), s).includes('any call') && /at most 2 calls a month/.test(describeRule(s.rules.find(r => r.id === 'r-sat2'), s)), 'a list of every call reads as "any call" ("calls" after a count)');
+  ok(!/MO1 call, MO2 call/.test(describeRule(s.rules.find(r => r.id === 'r-req-x'), s)), 'and not as the whole list');
+  s.rules.push(JSON.parse(JSON.stringify(M.DEFAULT_RULES.find(r => r.id === 'r-c3-fair'))));
+  M.setCell(s, days[2], 'i0', { a: ['C3'] }); M.setCell(s, days[3], 'i0', { a: ['OGC'], r: [] });
+  const mk = (ruleId, date, staffId, extra = {}) => ({ ruleId, date, staffId, hard: false, ...extra });
+  const ev = { violations: [mk('r-sat2', days[2], 'i0'), mk('r-sat2', days[3], 'i0'), mk('r-c3-fair', '', '', { date: undefined, staffId: undefined }), { ruleId: 'r-fair', hard: false }, { ruleId: 'r-postcall', hard: true, date: days[3], staffId: 'i0' }] };
+  const on = relevanceOf(s, ev, true), off = relevanceOf(s, ev, false);
+  ok(on.keep(ev.violations[0]) && !on.keep(ev.violations[1]), 'a preference is kept when its cell holds C3 and hidden when it only holds another call');
+  ok(on.keep(ev.violations[2]) && !on.keep(ev.violations[3]), 'a rule about C3 with no cell is kept; one about other calls is hidden');
+  ok(on.keep(ev.violations[4]) && off.keep(ev.violations[1]) && on.hidden === 2 && off.hidden === 0, 'must-fix problems always show, and the switch off shows everything');
+}
 // request importance: X! must have, X? nice to have, next to X (and an older saved roster gains them)
 {
   const s = team();
   const dm = M.dutyMap(s), up = new Map([...dm.keys()].map(c => [c.toUpperCase(), c]));
   ok(S.codesFromText('X!', dm, up).r.join() === 'X!' && S.codesFromText('X?', dm, up).r.join() === 'X?' && S.codesFromText('R!/R?', dm, up).r.join() === 'R!,R?', 'the sheet reads X!, X?, R! and R? as requests');
   const w = id => s.rules.find(r => r.id === id).weight;
+  ok(['r-c3-fair', 'r-r1b-fair'].every(id => M.DEFAULT_RULES.find(r => r.id === id).weight === 40), 'sharing cardiac and ICU calls equally is weighted 40 (it was 10)');
   ok(w('r-req-rh') > w('r-req-r') && w('r-req-r') > w('r-req-rl') && w('r-req-rl') > 0, 'call requests have the same three levels: R! must have, R, R? nice to have');
   ok(w('r-req-xx') > w('r-req-xh') && w('r-req-xh') > w('r-req-x') && w('r-req-x') > w('r-req-xl'), 'blocked by the planner outranks must have, which outranks X, which outranks nice to have');
   const old = JSON.parse(JSON.stringify(s));
-  old.rulesVersion = 3; old.rules.find(r => r.id === 'r-req-xx').weight = 80; old.duties = old.duties.filter(d => !['X!', 'X?', 'R!', 'R?'].includes(d.code)); old.rules = old.rules.filter(r => !['r-req-xh', 'r-req-xl', 'r-req-rh', 'r-req-rl'].includes(r.id));
+  old.rulesVersion = 3; old.rules.find(r => r.id === 'r-req-xx').weight = 80; old.rules.push({ ...JSON.parse(JSON.stringify(M.DEFAULT_RULES.find(r => r.id === 'r-c3-fair'))), weight: 10 }); old.duties = old.duties.filter(d => !['X!', 'X?', 'R!', 'R?'].includes(d.code)); old.rules = old.rules.filter(r => !['r-req-xh', 'r-req-xl', 'r-req-rh', 'r-req-rl'].includes(r.id));
   const m = M.migrate(old);
   ok(m.duties.some(d => d.code === 'X!') && m.duties.some(d => d.code === 'X?') && m.rules.some(r => r.id === 'r-req-xh') && m.rules.some(r => r.id === 'r-req-xl') && m.duties.some(d => d.code === 'R!') && m.duties.some(d => d.code === 'R?') && m.rules.some(r => r.id === 'r-req-rh') && m.rules.some(r => r.id === 'r-req-rl'), 'a saved roster gains the four request codes and their rules');
+  ok(m.rules.find(r => r.id === 'r-c3-fair').weight === 40, 'a saved roster still at the old fairness weight gets the new one');
   ok(m.rules.find(r => r.id === 'r-req-xx').weight === 200, 'and a block already saved at the old weight is raised to the top');
   M.setCell(s, days[5], 'i0', { a: ['C3'], r: ['X!'] }); M.setCell(s, days[6], 'i0', { a: ['C3'], r: ['X?'] });
   ok(S.cellText(s, days[5], 'i0').includes('X!') && S.cellText(s, days[6], 'i0').includes('X?'), 'and they are written back to the sheet as typed');
