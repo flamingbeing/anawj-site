@@ -178,6 +178,12 @@ changed screens, e.g. `<preview>/logbook/?demo#notes`. Previews can't sign in (b
 behaviour with tests or the emulator, and never add preview domains to Firebase or the Google / Dropbox OAuth
 clients. If no preview appears, Cloudflare isn't connected yet: say so and fall back to screenshots.
 
+**Build minutes are limited** (owner, 16 Oct 2026): every push to a branch with a PR starts a Cloudflare build, and the
+free plan has 3,000 build minutes a month across all the owner's Workers (anawj-preview and flamingbeing-home). Commit
+as often as you like, but **push once per finished step** (tests passing, ready to look at), not after every small
+commit; don't push just to save work in progress. Pushes that change only notes, status files or tests are skipped by
+the Worker's build watch paths (PREVIEWS.md).
+
 ## Claude Code–Codex handovers
 
 Both assistants run in separate cloud environments. Use
