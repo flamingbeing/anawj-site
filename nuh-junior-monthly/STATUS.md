@@ -18,3 +18,5 @@
 ## Decisions
 - 15 Oct 2026: own app, own subdomain, NUHS design; fill the existing Google Sheet rather than replace it (owner).
 - 15 Oct 2026: "weekend" in the fellows' ICU limit means Saturday and Sunday (owner).
+- 16 Oct 2026: the sheet import moves people to the group their new grade shows (ticked in the review, newest month
+  only), so the staff list is right after July without hand edits; APMES People reads it for residents' years (owner).

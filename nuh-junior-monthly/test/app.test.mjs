@@ -258,6 +258,48 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const ex = S.exportBlock(s, MONTH);
   ok(ex.changes.length === 0, 'and nothing is written back differently (' + ex.changes.map(c => c.cell + ' ' + c.from + '>' + c.to).join(', ') + ')');
 }
+// a new grade (the July change-over): a matched person moves to the end of the group the sheet's grade shows, only from
+// the newest month imported; an unticked move stays; someone listed twice moves to the grade of the row that is kept
+{
+  const sheetFor = (month, title, people) => {
+    const md = M.monthDays(month);
+    const head = ['S/N', 'Grade', 'Name', ...md.map((d, i) => String(i + 1)), '1st'];
+    const wd = ['', '', '', ...md.map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][M.weekday(d)]), ''];
+    return S.parseGrid([['x'], ['', '', '', title], wd, head, ...people.map(([g, name, code], i) => [String(i + 1), g, name, ...md.map(() => code), ''])]);
+  };
+  const s = M.defaultState();
+  const person = (id, name, group) => s.staff.push({ id, name, short: '', group, tags: [], fte: 1, start: '', end: '', note: '', active: true });
+  person('up', 'Year Up', 'res1'); person('kept', 'Kept Back', 'res1'); person('two', 'Twice Moved', 'res1');
+  person('stay', 'Twice Stays', 'res1'); person('r2a', 'Res Two First', 'res2'); person('r2b', 'Res Two Last', 'res2');
+  person('r1', 'Res One Other', 'res1');
+  const june = sheetFor('2027-06', '1 to 30 June 27', [['RES2', 'Res Two First', 'CP'], ['RES2', 'Res Two Last', 'CP'], ['RES1', 'Year Up', 'CP'],
+    ['RES1', 'Kept Back', 'CP'], ['RES1', 'Twice Moved', 'CP'], ['RES1', 'Twice Stays', 'CP'], ['RES1', 'Res One Other', 'CP']]);
+  const pJun = S.planImport(s, june, '2027-06');
+  ok(june.month === '2027-06' && !pJun.moves.length && !pJun.olderMoves.length, 'no grade changes, nobody moves');
+  S.applyImport(s, pJun, june, {});
+  const july = sheetFor('2027-07', '1 to 31 July 27', [['RES2', 'Res Two First', 'ICU'], ['RES2', 'Res Two Last', 'ICU'], ['RES2', 'Year Up', 'ICU'],
+    ['RES2', 'Kept Back', 'ICU'], ['RES1', 'Twice Moved', 'Z'], ['RES2', 'Twice Moved', 'ICU'], ['RES1', 'Twice Stays', 'ICU'], ['RES2', 'Twice Stays', 'Z'],
+    ['RES1', 'Res One Other', 'ICU']]);
+  const pJul = S.planImport(s, july, '2027-07');
+  ok(pJul.moves.map(m => `${m.name} ${m.fromGrade}>${m.toGrade}`).join(', ') === 'Year Up RES1>RES2, Kept Back RES1>RES2, Twice Moved RES1>RES2',
+    `the review lists who moves grade (${pJul.moves.map(m => `${m.name} ${m.fromGrade}>${m.toGrade}`).join(', ')})`);
+  const res = S.applyImport(s, pJul, july, { moves: ['up', 'two'] });   // Kept Back unticked
+  const group = id => s.staff.find(p => p.id === id).group;
+  ok(res.moved === 2 && group('up') === 'res2' && group('two') === 'res2', 'a new grade moves them to that group on Import');
+  ok(group('kept') === 'res1', 'an unticked move stays where it was');
+  ok(group('stay') === 'res1', 'listed twice: the row with the roster decides the grade');
+  ok(M.staffInMonth(s, '2027-07').filter(p => p.group === 'res2').map(p => p.name).join(', ') === 'Res Two First, Res Two Last, Year Up, Twice Moved',
+    'they go to the end of the new group, so the sheet order stays grouped');
+  ok(s.staff.map(p => p.id).join(',') === 'kept,stay,r2a,r2b,up,two,r1', `in the staff list too, right after the group's last person (${s.staff.map(p => p.id).join(',')})`);
+  // an older month never moves anyone back
+  const pOld = S.planImport(s, june, '2027-06');
+  ok(pOld.latest === '2027-07' && !pOld.moves.length && pOld.olderMoves.map(m => m.id).join(',') === 'up,two', 'importing an older month moves nobody (the review says who differs)');
+  S.applyImport(s, pOld, june, {});
+  ok(group('up') === 'res2' && group('two') === 'res2', 'so June again leaves them in their new group');
+  // the newest month again: with no ticks given, every planned move is made
+  const again = S.planImport(s, july, '2027-07');
+  ok(again.moves.map(m => m.id).join(',') === 'kept' && S.applyImport(s, again, july, {}).moved === 1 && group('kept') === 'res2', 'the newest month again offers the move left out, and makes it');
+}
 // the practice department loads and its rules can be checked
 {
   const s = demoState('2026-10-15');
