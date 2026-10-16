@@ -8,7 +8,7 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `evals/`: APMES workplace-based assessments. Start with `evals/NOTES.md` (decisions, MedHub, forms, operations), then `evals/README.md`.
 - `logbook/`: APMES case logbook. Start with `logbook/NOTES.md` (principles, words, screens, tags, demo, how to test), then `logbook/README.md`.
 - `people/`: APMES People, the one place to keep the resident, faculty and PD lists that logbook and evals share
-  (add a yearly intake, year check, CSV), at `apmes.anawj.com/people/`; admins and PDs only. It reuses evals' code. Start
+  (add a yearly intake, year check, CSV, import from the monthly roster, a read-only rotations view), at `apmes.anawj.com/people/`; admins and PDs only. It reuses evals' code. Start
   with `people/NOTES.md`.
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`), at `nuhroster.anawj.com` (the old `anawj.com/nuh-roster/` redirects). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
 - `ntf-roster/`: NTF (Ng Teng Fong) anaesthesia monthly duty roster: calls, PM shifts, leave and requests on one grid,

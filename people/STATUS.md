@@ -23,14 +23,13 @@ check `evals/` work in progress too.
 
 ## Next (agreed queue)
 
-1. **Rotations, stage 1: read-only** (owner, 16 Oct 2026; waits on the owner's go). Read the department's master block
-   rotation sheet (from Google with the owner's own sign-in, or an uploaded file) in the browser and show rotations,
-   who has done what, and manpower. No Firebase, nothing written to the sheet. First import hand-linked (sheet name to
-   person), the links kept in the browser. Plus a one-way hand-off of the postings the monthly roster needs (ICU, cardiac,
-   the OG floats) in the layout NUH Junior Monthly's Paste rotations takes (names down, Mondays across), named as the
-   roster app names people. The roster app **pulls** it (it opens People, which sends after the user taps Send): the
-   roster app's side is noted in `nuh-junior-monthly/NOTES.md`, "Rotations from People". The sheet reader should be a standalone module with no screen of its own, so People can reuse
-   it. Code meanings and the sheet's layout: the owner's private notes (code key, 66 codes).
+1. **Rotations, stage 1, part 1 is built** (read-only grid, people per posting, a person's history, in the browser; People ›
+   Rotations, owner's go 16 Oct 2026). **Part 2, next:** link sheet names to people (by hand once, kept in the browser; the
+   sheet often has first names only), then the hand-off of the postings the monthly roster needs (ICU, cardiac, the OG
+   floats) in the layout NUH Junior Monthly's Paste rotations takes (names down, Mondays across), named as the roster app
+   names people. The roster app **pulls** it (it opens People, which sends after the user taps Send): the roster app's side is
+   in `nuh-junior-monthly/NOTES.md`, "Rotations from People". Open: reading the sheet straight from Google (the owner has no
+   link yet) instead of a downloaded .xlsx. The reader is a standalone module (`js/rotations.js`) so it can move.
 2. **Rotations store with access control** (owner, 16 Oct 2026; the empty project `apmes-rotations` exists, locked, with the owner as
    its only member): see the decisions log. Not needed for stage 1.
 3. Later, and only with the rotation planner's say: editing rotations in the app (stage 2), then retiring the sheet.
@@ -95,4 +94,7 @@ check `evals/` work in progress too.
   come when stage 2 is built; reusing the roster app's own project was the other option (its rosterers are already members),
   but signing in from People's address to it needs extra setup that is not yet checked. Where the rotations screen lives
   (People or the roster app) decides this; not decided.
+- 16 Oct 2026: rotations stage 1 part 1 built (owner approved free plan for `apmes-rotations`, so billing is not needed: the app
+  will hardly be opened). The sheet's sections (SR2/SR1/SMO, CA3 to CA1, Fellows, MOPEX, External Residents) say each person's
+  year, which could later replace or check the grade import from the monthly roster.
 
