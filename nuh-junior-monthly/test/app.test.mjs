@@ -6,6 +6,7 @@ import * as S from '../js/sheet.js';
 import { evaluate, describeRule } from '../js/rules.js';
 import { solve } from '../js/solver.js';
 import { demoState } from '../js/demo.js';
+import { apmesList } from '../js/apmes.js';
 
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -174,5 +175,23 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(s.staff.length > 60, 'practice department');
   const ev = evaluate(s, { from: '2026-10-01', to: '2026-10-31' });
   ok(ev.violations.length >= 0 && !(ev.failed || []).length, 'every rule checks');
+}
+// the staff list for APMES People: everyone in post, in sheet order, with the sheet's grade; the roster month is the
+// last one imported from the sheet
+{
+  const s = M.defaultState();
+  s.staff.push({ id: 'a', name: 'Res Two', group: 'res2', tags: [], fte: 1, active: true },
+    { id: 'b', name: 'Senior\tOne', group: 'r', tags: [], fte: 1, active: true, start: '2026-07-01' },
+    { id: 'c', name: 'Gone Already', group: 'res1', tags: [], fte: 1, active: true, end: '2026-09-30' },
+    { id: 'd', name: 'Not Active', group: 'res1', tags: [], fte: 1, active: false },
+    { id: 'e', name: 'Mo Pex', group: 'mopex', tags: [], fte: 1, active: true, note: 'private note' });
+  s.sheets = { '2026-11': {}, '2026-12': {} };
+  const out = apmesList(s, { today: '2026-10-16' });
+  const lines = out.text.replace(/\n$/, '').split('\n');
+  ok(lines[0] === 'NUH Junior Monthly staff, roster month 2026-12, copied 2026-10-16' && lines[1] === 'Grade\tName\tFrom\tUntil', 'APMES list: the month and the header');
+  ok(JSON.stringify(lines.slice(2)) === JSON.stringify(['R\tSenior One\t2026-07-01\t', 'RES2\tRes Two\t\t', 'MOPEX\tMo Pex\t\t']), 'APMES list: in post, sheet order, sheet grades (' + lines.slice(2) + ')');
+  ok(out.count === 3 && out.month === '2026-12' && !out.text.includes('private'), 'APMES list: names and grades only');
+  ok(apmesList(M.defaultState(), { today: '2026-10-16' }).month === '2026-10', 'APMES list: no sheet imported yet: this month');
+  ok(apmesList(demoState('2026-10-15')).count > 60, 'APMES list: the practice department');
 }
 console.log(`nuh-junior-monthly: ${n} checks passed`);
