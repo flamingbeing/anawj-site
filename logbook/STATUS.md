@@ -6,7 +6,7 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-15 (07:20 UTC) by Claude Code, Logbook 2 (log2): reliability fixes merged (#583–#589); follow-ups in `status/wip/README.md`.
+Last updated: 2026-10-16 by Claude Code, Logbook 1 (log1): #581 closed as superseded by #661; Cloudflare plugin (#673).
 
 ## Now
 
@@ -134,6 +134,11 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Decisions log
 
+- 2026-10-16 (log1): Where two sessions built the same thing from different instructions, the newer one on main stands (owner, on
+  Totals: #661's layout and labels win over the older #581, which was closed). Before pushing an older branch over main, check
+  whether main already changed that area, and ask.
+- 2026-10-16 (log1): Cloud sessions install Cloudflare's official Claude Code plugin (#673; anantf-site #133). No deploys or
+  Cloudflare setting changes through it without the owner's OK; Workers deploy only through Workers Builds.
 - 2026-10-15 (log2): Owner: when GitHub's Checks are slow, sessions may run the same checks locally and merge on that (#589 merged
   on the full local logbook suite, rules suite and conflict scenarios; the rules deploy was still confirmed afterwards).
 - 2026-10-15 (log2): Reliability hour with Firetop. Live data checked clean (drift IN SYNC; integrity scan: no duplicates, no
