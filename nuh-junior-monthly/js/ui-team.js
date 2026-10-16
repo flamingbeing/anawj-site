@@ -30,6 +30,37 @@ function when(ms) {
 // the name is whatever the saver's account says; the email is checked by the rules, so show it too
 const byName = b => (b ? (b.name && b.email && b.name !== b.email ? `${b.name} (${b.email})` : b.email || b.name) : '') || 'someone';
 
+// The one-tap start on a device with an empty roster (the welcome screen): sign in (if not already), and when the account is on
+// the team list, bring down the team's staff list, rules and the month on screen. Nothing local is lost: the roster was empty.
+export async function joinAndLoad(app) {
+  const fmt = m => (app.model && app.model.fmtMonth ? app.model.fmtMonth(m) : m);
+  try {
+    let user = await cloud.currentUser();
+    if (!user) user = await cloud.signIn();
+    const member = await cloud.myMember();
+    if (!member) {
+      app.toast(`Signed in as ${user.email}, but that account is not on the team list yet. Team sharing in More lets you ask to join.`, { kind: 'warn', ms: 10000 });
+      app.go('more');
+      return;
+    }
+    const m = app.month;
+    const [t, mo] = await Promise.all([cloud.loadTeam(), cloud.loadMonth(m)]);
+    if (!t && !mo) { app.toast('Signed in, but nothing has been saved to the team yet. Save it first from a device that has the roster.', { kind: 'warn', ms: 9000 }); app.go('more'); return; }
+    let next = app.store.get();
+    if (t) next = cloud.mergeTeam(next, t);
+    if (mo) next = cloud.mergeMonth(next, m, mo);
+    app.store.replace(next, 'Load from team');
+    const seen = readSeen();
+    if (t) seen.team = t.updatedAt ?? null;
+    if (mo) seen.months[m] = mo.updatedAt ?? null;
+    writeSeen(seen);
+    app.toast(mo ? `Loaded the team's roster and ${fmt(m)}.` : `Loaded the team's roster. ${fmt(m)} is not on the team yet.`, { action: { label: 'Undo', fn: () => app.store.undo() } });
+  } catch (e) {
+    console.error(e);
+    app.toast(cloud.friendly(e), { kind: 'error', ms: 9000 });
+  }
+}
+
 export function mountTeam(el, app) {
   const h = app.h;
   const M = app.model;

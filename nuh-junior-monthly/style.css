@@ -891,6 +891,10 @@ td.c.pt.we, td.c.pt.hol { background-color: var(--pt); background-image: linear-
 .welcome .guide-slot { padding: 0; }
 .welcome-card.has-guide { max-width: 640px; }
 .welcome-intro { text-align: center; }
+.welcome-team { text-align: center; margin: 14px 0 6px; }
+.welcome-team p { margin: 0 0 10px; }
+.welcome-team-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.welcome-toggle { display: block; margin: 12px auto 0; }
 
 /* ---------- Getting started ---------- */
 .gs { background: var(--surface); border: 0; border-radius: var(--radius); overflow: hidden; text-align: left; }
