@@ -219,6 +219,7 @@ export function compileWho(ctx, who) {
   ctx.people.forEach((p, i) => {
     let ok = everyone || who.groups.includes(p.group) || who.staff.includes(p.id) || (p.tags || []).some(t => who.tags.includes(t));
     if (who.exclude.includes(p.id)) ok = false;
+    if (Array.isArray(who.onlyGroups) && who.onlyGroups.length && !who.onlyGroups.includes(p.group)) ok = false;   // and in one of these groups
     if (ok) { inWho[i] = 1; list.push(i); }
   });
   return { inWho, list };
@@ -340,6 +341,7 @@ function textKit(state) {
       parts.push(...who.tags.map(id => (tags.find(g => g.id === id) || { name: id }).name));
       parts.push(...who.staff.map(id => { const p = staff.find(x => x.id === id); return p ? (p.short || p.name) : id; }));
       let text = parts.length ? listOr(parts.length > 4 ? [...parts.slice(0, 3), `${parts.length - 3} more`] : parts) : 'everyone';
+      if (Array.isArray(who.onlyGroups) && who.onlyGroups.length) text += ` (only ${listOr(who.onlyGroups.map(id => (groups.find(g => g.id === id) || { name: id }).name), 'or')})`;
       if (who.exclude.length) text += ` except ${listOr(who.exclude.map(id => { const p = staff.find(x => x.id === id); return p ? (p.short || p.name) : id; }), 'and')}`;
       return text;
     },

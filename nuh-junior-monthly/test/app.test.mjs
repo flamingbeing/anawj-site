@@ -36,12 +36,34 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   M.setCell(s, days[5], 'i0', { a: ['ICU', 'R1B'] });
   ok(ids(s, 'r-r1b-gap').length >= 1, 'no ICU call on the day off');
 }
+// the owner's rulings (16 Oct 2026): requests and blocks are preferences; "new to ICU" is strict only for rotating residents and MOPEXes
+{
+  const s = team();
+  ok(M.defaultState().rules.find(r => r.id === 'r-req-x').hard === false && M.defaultState().rules.find(r => r.id === 'r-req-xx').hard === false, 'requests and blocks are preferences');
+  ok(M.defaultState().rules.find(r => r.id === 'r-postcall').hard !== false, 'post call as a day off stays a must-hold rule');
+  s.staff.push({ id: 'rr0', name: 'Rotating Person', group: 'rr', tags: ['icunew'], fte: 1, active: true });
+  for (const d of [M.addDays(days[0], -2), M.addDays(days[0], -1)]) { M.setCell(s, d, 'rr0', { a: ['CP'] }); M.setCell(s, d, 'i1', { a: ['CP'] }); }   // both start ICU on day 1
+  for (const d of days) M.setCell(s, d, 'rr0', { a: ['ICU'] });
+  s.staff[1].tags = ['icunew'];   // an anaesthesia resident (group res2), also new to ICU
+  M.setCell(s, days[1], 'rr0', { a: ['ICU', 'R1B'] });
+  M.setCell(s, days[1], 'i1', { a: ['ICU', 'R1B'] });
+  const hardNew = evalM(s).violations.filter(v => v.ruleId === 'r-r1b-new' && v.hard !== false);
+  ok(hardNew.length === 1 && hardNew[0].staffId === 'rr0', 'new to ICU is a must-hold only for the rotating resident');
+  ok(evalM(s).violations.some(v => v.ruleId === 'r-r1b-new-res' && v.staffId === 'i1'), 'an anaesthesia resident new to ICU gets the preference instead');
+  // a saved state from before the rulings is updated once
+  const old = M.defaultState();
+  old.rulesVersion = undefined;
+  const x = old.rules.find(r => r.id === 'r-req-x'); x.hard = true; x.weight = 10;
+  old.rules = old.rules.filter(r => r.id !== 'r-r1b-new-res'); delete old.rules.find(r => r.id === 'r-r1b-new').who.onlyGroups;
+  const up = M.migrate(JSON.parse(JSON.stringify(old)));
+  ok(up.rules.find(r => r.id === 'r-req-x').hard === false && up.rules.some(r => r.id === 'r-r1b-new-res') && up.rules.find(r => r.id === 'r-r1b-new').who.onlyGroups.includes('mopex'), 'an older saved state gets the rulings once');
+}
 // a cardiac call needs a cardiac day; first days of a posting
 {
   const s = team();
   M.setCell(s, days[10], 'i1', { a: ['ICU', 'C3'] });
   ok(ids(s, 'r-c3-onc').length === 1, 'C3 off cardiac is flagged');
-  s.staff[1].tags = ['icunew'];
+  s.staff[1].tags = ['icunew']; s.staff[1].group = 'rr';   // a rotating resident: strict
   for (const d of days.slice(0, 12)) M.setCell(s, d, 'i1', { a: ['CP'] });
   M.setCell(s, days[13], 'i1', { a: ['ICU', 'R1B'] });   // day 2 of the ICU block
   ok(ids(s, 'r-r1b-new').length === 1, 'new to ICU: no call on day 2');

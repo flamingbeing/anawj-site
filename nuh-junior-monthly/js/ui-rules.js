@@ -720,6 +720,7 @@ export function seg(h, { name, label, value, options, onChange, compact = false 
 export function whoMatches(who, p) {
   who = W(who);
   if ((who.exclude || []).includes(p.id)) return false;
+  if (Array.isArray(who.onlyGroups) && who.onlyGroups.length && !who.onlyGroups.includes(p.group)) return false;
   if (!who.groups.length && !who.tags.length && !who.staff.length) return true;
   return who.groups.includes(p.group) || who.staff.includes(p.id) || (p.tags || []).some(t => who.tags.includes(t));
 }
@@ -749,6 +750,7 @@ export function whoText(who, state) {
   parts.push(...who.staff.map(nm));
   let txt = parts.length > 3 ? `${parts.slice(0, 2).join(', ')} and ${parts.length - 2} more` : parts.join(', ');
   if (!txt) txt = 'Everyone';
+  if (Array.isArray(who.onlyGroups) && who.onlyGroups.length) txt += ` (only ${who.onlyGroups.map(id => ((state.groups || []).find(g => g.id === id) || { name: id }).name).join(' or ')})`;
   if (who.exclude.length) txt += ` except ${who.exclude.length > 2 ? `${who.exclude.length} people` : who.exclude.map(nm).join(' and ')}`;
   return txt;
 }
