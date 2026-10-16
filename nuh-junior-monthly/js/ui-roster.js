@@ -211,10 +211,10 @@ export function mount(el, app) {
         row('<span class="gk-cell" style="background:#ffee3a"></span>', 'Tinted cell: that day\'s posting (planned by the week on Postings)'),
         row('<span class="chip dx">PC</span>', 'Post call: the day after a call (worked out, never typed)'),
         row('<span class="chip dx">PPC</span>', 'The day off after an ICU post call (worked out when the person is still in ICU)'),
-        row('<span class="gk-cell"><span class="vx vh"></span></span>', 'Red corner: a must-fix problem in that cell (tap the cell to see it)'),
-        row('<span class="gk-cell"><span class="vx vs"></span></span>', 'Amber corner: something to improve (a preference)'),
+        row('<span class="gk-cell"><span class="vx vh"></span></span>', 'Solid red ring with a glow: a must-fix problem in that cell (tap the cell to see it)'),
+        row('<span class="gk-cell"><span class="vx vs"></span></span>', 'Thin dashed amber ring: something to improve (a preference)'),
         row('<span class="vx-nm vh"></span>', 'Dot after a name: a problem about their whole month (fair share, a monthly minimum)'),
-        row('<span class="gk-cell"><span class="nd"></span></span>', 'Blue dot: a note on that cell'),
+        row('<span class="gk-cell"><span class="nd"></span></span>', 'Small orange corner: a note on that cell (as in Google Sheets)'),
         row('<span class="gk-txt">Wk</span>', 'Weekend and public holiday calls this month (the totals at the end of each row)'),
         row('<span class="gk-txt">2/2</span>', 'Bottom rows: how many are on each cover rule that day, against what it needs')),
     });

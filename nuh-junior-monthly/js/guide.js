@@ -296,7 +296,7 @@ export function startTasks(app) {
       done: () => {
         let n = 0;
         try { const days = M.monthDays(thisM); n = app.rules.evaluateRule(app.store.get(), found, { from: days[0], to: days[days.length - 1] }).length; } catch (e) { n = 0; }
-        return n ? `Rule added, and it finds ${n} must-fix problem${n === 1 ? '' : 's'} in ${M.fmtMonth(thisM)}: a red corner in the grid, and a line in Check.`
+        return n ? `Rule added, and it finds ${n} must-fix problem${n === 1 ? '' : 's'} in ${M.fmtMonth(thisM)}: a red ring on the cell, and a line in Check.`
           : 'Rule added. They are never on call together this month, so there is nothing to fix.';
       },
       show: async () => {

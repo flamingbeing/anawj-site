@@ -45,11 +45,11 @@ export const TOUR_STEPS = [
     text: 'Requests (Cr, Nc, Wr…) are outlined chips: what someone asked for, not what they are doing. Requests shows or hides them; Key explains every mark in the grid.' },
   { id: 'problems', tab: 'roster', target: 'problems', title: 'Problems',
     text: app => hardCount(app)
-      ? 'Must-fix problems this month: hard rules that are broken. A red corner marks each cell; this opens the full list.'
-      : 'Must-fix problems show here: hard rules that are broken. This month has none; when it does, a red corner marks each cell and this opens the list.',
+      ? 'Must-fix problems this month: hard rules that are broken. A red ring marks each cell; this opens the full list.'
+      : 'Must-fix problems show here: hard rules that are broken. This month has none; when it does, a red ring marks each cell and this opens the list.',
     phone: { target: 'tab-check', text: app => hardCount(app)
-      ? 'The number on Check counts this month\'s must-fix problems: hard rules that are broken. A red corner in the grid marks each cell.'
-      : 'Check lists the month\'s problems. Must-fix ones (hard rules that are broken) put a number on Check and a red corner on the cell; this month has none.' } },
+      ? 'The number on Check counts this month\'s must-fix problems: hard rules that are broken. A red ring in the grid marks each cell.'
+      : 'Check lists the month\'s problems. Must-fix ones (hard rules that are broken) put a number on Check and a red ring on the cell; this month has none.' } },
   { id: 'autofill', tab: 'roster', target: 'autofill', title: 'Auto-fill',
     text: 'Drafts the calls and PM shifts around leave and requests, from your rules. You see a preview first, and Apply can be undone.' },
   { id: 'check', tab: 'check', target: ['check', 'tab-check'], title: 'Check',
