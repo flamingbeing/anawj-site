@@ -501,13 +501,13 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   // the sheet's colours: a saved duty in its old colour moves across once; one the rosterer changed stays
   const old = M.defaultState(); old.rulesVersion = 9;
   const dd = c => old.duties.find(d => d.code === c);
-  Object.assign(dd('C3'), { color: '#b71c1c', ink: '#fff' }); Object.assign(dd('ICU'), { color: '#123456', ink: '#fff' });
+  Object.assign(dd('C3'), { color: '#b71c1c', ink: '#fff' }); Object.assign(dd('S1'), { color: '#6d4c41', ink: '#fff' });
   const mig = M.migrate(JSON.parse(JSON.stringify(old)));
   const md = c => mig.duties.find(d => d.code === c);
-  ok(md('C3').color === '#ffab2e', 'colours: calls are orange like the sheet');
-  ok(md('ICU').color === '#123456', 'colours: a colour the rosterer chose is kept');
+  ok(md('C3').color === '#bf5600', 'colours: calls are orange like the sheet');
+  ok(md('S1').color === '#bf5600', 'colours: a duty saved with older defaults also moves across');
   const df = c => M.DEFAULT_DUTIES.find(d => d.code === c).color;
-  ok(df('ICU') === '#ffee3a' && df('X') === '#c62828' && df('R') === '#1f5fd0' && df('AL') === '#2c5fc6' && df('Z') === '#d0d0d0', 'colours: ICU yellow, blocked red, requests blue, leave blue, grey');
+  ok(df('ICU') === '#fff59d' && df('X') === '#c62828' && df('R') === '#1f5fd0' && df('AL') === '#aecbfa' && df('Z') === '#d5d8de', 'colours: ICU yellow, blocked red, requests blue, leave blue, grey');
 }
 {
   // a C3 call counts as a day on the cardiac posting (the call replaces the posting code on the sheet); R1B for ICU
@@ -572,5 +572,23 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const flagged = c => { rule.params.carry = c; return evaluate(st, { from: nov[0], to: nov[nov.length - 1] }).violations.filter(v => v.ruleId === 'r-c3-fair').length; };
   ok(flagged(0) === 0 && flagged(1) > 0, 'carry-over: equal Novembers are fair without it, and not once October counts');
   ok(/carries over/.test(describeRule({ ...rule, params: { ...rule.params, carry: 0.5 } }, st)), 'carry-over: the rule says so');
+}
+{
+  // fewer alerts about equal calls: a gap is only pointed out above `alert`, though Fill still aims for tolerance
+  const st = M.defaultState();
+  const rule = JSON.parse(JSON.stringify(M.DEFAULT_RULES.find(r => r.id === 'r-c3-fair')));
+  rule.params.carry = 0; st.rules = [rule];
+  ok(rule.params.alert === 2 && rule.params.tolerance === 1, 'equal calls: alerts above 2, aim within 1');
+  for (const id of ['x', 'y']) st.staff.push({ id, name: id, group: 'nhg', tags: [], fte: 1, active: true });
+  const nov = M.monthDays('2026-11');
+  for (const d of nov) for (const id of ['x', 'y']) M.setCell(st, d, id, { a: ['C'] });
+  const wd = nov.filter(d => !M.isWeekend(d));
+  const n = k => evaluate(st, { from: nov[0], to: nov[nov.length - 1] }).violations.filter(v => v.ruleId === 'r-c3-fair').length;
+  wd.slice(0, 2).forEach(d => M.setCell(st, d, 'x', { a: ['C3'] }));   // x two weekday calls, y none: each is 1 point from the mean
+  ok(n() === 0, 'equal calls: a gap of one call is not pointed out');
+  wd.slice(2, 6).forEach(d => M.setCell(st, d, 'x', { a: ['C3'] }));   // six against none: 3 points from the mean
+  ok(n() > 0, 'equal calls: a bigger gap still is');
+  const old = M.defaultState(); old.rulesVersion = 12; delete old.rules.find(r => r.id === 'r-c3-fair').params.alert;
+  ok(M.migrate(JSON.parse(JSON.stringify(old))).rules.find(r => r.id === 'r-c3-fair').params.alert === 2, 'a saved roster gets the alert level once');
 }
 console.log(`nuh-junior-monthly: ${n} checks passed`);
