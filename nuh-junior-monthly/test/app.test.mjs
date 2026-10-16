@@ -573,4 +573,22 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(flagged(0) === 0 && flagged(1) > 0, 'carry-over: equal Novembers are fair without it, and not once October counts');
   ok(/carries over/.test(describeRule({ ...rule, params: { ...rule.params, carry: 0.5 } }, st)), 'carry-over: the rule says so');
 }
+{
+  // fewer alerts about equal calls: a gap is only pointed out above `alert`, though Fill still aims for tolerance
+  const st = M.defaultState();
+  const rule = JSON.parse(JSON.stringify(M.DEFAULT_RULES.find(r => r.id === 'r-c3-fair')));
+  rule.params.carry = 0; st.rules = [rule];
+  ok(rule.params.alert === 2 && rule.params.tolerance === 1, 'equal calls: alerts above 2, aim within 1');
+  for (const id of ['x', 'y']) st.staff.push({ id, name: id, group: 'nhg', tags: [], fte: 1, active: true });
+  const nov = M.monthDays('2026-11');
+  for (const d of nov) for (const id of ['x', 'y']) M.setCell(st, d, id, { a: ['C'] });
+  const wd = nov.filter(d => !M.isWeekend(d));
+  const n = k => evaluate(st, { from: nov[0], to: nov[nov.length - 1] }).violations.filter(v => v.ruleId === 'r-c3-fair').length;
+  wd.slice(0, 2).forEach(d => M.setCell(st, d, 'x', { a: ['C3'] }));   // x two weekday calls, y none: each is 1 point from the mean
+  ok(n() === 0, 'equal calls: a gap of one call is not pointed out');
+  wd.slice(2, 6).forEach(d => M.setCell(st, d, 'x', { a: ['C3'] }));   // six against none: 3 points from the mean
+  ok(n() > 0, 'equal calls: a bigger gap still is');
+  const old = M.defaultState(); old.rulesVersion = 12; delete old.rules.find(r => r.id === 'r-c3-fair').params.alert;
+  ok(M.migrate(JSON.parse(JSON.stringify(old))).rules.find(r => r.id === 'r-c3-fair').params.alert === 2, 'a saved roster gets the alert level once');
+}
 console.log(`nuh-junior-monthly: ${n} checks passed`);

@@ -1057,11 +1057,12 @@ export const RULE_TYPES = {
       P.num('weekendWeight', 'Weekend counts as (second way)', { min: 0, max: 10 }),
       P.num('holidayWeight', 'Public holiday counts as (second way)', { min: 0, max: 10 }),
       P.num('tolerance', 'Allowed difference from average', { min: 0, max: 10 }),
+      P.num('alert', 'Only point it out above (difference)', { min: 0, max: 20 }, 'Fill still aims for an even share, but Check and the dot after a name only mention a gap bigger than this (0 or empty: the same as the allowed difference).'),
       { key: 'among', label: 'Only people on (their days on it set the share)', kind: 'codes', optional: true, help: 'A posting, e.g. ICU: only people in ICU count, and someone in ICU for half the month gets half a share.' },
       P.num('carry', 'Carry over from earlier months (0 to 1)', { min: 0, max: 1 }, 'How much of what a person was over or under in the months before counts now: 0 none, 1 all. Needs "Only people on". The last month counts fully, each month before a quarter less.'),
       P.num('carryMonths', 'Months to look back', { min: 1, max: 12 }),
     ],
-    defaults: () => ({ codes: [], period: 'month', scheme: 'offdays', offBonus: 0.5, eveBonus: 0.5, weekendWeight: 2, holidayWeight: 2, tolerance: 1, among: [], carry: 0, carryMonths: 4 }),
+    defaults: () => ({ codes: [], period: 'month', scheme: 'offdays', offBonus: 0.5, eveBonus: 0.5, weekendWeight: 2, holidayWeight: 2, tolerance: 1, among: [], carry: 0, carryMonths: 4, alert: 0 }),
     describe(r, T) {
       const p = r.params;
       const among = (p.among || []).length ? `people on ${T.codes(p.among)}` : T.who(r.who);
@@ -1077,6 +1078,7 @@ export const RULE_TYPES = {
       const offdays = p.scheme !== 'fixed', ob = num(p.offBonus, 0.5), eb = num(p.eveBonus, 0.5);
       // the call itself counts as a day on the posting (C3 on a cardiac week, R1B on an ICU week): on the sheet the call replaces the posting code
       const ma = (p.among || []).length ? X.codes([...p.among, ...(p.codes || [])]) : null;
+      const alertAt = Math.max(tol, num(p.alert, 0));   // a gap is only pointed out above this; the solver still pushes from `tol`
       const { ctx, u } = X, n = ctx.n, ok = X.when, act = ctx.act, list = X.W.list, inWho = X.W.inWho;
       const periods = p.period === 'range' ? ctx.periods.range : ctx.periods.month;
       const K = periods.length;
@@ -1132,7 +1134,7 @@ export const RULE_TYPES = {
               if (dev <= 1e-9) continue;
               const pp = Math.round(u * dev * 10) / 10;
               pen += pp; ctx.n2++;
-              if (out) {
+              if (out && Math.abs(v - mean) > alertAt) {
                 const lab = p.period === 'range' ? 'in these dates' : `in ${fmtMonth(periods[k].key)}`;
                 // about the whole period, so no date: the grid marks the name, Check's Show opens their month
                 const wtxt = ww !== 1 || hw !== 1 ? ' (weekends and holidays count extra)' : '';
