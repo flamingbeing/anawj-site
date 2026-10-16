@@ -50,7 +50,8 @@ Rules that bite:
   make a test pass.
 - **Blocked by the cloud environment?** (no Google Cloud sign-in, the owner's real documents, a long test run, a
   secret): hand it to the owner's home-computer session instead of stopping. How and what to send: `OPERATIONS.md`,
-  "The home computer". It changes live projects only with the owner's OK.
+  "The home computer". Since 16 Oct 2026 it has the owner's standing permission for live Firebase and Cloudflare
+  changes (limits in `OPERATIONS.md`), so send it those jobs instead of asking the owner.
 
 - The homepage (`index.html`) only shows whether the server is up or down (owner, Oct 2026). Apps stay unlisted:
   never link them from the homepage, and give each app page `<meta name="robots" content="noindex, nofollow">`
