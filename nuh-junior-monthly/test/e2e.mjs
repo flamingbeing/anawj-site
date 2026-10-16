@@ -219,6 +219,13 @@ for (const w of [320, 360, 390, 430]) {
     const vis = sel => { const e = document.querySelector(sel); return e && !e.hidden && e.offsetParent !== null ? e.getBoundingClientRect().height : 0; };
     return { r, vw: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth, top: document.getElementById('top').getBoundingClientRect().height, lockNote: vis('.lock-note'), banner: vis('.r-banner') };
   });
+  // locked (the start): no Fill, and the slim locked and empty-month banners
+  const locked = await read();
+  ok(!('autofill' in locked.r), `${w}px: Fill is hidden while the month is locked`);
+  ok(locked.lockNote > 0 && locked.lockNote <= 44 && locked.banner > 0 && locked.banner <= 44, `${w}px: the locked and empty-month banners are one slim line each (${Math.round(locked.lockNote)} and ${Math.round(locked.banner)} px)`);
+  await page.locator('#lockm').click();
+  await page.getByRole('button', { name: 'Unlock', exact: true }).click();
+  await page.waitForTimeout(500);
   const m = await read();
   ok(m.sw <= m.vw + 1, `${w}px: no sideways page scroll (${m.sw} > ${m.vw})`);
   const names = Object.keys(m.r);
@@ -234,8 +241,6 @@ for (const w of [320, 360, 390, 430]) {
   for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) if (hit(m.r[all[i]], m.r[all[j]])) clash.push(`${all[i]}/${all[j]}`);
   ok(!clash.length, `${w}px: no header control overlaps another (${clash.join(', ')})`);
   ok(m.top <= 150, `${w}px: the header is at most two rows high (${Math.round(m.top)} px)`);
-  // locked (the start) and an empty month: one slim line each, together at most 100 px
-  ok(m.lockNote > 0 && m.lockNote <= 44 && m.banner > 0 && m.banner <= 44, `${w}px: the locked and empty-month banners are one slim line each (${Math.round(m.lockNote)} and ${Math.round(m.banner)} px)`);
   // the filters sit behind one button, and the row is not cut off
   const tb = await page.locator('.r-toolbar').evaluate(el => [el.scrollWidth, el.clientWidth]);
   ok(tb[0] <= tb[1] + 1 && await page.getByRole('button', { name: /^Filters/ }).isVisible(), `${w}px: the filter row fits, with one Filters button`);

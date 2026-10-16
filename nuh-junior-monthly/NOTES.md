@@ -147,6 +147,9 @@ On phones the second header row is the month, Today, the lock and Fill. Fill sho
 that slot was an empty hole. The month title now takes the free width (`.month-title { flex: 1 }`), so Today and the lock sit at the
 right edge on every tab; a phone test checks it on the Day tab.
 
+Fill is also hidden while the month is locked (owner, 16 Oct 2026), in the header and in the empty-month banner: a locked month can't be changed, so Fill would only
+confuse. It returns when the month is unlocked.
+
 ## Cell marks (owner, 16 Oct 2026)
 
 The orange corner means a **note**, as in Google Sheets (it used to mark problems, which people read as comments). A problem is a
