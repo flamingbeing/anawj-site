@@ -141,6 +141,12 @@ month with no entry yet gets a locked one when it is opened (`store.ensureLocked
 sheet unlocks that one month (it is deliberate). Not in Practice. A month the cloud copy holds as unlocked comes in unlocked
 and is locked again at the next close or start. The stored status values are unchanged (`published` = locked), so no rules change.
 
+## Phone header has no gap (owner, 16 Oct 2026)
+
+On phones the second header row is the month, Today, the lock and Fill. Fill shows on the Roster tab only, so on the other tabs
+that slot was an empty hole. The month title now takes the free width (`.month-title { flex: 1 }`), so Today and the lock sit at the
+right edge on every tab; a phone test checks it on the Day tab.
+
 ## Cell marks (owner, 16 Oct 2026)
 
 The orange corner means a **note**, as in Google Sheets (it used to mark problems, which people read as comments). A problem is a

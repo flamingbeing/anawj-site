@@ -246,6 +246,11 @@ for (const w of [320, 360, 390, 430]) {
   await page.getByRole('button', { name: 'Done' }).click();
   await page.waitForTimeout(250);
   await axe(page, `the phone roster header at ${w}`);
+  // on a tab with no Fill the row has no hole: Today and the lock sit at the right edge
+  await page.evaluate(() => { location.hash = '#day'; });
+  await page.waitForTimeout(500);
+  const dayRow = await page.evaluate(() => ({ vw: document.documentElement.clientWidth, lock: document.getElementById('lockm').getBoundingClientRect().right, fill: document.getElementById('autofill').offsetParent !== null }));
+  ok(!dayRow.fill && dayRow.lock >= dayRow.vw - 14, `${w}px: with no Fill (Day tab) the lock sits at the right edge, no gap (${Math.round(dayRow.lock)} of ${dayRow.vw})`);
   await page.close();
 }
 // ---------- the Google Sheet: read it, check it is unchanged, write only the changes (a fake Sheets API; no Google account) ----------
