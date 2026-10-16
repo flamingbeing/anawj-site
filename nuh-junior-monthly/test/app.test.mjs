@@ -541,4 +541,19 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const v = evaluate(s, { from: nov[0], to: nov[nov.length - 1] }).violations.filter(x => x.staffId === 'j').map(x => x.ruleId);
   ok(!v.includes('r-c3-onc'), 'a C3 on the last day of the month is on the cardiac posting when its C days start two days later');
 }
+{
+  // the day-1 cardiac call rule does not apply to RES3 and senior residents
+  const s = M.defaultState();
+  s.rules = [JSON.parse(JSON.stringify(M.DEFAULT_RULES.find(r => r.id === 'r-c3-d1')))];
+  for (const [id, g] of [['a', 'res3'], ['b', 'r'], ['c', 'res2']]) {
+    s.staff.push({ id, name: id, group: g, tags: [], fte: 1, active: true });
+    M.setCell(s, '2026-11-02', id, { a: ['C3'] });
+    M.setCell(s, '2026-11-03', id, { a: ['C'] });
+  }
+  const nov = M.monthDays('2026-11');
+  const who = evaluate(s, { from: nov[0], to: nov[nov.length - 1] }).violations.filter(x => x.ruleId === 'r-c3-d1').map(x => x.staffId).join();
+  ok(who === 'c', 'no day-1 cardiac call preference for RES3 and senior residents, still for the others');
+  const old = M.defaultState(); old.rulesVersion = 10; old.rules.find(r => r.id === 'r-c3-d1').who = { groups: [], tags: [], staff: [], exclude: [] };
+  ok(M.migrate(JSON.parse(JSON.stringify(old))).rules.find(r => r.id === 'r-c3-d1').who.onlyGroups.length > 5, 'a saved roster gets the group limit once');
+}
 console.log(`nuh-junior-monthly: ${n} checks passed`);
