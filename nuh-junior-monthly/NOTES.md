@@ -132,3 +132,11 @@ More > Team sharing > **Earlier saves** lists the last 20 saves of the month on 
 who saved and when. **Restore** brings that copy into the browser only (Undo puts the current one back); it reaches the team
 at the next Save to team. Every save is kept for good for now. Thinning (a Firestore TTL policy on an `expireAt` field: about
 60 days, keeping the first save of each week) is planned but not built; the owner asked for a reminder in December 2026.
+
+## Months start locked (owner, 16 Oct 2026)
+
+Every month is locked until someone unlocks it (the Locked button at the top). A month with no entry yet gets a locked one
+when it is opened (`store.ensureLocked`); the first time this version starts on a device, every existing month is locked
+once (`settings.lockedByDefault`, `store.lockAllOnce`). Reading a month in from Google or the sheet unlocks that one month
+(it is deliberate). Not in Practice. A month the team copy holds as unlocked stays unlocked when pulled. The stored
+status values are unchanged (`published` = locked), so no rules change.

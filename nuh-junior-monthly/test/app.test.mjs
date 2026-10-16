@@ -258,6 +258,24 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   store.commit('unlock', d => { M.setMonthLocked(d, MONTH, false); });
   ok(store.commit('edit', d => { M.setCell(d, days[2], 'z1', { a: ['ICU'] }); }) === true, 'unlocked, it changes again');
 }
+// every month starts locked (not in Practice): a month with no entry gets a locked one, existing months once per device
+{
+  const { createStore } = await import('../js/store.js');
+  const old = M.defaultState();
+  old.months['2026-09'] = { status: 'draft', publishedAt: '', note: '' };
+  const store = createStore({ demo: false, fallback: () => old });
+  ok(!M.isMonthLocked(store.get(), '2026-09'), 'an existing month is open before the first start');
+  store.lockAllOnce();
+  ok(M.isMonthLocked(store.get(), '2026-09'), 'every existing month is locked once');
+  store.commit('unlock', d => { M.setMonthLocked(d, '2026-09', false); });
+  store.lockAllOnce();
+  ok(!M.isMonthLocked(store.get(), '2026-09'), 'and not again: an unlocked month stays unlocked');
+  ok(store.ensureLocked('2026-10') && M.isMonthLocked(store.get(), '2026-10'), 'a new month starts locked');
+  store.commit('unlock', d => { M.setMonthLocked(d, '2026-10', false); });
+  ok(store.ensureLocked('2026-10') === false && !M.isMonthLocked(store.get(), '2026-10'), 'a month someone unlocked is left alone');
+  const demo = createStore({ demo: true, fallback: () => M.defaultState() });
+  ok(demo.ensureLocked('2026-10') === false && demo.lockAllOnce() === false && !M.isMonthLocked(demo.get(), '2026-10'), 'Practice is never locked');
+}
 // import fixes found by the backtest: leave inside a posting keeps the posting; someone listed twice
 {
   const head = ['S/N', 'Grade', 'Name', ...days.map((d, i) => String(i + 1)), '1-Jan'];

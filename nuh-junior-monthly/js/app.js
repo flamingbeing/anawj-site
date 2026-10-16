@@ -124,6 +124,7 @@ function monthFromParams(p) { return validMonth(p.m) ? p.m : validDay(p.d) ? p.d
 function setMonth(m) {
   if (!validMonth(m) || m === app.month) return;
   app.month = m;
+  app.store.ensureLocked(m);
   evalCache = null;
   try { localStorage.setItem('nuhjm-ui-month', JSON.stringify({ m, at: M.iso(new Date()) })); } catch (e) { /* ignore */ }
   // keep the month in the link, so a reload or a relaunch of the installed app comes back to it
@@ -399,7 +400,7 @@ async function doRoute() {
   const { tab, params, key } = parseHash();
   app.params = params;
   const pm = monthFromParams(params);
-  if (pm && pm !== app.month) { app.month = pm; evalCache = null; }
+  if (pm && pm !== app.month) { app.month = pm; app.store.ensureLocked(pm); evalCache = null; }
   const sameTab = tab === current.tab && current.view;
   app.tab = tab;
   renderHeader();
@@ -623,10 +624,12 @@ function goToday() {
 
 function doUndo() {
   const label = app.store.undo();
+  app.store.ensureLocked(app.month);
   if (label) toast(`Undone: ${label}`, { action: { label: 'Redo', fn: doRedo }, ms: 3000 });
 }
 function doRedo() {
   const label = app.store.redo();
+  app.store.ensureLocked(app.month);
   if (label) toast(`Redone: ${label}`, { ms: 2500 });
 }
 
@@ -687,6 +690,8 @@ async function start() {
   // Month on screen: the hash (?m=), else this month.
   const hp = parseHash().params;
   app.month = monthFromParams(hp) || thisMonth();
+  app.store.lockAllOnce();
+  app.store.ensureLocked(app.month);
 
   renderNav();
   renderDemoBar();
