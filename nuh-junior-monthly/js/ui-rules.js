@@ -91,6 +91,7 @@ const TOPICS = [
 ];
 export function topicOf(r) {
   const p = r.params || {};
+  if (/^r-mo-/.test(r.id || '')) return 'mo';
   if (r.type === 'requests' || /^r-req-|^r-pool-/.test(r.id || '')) return 'requests';
   const codes = [].concat(p.codes || [], p.ifCodes || [], p.thenCodes || [], p.codesA || [], p.codesB || []);
   const has = c => codes.includes(c);
