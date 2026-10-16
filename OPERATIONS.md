@@ -88,47 +88,14 @@ near zero (the APMES apps are a demo). Rough projections, not measurements:
 
 ## The home computer ("firetop" helper)
 
-The owner's always-on Claude Code session at home (Remote Control): session `session_01F92cPiysiT5WAFPXMga7f4`,
-"firetop-partitioned-rose". Cloud sessions hand it work with `send_message` and it reports back by message. Its own notes stay on that
-computer, never in this repo.
+The owner's always-on Claude Code session at home. Send it what a cloud session can't do: live Firebase and
+Cloudflare changes (standing permission, owner, 16 Oct 2026), production operations on the Google Cloud projects
+(backups, restores, budgets, logs), the owner's real documents, long or heavy jobs, and anything needing a secret. It
+also runs the scheduled backup, uptime and drift checks. Not for hosting: it's a home computer on home internet.
 
-**Standing permission (owner, 16 Oct 2026):** firetop has standing read-write permission for the owner's Firebase
-projects and Cloudflare account, and is signed in to both. So when a session needs a live change the cloud sandbox
-can't make, or one the owner used to do by hand, send firetop a job instead of asking the owner: creating or changing
-a Firebase project, Firestore data or rules, Auth settings and authorised domains, Hosting, IAM roles, budgets and
-backups, the GitHub secrets and variables for those, and Cloudflare DNS, Workers and rules checks. A job says the
-project or zone, the exact change (file, rule text, record or document ids), why, and how to verify; never put
-secrets or patient or resident data in it. Firetop saves the before-state, makes the change, verifies it, logs it in
-its own change log and replies. **Still the owner's call, not through firetop alone:** deleting databases, backups,
-buckets or domains; making private data public; spending beyond his budgets; account-level security (members, API
-tokens, sign-in methods). Console-only clicks (turning on a sign-in provider, OAuth client origins, publishing a
-consent screen) still need the owner; firetop gives him the exact clicks.
-
-Send it:
-
-- **Production operations** on the Google Cloud projects (it has `gcloud` signed in as the owner): Firestore backups,
-  restores and restore drills, point-in-time recovery, budget and billing checks, indexes, quotas, logs. Cloud
-  sessions can't do these.
-- **The owner's real documents** (study forms, the eCRF template and anything that must not enter this public
-  repo): it reads them locally and answers; they never leave the owner's own storage.
-- **Long or heavy jobs**: every app's tests and browser tests before a release, builds, data crunching.
-- **Secrets**: the owner pastes any secret there, never into a cloud session or this repo.
-
-Scheduled checks it runs (owner, 13 Oct 2026; read-only, alerts go to the owner's phone):
-
-- **Backups, daily 08:00:** a ready Firestore backup under 30 hours old for `prewarm-study`, `apmes-logbook` and
-  `nuh-roster`, and point-in-time recovery still on for `prewarm-study`. Alerts only when something is wrong, plus an
-  "all OK" on Mondays so silence means it's still running.
-- **Uptime (since 14 Oct 2026):** a small container on the home NAS ("webapps-check") checks the 11 live addresses
-  in the Worker's `SITES` list (`worker/routes.js`) and reports to one Uptime Kuma push monitor, which alerts on
-  Telegram. An outage can take up to an hour to show. It checks from the owner's home internet, so a home outage makes
-  every site look down at once. The seven older per-address monitors were paused on 14 Oct (owner's OK; Resume in Kuma brings one back).
-- **Logbook drift check, Mondays 08:30:** compares the app's data with the response sheet; read-only.
-- No weekly spend report (owner's choice): the budget emails at 50%, 90% and 100% instead.
-- To change or stop them, ask that session.
-
-Don't send it: hosting or anything that must stay up (it's a home computer on home internet, and goes offline
-until the owner signs in again after a restart).
+How to reach it, what it may change, the job format, the limits that still need the owner and the scheduled checks:
+`ops/firetop.md` in the owner's private repo `flamingbeing/life` (moved there 16 Oct 2026 so the public repo doesn't
+map how his accounts are run).
 
 ## Handing over
 
