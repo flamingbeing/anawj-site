@@ -171,6 +171,13 @@ const noSideScroll = async (page, label) => {
   await page.waitForTimeout(300);
   const pooled = await page.evaluate(nm0 => { const s = window.jmApp.store.get(); const p = s.staff.find(x => x.name === nm0); return { tags: p.tags, on: s.rules.find(r => r.id === 'r-pool-1').enabled }; }, nm);
   ok(pooled.tags.includes('mo1s') && pooled.tags.includes('mo1') && pooled.on, 'importing the strong / weak list tags the person and turns the pool rules on');
+  // Fill sits on the Check tab too (that is where the problems show), and not on Day or Rules
+  await go(page, '#check');
+  await page.waitForTimeout(300);
+  ok(await page.locator('#autofill').isVisible(), 'the Check tab has the Fill button');
+  await go(page, '#day');
+  await page.waitForTimeout(300);
+  ok(!(await page.locator('#autofill').isVisible()), 'the Day tab has no Fill button');
   // auto-fill next month: no must-fix problems left
   await page.evaluate(() => window.jmApp.setMonth(window.jmApp.model.addMonths(window.jmApp.month, 1)));
   await page.waitForTimeout(300);
