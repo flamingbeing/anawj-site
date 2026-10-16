@@ -27,7 +27,8 @@ try { for (const width of [390, 1280]) {
   await ini.click();
   assert.equal(await ini.getAttribute('aria-pressed'), 'true');
   assert.match(await ini.innerText(), /ZQ · not initials/);
-  assert.equal(await p.locator('.box-marks mark.m-ini').count(), 0, 'still marked in the box');
+  // (the box's marks repaint just after the tap: wait for it, as a check made at once raced it on a busy machine)
+  await p.waitForFunction(() => !document.querySelector('.box-marks mark.m-ini'), null, { timeout: 3000 }).catch(() => { throw new Error('still marked in the box'); });
   await ini.click(); assert.equal(await ini.innerText(), 'ZQ = initials');
   await ini.click();
   assert.deepEqual(await saveCase(), { initials: '', details: 'ZQ 45F fake hernia repair' });
