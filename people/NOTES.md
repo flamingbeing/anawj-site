@@ -65,8 +65,15 @@ see it: `STATUS.md`. The sheet's real details (names, the code key's answers) ar
   week, `C-E` an elective). A bare number in a week cell is a count, not a posting. Codes not in the key are listed under the grid.
 - The code key (`CODE_KEY`: institution, type, meaning) comes from the owner's answers to a "Rotation Code Key" page, with
   names and hedges removed. Add a code there when the sheet gains one.
-- Not built yet (stage 1, part 2): link sheet names to people (by hand once, kept in the browser) and the hand-off of the
-  critical postings to NUH Junior Monthly, which pulls them (`nuh-junior-monthly/NOTES.md`, "Rotations from People").
+- **Hand-off to NUH Junior Monthly** (the roster app pulls): Postings › Pull from APMES People… in that app opens
+  `people/?pull=rotations#rotations`. People says hello to the tab that opened it (`people-pull-hello`); the roster app
+  answers `nuhjm-pull-info` (its staff names, the posting codes it accepts, the first and last Monday shown). With a sheet open,
+  People lists who on the sheet has a critical posting in those weeks (`CRITICAL`: ICU, C, C-e, C-p, OGDF, OGNF1, OGNF2, and
+  only those the roster accepts) and the user links each sheet name to a roster name (a suggestion is made only when one name
+  fits best, `suggestLinks`; "Not in the roster" is a choice too). Links are kept in this browser (`people-rot-links-v1`, names
+  only). KIV cells and electives (`-E`) are left out unless ticked. Only after Send does `people-rotations` (the paste text,
+  `exportRotations`) go to the opener, and the roster app opens its Paste rotations box with it: nothing is applied until Apply.
+  Both ends check the origin (the other app's address, or their own on previews and tests). Test: `people/test/e2e.mjs` 6d.
 
 ## Linked from
 

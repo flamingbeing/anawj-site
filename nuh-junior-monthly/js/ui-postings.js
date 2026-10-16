@@ -3,6 +3,7 @@
 // for a week puts that posting code on each of its seven days (the roster grid shows it as the cell colour). Rotations
 // from the master rotation sheet can be pasted in (names down, Mondays across).
 import * as M from './model.js';
+import { pullFromPeople } from './people-pull.js';
 
 const SHORT_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const fmtShort = s => { const d = M.parseISO(s); return `${d.getDate()} ${SHORT_MON[d.getMonth()]}`; };
@@ -93,7 +94,8 @@ export function mount(el, app) {
         h('h2', null, `Postings, ${M.fmtMonth(app.month)}`),
         h('p', { class: 'muted' }, 'Plan each person\'s posting by the week (Monday to Sunday). It fills every day of that week: the roster shows it as the cell colour, and rules use it ("a cardiac call only on a cardiac day"). Leave and calls already in a cell stay.'),
         h('div', { class: 'pv-tools' }, search, pick,
-          h('button', { type: 'button', class: 'btn', onclick: pasteDialog }, 'Paste rotations…'))));
+          h('button', { type: 'button', class: 'btn', onclick: () => pasteDialog() }, 'Paste rotations…'),
+          h('button', { type: 'button', class: 'btn', onclick: () => pullFromPeople(app, text => pasteDialog(text)) }, 'Pull from APMES People…'))));
 
     const table = h('table', { class: 'pv-table' });
     const thead = h('thead', null, h('tr', null, h('th', { scope: 'col', class: 'pv-name' }, 'Name'),
@@ -145,9 +147,10 @@ export function mount(el, app) {
     paintRows();
   }
 
-  function pasteDialog() {
+  function pasteDialog(prefill = '') {
     const ta = h('textarea', { rows: '8', class: 'pv-paste', 'aria-label': 'Rotations to paste', placeholder: 'Name\t7/12/2026\t14/12/2026\nAn Example\tICU\tICU\n…' });
-    const msg = h('p', { class: 'muted' }, 'Copy the weeks you need from the rotation sheet: the first row the Mondays, then one row per person (name, then a posting code per week). Names are matched to People; unknown codes are skipped.');
+    ta.value = prefill;
+    const msg = h('p', { class: 'muted' }, prefill ? 'From APMES People: the ICU, cardiac and OG float postings. Look them over, then Apply. Weeks you apply replace the posting those people have that week.' : 'Copy the weeks you need from the rotation sheet: the first row the Mondays, then one row per person (name, then a posting code per week). Names are matched to People; unknown codes are skipped.');
     app.sheet({
       title: 'Paste rotations', body: h('div', { class: 'bx-form' }, msg, ta), actions: [{ label: 'Cancel' }, {
         label: 'Apply', primary: true, fn: () => {
