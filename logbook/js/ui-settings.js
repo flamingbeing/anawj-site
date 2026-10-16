@@ -12,6 +12,7 @@ import { DEFAULT_ACCENT, cleanAccent, SWATCHES } from './colors.js';
 import { THEMES, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, SPACINGS, TAB_STYLES, BANDS, HEAD_FONTS } from './themes.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS, HEAD_STYLES, mdDate, fileDate } from './markdown.js';
 import { checkCss } from './custom-css.js';
+import { cleanMine, saveMine, minePatch, matchMine, exportText, importText } from './my-themes.js';
 import { FONTS, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont } from './fonts.js';
 import { SWITCHES, switchLabel, switchChanges, applyPatch, resetPatch, tabsAfter } from './profiles.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
@@ -141,7 +142,7 @@ export function renderThemes() {
     displayPreview(),
     h('section', { class: 'card' },
       h('h2', {}, 'Themes'),
-      h('p', { class: 'theme-now' }, 'Now: ', h('b', {}, themeLabel(st))),
+      h('p', { class: 'theme-now' }, 'Now: ', h('b', {}, matchMine(st.myThemes, st) && custom ? `${matchMine(st.myThemes, st).name} (yours)` : themeLabel(st))),
       help('A theme sets the colours, light or dark, corners, lines, fonts and spacing in one go. Change anything below afterwards; your changes stay.'),
       h('h3', {}, 'Classic'),
       h('div', { class: 'theme-grid' }, THEMES.filter(t => t.group === 'classic').map(t => h('button', { type: 'button', class: 'theme-card', 'aria-pressed': String(t.id === theme.id && !custom), onclick: () => pickTheme(t) },
@@ -152,6 +153,7 @@ export function renderThemes() {
       h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('button', { type: 'button', class: 'small', onclick: async () => {
         const m = await import('./ui-feedback.js'); m.setFeedbackDraft?.('Theme suggestion: '); location.hash = '#feedback';
       } }, 'Suggest a theme'))),
+    myThemesCard(st, custom),
     h('section', { class: 'card' },
       h('h2', {}, 'Colour and light'),
       pick('Light or dark', THEME_MODES, cachedTheme(), v => { applyTheme(v); setDisplay({ themeMode: null }); hooks.render(); }),
@@ -182,6 +184,46 @@ export function renderThemes() {
 }
 // Settings → Display → Advanced display settings (#displayadv), under headings (owner, 13 Oct 2026): the header and
 // tab bar, Logbook rows, text, the Case tab layout, then custom CSS
+// Your themes (owner, 16 Oct 2026; my-themes.js): once anything on this page changes the look is Custom, and this card
+// offers to keep it under a name. Saved themes are picked like any other; Export and Import move them as a file.
+function myThemesCard(st, custom) {
+  const mine = cleanMine(st.myThemes), now = matchMine(mine, st);
+  const put = list => { setDisplay({ myThemes: list.length ? list : null }); hooks.render(); };
+  const name = h('input', { type: 'text', maxlength: '40', 'aria-label': 'Name for this look', placeholder: 'e.g. Night shift', value: now ? now.name : '' });
+  const save = () => {
+    try { put(saveMine(display().myThemes, name.value, display(), cachedTheme())); toast(`Saved as “${name.value.trim()}”`); }
+    catch (err) { toast(err.message); }
+  };
+  const use = t => {
+    const before = display(), beforeMode = cachedTheme();
+    if (t.mode) applyTheme(t.mode);
+    applyDisplay(setDisplay(minePatch(t))); hooks.render();
+    toast(`Theme: ${t.name}`, { action: 'Undo', onaction: () => { applyTheme(beforeMode); applyDisplay(setDisplay(Object.fromEntries([...THEME_KEYS, 'theme'].map(k => [k, before[k] ?? null])))); hooks.render(); } });
+  };
+  const drop = t => {
+    const before = display().myThemes;
+    put(cleanMine(before).filter(x => x.id !== t.id));
+    toast(`Deleted “${t.name}”`, { action: 'Undo', onaction: () => put(cleanMine(before)) });
+  };
+  const exportAll = () => { download('my-logbook-themes.json', new Blob([exportText(mine)], { type: 'application/json' })); toast('Themes saved as a file'); };
+  const importBtn = fileButton('Import…', '.json,application/json', async file => {
+    try { const r = importText(await file.text(), display().myThemes); put(r.list); toast(`${r.added} theme${r.added === 1 ? '' : 's'} added`); }
+    catch (err) { toast(err.message); }
+  }, 'btn small');
+  return h('section', { class: 'card my-themes' },
+    h('h2', {}, 'Your themes'),
+    custom && !now ? h('p', { class: 'tip', role: 'note' }, 'You’ve changed this theme: it’s now Custom. Save it to pick it again later.')
+      : help('Change anything on this page, then save the look here under a name of your own.'),
+    h('div', { class: 'bar', style: 'margin:6px 0 0' }, name, h('button', { type: 'button', class: custom && !now ? 'primary' : '', onclick: save }, now ? 'Save changes' : 'Save this look')),
+    mine.length ? h('ul', { class: 'theme-list', role: 'list', style: 'margin-top:10px' }, mine.map(t => h('li', { class: 'my-theme' },
+      h('button', { type: 'button', class: 'theme-row', 'aria-pressed': String(!!now && now.id === t.id), onclick: () => use(t) },
+        themeSwatch({ look: t.look, mode: t.mode === 'dark' || t.mode === 'oled' ? t.mode : null }), h('span', { class: 'mt' }, h('b', {}, t.name), h('small', {}, t.mode ? `Yours · ${t.mode}` : 'Yours'))),
+      h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Delete ${t.name}`, title: 'Delete', onclick: () => drop(t) }, '×')))) : null,
+    h('div', { class: 'bar', style: 'margin:10px 0 0' },
+      mine.length ? h('button', { type: 'button', class: 'small', onclick: exportAll }, 'Export…') : null, importBtn),
+    help('Export saves your themes as a file to keep or send to someone; Import adds themes from such a file. Only look settings travel, never cases or names.'));
+}
+
 export function renderDisplayAdvanced() {
   const st = display();
   const set = (k, off = null) => v => applyDisplay(setDisplay({ [k]: v || off }));
