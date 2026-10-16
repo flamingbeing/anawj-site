@@ -260,7 +260,9 @@ export function exportBlock(state, month) {
         const prev2 = M.getCell(state, days[days.length - 2], id);
         if (prev2 && (prev2.a || []).some(c => dmap.get(c)?.rest2) && (lastCell?.a || []).some(c => (prev2.a || []).includes(c) && dmap.get(c)?.kind === 'posting')) want = 'PPC';
       }
-      if (want && norm(nextOrig).toUpperCase() !== want) nx = want;
+      // the 1st-of-next-month cell holds a marker (Z) in some sheets: leave anything that isn't blank or a PC/PPC as it is
+      const nextKeep = norm(nextOrig) !== '' && !/^(PC|PPC)$/i.test(norm(nextOrig));
+      if (want && !nextKeep && norm(nextOrig).toUpperCase() !== want) nx = want;
       if (nx !== nextOrig) changes.push({ cell: `${colName(lay.nextCol)}${r}`, name: person.name, date: nextDay, from: nextOrig.trim(), to: nx });
     }
     out.push(nx);

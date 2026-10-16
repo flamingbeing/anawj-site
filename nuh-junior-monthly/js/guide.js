@@ -16,23 +16,23 @@ const isEmpty = app => !((app.store.get().staff || []).length);
 // Each step: id, title, text and its buttons ({ label, icon?, fn(app) }). needsStaff: its buttons wait for step 1.
 export const STEPS = [
   { id: 'staff', title: 'Add your staff',
-    text: 'Import the department\'s leave request Excel sheet (it brings the leave and requests too), or add names under People.',
-    acts: [{ label: 'Import Excel sheet', icon: 'upload', fn: app => app.go('more') }, { label: 'Add staff', icon: 'plus', fn: app => app.go('people', { s: 'staff' }) }] },
+    text: 'Open More › Import from the Google Sheet and paste the month\'s tab (or a downloaded .xlsx). People, postings, leave and requests come in.',
+    acts: [{ label: 'Import from the Google Sheet', icon: 'upload', fn: app => app.go('more') }, { label: 'Add staff', icon: 'plus', fn: app => app.go('people', { s: 'staff' }) }] },
   { id: 'codes', title: 'Check the duty codes',
-    text: 'C, P, SMO, OTC… with their colours, and which ones Auto-fill may place. Some meanings are guesses: put them right under People › Duty codes.',
+    text: 'C3, R1B, PC, PPC… with their colours. Auto-fill places only C3 and R1B. Change a meaning under People › Duty codes.',
     acts: [{ label: 'Open duty codes', fn: app => app.go('people', { s: 'codes' }) }] },
   { id: 'rules', title: 'Review the rules',
-    text: 'The starting numbers are guesses: 2 juniors and 1 senior on call each night, 1 PM shift on weekdays, at most 7 calls a month. Open a rule to change it.',
+    text: 'The cardiac and ICU rules come from two years of rosters; the ones marked To confirm are guesses. Open a rule to change it.',
     acts: [{ label: 'Open Rules', fn: app => app.go('rules') }] },
-  { id: 'leave', title: 'Enter leave and requests', needsStaff: true,
-    text: 'Tap a cell for leave (AL) or a request (Nc, Cr…). Tip: Paint fills a block of leave in a few taps.',
-    acts: [{ label: 'Show me Paint', icon: 'brush', fn: app => showOnRoster(app, 'paint', app.isPhone() ? 'Paint: pick a code, then tap the cells' : 'Paint: pick a code, then drag across the days') }] },
+  { id: 'leave', title: 'Check leave and postings', needsStaff: true,
+    text: 'Leave and requests come in with the sheet. Check each person\'s posting by the week under Postings.',
+    acts: [{ label: 'Open Postings', fn: app => app.go('postings') }] },
   { id: 'autofill', title: 'Auto-fill the month', needsStaff: true,
-    text: 'Auto-fill drafts the calls and PM shifts around the leave and requests. You see a preview first, and Apply can be undone.',
+    text: 'Auto-fill places the cardiac (C3) and ICU (R1B) calls around postings, leave and requests. You see a preview first, and Apply can be undone.',
     acts: [{ label: app => `Auto-fill ${M.fmtMonth(app.month)}`, icon: 'spark', fn: app => app.openAutofill() }] },
-  { id: 'shared', title: 'Check and share',
-    text: 'Look the month over in Check, then download the Excel sheet, calendar files or a backup (More).',
-    acts: [{ label: 'Open Check', fn: app => app.go('check') }, { label: 'Export and backup', fn: app => app.go('more') }] },
+  { id: 'shared', title: 'Put it back in the Google Sheet',
+    text: 'Look the month over in Check. Then, in More, copy the cells and paste them over the sheet\'s day cells (values only).',
+    acts: [{ label: 'Open Check', fn: app => app.go('check') }, { label: 'Put it back', fn: app => app.go('more') }] },
 ];
 
 // Which steps are done: one pass over the cells that stops once it has seen leave (or a request) and an Auto-fill code.
@@ -153,7 +153,7 @@ export function welcomeScreen(app) {
       h('div', { class: 'welcome-intro' },
         h('div', { class: 'empty-ic', html: icon('grid') }),
         h('h2', null, 'Welcome to NUH Junior Monthly'),
-        h('p', null, 'Plan the monthly calls, PM shifts and clinics together with leave and requests, check them against your rules, and let Auto-fill draft the rest.'),
+        h('p', null, 'Fill the cardiac (C3) and ICU (R1B) calls in the department\'s Google Sheet: bring the month in, plan postings by the week, check the rules, and let Auto-fill draft the calls.'),
         h('p', { class: 'muted' }, 'Everything stays in this browser until team sharing is set up.')),
       slot));
   return { el, slot };
@@ -307,7 +307,7 @@ export function startTasks(app) {
       text: `Go to ${M.fmtMonth(nextM)} (the › beside the month), press Auto-fill, then Start, then Apply.`,
       begin: () => {},
       check: (s, info) => info && info.source === 'commit' && /^Auto-fill /.test(info.label || ''),
-      done: () => 'Applied: the calls and PM shifts are in, around the leave and requests. Undo in the header takes it back.',
+      done: () => 'Applied: the cardiac and ICU calls are in. Undo in the header takes it back.',
       show: async () => {
         const btn = document.querySelector('.af-sheet .af-actions .btn-primary');
         if (btn) return showMe(app, { el: btn, text: `${tap} ${btn.textContent.trim()}` });

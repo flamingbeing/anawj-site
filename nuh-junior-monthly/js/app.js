@@ -484,16 +484,16 @@ function welcomeCard() {
     h('div', { class: 'card welcome-card' },
       h('div', { class: 'empty-ic', html: icon('grid') }),
       h('h2', null, 'Welcome to NUH Junior Monthly'),
-      h('p', null, 'Plan the monthly calls, PM shifts and clinics together with leave and requests, check them against your rules, and fill the gaps automatically.'),
+      h('p', null, 'Fill the cardiac (C3) and ICU (R1B) calls in the department\'s Google Sheet: bring the month in, plan postings by the week, check the rules, and let Auto-fill draft the calls.'),
       h('p', { class: 'muted' }, 'Start by bringing in the department list. Everything stays in this browser until team sync is set up.'),
       // the next steps, in order; the default rules are already on, with numbers that are guesses
       h('ol', { class: 'welcome-steps' },
-        h('li', null, 'Add your staff (import the Excel sheet, or add them under People).'),
-        h('li', null, 'Enter leave and requests on the roster (the Excel import brings them in too).'),
-        h('li', null, `Check the rules: ${(app.store.get().rules || []).filter(r => r.enabled !== false).length} default rules are already on, and their numbers (calls a month, people on call each night) are guesses.`),
-        h('li', null, 'Press Auto-fill, look at the preview, then Apply.')),
+        h('li', null, 'Bring the month in: More › Import from the Google Sheet (people, postings, leave and requests come with it).'),
+        h('li', null, 'Check each person\'s posting by the week under Postings.'),
+        h('li', null, `Check the rules: ${(app.store.get().rules || []).filter(r => r.enabled !== false).length} default rules are already on; the ones marked To confirm are guesses.`),
+        h('li', null, 'Press Auto-fill, look at the preview, then Apply. Then put the calls back in the sheet (More).')),
       h('div', { class: 'welcome-actions' },
-        h('button', { type: 'button', class: 'btn btn-primary', onclick: () => go('more'), html: `${icon('upload')}<span>Import Excel sheet</span>` }),
+        h('button', { type: 'button', class: 'btn btn-primary', onclick: () => go('more'), html: `${icon('upload')}<span>Import from the Google Sheet</span>` }),
         h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => go('people'), html: `${icon('plus')}<span>Add staff</span>` }),
         h('a', { class: 'btn btn-ghost', href: './?demo', target: '_blank', rel: 'noopener', html: `${icon('eye')}<span>Try the practice department</span>` }))));
 }
