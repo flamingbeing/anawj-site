@@ -66,7 +66,7 @@ Vendored: ExcelJS 4.4.0 (MIT, `vendor/`).
 
 Off until the owner creates the Firebase project `ntf-roster`. Steps are at the top of `js/firebase-config.js`: create
 the project with Google sign-in and Firestore, add `ntfroster.anawj.com` to the authorised domains (never preview
-domains), paste the web config, add yourself as the first admin in `members/{email}`, grant the rules deployer
-(`firebase-rules-deployer@apmes-logbook.iam.gserviceaccount.com`) Firebase Rules Admin, and add the project to
+domains), paste the web config, add yourself as the first admin in `members/{email}`, grant the rules-deployer
+service account Firebase Rules Admin, and add the project to
 `.github/workflows/deploy-firestore-rules.yml`. Staff names and leave are then stored in Google Cloud: check PDPA and
 hospital policy before using real names.

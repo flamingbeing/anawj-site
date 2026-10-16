@@ -43,14 +43,14 @@ Rules that bite:
 
 - Accounts, settings, costs, the pre-launch checklist and how to hand over: [OPERATIONS.md](OPERATIONS.md). Update
   it when an account, setting or cost changes.
-- A PR that changes any `firestore.rules` deploys live on merge. Sessions may merge it themselves (owner, 14 Oct 2026: rules
-  and data are his biggest headache; he does not want to intervene), carefully: run `tools/test-rules.sh` first, merge only
+- A PR that changes any `firestore.rules` deploys live on merge. Sessions may merge it themselves (owner, 14 Oct 2026),
+  carefully: run `tools/test-rules.sh` first, merge only
   when the Checks are green, confirm the "Deploy Firestore rules" run succeeded, and say in the report which rules changed
   and what they now allow or deny. Never loosen rules on real-data collections (logbook, evals, prewarm, roster) just to
   make a test pass.
 - **Blocked by the cloud environment?** (no Google Cloud sign-in, the owner's real documents, a long test run, a
   secret): hand it to the owner's home-computer session instead of stopping. How and what to send: `OPERATIONS.md`,
-  "The home computer" (details in `life/ops/firetop.md`).
+  "The home computer".
 
 - The homepage (`index.html`) only shows whether the server is up or down (owner, Oct 2026). Apps stay unlisted:
   never link them from the homepage, and give each app page `<meta name="robots" content="noindex, nofollow">`
@@ -64,8 +64,8 @@ Rules that bite:
 - `nuh-roster/firestore.rules` (Firebase project `nuh-roster`) and `prewarm/firestore.rules` (project `prewarm-study`) deploy the same way.
   How: `.github/workflows/deploy-firestore-rules.yml` deploys a changed file to its project on merge to main
   (check the "Deploy Firestore rules" run in Actions). It compiles the rules first, so a syntax error fails the run
-  and leaves the live rules as they were. It signs in with the `FIREBASE_SERVICE_ACCOUNT` secret (service account
-  `firebase-rules-deployer@apmes-logbook.iam.gserviceaccount.com`, Firebase Rules Admin on both projects); sessions
+  and leaves the live rules as they were. It signs in with the `FIREBASE_SERVICE_ACCOUNT` secret (the rules-deployer
+  service account, Firebase Rules Admin on each project); sessions
   never need the secret. A manual run (Run workflow) deploys both files over the live rules: ask the owner first.
   A new Firestore-backed app needs a matrix entry and paths filter in the workflow, and the owner grants that
   service account Firebase Rules Admin on the new project.
@@ -150,10 +150,12 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
   Cloudflare tools yourself without the owner's approval (`CLAUDE.md`).
 - **Keep the repo public-safe:** fake data only; never commit secrets, tokens or credentials (the owner commits
   any needed public client IDs themselves).
-  **Private work goes in `flamingbeing/life`** (the owner's private repo; owner, 15 Oct 2026: "many things can be kept
-  private in Life"). Before writing anything here, ask whether it needs to be public for the app to work; if not, and it
-  is sensitive, put it in `life` instead (attach it with `add_repo` if the session lacks it; Codex: ask the owner). That
-  covers:
+  **Private work goes in `flamingbeing/life`** (the owner's private repo, 15 Oct 2026). Claude Code cloud sessions load
+  it at start (`.claude/hooks/session-start.sh` clones it next to this repo; if that fails, attach it with `add_repo`);
+  read its `CLAUDE.md`, `README.md` and `repos/anawj-site.md` before starting. Codex should have it in its environment
+  too (ask the owner if it doesn't). Before writing anything here, ask whether it needs to be public for the app to
+  work; if not, and it is sensitive, put it there instead, and leave at most a short "(details in the owner's private
+  notes)" here. That covers:
   - personal notes: how the owner works through his day, his thoughts, private plans;
   - real-world data and anything worked out from it: copies or extracts of department sheets and rosters, real staff
     names, analyses of real data, findings that name people, research notes on colleagues' workflows;
@@ -185,7 +187,7 @@ behaviour with tests or the emulator, and never add preview domains to Firebase 
 clients. If no preview appears, Cloudflare isn't connected yet: say so and fall back to screenshots.
 
 **Build minutes are limited** (owner, 16 Oct 2026): every push to a branch with a PR starts a Cloudflare build, and the
-free plan has 3,000 build minutes a month across all the owner's Workers (anawj-preview and flamingbeing-home). Commit
+free plan has a monthly limit of build minutes shared across the Cloudflare account (PREVIEWS.md). Commit
 as often as you like, but **push once per finished step** (tests passing, ready to look at), not after every small
 commit; don't push just to save work in progress. Pushes that change only notes, status files or tests are skipped by
 the Worker's build watch paths (PREVIEWS.md).

@@ -60,9 +60,9 @@ app's `firebase-config.js` and the rules deploy workflow; ask for it when wanted
 
 ## Build minutes
 
-Workers Builds' free plan gives 3,000 build minutes a month for the whole Cloudflare account (anawj-preview and
-flamingbeing-home together); October 2026 was on course for about 900. If they run out, builds and previews stop until
-the 1st (the live sites keep working), or Workers Paid (US$5 a month) raises the limit. To save minutes:
+Workers Builds' free plan gives a monthly allowance of build minutes for the whole Cloudflare account (shared with any
+other Workers on it). If they run out, builds and previews stop until the 1st (the live sites keep working), or Workers
+Paid raises the limit. To save minutes:
 
 - **Build watch paths** (owner's click: Workers → anawj-preview → Settings → Build → Build watch paths): include `*`,
   exclude `*.md`, `**/STATUS.md`, `**/status/**`, `**/test/**`, `.github/**`. A push touching only those files makes no

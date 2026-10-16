@@ -970,7 +970,7 @@ The first tap selects a tag in List or Pills and opens a small read-only details
 Notes v1 followed in its own PR (Claude, after the handover): see **Notes** under "Where things are".
 
 - **Drift check lesson (15 Oct 2026):** an edit or delete in a resident's account found by the drift check is the resident's own
-  work until they say otherwise (a resident's (202411) deliberate duplicate clean-up was first undone as "accidental"). Ask the owner to
+  work until they say otherwise (a resident's deliberate duplicate clean-up was first undone as "accidental"). Ask the owner to
   ask the resident before restoring, and keep a before-snapshot of anything written back.
 
 Reliability-hour lessons (15 Oct 2026): a cloud container with 4 CPUs runs only 2 agents per workflow, so run one workflow per area

@@ -38,7 +38,7 @@ The roster's address is `nuhroster.anawj.com` (owner, 13 Oct: he may manage othe
 
 One step at a time; each is merged and checked before the next starts. Each session updates its own app's
 `STATUS.md` and touches no other app's files. When a step is done, its session tells the homepage session
-(`session_01F6SrdrEnHJKzjEAr5LcDy8`), which starts the next one and ticks it here.
+(its id is in the owner's private notes), which starts the next one and ticks it here.
 
 1. **Hosting** — Logbook 1 (log1). A live Cloudflare Worker that serves `main` at the subdomains, maps each address
    to its folder (table above), deploys on every merge to `main` and stamps service-worker versions like

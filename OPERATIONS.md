@@ -9,16 +9,14 @@ marked **owner** need the owner's own sign-in; no session can do them.
 Today the APMES apps are a demo: residents don't use them yet. These are cheapest to do now, with no real data to
 protect or move. (Prewarm already holds real study data, so its items come first.)
 
-1. **Backups: done 13 Oct 2026** (owner approved each step; set up from the home computer with `gcloud`). Every
+1. **Backups: done 13 Oct 2026** (owner approved each step). Every
    project's `(default)` Firestore database (asia-southeast1) has a **daily backup kept 7 days**. `prewarm-study` also
    has **point-in-time recovery** (any moment in the last 7 days). Restore: Google Cloud console → Firestore →
    Disaster recovery (backups restore into a new database, never over the live one). **Still to do: delete
    protection** is off on all three databases; switching it on is free and stops a whole database being deleted by
    mistake.
-2. **Budget alerts: done 13 Oct 2026.** One budget on the owner's billing account (it's in SGD): about S$13 (US$10) a
-   month, emailing at 50%, 90% and 100%. Budgets only alert; they never stop spending. (The Billing Budgets API was
-   switched on in `apmes-logbook` to set it from the command line. A S$5 budget Firebase made for `nuh-roster` is
-   still there.)
+2. **Budget alerts: done 13 Oct 2026.** A monthly budget on the billing account, emailing at 50%, 90% and 100%
+   (amounts in the owner's private notes). Budgets only alert; they never stop spending.
 3. **Plans: done 13 Oct 2026.** All three projects are on Blaze (pay-as-you-go) on the same billing account.
    `prewarm-study` was on the free Spark plan until 13 Oct, so it had no backups and would have stopped for the day
    on hitting a quota.
@@ -36,23 +34,21 @@ protect or move. (Prewarm already holds real study data, so its items come first
 
 ## Accounts and settings
 
-All are the owner's personal accounts today.
+All are held by the owner today (a handover adds a second owner: below).
 
 | Account | What it holds | Settings that matter |
 |---|---|---|
 | **GitHub** `flamingbeing/anawj-site` (public) | All code, docs, PRs; GitHub Pages serves `anawj.com` | Pages source "GitHub Actions" (`.github/workflows/pages.yml`); secret `FIREBASE_SERVICE_ACCOUNT` (rules deploys); secret `CLAUDE_CODE_OAUTH_TOKEN` (instant page edits; set 14 Oct 2026 with the owner's own `claude setup-token`, plus "Allow GitHub Actions to create and approve pull requests"; default workflow permissions stay read; to stop it, delete the secret); PR labeller; weekly proof-read issue; page-edit suggestions arrive as **public** issues (`edit/NOTES.md`) |
-| **GitHub** `flamingbeing/life` (**private**) | The owner's personal notes: daily log, knowledge notes, plans with personal details | Private. Cloud sessions attach it only when he asks; never copy anything from it into the public repo (rule in `AGENTS.md`); its own `CLAUDE.md` holds the rules for sessions; no patient-identifiable details even there |
 | **Domain registrar** for `anawj.com` | The domain itself | **Owner: fill in which registrar and the renewal date.** If it lapses, every address stops |
-| **Cloudflare** | DNS for `anawj.com`; Worker `anawj-preview` | Worker serves PR previews and the subdomains (`SUBDOMAINS.md`, `PREVIEWS.md`); custom domains on the Worker; `edit.anawj.com` redirect rule (`edit/NOTES.md`); Ask Claude (`ask.anawj.com`): a Zero Trust Access application allowing only the owner's email, and three Worker secrets (`GITHUB_ISSUES_TOKEN`, a fine-grained GitHub token for this repo's issues; `ACCESS_TEAM`; `ACCESS_AUD`) (`edit/NOTES.md`, "Ask Claude"). Free plan: 100,000 Worker requests a day |
+| **Cloudflare** | DNS for `anawj.com`; Worker `anawj-preview` | Worker serves PR previews and the subdomains (`SUBDOMAINS.md`, `PREVIEWS.md`); custom domains on the Worker; `edit.anawj.com` redirect rule (`edit/NOTES.md`); Ask Claude (`ask.anawj.com`): a Zero Trust Access application (owner only), and three Worker secrets (`GITHUB_ISSUES_TOKEN`, a fine-grained GitHub token for this repo's issues; `ACCESS_TEAM`; `ACCESS_AUD`) (`edit/NOTES.md`, "Ask Claude"). Free plan: 100,000 Worker requests a day |
 | **Firebase `apmes-logbook`** (Blaze, asia-southeast1; daily backups) | Logbook and evals data | Google sign-in; sign-in domain `apmes.anawj.com` (moved from `anawj.com` in step 5; `anawj.com` stays in the authorised domains until the old address is retired); authorised domains (must list `apmes.anawj.com`); `owners/`, `admins/` entries set by hand in the console (`logbook/NOTES.md`, Roles) |
 | **Firebase `prewarm-study`** (Blaze since 13 Oct 2026, asia-southeast1; daily backups and point-in-time recovery) | **Real study data** | Anonymous sign-in (join codes), email link and password for admins; `admins/` entries set by hand; authorised domains |
 | **Firebase `nuh-roster`** (Blaze; daily backups) | Roster data (not approved for real names yet) | Google sign-in; authorised domains |
 | **Firebase `nuh-junior-monthly`** (**not created yet**, 16 Oct 2026) | Will hold the junior monthly roster's team copy (rules, postings, people, rosters); until it exists the app keeps its data in the browser (Backup moves it). Real staff names would live here: confirm with the department who may approve that first | When created: Google sign-in, authorised domain `nuhjuniormonthly.anawj.com`, config into `nuh-junior-monthly/js/firebase-config.js`, Firebase Rules Admin for the rules deployer, first admin by hand in `members/` (`nuh-junior-monthly/js/firebase-config.js` has the steps). Rules and their emulator test are already wired (`tools/test-rules.sh`, `deploy-firestore-rules.yml`) |
 | **Firebase `ntf-roster`** (**not created yet**, 15 Oct 2026) | Will hold the NTF roster's team copy; until it exists the app keeps its data in the browser (Backup moves it) | When created: Google sign-in, authorised domain `ntfroster.anawj.com`, config into `ntf-roster/js/firebase-config.js`, Firebase Rules Admin for the rules deployer, a matrix entry in `deploy-firestore-rules.yml` (`ntf-roster/STATUS.md`) |
 | **Google Cloud OAuth clients** | Sign-in and backups | Each project's web sign-in client (allowed origins and redirect addresses); the logbook's Google Drive client (`GOOGLE_CLIENT_ID`); the "Connect Claude" Desktop client (`mcp/README.md`); consent screen points to `anawj.com/privacy/` |
-| **Service account** `firebase-rules-deployer@apmes-logbook` | Deploys rules on merge | Firebase Rules Admin on all three projects; its key is the GitHub secret above |
+| **Rules-deployer service account** (in `apmes-logbook`) | Deploys rules on merge | Firebase Rules Admin on all three projects; its key is the GitHub secret above |
 | **Dropbox app** | Logbook backups to Dropbox | App key `DROPBOX_APP_KEY` (public); development mode; redirect addresses |
-| **Home computer** (always on) | An always-on Claude Code session (Remote Control) | `gcloud` signed in as the owner, used for backups and budgets; its own notes live on that computer, never in this repo (`ROADMAP.md`, Ways of working) |
 | **Claude (claude.ai)** | Sessions, the daily "Page edits check" routine | Routine runs 8:58 am Singapore, drafts one PR, never merges (`edit/NOTES.md`) |
 
 Public client IDs (Firebase config, OAuth client IDs, Dropbox app key) are in the repo on purpose: they identify the
@@ -88,14 +84,9 @@ near zero (the APMES apps are a demo). Rough projections, not measurements:
 
 ## The home computer ("firetop" helper)
 
-The owner's always-on Claude Code session at home. Send it what a cloud session can't do: live Firebase and
-Cloudflare changes (standing permission, owner, 16 Oct 2026), production operations on the Google Cloud projects
-(backups, restores, budgets, logs), the owner's real documents, long or heavy jobs, and anything needing a secret. It
-also runs the scheduled backup, uptime and drift checks. Not for hosting: it's a home computer on home internet.
-
-How to reach it, what it may change, the job format, the limits that still need the owner and the scheduled checks:
-`ops/firetop.md` in the owner's private repo `flamingbeing/life` (moved there 16 Oct 2026 so the public repo doesn't
-map how his accounts are run).
+The owner's always-on helper session takes what a cloud session can't do (live Firebase and Cloudflare changes,
+production operations, the owner's real documents, long jobs, secrets). How to use it: `ops/firetop.md` in
+`flamingbeing/life`.
 
 ## Handing over
 

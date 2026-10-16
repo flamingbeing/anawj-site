@@ -4,14 +4,13 @@
 
 Status: **approved 12 Oct 2026.** PR 1 (offline app) and PR 2 (sharing) built; PR 3 (admin polish) next.
 
-A phone app for the op-day data of the prewarming RCT (optimal pre-warming time to prevent inadvertent perioperative
-hypothermia; multi-level spine surgery; groups 0, 10 and 30 min). It is for the readings that must be taken at the
+A phone app for the op-day data of the prewarming study (pre-warming to prevent inadvertent perioperative
+hypothermia). It is for the readings that must be taken at the
 bedside, above all temperature every 5 minutes. Everything else (history, medication, bloods, post-op days,
 discharge) comes from Epic or another app later.
 
-Sources: the 3M study eCRF template (572 columns, "Data Collection" sheet), the intraop protocol for junior doctors
-and the paper data collection form investigators use now (version 3.2, 8 Oct 2025). None of these files is in this
-public repo (they carry staff names). The column headers are transcribed into the app; screens follow the paper
+Sources: the study's eCRF template, its intraop protocol and the paper data collection form investigators use now.
+None of these files is in this public repo (they carry staff names; details in the owner's private notes). The column headers are transcribed into the app; screens follow the paper
 form's order and wording, so the app feels like the form they know.
 
 ## Decisions (owner, 12 Oct 2026)
@@ -115,8 +114,7 @@ form's order and wording, so the app feels like the form they know.
 2. Turn on Authentication → Anonymous and Google sign-in; add `anawj.com` as an authorised domain.
 3. Add a web app and commit its config to `prewarm/js/firebase-config.js` (public client ID; Claude prepares the
    file shape).
-4. Give `firebase-rules-deployer@apmes-logbook.iam.gserviceaccount.com` the Firebase Rules Admin role on the new
-   project.
+4. Give the rules-deployer service account the Firebase Rules Admin role on the new project.
 
 ## Answers (owner, 12 Oct 2026)
 
@@ -124,26 +122,6 @@ Group shown only on the pre-warming screen; Subject ID (exported in the Enrollme
 investigators are admins; hospitals NTF, NUH, SGH, CGH, TTSH, KTPH, WH; keep data until the study ends; BP/HR/BIS: baseline live,
 15-min rows off by default (a setting turns them on); transfusion: units in the template column, volumes on the
 Extra sheet; thermal sensation −3 … +3.
-
-## Questions as asked
-
-1. **Blinding.** The protocol says the recruiter is blinded to the group. Can every investigator using the app see
-   the randomisation group? If not, the group can be hidden except on the pre-warming screen, or shown only to
-   whoever enters it.
-2. **Patient ID on the day**: Enrollment ID (after randomisation) or Screening ID (SBHx)?
-3. **Hospital names or codes** for the sites, and who besides the owner is an admin.
-4. **Keeping data**: delete patients from Firebase after export, or keep until the study ends?
-5. **BP, heart rate and BIS**: the paper form has only a baseline row and a "Vital signs data collected" tick, which
-   suggests the rest is downloaded from the monitor. Enter only baseline live, with the 15-min rows switched off by
-   default (a setting turns them on)?
-6. **Transfusion in the template**: one "units/mL" column per product. Export units there and put volumes on the
-   extra sheet?
-7. **Thermal sensation scale**: the paper form hasn't filled it in yet. Is −3 … +3 what the study team will use?
-
-Mismatches between the paper form and the template, for when the other sections are built: heart failure has a
-"right sided" option on paper; MACE is five separate yes/no questions on paper but one code in the template; AF at
-discharge asks "new onset / existing" on paper; hypertension and diabetes medicines are tick-all on paper but one
-code in the template; Troponin is ng/mL on paper.
 
 ## Not in version 1
 

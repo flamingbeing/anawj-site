@@ -76,14 +76,13 @@ change); it prints why any field was not placed (the paper form has no per-readi
 
 ## Where it stands (15 Oct 2026)
 
-Tried on the owner's real v3.2 form and five real pages (one patient), with the handwriting read by a person-equivalent
-stand-in (firetop's own reads of the saved crops, via `--export-crops` / `--readings`): alignment accepted on all five
-pages (page 7 by the table rule), 18 of 18 tick questions right, the page header never cropped, the Y/N columns, the Room
-Temp arrows and the 155 page-7 temperature crops all in the right place, 345 fields, 34 flagged, nothing wrong-but-unflagged.
+Tried on a handful of real pages with a stand-in reader (a person-equivalent reading the saved crops, via
+`--export-crops` / `--readings`): alignment, ticks and crop placement all held, and every misread was flagged (trial
+numbers in the owner's private notes).
 
-**The live reader (`readers.AnthropicReader`) has never run, so its accuracy and cost are unmeasured.** The owner has no
-Anthropic API credits for now (decision of 15 Oct 2026), so it is shelved; every reading so far was a stand-in, and both
-reads in a stand-in run are the same text, so there is no second opinion. Check a sample of temperatures against the paper.
+**The live reader (`readers.AnthropicReader`) has never run, so its accuracy and cost are unmeasured.** It is shelved
+for now (owner, 15 Oct 2026); every reading so far was a stand-in, and both reads in a stand-in run are the same text,
+so there is no second opinion. Check a sample of temperatures against the paper.
 
 Still to prove: a "No pre-warming" patient's page 4 (the option whose tick also ticks "Not applicable"; the owner will bring
 one), other handwriting and other patients (a bigger batch), and the live reader.
