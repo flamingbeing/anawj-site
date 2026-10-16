@@ -700,8 +700,9 @@ export const RULE_TYPES = {
       P.codes('thenCodes', 'Codes'),
       P.num('from', 'From day', { min: -14, max: 14, help: '1 = the next day, -1 = the day before' }),
       P.num('to', 'To day', { min: -14, max: 14 }),
+      P.sel('thenDay', 'Only when that day is', [['', 'any day'], ['0', 'a Sunday'], ['1', 'a Monday'], ['2', 'a Tuesday'], ['3', 'a Wednesday'], ['4', 'a Thursday'], ['5', 'a Friday'], ['6', 'a Saturday']], 'Leave on "any day" unless the rule is only about one weekday (for example no Saturday call after an ICU call).'),
     ],
-    defaults: () => ({ ifCodes: [], thenCodes: [], mode: 'forbid', from: 1, to: 1 }),
+    defaults: () => ({ ifCodes: [], thenCodes: [], mode: 'forbid', from: 1, to: 1, thenDay: '' }),
     describe(r, T) {
       const p = r.params, a = num(p.from, 1), b = num(p.to, a);
       const no = p.mode === 'require' ? '' : 'no ';
@@ -713,13 +714,16 @@ export const RULE_TYPES = {
       else if (a === b) off = a > 0 ? `${a} days later` : a < 0 ? `${-a} days before` : 'the same day';
       else off = `from day ${a} to day ${b}`;
       const lead = a > 0 ? `After ${T.codes(p.ifCodes)}` : cap(T.codes(p.ifCodes));
-      return withWhen(`${whoPrefix(r, T)}${whoPrefix(r, T) ? lead.toLowerCase() : lead}: ${no}${T.codes(p.thenCodes)} ${off}`, r, T);
+      const tdn = p.thenDay === '' || p.thenDay == null ? null : Number(p.thenDay);
+      const onDay = tdn == null ? '' : ` (only on a ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][tdn]})`;
+      return withWhen(`${whoPrefix(r, T)}${whoPrefix(r, T) ? lead.toLowerCase() : lead}: ${no}${T.codes(p.thenCodes)} ${off}${onDay}`, r, T);
     },
     validate(r) { return num(r.params.from, 1) > num(r.params.to, 1) ? ['From day is after To day'] : []; },
     compile(r, X) {
       const p = r.params, mi = X.codes(p.ifCodes), mt = X.codes(p.thenCodes);
       if (mi.empty || mt.empty) return null;
       const a = num(p.from, 1), b = num(p.to, a), forbid = p.mode !== 'require';
+      const tday = p.thenDay === '' || p.thenDay == null ? -1 : Number(p.thenDay);   // only when the later day is this weekday
       const { ctx, u } = X, n = ctx.n, ok = X.when, act = ctx.act, inWho = X.W.inWho;
       const d0 = Math.max(0, ctx.lo - Math.max(b, 0)), d1 = Math.min(n - 1, ctx.hi - Math.min(a, 0));
       const samePair = i => {
@@ -740,6 +744,7 @@ export const RULE_TYPES = {
             for (let k = a; k <= b; k++) {
               const e = d + k;
               if (e < 0 || e >= n || !act[base + e]) continue;
+              if (tday >= 0 && ctx.wd[e] !== tday) continue;
               const dIn = d >= ctx.lo && d <= ctx.hi, eIn = e >= ctx.lo && e <= ctx.hi;
               if (!dIn && !eIn) continue;
               // the same day (offset 0, must not): two different codes, one from each list (a code never clashes with itself)

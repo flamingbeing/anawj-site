@@ -691,7 +691,7 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(ev('r-pool-1').length === 1 && ev('r-pool-2').length === 1 && ev('r-pool-3').length === 0, 'pools: two call requests on one day in the same pool are flagged, different pools are not');
   const old = M.defaultState(); old.rulesVersion = 16; old.tags = old.tags.filter(t => !/^mo\d[sw]$/.test(t.id)); old.rules = old.rules.filter(r => !/^r-(req-load|req-npload|pool-\d)$/.test(r.id));
   const mg = M.migrate(JSON.parse(JSON.stringify(old)));
-  ok(mg.rulesVersion === 18 && mg.tags.some(t => t.id === 'mo3w') && mg.rules.some(r => r.id === 'r-pool-3' && !r.enabled), 'pools: a saved roster gains the tags and rules once');
+  ok(mg.rulesVersion === 19 && mg.tags.some(t => t.id === 'mo3w') && mg.rules.some(r => r.id === 'r-pool-3' && !r.enabled), 'pools: a saved roster gains the tags and rules once');
 }
 
 // the Rules tab groups rules by topic
@@ -719,5 +719,37 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(ev('r-mo-satfri').length === 1, 'R1 to R3 rules: a Friday call six days after a Saturday call is flagged');
   const off = M.defaultState();
   ok(['r-mo-nogo', 'r-mo-weak', 'r-mo-satfri', 'r-mo-res', 'r-mo-fellow', 'r-mo-mopex'].every(id => off.rules.find(r => r.id === id && r.enabled === false)), 'R1 to R3 rules: all off until the group is turned on');
+}
+
+// Saturday after ICU, the Friday to Sunday cap, and a pool's call request gets its call (the R1 to R3 rosterer's rules; made-up names)
+{
+  const s = M.defaultState();
+  for (const [id, tags] of [['p1', ['mo1', 'mo1s']], ['p2', ['fsscap']], ['p3', []]]) s.staff.push({ id, name: 'Pool ' + id, group: 'res2', tags, fte: 1, active: true });
+  for (const r of s.rules) if (r.id.startsWith('r-mo-')) r.enabled = true;
+  const D = M.monthDays('2026-12');
+  const sat = D.filter(d => M.weekday(d) === 6);
+  const ev = rule => evaluate(s, { from: D[0], to: D[D.length - 1] }).violations.filter(v => v.ruleId === rule);
+  const at = d => D.indexOf(d);
+  // ICU call on a Thursday, R2 on the Saturday after: flagged. ICU on a Monday, R2 on the Saturday: fine.
+  const s1 = sat[1];
+  M.setCell(s, D[at(s1) - 2], 'p3', { a: ['ICU', 'R1B'] }); M.setCell(s, s1, 'p3', { a: ['R2'] });
+  ok(ev('r-mo-icusat1').length === 1, 'Saturday after ICU: a Saturday call two days after an ICU call is flagged');
+  const s2 = sat[2];
+  M.setCell(s, D[at(s2) - 5], 'p1', { a: ['ICU', 'R1B'] }); M.setCell(s, s2, 'p1', { a: ['R3'] });
+  ok(ev('r-mo-icusat1').length === 1 && ev('r-mo-icusat2').length === 0, 'Saturday after ICU: an ICU call on the Monday before is allowed');
+  M.setCell(s, D[at(sat[3]) - 6], 'p3', { a: ['ICU', 'R1B'] }); M.setCell(s, sat[3], 'p3', { a: ['R1'] });
+  ok(ev('r-mo-icusat2').length === 1, 'Saturday after ICU: an ICU call on the Sunday six days before is flagged');
+  ok(M.defaultState().rules.find(r => r.id === 'r-mo-icusat1').params.thenDay === '6' && /only on a Saturday/.test(describeRule(s.rules.find(r => r.id === 'r-mo-icusat1'), s)), 'Saturday after ICU: the rule reads in plain words');
+  // the cap: three weekend-ish calls for the tagged person, the same for an untagged one is not counted
+  const fri = D.filter(d => M.weekday(d) === 5);
+  for (const d of [fri[0], sat[0], sat[1]]) M.setCell(s, d, 'p2', { a: ['R1'] });
+  for (const d of [fri[1], sat[2], sat[3]]) M.setCell(s, d, 'p3', { a: ['R3'] });
+  ok(ev('r-mo-fss').length === 1 && ev('r-mo-fss')[0].staffId === 'p2', 'Fri to Sun cap: three calls for the tagged person are flagged, an untagged person is not');
+  // pool request gets its call
+  const w = D[10];
+  M.setCell(s, w, 'p1', { a: ['R2'], r: ['R'] });
+  ok(ev('r-mo-pool-r1').length === 1, 'pool request: an MO1-pool R request given R2 instead of R1 is flagged');
+  M.setCell(s, w, 'p1', { a: ['R1'], r: ['R'] });
+  ok(ev('r-mo-pool-r1').length === 0, 'pool request: given R1, nothing to flag');
 }
 console.log(`nuh-junior-monthly: ${n} checks passed`);

@@ -15,6 +15,16 @@ Last updated: 2026-10-16 by Claude Code (jm1).
 - Reminders set for the owner: 23 Oct (balance over a posting that straddles two months), 16 Dec (thinning old saves).
 
 ## Next (agreed order)
+0. **Waitlist step 2: revisit in a week (owner, 16 Oct 2026: "maybe in a week"; about 23 Oct).** The plan: the Leave tab (read only, #733) gets
+   status changes (a person's waitlist colour set from the app, written back to the sheet with the same "check nothing changed" safeguard
+   and an undo) and a new **daily rosterer** member role who may change waitlist status only (the daily rosterers run the NUH daily
+   roster, a different group from the monthly rosterers; the owner adds those members himself). Kept in its own cloud collection so
+   the Firestore rules can allow just that; a rules change deploys live on merge, so run `tools/test-rules.sh`, explain what it allows
+   and denies, and never loosen the real-data collections. A late-request flag (within 5 working days of the leave date) is planned.
+   Then (3) the WR / premed roster, (4) the junior call roster and EOT calls, (5) their rules and Fill.
+   Also open: where the staff list comes from for a future month (People for residents, the roster app for fellows, MOPEX, RR, NHG and
+   locums; the sheet stays the truth), which the owner is still thinking about (asks: who creates the month's sheet, and does the rotations
+   document cover fellows and MOPEX).
 1. ~~Share the sheet layout in the cloud copy~~ done with Save/Pull covering every month (see Recently done). Rules deployed.
 2. ~~A per-person "no calls until" date~~ done (see Recently done). Still to do: a suggested date for new people read from the
    sheet (first month they appear).
@@ -33,6 +43,9 @@ Last updated: 2026-10-16 by Claude Code (jm1).
    no longer types them by hand. Design in NOTES.md, "Rotations from People".
 
 ## Recently done
+- #735 request screening (more than 4 requests, more than 2 no-premed, same-day pool clashes), the strong / weak MO pools and their import (People › Tags);
+  #736 the Rules tab explains the order things happen in and groups rules by topic, and the R1 to R3 rosterer's rules (all off until "Turn on all
+  the R1 to R3 rules"); then the Saturday-after-ICU rule, the Fri to Sun call cap (a tag) and pool call requests gets its call.
 - No calls until: a date on each person; a hard rule and Fill respect it (People › edit a person).
 - #721 Fill lets you pick which calls to draft; #719 shared calls use the rosterer's points and `C-e`/`C-p` do not count as cardiac.
 - #716 Tabs reordered, one-row header (no Help button, padlock, "Fill"), Check shows what Fill places, posting filter and

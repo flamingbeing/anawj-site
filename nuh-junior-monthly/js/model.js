@@ -27,6 +27,7 @@ export const DEFAULT_TAGS = [
   { id: 'mo1', name: 'MO1 call level', help: 'Does R1 (MO1) calls' },
   { id: 'mo2', name: 'MO2 call level', help: 'Does R2 (MO2) calls' },
   { id: 'mo3', name: 'MO3 call level', help: 'Does R3 (MO3) calls' },
+  { id: 'fsscap', name: 'Fri to Sun call cap', help: 'At most 2 calls on a Friday, Saturday or Sunday a month (the R1 to R3 rosterer sets this for one person)' },
   { id: 'mo1s', name: 'Strong MO1', help: 'MO1 pool: strong (from the manpower master list)' },
   { id: 'mo1w', name: 'Weak MO1', help: 'MO1 pool: weak (from the manpower master list)' },
   { id: 'mo2s', name: 'Strong MO2', help: 'MO2 pool: strong (from the manpower master list)' },
@@ -192,6 +193,15 @@ export const DEFAULT_RULES = [
   R('r-mo-nogo', 'sameDay', 'No R1 to R3 call on a posting, obstetric call or rest day', { codesA: ['OGN', 'OGD', 'OGC', 'TTSH', 'NTF', 'KKH', 'LI', 'C', 'C3', 'C-e', 'C-p', 'AP', 'CP', 'WR', 'RD'], codesB: ['R1', 'R2', 'R3'], mode: 'forbid' }, { enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. ' }),
   R('r-mo-weak', 'cover', 'At most one weak MO on the R1, R2 and R3 calls of a night', { codes: ['R1', 'R2', 'R3'], min: null, max: 1 }, soft(60, { who: { tags: ['mo1w', 'mo2w', 'mo3w'] }, enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. A weak R1 gets a strong R2 and R3, a weak R2 a strong R1 and R3, a weak R3 a strong R1 and R2. Needs the strong / weak list (People > Tags).' })),
   R('r-mo-satfri', 'sequence', 'No Friday call the week after a Saturday call', { ifCodes: ['R1', 'R2', 'R3'], thenCodes: ['R1', 'R2', 'R3'], mode: 'forbid', from: 6, to: 6 }, soft(10, { when: { days: [6] }, enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. ' })),
+  R('r-mo-icusat1', 'sequence', 'No Saturday R1 to R3 call the day after, or two days after, an ICU call (Thu, Fri)', { ifCodes: ['R1B'], thenCodes: ['R1', 'R2', 'R3'], mode: 'forbid', from: 1, to: 2, thenDay: '6' }, soft(30, { enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026: no Saturday call after ICU on the previous Thursday, Friday, Saturday or Sunday. This one covers the Thursday and Friday before.' })),
+  R('r-mo-icusat2', 'sequence', 'No Saturday R1 to R3 call six or seven days after an ICU call (Sun, Sat)', { ifCodes: ['R1B'], thenCodes: ['R1', 'R2', 'R3'], mode: 'forbid', from: 6, to: 7, thenDay: '6' }, soft(30, { enabled: false, note: 'The Sunday and Saturday of the week before (see the rule above).' })),
+  R('r-mo-fss', 'limit', 'At most 2 Friday, Saturday or Sunday calls a month for people tagged "Fri to Sun call cap"', { codes: CALLS, period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(40, { who: { tags: ['fsscap'] }, when: { days: [0, 5, 6] }, enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. Tick the tag on the person it applies to (People > Staff).' })),
+  R('r-mo-pool-r1', 'requests', 'A call request (R) from the MO1 pool gets R1', { request: 'R', codes: ['R1'], mode: 'want', span: 'day' }, soft(10, { who: { tags: ['mo1s', 'mo1w'] }, enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. Needs the strong / weak list (People > Tags).' })),
+  R('r-mo-pool-rh1', 'requests', 'A must-have call request (R!) from the MO1 pool gets R1', { request: 'R!', codes: ['R1'], mode: 'want', span: 'day' }, soft(60, { who: { tags: ['mo1s', 'mo1w'] }, enabled: false, note: 'As the rule above, for R!.' })),
+  R('r-mo-pool-r2', 'requests', 'A call request (R) from the MO2 pool gets R2', { request: 'R', codes: ['R2'], mode: 'want', span: 'day' }, soft(10, { who: { tags: ['mo2s', 'mo2w'] }, enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. Needs the strong / weak list (People > Tags).' })),
+  R('r-mo-pool-rh2', 'requests', 'A must-have call request (R!) from the MO2 pool gets R2', { request: 'R!', codes: ['R2'], mode: 'want', span: 'day' }, soft(60, { who: { tags: ['mo2s', 'mo2w'] }, enabled: false, note: 'As the rule above, for R!.' })),
+  R('r-mo-pool-r3', 'requests', 'A call request (R) from the MO3 pool gets R3', { request: 'R', codes: ['R3'], mode: 'want', span: 'day' }, soft(10, { who: { tags: ['mo3s', 'mo3w'] }, enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. Needs the strong / weak list (People > Tags).' })),
+  R('r-mo-pool-rh3', 'requests', 'A must-have call request (R!) from the MO3 pool gets R3', { request: 'R!', codes: ['R3'], mode: 'want', span: 'day' }, soft(60, { who: { tags: ['mo3s', 'mo3w'] }, enabled: false, note: 'As the rule above, for R!.' })),
   R('r-mo-res', 'limit', 'Residents: 3 to 5 R1 to R3 calls a month', { codes: ['R1', 'R2', 'R3'], period: 'month', window: 7, min: 3, max: 5, fte: false, prorate: false }, soft(20, { who: { groups: ['res1', 'res2', 'res3'] }, enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. ' })),
   R('r-mo-fellow', 'limit', 'Fellows: 1 to 2 R1 to R3 calls a month', { codes: ['R1', 'R2', 'R3'], period: 'month', window: 7, min: 1, max: 2, fte: false, prorate: false }, soft(20, { who: { groups: ['fellow'] }, enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. ' })),
   R('r-mo-mopex', 'limit', 'MOPEX: 1 R1 to R3 call a month', { codes: ['R1', 'R2', 'R3'], period: 'month', window: 7, min: 1, max: 1, fte: false, prorate: false }, soft(20, { who: { groups: ['mopex'] }, enabled: false, note: 'From the R1 to R3 rosterer, 16 Oct 2026. ' })),
@@ -284,9 +294,9 @@ export function cleanRule(r) {
 // One-time updates to rules that were already saved (the owner's rulings of 16 Oct 2026): requests and blocks become
 // preferences, "new to ICU" is strict only for rotating residents and MOPEXes. Only a rule still in its old form changes.
 function updateRules(s) {
-  if ((s.rulesVersion || 1) >= 18) return;
+  if ((s.rulesVersion || 1) >= 19) return;
   const from2 = (s.rulesVersion || 1) < 2;
-  s.rulesVersion = 18;
+  s.rulesVersion = 19;
   const find = id => s.rules.find(r => r.id === id);
   if (from2) for (const [id, w] of [['r-req-x', 60], ['r-req-xx', 80]]) { const r = find(id); if (r && r.hard) { r.hard = false; r.weight = w; } }
   const n = from2 && find('r-r1b-new');
@@ -352,6 +362,8 @@ function updateRules(s) {
   // no day-1 cardiac call rule for RES3 and senior residents (owner, 16 Oct 2026); a rule still without a group limit changes
   const c3d1 = find('r-c3-d1');
   if (c3d1 && c3d1.who && !(Array.isArray(c3d1.who.onlyGroups) && c3d1.who.onlyGroups.length)) c3d1.who.onlyGroups = [...C3_D1_GROUPS];
+  if (!(s.tags || []).some(x => x.id === 'fsscap')) (s.tags = s.tags || []).push(clone(DEFAULT_TAGS.find(t => t.id === 'fsscap')));
+  for (const id of ['r-mo-icusat1', 'r-mo-icusat2', 'r-mo-fss', 'r-mo-pool-r1', 'r-mo-pool-rh1', 'r-mo-pool-r2', 'r-mo-pool-rh2', 'r-mo-pool-r3', 'r-mo-pool-rh3']) add(id);
   for (const id of ['r-mo-nogo', 'r-mo-weak', 'r-mo-satfri', 'r-mo-res', 'r-mo-fellow', 'r-mo-mopex']) add(id);
   // strong / weak pools and the request screening (the R1 to R3 rosterer's rules, 16 Oct 2026)
   for (const t of DEFAULT_TAGS.filter(t => /^mo[123][sw]$/.test(t.id))) if (!(s.tags || []).some(x => x.id === t.id)) (s.tags = s.tags || []).push(clone(t));
