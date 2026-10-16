@@ -1,4 +1,4 @@
-// Search (🔍 in the header on every tab, or / on a computer; log2 9e): one box over your cases (and planned ones),
+// Search (the magnifier in the header on every tab, or / on a computer; log2 9e): one box over your cases (and planned ones),
 // reflections and notes, with the Logbook's search language and a few more operators (global-search.js; ⓘ lists them).
 // Results come grouped by kind with counts, Best match or Newest, the words marked in a short piece of each; a tap opens
 // the item where it lives (a case's edit page, the reflection editor, the note). A case found also links its

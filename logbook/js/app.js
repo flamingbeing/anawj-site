@@ -12,7 +12,7 @@ import { createNavigation } from './navigation.js';
 import { renderNotes, leaveNotes, openDayNote, renderNoteSettings } from './ui-notepad.js';
 import { fromQuery, keepShared, readInbox } from './share-in.js';
 import { purgeExpired } from './bin.js';
-import { profile } from './ui-core.js';
+import { profile, ic } from './ui-core.js';
 import { deviceOn, barAtBottom } from './device-presets.js';
 import { notesChanged } from './ui-notepad.js';
 import { finePrint, signOutCard } from './more-cards.js';
@@ -134,7 +134,7 @@ const TABS = [
   { id: 'settings', bar: true, label: 'Settings', render: page(['settings', 'send', 'sync', 'settingsFile'], () => renderSettingsMenu()), hidden: true, under: 'more', desc: 'Profile, look, logging, reflections, notes and sharing, data' },
   { id: 'recovery', bar: true, short: 'Recover', label: 'Recover', render: page(['recovery'], m => m.recovery.renderRecovery()), hidden: true, under: 'more', desc: 'Changes waiting to sync, recently deleted, unfinished drafts and earlier versions' },
   { id: 'data', bar: true, short: 'Export', label: 'Export / Import', render: page(['logbook', 'notesExport', 'cloudSave', 'backup'], () => renderDataPage()), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
-  // Search (log2 9e): the 🔍 in the header, or / on a computer
+  // Search (log2 9e): the magnifier in the header, or / on a computer
   { id: 'search', label: 'Search', render: page(['search'], m => m.search.renderSearch()), hidden: true, unlisted: true },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
@@ -938,9 +938,10 @@ function flushRender() {
 
 // The header is always one line (title left, name right), so it never changes height between
 // loading, signed out and signed in. Demo / offline show as a small tag beside the name.
-// 🔍 Search: on every tab (log2 9e); / opens it on a computer when you're not typing
+// Search: on every tab (log2 9e), a line magnifier in the theme's colours (not an emoji; owner, 16 Oct 2026);
+// / opens it on a computer when you're not typing
 const searchBtn = () => h('button', { type: 'button', class: 'who-search', title: 'Search cases, reflections and notes (/)', 'aria-label': 'Search',
-  onclick: () => go('search') }, h('span', { 'aria-hidden': 'true' }, '🔍'));
+  onclick: () => go('search') }, ic('search'));
 addEventListener('keydown', e => {
   if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || !S.user || e.defaultPrevented) return;
   const t = e.target;

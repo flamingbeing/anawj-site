@@ -1,4 +1,4 @@
-// Fake data only. Search (log2 9e, 16 Oct 2026): 🔍 in the header (and / on a computer) opens one box over cases,
+// Fake data only. Search (log2 9e, 16 Oct 2026): the magnifier in the header (and / on a computer) opens one box over cases,
 // reflections and notes; results grouped with counts and the words marked; operators (in:, status:, has:); a tap opens
 // the case, the reflection or the note; a case links its reflection.
 import assert from 'node:assert/strict';
@@ -22,7 +22,7 @@ try { for (const width of [390, 1280]) {
   const box = () => p.getByLabel('Search everything');
   const group = k => p.locator('.gs-group', { has: p.locator('.gs-h', { hasText: k }) });
 
-  // open: the 🔍 (and / on a computer)
+  // open: the magnifier (and / on a computer)
   if (width === 1280) { await p.locator('body').click({ position: { x: 5, y: 300 } }).catch(() => {}); await p.evaluate(() => document.activeElement?.blur()); await p.keyboard.press('/'); }
   else await p.locator('.who-search').click();
   await box().waitFor();
@@ -61,7 +61,7 @@ try { for (const width of [390, 1280]) {
   await poll(async () => (await p.locator('.gs-group').count()) === 2, 'the case (1 June) drops out');
   await box().fill('fakesrch');
 
-  // save it: it shows on the Logbook (🔍) and runs here from there
+  // save it: it shows on the Logbook (magnifier icon) and runs here from there
   p.once('dialog', d => d.accept('Fake everywhere'));
   await p.getByRole('button', { name: 'Save search' }).click();
   await p.locator('.gs-saved .chip', { hasText: 'Fake everywhere' }).waitFor();

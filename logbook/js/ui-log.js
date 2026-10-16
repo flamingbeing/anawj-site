@@ -254,17 +254,20 @@ function fitBox(ta) {
   const want = Math.min(Math.round(innerHeight * 0.66), ta.scrollHeight + 2);
   if (want > ta.offsetHeight) ta.style.height = want + 'px';
 }
-// the grab bar under the box: drag (finger or mouse) to set the height; double-tap resets; ↑ ↓ on a keyboard
-function boxGrab(ta) {
+// the grab bar under the box: drag (finger or mouse) to set the height; double-tap resets; ↑ ↓ on a keyboard.
+// The List box (paste a list) has its own (owner, 16 Oct 2026): its height is kept apart (display().listHeight)
+const listHeight = () => { const v = Math.round(Number(display().listHeight)); return v >= 60 && v <= 2000 ? v : null; };
+function boxGrab(ta, list = false) {
   const set = px => { const v = Math.max(60, Math.min(Math.round(innerHeight * 0.85), Math.round(px))); ta.style.height = v + 'px'; grab.setAttribute('aria-valuenow', v); return v; };
-  const save = v => { setDisplay({ boxHeight: v }); fitBox(ta); };
+  const save = v => { if (list) setDisplay({ listHeight: v }); else { setDisplay({ boxHeight: v }); fitBox(ta); } };
+  const reset = () => { if (list) { setDisplay({ listHeight: null }); ta.style.height = ''; } else { setDisplay({ boxHeight: null }); fitBox(ta); } };
   let lastTap = 0;
   // a focusable separator is a slider to screen readers: it needs a value (the height in pixels)
-  const grab = h('div', { class: 'box-grab', role: 'separator', tabindex: '0', 'aria-orientation': 'horizontal', 'aria-label': 'Case box height: drag to change, double-tap to reset',
-    'aria-valuemin': '60', 'aria-valuemax': String(Math.round(innerHeight * 0.85)), 'aria-valuenow': String(boxHeight() || 96),
+  const grab = h('div', { class: 'box-grab', role: 'separator', tabindex: '0', 'aria-orientation': 'horizontal', 'aria-label': `${list ? 'List box' : 'Case box'} height: drag to change, double-tap to reset`,
+    'aria-valuemin': '60', 'aria-valuemax': String(Math.round(innerHeight * 0.85)), 'aria-valuenow': String((list ? listHeight() : boxHeight()) || (list ? 180 : 96)),
     onpointerdown: e => {
       const now = Date.now();
-      if (now - lastTap < 350) { lastTap = 0; setDisplay({ boxHeight: null }); fitBox(ta); return; }
+      if (now - lastTap < 350) { lastTap = 0; reset(); return; }
       lastTap = now;
       e.preventDefault();
       const y0 = e.clientY, h0 = ta.offsetHeight;
@@ -1114,10 +1117,11 @@ function renderBulk(card) {
     },
   });
   ui.textarea = ta;
+  if (listHeight()) ta.style.height = listHeight() + 'px';
   const out = h('div');
   add(card, 
     h('p', { class: 'hint help' }, 'Paste your notes or OT list with an empty line between cases (a case can take several lines; a bold first line, **like this**, starts a case too). Tags are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
-    ta,
+    ta, boxGrab(ta, true),
     h('div', { class: 'bar', style: 'margin-top:8px' },
       h('button', { class: 'primary', onclick: () => { bulkRows = reviewRows(ta.value); bulkText = ta.value; paintBulk(out); } }, 'Review'),
       pasteBtn(ta, 'Paste from clipboard'),
