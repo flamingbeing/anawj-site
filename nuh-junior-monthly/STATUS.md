@@ -38,9 +38,9 @@ Last updated: 2026-10-16 by Claude Code (jm1).
 6. Cloud: thin old saves (Firestore TTL on `expireAt`, keep the first save of each week; needs a small rules change and a
    firetop job). Autosync was deliberately not built: the header cloud button shows the state instead.
 
-7. **Pull rotations from APMES People** (owner's plan, 16 Oct 2026; not started, waits on People's side being built, then the
-   owner's go): the postings this app needs (ICU, cardiac, the OG floats) for the months being planned, so the rosterer
-   no longer types them by hand. Design in NOTES.md, "Rotations from People".
+7. **Pull rotations from APMES People** (built 16 Oct 2026, owner's plan): Postings › Pull from APMES People… brings the
+   ICU, cardiac and OG float postings for the weeks shown into Paste rotations to look over and Apply. Still to do: a real run
+   with the owner's sheet and the real roster. Design in NOTES.md, "Rotations from People".
 
 ## Recently done
 - #735 request screening (more than 4 requests, more than 2 no-premed, same-day pool clashes), the strong / weak MO pools and their import (People › Tags);

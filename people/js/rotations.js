@@ -278,3 +278,56 @@ export function sampleRows() {
     ['Junior Manpower', ...same('9')],
   ];
 }
+
+// ---------- hand-off to NUH Junior Monthly ----------
+// The roster app pulls only the postings that matter for the monthly roster (owner, 16 Oct 2026): ICU, cardiac (C, its echo
+// week C-e and perfusion C-p) and the OG floats. It says which posting codes it accepts; only those among these go over.
+export const CRITICAL = ['ICU', 'C', 'C-e', 'C-p', 'OGDF', 'OGNF1', 'OGNF2'];
+
+// Who on the sheet is who in the roster: for each sheet person the roster name that fits best, or null.
+// `score` (0..3, batch.js nameScore) is passed in to keep this file free of page code. 3 is the same name, 2 one name inside
+// the other; a suggestion is made only when exactly one roster name has the best score and it is at least 2.
+export function suggestLinks(people, staffNames, score) {
+  const out = new Map();
+  for (const p of people) {
+    let best = 0, pick = [];
+    for (const n of staffNames) {
+      const s = score(p.name, n);
+      if (s > best) { best = s; pick = [n]; } else if (s === best && s > 0) pick.push(n);
+    }
+    if (best >= 2 && pick.length === 1) out.set(p.key, pick[0]);
+  }
+  return out;
+}
+
+// The postings to hand over, in the roster app's Paste rotations format (a row of Mondays, then one row per person with
+// the roster's own name for them). Options:
+//   accepted  posting codes the roster knows (default: all CRITICAL)      from, to  first and last Monday wanted
+//   links     { sheetKey: rosterName | '' } chosen by hand ('' = not in the roster); other people use `suggested`
+//   suggested Map from suggestLinks      provisional / elective  also send KIV and -E cells (default no)
+// Returns { text, weeks, people: [{ name, key, rosterName, cells }], unlinked: [{ name, key, cells }] }; unlinked are the
+// sheet people with a critical posting in range who have no roster name yet.
+export function exportRotations(parsed, { accepted = CRITICAL, from = '', to = '9999-12-31', links = {}, suggested = new Map(), provisional = false, elective = false } = {}) {
+  const ok = new Set(CRITICAL.filter(c => accepted.some(a => String(a).toUpperCase() === c.toUpperCase())));
+  const cols = parsed.weeks.map((w, i) => ({ i, monday: weekMonday(w.start) })).filter(c => c.monday >= from && c.monday <= to);
+  const pick = raw => {
+    const sc = splitCode(raw);
+    if (!sc || (sc.provisional && !provisional)) return '';
+    const unkiv = p => p.code.replace(/^KIV\s+/i, '');       // "KIV ICU" is a key entry of its own: the code under it is ICU
+    const part = sc.parts.find(p => ok.has(unkiv(p)) && (elective || !p.elective));
+    return part ? unkiv(part) : '';
+  };
+  const people = [], unlinked = [];
+  for (const s of parsed.sections) for (const p of s.people) {
+    const codes = cols.map(c => pick(p.codes[c.i]));
+    const cells = codes.filter(Boolean).length;
+    if (!cells) continue;
+    const decided = Object.prototype.hasOwnProperty.call(links, p.key);
+    if (decided && !links[p.key]) continue;                // chosen "not in the roster"
+    const name = decided ? links[p.key] : suggested.get(p.key) || '';
+    if (name) people.push({ name: p.name, key: p.key, rosterName: name, codes, cells }); else unlinked.push({ name: p.name, key: p.key, origin: p.origin, cells });
+  }
+  const clean = t => String(t).replace(/[\t\r\n]+/g, ' ').trim();
+  const text = people.length ? [['Name', ...cols.map(c => c.monday)].join('\t'), ...people.map(p => [clean(p.rosterName), ...p.codes].join('\t'))].join('\n') + '\n' : '';
+  return { text, weeks: cols.map(c => c.monday), people, unlinked };
+}

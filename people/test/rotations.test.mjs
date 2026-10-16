@@ -1,6 +1,6 @@
 // Plain node checks for people/js/rotations.js (the block rotation sheet reader). Made-up names only.
 import assert from 'node:assert/strict';
-import { CODE_KEY, splitCode, weekColumns, parseBlockSheet, readable, manpower, unknownCodes, history, nameKey, weekMonday, sampleRows } from '../js/rotations.js';
+import { CODE_KEY, splitCode, weekColumns, parseBlockSheet, readable, manpower, unknownCodes, history, nameKey, weekMonday, sampleRows, CRITICAL, suggestLinks, exportRotations } from '../js/rotations.js';
 
 let n = 0;
 const t = (name, fn) => { try { fn(); n++; } catch (e) { console.error('✗ ' + name); throw e; } };
@@ -92,6 +92,47 @@ t('the key is complete: every entry has an institution, a type and a meaning', (
     assert.ok(v[2] && v[2].length >= 3, code);
   }
   assert.ok(Object.keys(CODE_KEY).length >= 60);
+});
+
+t('hand-off: only the critical postings, in the roster paste format', () => {
+  const p = parseBlockSheet(sampleRows());
+  const links = { [nameKey('Kim Placeholder')]: 'Kim P', [nameKey('Pat Madeup')]: 'Pat M', [nameKey('Robin Testcase')]: 'Robin T', [nameKey('Sam Sample')]: 'Sam S', [nameKey('Dana Visitor')]: '' };
+  const r = exportRotations(p, { links });
+  const rows = r.text.trim().split('\n').map(l => l.split('\t'));
+  assert.deepEqual(rows[0].slice(0, 3), ['Name', '2027-01-04', '2027-01-11']);   // the first week starts midweek: its Monday
+  const kim = rows.find(x => x[0] === 'Kim P');
+  assert.deepEqual(kim.slice(1), ['ICU', 'ICU', 'ICU', 'ICU', '', '', '', '', 'C', 'C', 'C-e', 'C-p']);
+  const pat = rows.find(x => x[0] === 'Pat M');
+  assert.equal(pat[9], '');                              // KIV ICU is provisional: left out
+  assert.equal(pat[10], 'ICU');
+  assert.equal(rows.find(x => x[0] === 'Robin T')[9], 'ICU');   // "Part B/ ICU": the ICU part
+  assert.equal(rows.find(x => x[0] === 'Robin T')[5], '');      // Liver-E is not critical
+  assert.equal(rows.find(x => x[0] === 'Sam S')[5], 'ICU');
+  assert.equal(r.people.some(x => x.name === 'Dana Visitor'), false);   // linked to nobody on purpose
+  assert.deepEqual(r.unlinked.map(x => x.name), []);                    // Dana was decided, Alex and Jo have none
+  const kiv = exportRotations(p, { links, provisional: true });
+  assert.equal(kiv.text.split('\n').find(l => l.startsWith('Pat M')).split('\t')[9], 'ICU');
+});
+
+t('hand-off: unlinked people, a date range and the codes the roster accepts', () => {
+  const p = parseBlockSheet(sampleRows());
+  const r = exportRotations(p, { accepted: ['ICU', 'OGNF1'], from: '2027-02-01', to: '2027-02-08' });
+  assert.deepEqual(r.weeks, ['2027-02-01', '2027-02-08']);
+  assert.deepEqual(r.people, []);
+  assert.deepEqual(r.unlinked.map(x => x.name), ['Sam Sample', 'Dana Visitor']);   // ICU in those two weeks, nobody linked yet
+  assert.equal(r.text, '');
+  const e = exportRotations(p, { accepted: ['icu'], links: { [nameKey('Sam Sample')]: 'Sam' } });   // codes match in any capitals
+  assert.ok(e.text.includes('Sam\t'));
+  assert.ok(CRITICAL.includes('OGDF'));
+});
+
+t('hand-off: suggestions need exactly one best roster name', () => {
+  const score = (a, b) => (a === b ? 3 : a.split(' ')[0] === b.split(' ')[0] ? 2 : 0);
+  const people = [{ key: 'a', name: 'Alex Example' }, { key: 'b', name: 'Sam Sample' }, { key: 'c', name: 'Pat Madeup' }];
+  const m = suggestLinks(people, ['Alex Example', 'Sam Other', 'Sam Third'], score);
+  assert.equal(m.get('a'), 'Alex Example');
+  assert.equal(m.has('b'), false);     // two Sams: no guess
+  assert.equal(m.has('c'), false);
 });
 
 console.log(`people rotations: ${n} checks passed`);
