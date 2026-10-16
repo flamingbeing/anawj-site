@@ -58,6 +58,22 @@ const noSideScroll = async (page, label) => {
     ok(around.before >= 2 && around.after >= 2 && around.cells === 0 && around.ro, `days around the month are shown and read-only (${around.before} before, ${around.after} after)`);
     await page.getByRole('button', { name: 'Days around' }).click();
     ok(await page.locator('thead th.dh.ctx').count() === 0, 'and can be switched off');
+    // painting with Lock, and the lock at the top of the cell popup
+    await page.getByRole('button', { name: 'Paint' }).click();
+    await page.locator('.pchip-lock').click();
+    const cellBtn = page.locator('td.c:not(.ctx) .cell').nth(3);
+    const ids = await cellBtn.evaluate(b => [b.dataset.d, b.dataset.s]);
+    await cellBtn.click();
+    await page.waitForTimeout(250);
+    ok(await page.evaluate(([d, s]) => !!JSON.parse(localStorage.getItem('nuhjm-demo')).cells?.[d]?.[s]?.lock, ids), 'painting with Lock locks the cell');
+    await cellBtn.click();
+    await page.waitForTimeout(250);
+    ok(await page.evaluate(([d, s]) => !JSON.parse(localStorage.getItem('nuhjm-demo')).cells?.[d]?.[s]?.lock, ids), 'painting a locked cell with Lock unlocks it');
+    await page.getByRole('button', { name: 'Done painting' }).click();
+    await cellBtn.click();
+    await page.waitForSelector('.ced-lockrow');
+    ok(await page.evaluate(() => { const w = document.querySelector('.ced-lockrow').parentElement; return w.firstElementChild.classList.contains('ced-lockrow'); }), 'the lock is the first thing in the cell popup');
+    await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Days around' }).click();
     ok(await page.locator('thead th.dh.ctx').count() >= 4, 'and on again');
   }
