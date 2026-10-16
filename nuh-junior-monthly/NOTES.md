@@ -183,6 +183,25 @@ the people in it hold in the main grid that day (it matched on all 30 days for e
 Weekend and public holiday rows are filled (green in A to C, red in E and F). S1 and S1B are not on this tab (S1 is only in the main
 grid). So the EOT calls (R1 to R3) are the MO team's calls, and the tab can be rebuilt from the main grid.
 
+## Screening requests and the strong / weak pools (the R1 to R3 rosterer's rules, 16 Oct 2026)
+
+The R1 to R3 rosterer opens the sheet's Request tab to the juniors, who type their requests in the grid (`R` or `R_` call
+request, `X` no call, `NP` no premed, `X/NP` both in one cell). She wants the problems found and settled by hand **before**
+anything is assigned. Built as ordinary rules, so they show on Check and in the sheet:
+- `r-req-load`: at most 4 requests a month (call requests, X, NP). `X/NP` is one request (the rule counts days, not codes).
+- `r-req-npload`: at most 2 no-premed requests a month. Premed duties (P1 to P6) are not counted yet: they are not on the sheet
+  until the premed roster is planned (step 3 of the expansion).
+- `r-pool-1/2/3`: at most one call request a day from the MO1 pool (strong and weak), the MO2 pool, and strong MO2 with weak MO3.
+  Off until the pool list is imported. Which of the clashing people gets the call is settled by hand, by the reason for the request.
+- `R_` is the same as `R` (`sheet.js` strips the underscore); `R1`, `R2`, `R3` are the assigned calls, a different thing.
+- The pools are six tags (`mo1s mo1w mo2s mo2w mo3s mo3w`) next to the call level tags `mo1 mo2 mo3`. **People > Tags > Import the
+  strong / weak list** takes the department's manpower master list pasted from the sheet (heading row "Strong MO1", "Weak MO1" ...;
+  other columns ignored), matches names with the staff list, and gives each person the call level and the pool tag (`js/pools.js`).
+  The real list (names) is in the owner's private notes, not here.
+- Still to build (rules she sent, 16 Oct 2026; more coming on Sundays): a weak R1 gets a strong R2 and R3 (and the same for weak R2
+  and R3), each person 3 to 5 calls a month (fellows 1 to 2, MOPEX 1), no Friday or Saturday call after a Sunday call in the week, no Friday call after a
+  Saturday call, no Saturday call after ICU on the Thursday to Sunday before, a Saturday cap of 2, and assign R1/R2/R3 to a request by pool.
+
 ## Phone header has no gap (owner, 16 Oct 2026)
 
 On phones the second header row is the month, Today, the lock and Fill. Fill shows on the Roster tab only, so on the other tabs

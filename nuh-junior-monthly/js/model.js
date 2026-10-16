@@ -27,6 +27,12 @@ export const DEFAULT_TAGS = [
   { id: 'mo1', name: 'MO1 call level', help: 'Does R1 (MO1) calls' },
   { id: 'mo2', name: 'MO2 call level', help: 'Does R2 (MO2) calls' },
   { id: 'mo3', name: 'MO3 call level', help: 'Does R3 (MO3) calls' },
+  { id: 'mo1s', name: 'Strong MO1', help: 'MO1 pool: strong (from the manpower master list)' },
+  { id: 'mo1w', name: 'Weak MO1', help: 'MO1 pool: weak (from the manpower master list)' },
+  { id: 'mo2s', name: 'Strong MO2', help: 'MO2 pool: strong (from the manpower master list)' },
+  { id: 'mo2w', name: 'Weak MO2', help: 'MO2 pool: weak (from the manpower master list)' },
+  { id: 'mo3s', name: 'Strong MO3', help: 'MO3 pool: strong (from the manpower master list)' },
+  { id: 'mo3w', name: 'Weak MO3', help: 'MO3 pool: weak (from the manpower master list)' },
   { id: 'icunew', name: 'New to ICU', help: 'First time in ICU: ICU calls from day 4 of the posting' },
   { id: 'rrlate', name: 'Ortho / HRM resident', help: 'Rotating resident from Ortho or HRM: ICU calls from day 8' },
   { id: 'supernum', name: 'Supernumerary in ICU', help: 'In ICU without calls (MOPEX new to ICU, hospital clinicians, a fellow\'s first month)' },
@@ -175,6 +181,13 @@ export const DEFAULT_RULES = [
   R('r-r1b-fair', 'spread', 'Share ICU calls fairly', { codes: ['R1B'], period: 'month', scheme: 'offdays', offBonus: 0.5, eveBonus: 0.5, weekendWeight: 2, holidayWeight: 1.5, tolerance: 1, among: ['ICU'], carry: 0.5, carryMonths: 4, alert: 1, alertPct: 40 }, soft(40)),
   R('r-r1b-sat', 'limit', 'At most 2 Saturday ICU calls a month', { codes: ['R1B'], period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(20, { when: { days: [6] } })),
   // everyone
+  // screening the requests before the app assigns R1 to R3 (Bridget's rules, 16 Oct 2026). X/NP is one request, not two. The pool
+  // rules stay off until the strong / weak list is imported (More > People > Tags), then the import turns them on.
+  R('r-req-load', 'limit', 'At most 4 requests a month (call requests, X, NP; X/NP counts once)', { codes: ['R', 'R!', 'R?', 'X', 'X!', 'X?', 'NP'], period: 'month', window: 7, min: null, max: 4, fte: false, prorate: false }, soft(5)),
+  R('r-req-npload', 'limit', 'At most 2 no-premed requests a month', { codes: ['NP'], period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(5, { note: 'Premed duties (P1 to P6) are not counted yet: they are not on the sheet until the premed roster is planned.' })),
+  R('r-pool-1', 'cover', 'One call request a day from the MO1 pool (strong and weak)', { codes: ['R', 'R!', 'R?'], min: null, max: 1 }, soft(5, { who: { tags: ['mo1s', 'mo1w'] }, enabled: false })),
+  R('r-pool-2', 'cover', 'One call request a day from the MO2 pool (strong and weak)', { codes: ['R', 'R!', 'R?'], min: null, max: 1 }, soft(5, { who: { tags: ['mo2s', 'mo2w'] }, enabled: false })),
+  R('r-pool-3', 'cover', 'One call request a day from strong MO2 and weak MO3', { codes: ['R', 'R!', 'R?'], min: null, max: 1 }, soft(5, { who: { tags: ['mo2s', 'mo3w'] }, enabled: false })),
   R('r-leave', 'sameDay', 'No calls on leave', { codesA: ['@leave'], codesB: ['@shift'], mode: 'forbid' }),
   R('r-postcall', 'sameDay', 'Post call is a day off', { codesA: ['x', 'PC'], codesB: ['@shift'], mode: 'forbid' }),
   R('r-ppc', 'sameDay', 'No EOD call: nothing on the day off after an ICU post call (PPC), unless a night would be empty', { codesA: ['PPC'], codesB: ['@shift'], mode: 'forbid' }, soft(500, { note: 'EOD call: a call right after the post call day. Used only when no one else can cover the night.' })),
@@ -264,9 +277,9 @@ export function cleanRule(r) {
 // One-time updates to rules that were already saved (the owner's rulings of 16 Oct 2026): requests and blocks become
 // preferences, "new to ICU" is strict only for rotating residents and MOPEXes. Only a rule still in its old form changes.
 function updateRules(s) {
-  if ((s.rulesVersion || 1) >= 16) return;
+  if ((s.rulesVersion || 1) >= 17) return;
   const from2 = (s.rulesVersion || 1) < 2;
-  s.rulesVersion = 16;
+  s.rulesVersion = 17;
   const find = id => s.rules.find(r => r.id === id);
   if (from2) for (const [id, w] of [['r-req-x', 60], ['r-req-xx', 80]]) { const r = find(id); if (r && r.hard) { r.hard = false; r.weight = w; } }
   const n = from2 && find('r-r1b-new');
@@ -332,6 +345,9 @@ function updateRules(s) {
   // no day-1 cardiac call rule for RES3 and senior residents (owner, 16 Oct 2026); a rule still without a group limit changes
   const c3d1 = find('r-c3-d1');
   if (c3d1 && c3d1.who && !(Array.isArray(c3d1.who.onlyGroups) && c3d1.who.onlyGroups.length)) c3d1.who.onlyGroups = [...C3_D1_GROUPS];
+  // strong / weak pools and the request screening (Bridget's rules, 16 Oct 2026)
+  for (const t of DEFAULT_TAGS.filter(t => /^mo[123][sw]$/.test(t.id))) if (!(s.tags || []).some(x => x.id === t.id)) (s.tags = s.tags || []).push(clone(t));
+  add('r-req-load'); add('r-req-npload'); add('r-pool-1'); add('r-pool-2'); add('r-pool-3');
   // the sheet's colours on the original soft look (owner, 16 Oct 2026; stronger fills made the text hard to read): every duty with a palette colour takes it once. (An earlier
   // step moved only duties still in the very first defaults, and missed ones saved with older defaults, such as S1 and OGD.)
   for (const [code, pal] of Object.entries(PALETTE)) {
