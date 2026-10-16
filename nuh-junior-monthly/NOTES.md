@@ -143,6 +143,8 @@ and is locked again at the next close or start. The stored status values are unc
 
 ## The cloud (owner, 16 Oct 2026)
 
+**Save and Pull cover all the data** (owner, 16 Oct 2026): the staff list, rules and settings plus every month, each month with its days, status and the imported sheet layout (`months/{m}.layout`, a JSON string, so a second device can write to the sheet and hide people the sheet leaves out). A save writes only the months that changed since this browser last saved or pulled (a fingerprint per month in `nuhjm-team-seen`), each with its own conflict check; a pull brings in every month the cloud holds. Months only this browser has are kept.
+
 "Team sharing" became **the cloud** (Save to cloud, Pull from cloud): there is one shared copy, not a group. A **cloud button in
 the header** (hidden in Practice and until Firebase is set up) says Saved 2:14 pm, Not saved, Cloud is newer or Cloud differs,
 with a dot when something needs doing; it opens the cloud panel (the same panel as More > Cloud: sign in, Save, Pull, Earlier

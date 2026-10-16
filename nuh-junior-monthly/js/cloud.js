@@ -162,12 +162,19 @@ export function cellsFromDoc(v) {
   return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
 }
 
+export function layoutFromDoc(v) {
+  if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { return null; } }
+  return v && typeof v === 'object' && !Array.isArray(v) && v.rows && typeof v.rows === 'object' ? v : null;
+}
+
 // One month's days and its status from a state: { cells: { '2026-11-03': { staffId: Cell } }, meta }.
+// layout: the month's imported sheet layout (state.sheets[m]), saved with it so other devices can write to the sheet too.
 export function pickMonth(state, m) {
   const cells = {};
   for (const [d, day] of Object.entries(state.cells || {})) if (d.startsWith(m + '-') && day && Object.keys(day).length) cells[d] = day;
   const meta = (state.months || {})[m] || {};
-  return plain({ cells, meta: { status: meta.status === 'published' ? 'published' : 'draft', publishedAt: meta.publishedAt || '', note: meta.note || '' } });
+  const lay = (state.sheets || {})[m];
+  return plain({ cells, layout: lay && typeof lay === 'object' ? lay : null, meta: { status: meta.status === 'published' ? 'published' : 'draft', publishedAt: meta.publishedAt || '', note: meta.note || '' } });
 }
 
 // A new state with the team document's parts put in (cells and months kept).
@@ -188,9 +195,12 @@ export function mergeMonth(state, m, doc) {
   for (const [d, day] of Object.entries(cellsFromDoc(doc && doc.cells))) {
     if (d.startsWith(m + '-') && day && typeof day === 'object' && Object.keys(day).length) cells[d] = plain(day);
   }
+  // the sheet layout the cloud copy holds (a JSON string); a copy saved before layouts were shared leaves this device's own
+  const lay = layoutFromDoc(doc && doc.layout);
+  const sheets = lay ? { ...(state.sheets || {}), [m]: lay } : state.sheets;
   const months = { ...(state.months || {}) };
   months[m] = { status: doc && doc.status === 'published' ? 'published' : 'draft', publishedAt: (doc && doc.publishedAt) || '', note: (doc && doc.note) || '' };
-  return { ...state, cells, months };
+  return sheets ? { ...state, cells, months, sheets } : { ...state, cells, months };
 }
 
 // ---- team list and months ----
@@ -208,50 +218,70 @@ export async function loadMonth(m) {
   return snap.exists() ? { ...snap.data(), cells: cellsFromDoc(snap.data().cells) } : null;
 }
 
-// Who saved last and when, for the status line: { team: {updatedAt, updatedBy} | null, month: … | null }.
+// Every month the cloud holds, with its days: [{ month, cells, layout, status, updatedAt, updatedBy, … }].
+export async function loadAllMonths() {
+  const { db, F } = await sdk();
+  const snap = await F.getDocs(F.collection(db, 'months'));
+  return snap.docs.map(d => ({ ...d.data(), month: d.id, cells: cellsFromDoc(d.data().cells) })).filter(d => MONTH_RE.test(d.month));
+}
+
+// Who saved last and when, for the status line: { team: {updatedAt, updatedBy} | null, month: … | null (month m),
+// months: { 'YYYY-MM': {updatedAt, updatedBy} } (every month in the cloud) }.
 export async function lastSaved(m) {
-  const [t, mo] = await Promise.all([loadTeam(), m ? loadMonth(m) : null]);
+  const [t, all] = await Promise.all([loadTeam(), loadAllMonths()]);
   const meta = d => d ? { updatedAt: d.updatedAt, updatedBy: d.updatedBy } : null;
-  return { team: meta(t), month: meta(mo) };
+  const months = {};
+  for (const d of all) months[d.month] = meta(d);
+  return { team: meta(t), month: m ? months[m] || null : null, months };
+}
+
+// The months a state holds anything for (days or an imported sheet): [YYYY-MM, …] in order.
+export function monthsWithContent(state) {
+  const set = new Set();
+  for (const d of Object.keys(state.cells || {})) { const day = state.cells[d]; if (day && Object.keys(day).length && MONTH_RE.test(d.slice(0, 7))) set.add(d.slice(0, 7)); }
+  for (const m of Object.keys(state.sheets || {})) if (MONTH_RE.test(m)) set.add(m);
+  return [...set].sort();
 }
 
 // Save the team list and/or one month together, in one transaction, each with its conflict check and a permanent
 // copy in its versions. team: pickTeam(state) or a state; month: { m, cells, meta }.
 // teamAt / monthAt: the updatedAt this browser last saw (null if it never loaded one). force: save over theirs.
 // Returns { at, by } (the new updatedAt for whatever was saved).
-export async function saveAll({ team = null, month = null } = {}, { teamAt = null, monthAt = null, force = false } = {}) {
+export async function saveAll({ team = null, month = null, months = [] } = {}, { teamAt = null, monthAt = null, monthsAt = {}, force = false } = {}) {
   const { db, F } = await sdk();
   const by = await me(), at = Date.now();
   const teamRef = F.doc(db, 'team', 'main');
-  let teamDoc = null, monthRef = null, monthDoc = null;
+  let teamDoc = null;
   if (team) teamDoc = checkDoc(plain({ ...pickTeam(team), updatedAt: at, updatedBy: by }), 'team list');
-  if (month) {
-    if (!MONTH_RE.test(month.m)) throw new Error('Not a month: ' + month.m);
-    const meta = month.meta || {};
-    monthRef = F.doc(db, 'months', month.m);
-    monthDoc = checkDoc(plain({
-      month: month.m, cells: JSON.stringify(month.cells || {}),   // one string: as a map, Firestore made an index entry for every field of every cell (over its 40,000 a document)
+  // every month to write: { m, ref, doc, seen }; `month` (one) is the older way of asking for the same
+  const list = [...(month ? [{ ...month, seen: monthAt }] : []), ...months.map(x => ({ ...x, seen: monthsAt[x.m] ?? null }))].map(x => {
+    if (!MONTH_RE.test(x.m)) throw new Error('Not a month: ' + x.m);
+    const meta = x.meta || {};
+    return { m: x.m, seen: x.seen ?? null, ref: F.doc(db, 'months', x.m), doc: checkDoc(plain({
+      month: x.m, cells: JSON.stringify(x.cells || {}),   // one string: as a map, Firestore made an index entry for every field of every cell (over its 40,000 a document)
+      ...(x.layout ? { layout: JSON.stringify(x.layout) } : {}),   // only months that were imported from a sheet
       status: meta.status === 'published' ? 'published' : 'draft', publishedAt: meta.publishedAt || '', note: meta.note || '',
       updatedAt: at, updatedBy: by,
-    }), 'month');
-  }
-  if (!teamDoc && !monthDoc) return { at, by };
+    }), `month ${x.m}`) };
+  });
+  if (!teamDoc && !list.length) return { at, by };
   await F.runTransaction(db, async tx => {
     // a transaction reads everything before it writes anything
     const curTeam = teamDoc ? await tx.get(teamRef) : null;
-    const curMonth = monthDoc ? await tx.get(monthRef) : null;
+    const curs = [];
+    for (const x of list) curs.push(await tx.get(x.ref));
     const stale = (cur, seen) => !force && cur && cur.exists() && cur.data().updatedAt !== seen;
     if (stale(curTeam, teamAt)) throw new Conflict('team', { updatedAt: curTeam.data().updatedAt, updatedBy: curTeam.data().updatedBy });
-    if (stale(curMonth, monthAt)) throw new Conflict('month', { updatedAt: curMonth.data().updatedAt, updatedBy: curMonth.data().updatedBy }, month.m);
+    list.forEach((x, i) => { if (stale(curs[i], x.seen)) throw new Conflict('month', { updatedAt: curs[i].data().updatedAt, updatedBy: curs[i].data().updatedBy }, x.m); });
     if (teamDoc) {
       tx.set(teamRef, teamDoc);
       const { updatedAt, updatedBy, ...copy } = teamDoc;
       tx.set(F.doc(F.collection(db, 'team', 'main', 'versions')), { team: copy, savedAt: at, savedBy: by });
     }
-    if (monthDoc) {
-      tx.set(monthRef, monthDoc);
-      const { updatedAt, updatedBy, ...copy } = monthDoc;
-      tx.set(F.doc(F.collection(db, 'months', month.m, 'versions')), { ...copy, savedAt: at, savedBy: by });
+    for (const x of list) {
+      tx.set(x.ref, x.doc);
+      const { updatedAt, updatedBy, ...copy } = x.doc;
+      tx.set(F.doc(F.collection(db, 'months', x.m, 'versions')), { ...copy, savedAt: at, savedBy: by });
     }
   });
   return { at, by };
@@ -261,8 +291,8 @@ export async function saveTeam(state, expectedUpdatedAt = null, { force = false 
   return (await saveAll({ team: state }, { teamAt: expectedUpdatedAt, force })).at;
 }
 
-export async function saveMonth(m, cells, meta = {}, expectedUpdatedAt = null, { force = false } = {}) {
-  return (await saveAll({ month: { m, cells, meta } }, { monthAt: expectedUpdatedAt, force })).at;
+export async function saveMonth(m, cells, meta = {}, expectedUpdatedAt = null, { force = false, layout = null } = {}) {
+  return (await saveAll({ month: { m, cells, meta, layout } }, { monthAt: expectedUpdatedAt, force })).at;
 }
 
 // Earlier saves of a month, newest first (each a whole copy: { id, cells, status, savedAt, savedBy, … }).

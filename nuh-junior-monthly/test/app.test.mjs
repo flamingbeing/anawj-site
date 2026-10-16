@@ -485,4 +485,16 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(apmesList(M.defaultState(), { today: '2026-10-16' }).month === '2026-10', 'APMES list: no sheet imported yet: this month');
   ok(apmesList(demoState('2026-10-15')).count > 60, 'APMES list: the practice department');
 }
+{
+  // the cloud copy holds every month and its sheet layout
+  let st = C.mergeMonth(M.defaultState(), '2026-11', { cells: { '2026-11-03': { s1: { a: ['ICU'] } } }, status: 'draft' });
+  st = { ...st, sheets: { '2026-10': { rows: { s1: 3 }, orig: {}, inSheet: ['s1'], known: ['s1'] } } };
+  ok(C.monthsWithContent(st).join() === '2026-10,2026-11', 'cloud: months with days or a sheet are saved');
+  const pk = C.pickMonth(st, '2026-10');
+  ok(pk.layout && pk.layout.rows.s1 === 3 && !C.pickMonth(st, '2026-11').layout, 'cloud: a month carries its sheet layout');
+  const back = C.mergeMonth(M.defaultState(), '2026-10', { cells: '{}', layout: JSON.stringify(pk.layout), status: 'draft' });
+  ok(back.sheets['2026-10'].inSheet[0] === 's1', 'cloud: the layout comes back with the month');
+  const keep = C.mergeMonth(st, '2026-10', { cells: '{}', status: 'draft' });
+  ok(keep.sheets['2026-10'].rows.s1 === 3, 'cloud: a copy with no layout keeps this device\'s');
+}
 console.log(`nuh-junior-monthly: ${n} checks passed`);
