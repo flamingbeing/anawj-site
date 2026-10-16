@@ -185,10 +185,11 @@ export function applyImport(draft, plan, grid, { addUnknown = true, tab = '', so
   const layout = { tab, headerRow: grid.headerRow, firstCol: grid.firstCol, nextCol: grid.nextCol, rows: {}, orig: {}, names: {}, importedAt: new Date().toISOString() };
   if (source) layout.source = { id: String(source.id), gid: source.gid == null ? null : String(source.gid), title: String(source.title || tab) };
   let added = 0, cells = 0;
+  const inSheet = new Set();   // everyone the sheet lists, even a row left alone (someone listed twice)
   for (const row of plan.people) {
     layout.orig[row.row] = [...row.texts, row.next];
     layout.names[row.row] = row.name;
-    if (row.skip) continue;
+    if (row.skip) { if (row.match) inSheet.add(row.match); continue; }
     let id = row.match;
     if (!id) {
       id = M.uid('s');
@@ -196,6 +197,7 @@ export function applyImport(draft, plan, grid, { addUnknown = true, tab = '', so
       added++;
     }
     layout.rows[row.row] = id;
+    inSheet.add(id);
     // the sheet shows only the call (or PC / PPC) on a posting day: the posting underneath comes from the days around
     const parsedRow = row.texts.map(t => codesFromText(t, dmap, upper));
     const postOf = p => p.a.find(c => dmap.get(c)?.kind === 'posting') || '';
@@ -234,6 +236,10 @@ export function applyImport(draft, plan, grid, { addUnknown = true, tab = '', so
     });
   }
   if (!draft.sheets || typeof draft.sheets !== 'object') draft.sheets = {};
+  // who was on the staff list now, and who the sheet lists: anyone known but not listed is hidden from the month
+  // (model.js notInSheet); people added later are not in `known`, so they stay visible
+  layout.known = draft.staff.map(p => p.id);
+  layout.inSheet = [...inSheet];
   draft.sheets[month] = layout;
   return { added, cells, moved };
 }

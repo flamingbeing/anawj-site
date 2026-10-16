@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import * as M from '../js/model.js';
 import * as S from '../js/sheet.js';
-import { evaluate, describeRule } from '../js/rules.js';
+import { evaluate, describeRule, buildContext } from '../js/rules.js';
 import { solve } from '../js/solver.js';
 import { demoState } from '../js/demo.js';
 import { apmesList } from '../js/apmes.js';
@@ -296,6 +296,19 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(CSm.headerState().kind === 'newer', 'a newer cloud copy says so');
   delete globalThis.localStorage;
 }
+// people the imported sheet leaves out are hidden from the month and not in post for the rules
+{
+  const st = M.defaultState();
+  st.staff = ['s1', 's2', 's3'].map(id => ({ id, name: id.toUpperCase(), short: id, group: 'res1', tags: [], fte: 1, start: '', end: '', note: '', active: true }));
+  st.sheets = { [MONTH]: { known: ['s1', 's2'], inSheet: ['s1'], rows: {} } };   // s3 was added after the sheet was read
+  ok(M.staffInMonth(st, MONTH).map(p => p.id).join() === 's1,s3', 'someone the sheet leaves out is hidden; someone added later is not');
+  ok(M.staffInMonth(st, '2027-01').length === 3, 'a month with no imported sheet hides nobody');
+  const ctx = buildContext(st, { from: days[0], to: days[days.length - 1] });
+  const i2 = ctx.index.get('s2'), i1 = ctx.index.get('s1');
+  ok(ctx.act[i2 * ctx.n + ctx.lo] === 0 && ctx.act[i1 * ctx.n + ctx.lo] === 1, 'the rules treat them as not in post that month');
+  st.settings.hideNotInSheet = false;
+  ok(M.staffInMonth(st, MONTH).length === 3 && buildContext(st, { from: days[0], to: days[days.length - 1] }).act[i2 * ctx.n + ctx.lo] === 1, 'and the setting shows them again');
+}
 // import fixes found by the backtest: leave inside a posting keeps the posting; someone listed twice
 {
   const head = ['S/N', 'Grade', 'Name', ...days.map((d, i) => String(i + 1)), '1-Jan'];
@@ -310,6 +323,7 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const plan = S.planImport(s, grid, MONTH);
   ok(plan.people.filter(p => p.skip).length === 1 && plan.people[1].skip, 'the row of someone listed twice without their roster is left alone');
   S.applyImport(s, plan, grid, {});
+  ok(s.sheets[MONTH].inSheet.length === s.sheets[MONTH].known.length && s.sheets[MONTH].known.length >= 2, 'an import records who the sheet lists and who was on the staff list');
   const p = s.staff.find(x => x.name === 'Icu Leave');
   ok(M.getCell(s, days[6], p.id).a.includes('ICU'), 'a day of leave inside ICU keeps the posting underneath');
   ok(!evaluate(s, { from: days[0], to: days[days.length - 1] }).violations.some(v => v.ruleId === 'r-r1b-d1' && v.staffId === p.id), 'leave inside ICU does not start a new posting');

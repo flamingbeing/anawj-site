@@ -26,8 +26,10 @@
 // ---------------------------------------------------------------------------------------------------------------
 
 import {
-  DEFAULT_RULES, dutyMap, addDays, monthDays, monthOf, fmtDay, fmtMonth, uid, isHoliday, getCell, TOKENS,
+  DEFAULT_RULES, dutyMap, addDays, monthDays, monthOf, fmtDay, fmtMonth, uid, isHoliday, getCell, TOKENS, notInSheet,
 } from './model.js';
+
+const NO_ABSENT = new Set();
 
 export { DEFAULT_RULES };
 
@@ -91,6 +93,9 @@ export function buildContext(state, { from, to, rules }) {
     ctx.weekStart[d] = d - ((ctx.wd[d] + 6) % 7);   // index of that week's Monday (may be < 0)
   }
   const before = addDays(start, -1);
+  // people the month's imported sheet left out are not in post that month (model.js notInSheet)
+  const absentIn = {};
+  for (const mk of new Set(ctx.month)) absentIn[mk] = notInSheet(state, mk);
   for (let p = 0; p < P; p++) {
     const per = people[p];
     const prev = getCell(state, before, per.id);
@@ -99,7 +104,7 @@ export function buildContext(state, { from, to, rules }) {
     ctx.pre[p] = [prev2 && Array.isArray(prev2.a) ? prev2.a : NONE, prev && Array.isArray(prev.a) ? prev.a : NONE];
     for (let d = 0; d < n; d++) {
       const i = p * n + d, s = days[d];
-      ctx.act[i] = (!per.start || s >= per.start) && (!per.end || s <= per.end) ? 1 : 0;
+      ctx.act[i] = (!per.start || s >= per.start) && (!per.end || s <= per.end) && !(absentIn[ctx.month[d]] || NO_ABSENT).has(per.id) ? 1 : 0;
       const cell = state.cells && state.cells[s] && state.cells[s][per.id];
       ctx.codes[i] = cell && Array.isArray(cell.a) ? cell.a : NONE;
       ctx.req[i] = cell && Array.isArray(cell.r) ? cell.r : NONE;
