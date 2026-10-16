@@ -578,7 +578,7 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const st = M.defaultState();
   const rule = JSON.parse(JSON.stringify(M.DEFAULT_RULES.find(r => r.id === 'r-c3-fair')));
   rule.params.carry = 0; st.rules = [rule];
-  ok(rule.params.alert === 2 && rule.params.tolerance === 1, 'equal calls: alerts above 2, aim within 1');
+  ok(rule.params.alert === 1 && rule.params.alertPct === 40 && rule.params.tolerance === 1, 'equal calls: aim within 1; alert above 1 point and 40% of the average');
   for (const id of ['x', 'y']) st.staff.push({ id, name: id, group: 'nhg', tags: [], fte: 1, active: true });
   const nov = M.monthDays('2026-11');
   for (const d of nov) for (const id of ['x', 'y']) M.setCell(st, d, id, { a: ['C'] });
@@ -588,7 +588,33 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(n() === 0, 'equal calls: a gap of one call is not pointed out');
   wd.slice(2, 6).forEach(d => M.setCell(st, d, 'x', { a: ['C3'] }));   // six against none: 3 points from the mean
   ok(n() > 0, 'equal calls: a bigger gap still is');
-  const old = M.defaultState(); old.rulesVersion = 12; delete old.rules.find(r => r.id === 'r-c3-fair').params.alert;
-  ok(M.migrate(JSON.parse(JSON.stringify(old))).rules.find(r => r.id === 'r-c3-fair').params.alert === 2, 'a saved roster gets the alert level once');
+  const old = M.defaultState(); old.rulesVersion = 12; const oldP = old.rules.find(r => r.id === 'r-c3-fair').params; delete oldP.alert; delete oldP.alertPct;
+  ok(M.migrate(JSON.parse(JSON.stringify(old))).rules.find(r => r.id === 'r-c3-fair').params.alert === 1, 'a saved roster gets the alert level once');
+}
+{
+  // percentage alerts: a gap must be over 1 point and over alertPct of the average
+  const st = M.defaultState();
+  const rule = JSON.parse(JSON.stringify(M.DEFAULT_RULES.find(r => r.id === 'r-c3-fair')));
+  rule.params.carry = 0; st.rules = [rule];
+  for (const id of ['x', 'y', 'z']) st.staff.push({ id, name: id, group: 'nhg', tags: [], fte: 1, active: true });
+  const nov = M.monthDays('2026-11');
+  for (const d of nov) for (const id of ['x', 'y', 'z']) M.setCell(st, d, id, { a: ['C'] });
+  const mt = nov.filter(d => { const w = new Date(d + 'T00:00:00').getDay(); return w >= 1 && w <= 4; });   // Mon to Thu: 1 point each
+  const flaggedIds = () => [...new Set(evaluate(st, { from: nov[0], to: nov[nov.length - 1] }).violations.filter(v => v.ruleId === 'r-c3-fair').map(v => v.staffId))].sort().join();
+  mt.slice(0, 3).forEach(d => M.setCell(st, d, 'x', { a: ['C3'] }));          // x 3 points, y and z 1 each: average 1.67
+  mt.slice(3, 4).forEach(d => M.setCell(st, d, 'y', { a: ['C3'] }));
+  mt.slice(4, 5).forEach(d => M.setCell(st, d, 'z', { a: ['C3'] }));
+  ok(flaggedIds() === 'x', 'percentage alerts: a person with few calls well above the others is pointed out');
+  // many calls: 12 against 8 (gap 2 on an average of 10 = 20%): not pointed out; with no percentage test it is
+  for (const d of nov) for (const id of ['x', 'y', 'z']) M.setCell(st, d, id, { a: ['C'] });
+  mt.slice(0, 12).forEach(d => M.setCell(st, d, 'x', { a: ['C3'] }));
+  mt.slice(5, 13).forEach(d => M.setCell(st, d, 'y', { a: ['C3'] }));
+  mt.slice(2, 12).forEach(d => M.setCell(st, d, 'z', { a: ['C3'] }));
+  const sparse = flaggedIds();
+  rule.params.alertPct = 0;
+  ok(sparse === '' && flaggedIds() !== '', 'percentage alerts: a gap of 2 on an average of 10 is not pointed out, but is without the percentage test');
+  // the R1 to R3 share compares each grade with itself
+  const r = M.DEFAULT_RULES.find(x => x.id === 'r-fair');
+  ok(r.params.byGroup === 'yes' && r.params.alertPct === 40, 'the R1 to R3 share compares the same grade');
 }
 console.log(`nuh-junior-monthly: ${n} checks passed`);

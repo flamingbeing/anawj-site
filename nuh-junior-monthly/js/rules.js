@@ -1057,12 +1057,14 @@ export const RULE_TYPES = {
       P.num('weekendWeight', 'Weekend counts as (second way)', { min: 0, max: 10 }),
       P.num('holidayWeight', 'Public holiday counts as (second way)', { min: 0, max: 10 }),
       P.num('tolerance', 'Allowed difference from average', { min: 0, max: 10 }),
-      P.num('alert', 'Only point it out above (difference)', { min: 0, max: 20 }, 'Fill still aims for an even share, but Check and the dot after a name only mention a gap bigger than this (0 or empty: the same as the allowed difference).'),
+      P.num('alert', 'Only point it out above (points)', { min: 0, max: 20 }, 'Fill still aims for an even share, but Check and the dot after a name only mention a gap bigger than this many points (0 or empty: the same as the allowed difference) and bigger than the percentage below.'),
+      P.num('alertPct', 'and above this % of the average', { min: 0, max: 500 }, 'A gap also has to be this big compared with the average (a gap of 1 against an average of 2 is 50%). People with few calls, like MO3s, then show up sooner than with a fixed number. 0: no percentage test.'),
+      P.sel('byGroup', 'Compare with', [['no', 'Everyone in the rule'], ['yes', 'The same grade']], 'The average each person is compared with: everyone in the rule, or only people of the same grade.'),
       { key: 'among', label: 'Only people on (their days on it set the share)', kind: 'codes', optional: true, help: 'A posting, e.g. ICU: only people in ICU count, and someone in ICU for half the month gets half a share.' },
       P.num('carry', 'Carry over from earlier months (0 to 1)', { min: 0, max: 1 }, 'How much of what a person was over or under in the months before counts now: 0 none, 1 all. Needs "Only people on". The last month counts fully, each month before a quarter less.'),
       P.num('carryMonths', 'Months to look back', { min: 1, max: 12 }),
     ],
-    defaults: () => ({ codes: [], period: 'month', scheme: 'offdays', offBonus: 0.5, eveBonus: 0.5, weekendWeight: 2, holidayWeight: 2, tolerance: 1, among: [], carry: 0, carryMonths: 4, alert: 0 }),
+    defaults: () => ({ codes: [], period: 'month', scheme: 'offdays', offBonus: 0.5, eveBonus: 0.5, weekendWeight: 2, holidayWeight: 2, tolerance: 1, among: [], carry: 0, carryMonths: 4, alert: 0, alertPct: 0, byGroup: 'no' }),
     describe(r, T) {
       const p = r.params;
       const among = (p.among || []).length ? `people on ${T.codes(p.among)}` : T.who(r.who);
@@ -1078,7 +1080,8 @@ export const RULE_TYPES = {
       const offdays = p.scheme !== 'fixed', ob = num(p.offBonus, 0.5), eb = num(p.eveBonus, 0.5);
       // the call itself counts as a day on the posting (C3 on a cardiac week, R1B on an ICU week): on the sheet the call replaces the posting code
       const ma = (p.among || []).length ? X.codes([...p.among, ...(p.codes || [])]) : null;
-      const alertAt = Math.max(tol, num(p.alert, 0));   // a gap is only pointed out above this; the solver still pushes from `tol`
+      const alertAt = Math.max(tol, num(p.alert, 0));   // a gap is only pointed out above this (points) and above alertPct of the average; the solver still pushes from `tol`
+      const alertPct = Math.max(0, num(p.alertPct, 0)) / 100, byGroup = p.byGroup === 'yes';
       const { ctx, u } = X, n = ctx.n, ok = X.when, act = ctx.act, list = X.W.list, inWho = X.W.inWho;
       const periods = p.period === 'range' ? ctx.periods.range : ctx.periods.month;
       const K = periods.length;
@@ -1123,22 +1126,25 @@ export const RULE_TYPES = {
         global(out) {
           let pen = 0;
           for (let k = 0; k < K; k++) {
-            let s = 0, c = 0;
-            for (const pi of list) { const v = val[pi * K + k]; if (v === v) { s += v; c++; } }
-            if (c < 2) continue;
-            const mean = s / c;
+            // the average each person is compared with: everyone in the rule, or the people of the same grade
+            const sum = new Map(), cnt = new Map();
+            const keyOf = pi => (byGroup ? ctx.people[pi].group : '');
+            for (const pi of list) { const v = val[pi * K + k]; if (v === v) { const g = keyOf(pi); sum.set(g, (sum.get(g) || 0) + v); cnt.set(g, (cnt.get(g) || 0) + 1); } }
             for (const pi of list) {
               const v = val[pi * K + k];
               if (v !== v) continue;
+              const g = keyOf(pi), c = cnt.get(g) || 0;
+              if (c < 2) continue;
+              const mean = sum.get(g) / c;
               const dev = Math.abs(v - mean) - tol;
               if (dev <= 1e-9) continue;
               const pp = Math.round(u * dev * 10) / 10;
               pen += pp; ctx.n2++;
-              if (out && Math.abs(v - mean) > alertAt) {
+              if (out && Math.abs(v - mean) > alertAt && Math.abs(v - mean) > alertPct * Math.abs(mean)) {
                 const lab = p.period === 'range' ? 'in these dates' : `in ${fmtMonth(periods[k].key)}`;
                 // about the whole period, so no date: the grid marks the name, Check's Show opens their month
                 const wtxt = ww !== 1 || hw !== 1 ? ' (weekends and holidays count extra)' : '';
-                out.push(X.V(pp, `${X.name(pi)}: ${X.T.codes(p.codes)} ${round1(v)} ${lab}${wtxt}${carry[pi * K + k] ? ` (includes ${carry[pi * K + k] > 0 ? '+' : ''}${round1(carry[pi * K + k])} carried over from earlier months)` : ''}; group average ${round1(mean)}`, { staffId: ctx.people[pi].id, month: periods[k].key }));
+                out.push(X.V(pp, `${X.name(pi)}: ${X.T.codes(p.codes)} ${round1(v)} ${lab}${wtxt}${carry[pi * K + k] ? ` (includes ${carry[pi * K + k] > 0 ? '+' : ''}${round1(carry[pi * K + k])} carried over from earlier months)` : ''}; ${byGroup ? 'average for the grade' : 'group average'} ${round1(mean)}`, { staffId: ctx.people[pi].id, month: periods[k].key }));
               }
             }
           }
