@@ -119,7 +119,7 @@ try { for (const width of [390, 1280]) {
   const iso = days[days.length - 1];
   const syncBtn = p.locator('button.lb-sync');
   const toLogbook = async () => { await p.evaluate(() => { location.hash = '#settings'; }); await p.evaluate(() => { location.hash = '#logbook'; }); await p.locator('main .lb-top').waitFor(); };
-  const runDone = async () => { await p.getByText(/^Synced \d+ of \d+ days?/).waitFor().catch(async e => { throw new Error(`${e.message}\ntoast: ${await p.locator('#toast').innerText().catch(() => '')}\nerrors: ${errors.join(' | ')}`); }); const t = await p.locator('dialog[open] [role=status]').innerText(); await p.getByRole('button', { name: 'Close', exact: true }).click(); return t; };
+  const runDone = async () => { await p.getByText(/^Synced \d+ of \d+/).waitFor().catch(async e => { throw new Error(`${e.message}\ntoast: ${await p.locator('#toast').innerText().catch(() => '')}\nerrors: ${errors.join(' | ')}`); }); const t = await p.locator('dialog[open] [role=status]').innerText(); await p.getByRole('button', { name: 'Close', exact: true }).click(); return t; };
   // the fake case is saved in the demo logbook (it must survive the sign-in pages' reloads)
   const setCase = details => p.evaluate(async ([d, details]) => { const cloud = await import('./js/cloud.js'); const { S } = await import('./js/ui-core.js');
     await cloud.saveCase('demo@example.com', { id: 'fake-sync-1', date: d, initials: 'ZZ', details, cats: ['01'], createdAt: Date.now() + 1e9, updatedAt: Date.now(), source: 'app' });
@@ -266,9 +266,34 @@ try { for (const width of [390, 1280]) {
   assert.ok(gh.has(`Limited/${iso}.md`));
   assert.equal(dbxLog.length, dbxBefore); assert.equal(driveLog.length, driveBefore);
 
+  // reflection notes too (log2 15), on the GitHub place only: one per reflection in Limited/Reflections/, and a day's
+  // Link points at its note
+  await p.evaluate(async () => {
+    const { patchLogbook, S } = await import('./js/ui-core.js'), sync = S.logbook.settings.sync;
+    await patchLogbook({ settings: { sync: { ...sync, targets: sync.targets.map(t => (t.kind === 'github' ? { ...t, reflections: true } : t)) }, markdown: { reflInDay: 'link' } } });
+  });
+  const want = await p.evaluate(async () => {
+    const { S } = await import('./js/ui-core.js'), live = (S.reflections || []).filter(r => !r.deleted);
+    return { n: live.length, linked: live.some(r => r.caseId && S.cases.some(c => c.id === r.caseId && c.date)) };
+  });
+  assert.ok(want.n > 0, 'the demo has reflections');
+  await toLogbook();
+  await p.waitForFunction(() => /to sync \(days and reflection notes\)$/.test(document.querySelector('button.lb-sync')?.title || ''));
+  await syncBtn.click();
+  assert.match(await runDone(), new RegExp(`\\(\\d+ days? and ${want.n} reflection notes?\\)`));
+  const notes = [...gh.keys()].filter(k => k.startsWith('Limited/Reflections/'));
+  assert.equal(notes.length, want.n);
+  for (const k of notes) assert.ok(START_RE.test(gh.get(k).text) && !gh.get(k).text.startsWith('---'), k);
+  if (want.linked) assert.ok([...gh.keys()].some(k => /^Limited\/\d{4}-\d{2}-\d{2}\.md$/.test(k) && /Reflection: \[\[Reflections\//.test(gh.get(k).text)), 'a day links to its reflection note');
+  // nothing new for GitHub: nothing sent (the other places now have days waiting: Link gives them the full text)
+  const putsR = ghLog.length;
+  await p.evaluate(async () => { const { runSync } = await import('./js/ui-sync.js'), { S } = await import('./js/ui-core.js'); await runSync({ only: S.logbook.settings.sync.targets.find(t => t.kind === 'github').id }); });
+  await p.getByText('Everything is synced').waitFor();
+  assert.equal(ghLog.length, putsR, 'nothing new: nothing sent');
+
   // the settings file carries where to sync, never the token
   const file = await p.evaluate(async () => { const { settingsFile } = await import('./js/settings-file.js'); return JSON.stringify(settingsFile((await import('./js/ui-core.js')).S.logbook)); });
-  assert.match(file, /fake-notes/); assert.ok(!file.includes('FAKE_GH_TOKEN'));
+  assert.match(file, /fake-notes/); assert.match(file, /"reflections":true/); assert.ok(!file.includes('FAKE_GH_TOKEN'));
 
   // Forget token, and sign-out's clean-up: nothing of the sync stays on the device
   await p.evaluate(() => { location.hash = '#sync'; }); await p.getByRole('heading', { name: 'Sync', exact: true }).waitFor();

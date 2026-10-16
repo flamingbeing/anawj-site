@@ -350,8 +350,8 @@ portfolio content.
   pattern (Settings → Sync) is separate. Changing the heading makes Sync rewrite each synced day once (3-way merge
   keeps the user's edits). **Under each case** (`reflInDay`: None (default) / Link / Embed `![[…]]` / Full text;
   `notesInDay`: None / Full text): a case's reflections and linked notes after it in a day and in one case, their
-  headings two levels down. Link and Embed need the reflection's own note, which only the export has (`ctx.reflPath`);
-  Copy, Share, Send to and Sync give the full text (Markdown links can't embed: a link). A linked note under its case
+  headings two levels down. Link and Embed need the reflection's own note (`ctx.reflPath`): the export, and Sync places
+  with **Also sync reflection notes**; Copy, Share, Send to and other Sync places give the full text (Markdown links can't embed: a link). A linked note under its case
   leaves the day's Notes. e2e: `md-format.mjs`. An older
   `settings.shareFormat` (the Copy & share format) carries over until the Markdown page is saved; `share-format.js`
   is kept for that and its tests. Previews use the user's own latest day and reflection.
@@ -378,6 +378,13 @@ portfolio content.
   (`forgetSync`). Drive/Dropbox reuse the backup sign-in (`signInFor`, pending `action: 'sync'`, `back` page);
   tokens stay memory-only, so a run resumed after one sign-in never leaves for a second (the other place waits for
   the next tap). ID check once per run. e2e: `test/e2e/sync.mjs` fakes all three APIs.
+- **Sync reflection notes** (log2 15; owner said build it, 16 Oct 2026; off unless chosen, per place: `target.reflections`):
+  one note per reflection in `Reflections/…` beside the day files, named and foldered as the Markdown export names
+  them (`reflectionFiles` in sync-md.js, in a stable order: date, created, id), inside the usual marked block, so no
+  front matter and no figures. Ledger keys `r:<id>` with the file's `path`; a reflection whose name changes (title,
+  date, heading) gets a new file and the old one is left (Sync never deletes a file; the run says how many); a
+  deleted reflection's file stays. Only on those places do a day's Link and Embed point at the notes (the day text
+  differs per place). Tested in `sync-md.test.mjs` and `e2e/sync.mjs`.
 - **Save to Google Drive / Dropbox** (Backup card; `cloud-save.js`, ids and pure helpers in `backup-targets.js`,
   tested): sign-in leaves the page and comes back, no popups (Oct 2026: on the owner's phone popups lost their
   opener, so Drive stayed on a blank page and Dropbox did nothing). Drive = OAuth implicit grant (token in the

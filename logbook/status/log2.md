@@ -4,7 +4,8 @@
 #665/#667/#669 Select and Bulk edit (9–9d), #671/#674 Search (9e), #677 Grid (10), #679 paging (11), #680 Send to
 presets (12), #686 Group by and Sort (14), #689/#690 Markdown (15), #691 BMI highlight (2), Year comparison (5b, this
 PR). Card style (raised / outlined / flat) left as is: Borders, Shadows and Flat already cover it.
-Open question for the owner: Sync writing the reflection notes (item 15's last part; see 15 below).
+16 Oct follow-up (owner: "do what you recommend"): Card style in Themes with the line strength in Advanced display;
+Your themes (save a Custom look, Export / Import); Sync writing reflection notes (per place, off by default).
 Waiting on the owner: a real-phone check of sign-in (installed app and Firefox for Android), and of each new Send to
 preset on an iPhone (Apple Notes Shortcut, Email, Telegram, Drafts, Bear, Things, Day One).
 
