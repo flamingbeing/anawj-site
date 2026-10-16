@@ -691,7 +691,7 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(ev('r-pool-1').length === 1 && ev('r-pool-2').length === 1 && ev('r-pool-3').length === 0, 'pools: two call requests on one day in the same pool are flagged, different pools are not');
   const old = M.defaultState(); old.rulesVersion = 16; old.tags = old.tags.filter(t => !/^mo\d[sw]$/.test(t.id)); old.rules = old.rules.filter(r => !/^r-(req-load|req-npload|pool-\d)$/.test(r.id));
   const mg = M.migrate(JSON.parse(JSON.stringify(old)));
-  ok(mg.rulesVersion === 19 && mg.tags.some(t => t.id === 'mo3w') && mg.rules.some(r => r.id === 'r-pool-3' && !r.enabled), 'pools: a saved roster gains the tags and rules once');
+  ok(mg.rulesVersion === 20 && mg.tags.some(t => t.id === 'mo3w') && mg.rules.some(r => r.id === 'r-pool-3' && !r.enabled), 'pools: a saved roster gains the tags and rules once');
 }
 
 // the Rules tab groups rules by topic
@@ -751,5 +751,12 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(ev('r-mo-pool-r1').length === 1, 'pool request: an MO1-pool R request given R2 instead of R1 is flagged');
   M.setCell(s, w, 'p1', { a: ['R1'], r: ['R'] });
   ok(ev('r-mo-pool-r1').length === 0, 'pool request: given R1, nothing to flag');
+}
+
+// Fill's ticks: cardiac and ICU by default; R1 to R3 can be ticked (they are auto-fill codes, start unticked)
+{
+  const s = M.defaultState();
+  ok(['R1', 'R2', 'R3', 'C3', 'R1B'].every(c => s.duties.find(d => d.code === c).auto), 'Fill: R1 to R3 are auto-fill codes');
+  ok(M.fillCodes(s).join() === 'C3,R1B', 'Fill: cardiac and ICU are ticked by default, R1 to R3 are not');
 }
 console.log(`nuh-junior-monthly: ${n} checks passed`);

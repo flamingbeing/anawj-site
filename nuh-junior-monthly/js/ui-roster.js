@@ -1421,8 +1421,9 @@ export function openAutofill(app) {
   let redo = false;   // also redo the calls already typed in the sheet (they come in as hand-entered)
   // what to fill: some of the auto-fill codes (cardiac and ICU today); the others are left exactly as they are
   const fillable = autoDuties.filter(d => d.kind === 'shift');
-  let chosen = new Set(fillable.map(d => d.code));
-  try { const saved = JSON.parse(localStorage.getItem('nuhjm-af-codes') || 'null'); if (Array.isArray(saved)) { const keep = fillable.map(d => d.code).filter(c => saved.includes(c)); if (keep.length) chosen = new Set(keep); } } catch (e) { /* all */ }
+  // R1 to R3 can be ticked too; they start unticked (cardiac and ICU stay the default)
+  const OFF_BY_DEFAULT = ['R1', 'R2', 'R3'];
+  let chosen = new Set(M.fillCodes(state));
   const picked = () => autoDuties.filter(d => d.kind !== 'shift' || chosen.has(d.code));
   try { timeMs = +localStorage.getItem('nuhjm-af-time') || 6000; } catch (e) { /* ignore */ }
 
@@ -1496,6 +1497,10 @@ export function openAutofill(app) {
         what.append(h('label', { class: 'af-opt', for: id }, cb, h('span', { class: 'af-opt-l' }, d.code), h('span', { class: 'af-opt-s' }, d.name)));
       }
       wrap.append(what, h('p', { class: 'muted af-what-note' }, 'Calls you do not tick are not changed, but the rules around them (post call, gaps, who is already on call) still apply.'));
+      if (OFF_BY_DEFAULT.some(c => chosen.has(c))) {
+        const off = (state.rules || []).filter(r => M.R13_RULE.test(r.id)).some(r => r.enabled === false);
+        if (off) wrap.append(h('p', { class: 'muted af-what-note' }, 'Ticking R1, R2 or R3 turns the R1 to R3 rules on (every night needs one of each, who may do which call, gaps and sharing). Turn them off again on the Rules tab.'));
+      }
     }
     // upper bounds: the search usually ends sooner, once it stops finding a better roster
     const times = [[3000, 'Quick', '3 s'], [6000, 'Normal', '6 s'], [15000, 'Thorough', '15 s']];
@@ -1511,7 +1516,7 @@ export function openAutofill(app) {
       const cb = h('input', { type: 'checkbox', id: 'af-redo', checked: redo });
       cb.addEventListener('change', () => { redo = cb.checked; });
       wrap.append(h('label', { class: 'af-redo', for: 'af-redo' }, cb,
-        h('span', null, ` Also redo the ${autoDuties.map(d => d.code).join(' and ')} calls already in the sheet (${n.manual}). For trying Auto-fill on a month that is already filled; Apply can be undone.`)));
+        h('span', null, ` Also redo the ${picked().map(d => d.code).join(' and ')} calls already in the sheet (${n.manual}). For trying Auto-fill on a month that is already filled; Apply can be undone.`)));
     }
     if (!autoDuties.length) wrap.append(h('p', { class: 'warn-box' }, 'No duty is marked "auto-fill" yet. Mark codes under People › Duty codes.'));
     const nothing = fillable.length > 0 && !chosen.size;
@@ -1562,6 +1567,10 @@ export function openAutofill(app) {
   function run() {
     runCount++;
     const seed = runCount;
+    // R1 to R3 ticked: the rules that make those calls work have to be on (they are off until the rosterer starts using them here)
+    if (OFF_BY_DEFAULT.some(c => chosen.has(c)) && (app.store.get().rules || []).some(r => M.R13_RULE.test(r.id) && r.enabled === false)) {
+      app.store.commit('Turn on the R1 to R3 rules', draft => { for (const r of draft.rules) if (M.R13_RULE.test(r.id)) r.enabled = true; });
+    }
     const snapshot = redo ? JSON.parse(JSON.stringify(app.store.get())) : app.store.get();
     if (redo) markAuto(snapshot);
     stageProgress();

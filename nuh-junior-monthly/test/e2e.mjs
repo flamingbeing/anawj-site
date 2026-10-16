@@ -185,7 +185,8 @@ const noSideScroll = async (page, label) => {
   ok(before > 30, 'next month starts without calls');
   await page.evaluate(() => window.jmApp.openAutofill());
   // choose what to fill: the calls ticked are drafted, the others stay as they are
-  ok(await page.locator('.af-what input[type=checkbox]').count() === 2, 'the Fill dialog offers cardiac and ICU calls to pick');
+  ok(await page.locator('.af-what input[type=checkbox]').count() === 5, 'the Fill dialog offers cardiac, ICU and R1 to R3 calls to pick');
+  ok(await page.locator('#af-c-C3').isChecked() && await page.locator('#af-c-R1B').isChecked() && !(await page.locator('#af-c-R1').isChecked()), 'cardiac and ICU start ticked, R1 to R3 unticked');
   await page.locator('#af-c-R1B').uncheck();
   ok((await page.locator('.af strong').first().innerText()).trim() === 'C3' && await page.getByRole('button', { name: 'Start' }).isEnabled(), 'with ICU unticked it drafts C3 only');
   await page.locator('#af-c-C3').uncheck();
@@ -422,6 +423,31 @@ for (const w of [320, 360, 390, 430]) {
   await page.getByRole('button', { name: 'Import', exact: true }).click();
   await page.waitForTimeout(300);
   ok(await page.evaluate(() => window.jmApp.store.get().staff.find(p => p.name === 'Icu Example').group) === 'res3', 'Import moved them to the new group');
+  await page.close();
+}
+// Fill can draft the R1 to R3 calls: ticking them turns the R1 to R3 rules on, and the calls are placed
+{
+  const page = await newPage({ width: 1280, height: 900 }, 'fill-r13');
+  await page.goto(BASE + '?demo#roster');
+  await ready(page);
+  await page.waitForTimeout(500);
+  const before = await page.evaluate(() => window.jmApp.store.get().rules.filter(r => /^r-r[123]-cover$/.test(r.id)).map(r => r.enabled));
+  ok(before.length === 3 && before.every(e => e === false), 'the R1 to R3 cover rules start off');
+  await page.evaluate(() => window.jmApp.setMonth(window.jmApp.model.addMonths(window.jmApp.month, 1)));
+  await page.waitForTimeout(300);
+  await page.evaluate(() => window.jmApp.openAutofill());
+  await page.locator('#af-c-C3').uncheck();
+  await page.locator('#af-c-R1B').uncheck();
+  for (const c of ['R1', 'R2', 'R3']) await page.locator('#af-c-' + c).check();
+  ok(await page.getByText('turns the R1 to R3 rules on').count() >= 1, 'the dialog says ticking R1 to R3 turns the rules on');
+  await page.getByRole('button', { name: 'Start' }).click();
+  await page.waitForFunction(() => /Apply/.test(document.body.innerText), null, { timeout: 40000 });
+  const rules = await page.evaluate(() => window.jmApp.store.get().rules.filter(r => /^r-r[123]-cover$/.test(r.id)).map(r => r.enabled));
+  ok(rules.every(e => e === true), 'starting Fill with R1 to R3 ticked turned the R1 to R3 cover rules on');
+  await page.getByRole('button', { name: /^Apply/ }).first().click();
+  await page.waitForTimeout(600);
+  const placed = await page.evaluate(() => { const st = window.jmApp.store.get(), m = window.jmApp.model; const d = m.monthDays(window.jmApp.month)[10]; const got = new Set(); for (const p of st.staff) for (const c of (m.getCell(st, d, p.id) || {}).a || []) got.add(c); return ['R1', 'R2', 'R3'].filter(c => got.has(c)); });
+  ok(placed.length === 3, `Fill placed an R1, R2 and R3 on a night (${placed.join(', ')})`);
   await page.close();
 }
 await b.close();

@@ -91,7 +91,7 @@ const TOPICS = [
 ];
 export function topicOf(r) {
   const p = r.params || {};
-  if (/^r-mo-/.test(r.id || '')) return 'mo';
+  if (M.R13_RULE.test(r.id || '') && r.type !== 'requests' || /^r-mo-/.test(r.id || '')) return 'mo';
   if (r.type === 'requests' || /^r-req-|^r-pool-/.test(r.id || '')) return 'requests';
   const codes = [].concat(p.codes || [], p.ifCodes || [], p.thenCodes || [], p.codesA || [], p.codesB || []);
   const has = c => codes.includes(c);
@@ -99,7 +99,6 @@ export function topicOf(r) {
   if (onlyOne(['C3', 'C', 'C-e', 'C-p'])) return 'c3';
   if (onlyOne(['R1B', 'ICU'])) return 'r1b';
   if (codes.some(c => ['R1', 'R2', 'R3'].includes(c)) && !has('C3') && !has('R1B')) return 'mo';
-  if (/^r-(r1|r2|r3)-|^r-mo-|^r-fair$|^r-gap$/.test(r.id || '')) return 'mo';
   return 'everyone';
 }
 

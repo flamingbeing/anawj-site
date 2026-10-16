@@ -12,7 +12,7 @@ const PAGE = 6;   // problems shown per rule before "Show all"
 // Which problems bear on what Fill places? A must-fix problem always does. A preference does when a cell it names holds
 // one of the codes (C3, R1B), or when its rule is about them and no cell is named (fairness, cover), or it wants one of them.
 export function relevanceOf(st, ev, fillOnly) {
-  const auto = (st.duties || []).filter(d => d.auto).map(d => d.code);
+  const auto = M.fillCodes(st);
   const rmap = new Map((st.rules || []).map(r => [r.id, r]));
   const ruleCodes = id => { const r = rmap.get(id), out = new Set(); if (r) for (const v of Object.values(r.params || {})) if (Array.isArray(v)) v.forEach(c => typeof c === 'string' && out.add(c)); return out; };
   const has = (d, sid) => { const c = M.getCell(st, d, sid); return !!c && (c.a || []).some(x => auto.includes(x)); };
