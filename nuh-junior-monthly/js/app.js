@@ -743,11 +743,11 @@ async function start() {
   $('#prevm').addEventListener('click', () => setMonth(M.addMonths(app.month, -1)));
   $('#nextm').addEventListener('click', () => setMonth(M.addMonths(app.month, 1)));
   $('#today').addEventListener('click', goToday);
-  $('#lockm').addEventListener('click', async () => {
+  // unlocking asks nothing (owner, 16 Oct 2026): the toast offers Undo, which locks it again
+  $('#lockm').addEventListener('click', () => {
     const st = app.store.get(), m = app.month, locked = M.isMonthLocked(st, m);
-    if (locked && !(await confirmBox(`Unlock ${M.fmtMonth(m)}? Anyone using it can change it again.`, { ok: 'Unlock' }))) return;
     app.store.commit(`${locked ? 'Unlock' : 'Lock'} ${M.fmtMonth(m)}`, draft => { M.setMonthLocked(draft, m, !locked); });
-    toast(locked ? `${M.fmtMonth(m)} is unlocked.` : `${M.fmtMonth(m)} is locked: nothing in it can change until you unlock it.`, { kind: 'ok', ms: 4000 });
+    toast(locked ? `${M.fmtMonth(m)} is unlocked.` : `${M.fmtMonth(m)} is locked: nothing in it can change until you unlock it.`, { kind: 'ok', ms: 4000, action: locked ? { label: 'Lock again', fn: () => app.store.undo() } : undefined });
   });
   $('#autofill').addEventListener('click', openAutofill);
   $('#cloudbtn').addEventListener('click', openCloud);

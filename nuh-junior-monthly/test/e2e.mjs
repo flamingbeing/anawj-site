@@ -249,8 +249,7 @@ for (const w of [320, 360, 390, 430]) {
   const locked = await read();
   ok(!('autofill' in locked.r), `${w}px: Fill is hidden while the month is locked`);
   ok(locked.lockNote > 0 && locked.lockNote <= 44 && locked.banner > 0 && locked.banner <= 44, `${w}px: the locked and empty-month banners are one slim line each (${Math.round(locked.lockNote)} and ${Math.round(locked.banner)} px)`);
-  await page.locator('#lockm').click();
-  await page.getByRole('button', { name: 'Unlock', exact: true }).click();
+  await page.locator('#lockm').click();   // unlocking asks nothing
   await page.waitForTimeout(500);
   const m = await read();
   ok(m.sw <= m.vw + 1, `${w}px: no sideways page scroll (${m.sw} > ${m.vw})`);
@@ -404,7 +403,6 @@ for (const w of [320, 360, 390, 430]) {
   });
   ok(refused === false && await page.getByText('is locked, so nothing was changed').count() >= 1, 'a locked month refuses a change and says why');
   await page.locator('#lockm').click();
-  await page.getByRole('button', { name: 'Unlock', exact: true }).click();
   await page.waitForTimeout(300);
   ok(await page.locator('#lockm').getAttribute('aria-pressed') === 'false', 'unlocked again');
   // a new grade in the sheet: the import review lists the move, ticked, and Import makes it
