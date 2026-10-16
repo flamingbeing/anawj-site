@@ -30,6 +30,8 @@ const OBJECTS = {
   partLabels: v => (v == null ? null : cleanLabels(v)),
   caseTpl: v => (v == null ? null : cleanCaseTemplate(v)),
   catOrder: strs,
+  // the Grid's column widths (px, this device; log2 10)
+  gridCols: v => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([k, x]) => ['date', 'ini', 'details', 'cats'].includes(k) && Number.isFinite(x)).map(([k, x]) => [k, Math.max(40, Math.min(1200, Math.round(x)))])) : null),
   anLayout: v => cleanLayout(v),   // Analytics Edit mode: the cards' order and the hidden ones
   caseHide: v => strs(v).slice(0, 20),
   basicOn: v => strs(v).slice(0, 30),
@@ -47,7 +49,7 @@ const PLAIN = new Set(['dayNoteOnCase', 'pasteClean', 'shareAsk', 'noteToolbar',
   'basic', 'mode', 'weekStart', 'afterSave', 'undoSecs', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'borders', 'reflPoints', 'round', 'shadows', 'bigTaps', 'swipeTabs', 'rowMenu', 'reflToolbar', 'autoTick', 'recentCount',
   // device keys added later (they were dropped on import until 13 Oct 2026; settings-file.test.mjs checks DISPLAY_KEYS)
   'rowCopy', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy', 'hideTabsTyping',
-  'labelParts', 'caseTplOn', 'boxHeight', 'boxGrow', 'totalsCompact', 'totalsTargets', 'calRefl', 'detectInitials', 'oneLetterInitials', 'skipStarts', 'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band']);
+  'labelParts', 'caseTplOn', 'gridLines', 'boxHeight', 'boxGrow', 'totalsCompact', 'totalsTargets', 'calRefl', 'detectInitials', 'oneLetterInitials', 'skipStarts', 'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band']);
 const MAX_JSON = 400 * 1024;
 
 // Reset all settings (Settings, at the bottom; owner, 15 Oct 2026): the account's settings back to their defaults (null),

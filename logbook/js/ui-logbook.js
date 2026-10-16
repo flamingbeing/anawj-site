@@ -604,7 +604,16 @@ function showDay() {
 
 const catText = cats => sortCodes(cats || []).join(', ');
 
+// The Grid (log2 10): a spreadsheet look (thin lines, no boxed inputs). Column widths drag from each heading's right
+// edge (this device; a double-tap on the edge resets that column); lines per row 1 / 2 / 3 / Fit (the summary grows to
+// its text). Edits save when a cell is left, as before.
+const GRID_COLS = [['date', 'Date', 150], ['ini', 'Initials', 72], ['details', 'Case summary', 0], ['cats', 'Tags', 220]];
+const LINE_OPTS = [['1', '1 line'], ['2', '2 lines'], ['3', '3 lines'], ['fit', 'Fit to text']];
 function gridView(rows, repaint) {
+  const lines = String(display().gridLines || '1');
+  const widths = { ...(display().gridCols || {}) };
+  const fitAll = () => tbody.querySelectorAll('textarea.g-details').forEach(fitCell);
+  const fitCell = ta => { if (lines !== 'fit') return; ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
   const tbody = h('tbody');
   for (const c of rows.slice(0, view.limit)) {
     const p = caseParts(c);
@@ -621,19 +630,55 @@ function gridView(rows, repaint) {
       Object.assign(c, await updateCase(next));
       Object.assign(p, { initials, details });
     };
-    const cell = (key, attrs = {}) => h('input', { ...attrs, value: row[key], oninput: e => { row[key] = e.target.value; tr.classList.add('dirty'); }, onchange: commit });
-    add(tr, 
+    const cell = (key, attrs = {}, tag = 'input') => h(tag, { ...attrs, value: row[key], oninput: e => { row[key] = e.target.value; tr.classList.add('dirty'); if (tag === 'textarea') fitCell(e.target); }, onchange: commit });
+    const details = cell('details', { 'aria-label': 'Details', class: 'g-details', rows: lines === 'fit' ? '1' : lines }, 'textarea');
+    details.value = row.details;
+    add(tr,
       h('td', { class: 'date' }, cell('date', { type: 'date', 'aria-label': 'Date', title: c.dateText && !c.date ? `Was written as “${c.dateText}”: pick the date` : '' })),
       h('td', { class: 'ini' }, cell('initials', { 'aria-label': 'Initials', placeholder: 'AB', autocapitalize: 'characters', size: '5' })),
-      h('td', {}, cell('details', { 'aria-label': 'Details' })),
+      h('td', { class: 'details' }, details),
       h('td', { class: 'cats' }, h('button', { type: 'button', class: 'grid-cats', 'aria-label': 'Tags: change', onclick: () => editCaseDialog(c) },
         (c.cats || []).length ? catPills(c.cats) : h('span', { class: 'flag err' }, 'no tag'))));
     add(tbody, tr);
   }
+  // a column's width: drag the heading's right edge (pointer events: a finger or a mouse); double-tap resets it
+  const cols = GRID_COLS.map(([k, , w]) => h('col', { 'data-col': k, style: widths[k] ? `width:${widths[k]}px` : w ? `width:${w}px` : '' }));
+  const table = h('table', { class: 'grid sheet' + (lines === 'fit' ? ' fit' : '') + (Object.keys(widths).length ? ' sized' : '') }, h('colgroup', {}, cols));
+  const head = h('tr', {}, GRID_COLS.map(([k, label], i) => {
+    let lastTap = 0;
+    const grip = h('span', { class: 'col-grip', role: 'separator', 'aria-orientation': 'vertical', 'aria-label': `${label} column width: drag to change, double-tap to reset`, tabindex: '0',
+      'aria-valuemin': '40', 'aria-valuemax': '1200', 'aria-valuenow': String(Math.round(widths[k] || GRID_COLS[i][2] || 300)),
+      onpointerdown: e => {
+        e.preventDefault(); e.stopPropagation();
+        const now = Date.now();
+        if (now - lastTap < 350) { lastTap = 0; delete widths[k]; setDisplay({ gridCols: Object.keys(widths).length ? { ...widths } : null }); repaint(); return; }
+        lastTap = now;
+        const th = e.currentTarget.closest('th'), x0 = e.clientX, w0 = th.getBoundingClientRect().width;
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        table.classList.add('sized');
+        const move = ev => { const w = Math.max(40, Math.round(w0 + ev.clientX - x0)); cols[i].style.width = w + 'px'; widths[k] = w; grip.setAttribute('aria-valuenow', String(w)); };
+        const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); if (widths[k]) setDisplay({ gridCols: { ...widths } }); };
+        addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+      },
+      onkeydown: e => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        const w = Math.max(40, Math.round((widths[k] || e.currentTarget.closest('th').getBoundingClientRect().width) + (e.key === 'ArrowRight' ? 16 : -16)));
+        widths[k] = w; cols[i].style.width = w + 'px'; grip.setAttribute('aria-valuenow', String(w)); table.classList.add('sized');
+        setDisplay({ gridCols: { ...widths } });
+      } });
+    return h('th', {}, h('span', { class: 'th-l' }, label), grip);
+  }));
+  add(table, h('thead', {}, head), tbody);
+  const linesSel = h('select', { 'aria-label': 'Lines per row', onchange: e => { setDisplay({ gridLines: e.target.value === '1' ? null : e.target.value }); repaint(); } },
+    LINE_OPTS.map(([v, t]) => h('option', { value: v, selected: lines === v }, t)));
   const more = rows.length > view.limit ? h('button', { onclick: () => { view.limit += 300; repaint(); } }, `Show more (${rows.length - view.limit} left)`) : null;
+  requestAnimationFrame(fitAll);
   return h('div', {},
-    h('p', { class: 'hint help' }, 'Edit the date, initials and details directly; changes save when you leave a cell. Tap the tags to change them.'),
-    h('div', { class: 'scroll' }, h('table', { class: 'grid' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Initials'), h('th', {}, 'Case summary'), h('th', {}, 'Tags'))), tbody)),
+    h('p', { class: 'hint help' }, 'Edit the date, initials and details directly; changes save when you leave a cell. Tap the tags to change them. Drag a heading’s edge to resize a column (double-tap it to reset).'),
+    h('div', { class: 'bar grid-opts' }, h('label', { class: 'refl-view' }, h('span', { class: 'hint' }, 'Lines per row '), linesSel),
+      Object.keys(widths).length ? h('button', { class: 'small linkish', onclick: () => { setDisplay({ gridCols: null }); repaint(); } }, 'Reset column widths') : null),
+    h('div', { class: 'scroll' }, table),
     more,
     pasteRows());
 }

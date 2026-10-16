@@ -32,6 +32,10 @@ const SCREENS = [
     await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   }, false],
   ['Logbook list', async p => { await hash('logbook')(p); await p.locator('main .seg button', { hasText: /^List$/ }).first().click(); }, false],
+  ['Logbook grid', async p => {
+    await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { show: { grid: true }, logbookView: 'grid' } }); });
+    await hash('logbook')(p); await p.locator('table.grid.sheet tbody tr').first().waitFor();
+  }, true],
   ['Logbook selecting', async p => {
     await hash('logbook')(p); await p.locator('main .seg button', { hasText: /^List$/ }).first().click();
     await p.locator('button.lb-selbtn').click();
