@@ -199,6 +199,55 @@ const noSideScroll = async (page, label) => {
   ok(await page.getByText('App version').count() >= 0, 'more ends with the version lines');
   await page.close();
 }
+// ---------- phone header and banners at 320, 360, 390 and 430 px: nothing clipped or overlapping, one size scale ----------
+for (const w of [320, 360, 390, 430]) {
+  const page = await newPage({ width: w, height: 800 }, `phone-${w}`, { isMobile: true, hasTouch: true });
+  await page.goto(BASE + '#roster');   // a roster of your own (the cloud button shows)
+  await ready(page);
+  await page.evaluate(() => {
+    const a = window.jmApp;
+    a.store.mark({ hidden: true });
+    a.store.commit('staff', d => { d.staff.push({ id: 'ha', name: 'Alex Tan', group: 'res1', tags: [], fte: 1, active: true, short: '' }); });
+  });
+  await page.waitForTimeout(500);
+  const read = () => page.evaluate(() => {
+    const ids = ['prevm', 'month', 'nextm', 'today', 'lockm', 'autofill', 'cloudbtn', 'undo', 'redo'];
+    const r = {};
+    for (const id of ids) { const e = document.getElementById(id); if (e && e.offsetParent !== null) { const b = e.getBoundingClientRect(); r[id] = [b.left, b.top, b.right, b.bottom]; } }
+    const brand = document.querySelector('.brand').getBoundingClientRect();
+    r.brand = [brand.left, brand.top, brand.right, brand.bottom];
+    const vis = sel => { const e = document.querySelector(sel); return e && !e.hidden && e.offsetParent !== null ? e.getBoundingClientRect().height : 0; };
+    return { r, vw: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth, top: document.getElementById('top').getBoundingClientRect().height, lockNote: vis('.lock-note'), banner: vis('.r-banner') };
+  });
+  const m = await read();
+  ok(m.sw <= m.vw + 1, `${w}px: no sideways page scroll (${m.sw} > ${m.vw})`);
+  const names = Object.keys(m.r);
+  ok(['prevm', 'nextm', 'today', 'lockm', 'autofill', 'cloudbtn', 'undo', 'redo'].every(n => names.includes(n)), `${w}px: every header control is there`);
+  const ctl = names.filter(n => !['month', 'brand'].includes(n));
+  ok(ctl.every(n => m.r[n][0] >= -0.5 && m.r[n][2] <= m.vw + 0.5), `${w}px: no header control is clipped by the screen edge`);
+  const hs = ctl.map(n => m.r[n][3] - m.r[n][1]);
+  ok(hs.every(x => x >= 43.5) && Math.max(...hs) - Math.min(...hs) <= 1, `${w}px: every header control is 44 px high (${hs.map(x => Math.round(x)).join(', ')})`);
+  ok(['prevm', 'nextm', 'lockm', 'undo', 'redo'].every(n => m.r[n][2] - m.r[n][0] >= 43.5), `${w}px: icon buttons are 44 px wide`);
+  const hit = (a, c) => a[0] < c[2] - 0.5 && c[0] < a[2] - 0.5 && a[1] < c[3] - 0.5 && c[1] < a[3] - 0.5;
+  const all = [...ctl, 'month', 'brand'];
+  const clash = [];
+  for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) if (hit(m.r[all[i]], m.r[all[j]])) clash.push(`${all[i]}/${all[j]}`);
+  ok(!clash.length, `${w}px: no header control overlaps another (${clash.join(', ')})`);
+  ok(m.top <= 150, `${w}px: the header is at most two rows high (${Math.round(m.top)} px)`);
+  // locked (the start) and an empty month: one slim line each, together at most 100 px
+  ok(m.lockNote > 0 && m.lockNote <= 44 && m.banner > 0 && m.banner <= 44, `${w}px: the locked and empty-month banners are one slim line each (${Math.round(m.lockNote)} and ${Math.round(m.banner)} px)`);
+  // the filters sit behind one button, and the row is not cut off
+  const tb = await page.locator('.r-toolbar').evaluate(el => [el.scrollWidth, el.clientWidth]);
+  ok(tb[0] <= tb[1] + 1 && await page.getByRole('button', { name: /^Filters/ }).isVisible(), `${w}px: the filter row fits, with one Filters button`);
+  await page.getByRole('button', { name: /^Filters/ }).click();
+  await page.waitForSelector('.fsheet');
+  ok(await page.locator('.fsheet select').count() >= 3, `${w}px: the Filters sheet holds the selects`);
+  await axe(page, `the phone Filters sheet at ${w}`, '.sheet');
+  await page.getByRole('button', { name: 'Done' }).click();
+  await page.waitForTimeout(250);
+  await axe(page, `the phone roster header at ${w}`);
+  await page.close();
+}
 // ---------- the Google Sheet: read it, check it is unchanged, write only the changes (a fake Sheets API; no Google account) ----------
 {
   const page = await newPage({ width: 1280, height: 900 }, 'google');

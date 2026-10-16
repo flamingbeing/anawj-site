@@ -304,6 +304,7 @@ function renderNav() {
   $('#redo').innerHTML = icon('redo');
   $('#prevm').innerHTML = icon('left');
   $('#nextm').innerHTML = icon('right');
+  $('#today').innerHTML = `${icon('day')}<span class="lbl">Today</span>`;
   $('#autofill').innerHTML = `${icon('spark')}<span class="lbl">Fill</span>`;   // the name read out stays "Auto-fill" (aria-label)
 }
 
