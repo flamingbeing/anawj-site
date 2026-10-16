@@ -19,11 +19,9 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
   the NTF roster), and gives back only the day cells to paste over the sheet; at `nuhjuniormonthly.anawj.com`. NUHS
   design. Start with `nuh-junior-monthly/NOTES.md`. Real sheets, names and analyses stay in `flamingbeing/life`.
 - `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template); served at `prewarmstudy.anawj.com`. Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
-- `bis-dsa/`: BIS to DSA teaching simulator for anaesthesia residents (one static page, synthetic EEG, no data), at
-  `anaes.anawj.com/bis/`. Start with `bis-dsa/NOTES.md`.
-- `ot-sim/`: anaesthesia operating-theatre simulator for teaching (a general anaesthetic, the vitals monitor and
-  crisis scenarios; one static site, synthetic physiology, no data), at `anaes.anawj.com/ot/`. Start with
-  `ot-sim/NOTES.md`, then `ot-sim/PLAN.md` (the build brief for autonomous sessions).
+- The BIS to DSA and OT simulators moved to the anantf site (`NTF-Anaesthesia/anantf-site`, `bis/` and `ot/`) on 16 Oct 2026,
+  at `anantf.com/bis/` and `anantf.com/ot/`. `anaes.anawj.com/bis/` and `/ot/` (`worker/routes.js`) and `anawj.com/bis-dsa/`
+  and `/ot-sim/` (stub pages) forward there. Work on them in that repo.
 - `hand-babies/`: hand surgery exam crash course for new MOs (one static page, no data), at `hand.anawj.com/babies/`. Start with `hand-babies/NOTES.md`.
 - `hand-log/`: hand surgery DOPS and Mini-CEX log (data on the device only, CSV/JSON export), at `hand.anawj.com/handlog/`. Start with `hand-log/NOTES.md`.
 - `edit/`: the page editor for any page on the site (`edit.anawj.com/<path>` redirects to it). Suggested edits arrive as
@@ -89,7 +87,7 @@ Rules that bite:
   an app's own files, write PRs as `#295 (logbook)`.
 
 Before merging, run (GitHub runs these too on every PR, plus the editor, feedback-button and hand browser tests: the
-"Checks" workflow; a red check means don't merge). On a PR the BIS to DSA, OT simulator, feedback-button and hand
+"Checks" workflow; a red check means don't merge). On a PR the feedback-button and hand
 browser tests run only when the PR changes that app (owner, 15 Oct 2026; `.github/workflows/checks.yml`). The merge checklist:
 
 ```
@@ -112,8 +110,6 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
   Checks workflow), `node ntf-roster/test/perf.e2e.mjs` (speed budgets on a slowed phone; also in the Checks workflow)
   and the unit tests in `ntf-roster/test/`.
 - Hand log changes: run `node hand-log/test/e2e.mjs`.
-- OT simulator changes: run `tools/test-ot-sim.sh` (model tests, repo check, browser test; see `ot-sim/NOTES.md`).
-- BIS to DSA changes: run `node bis-dsa/test/e2e.mjs` (it also runs `adv`, `sed`, `pv` and `timeline.e2e.mjs`; `BIS_SPLIT=1` runs it alone, as the Checks do) and `node bis-dsa/test/engine.check.mjs` (engine tuning, no browser).
 - People changes, and evals changes to `cloud.js`, `ui-core.js` or the People panes in `ui-admin.js`: run `node people/test/e2e.mjs`.
 - Page editor changes (`edit/`): run `node edit/test/e2e.mjs` and `node hand-babies/test/e2e.mjs` (it opens the editor).
 - Feedback button or Worker changes (`feedback/`, `worker/`): run `node feedback/test/e2e.mjs` (through the real Worker).

@@ -11,12 +11,13 @@ assert.deepEqual(resolve('apmes.anawj.com', '/logbook/js/app.js'), { file: 'logb
 assert.deepEqual(resolve('apmes.anawj.com', '/evals/'), { file: 'evals/' });
 assert.deepEqual(resolve('apmes.anawj.com', '/people/js/app.js'), { file: 'people/js/app.js' });
 assert.deepEqual(resolve('hand.anawj.com', '/babies'), { redirect: '/babies/' });
-assert.deepEqual(resolve('anaes.anawj.com', '/bis/'), { file: 'bis-dsa/' });
-assert.deepEqual(resolve('anaes.anawj.com', '/bis/app.js'), { file: 'bis-dsa/app.js' });
-assert.deepEqual(resolve('anaes.anawj.com', '/bis'), { redirect: '/bis/' });
-assert.deepEqual(resolve('anaes.anawj.com', '/ot/'), { file: 'ot-sim/' });
-assert.deepEqual(resolve('anaes.anawj.com', '/ot/js/engine.js'), { file: 'ot-sim/js/engine.js' });
-assert.deepEqual(resolve('anaes.anawj.com', '/ot'), { redirect: '/ot/' });
+// anaes.anawj.com: the BIS and OT simulators moved to anantf.com (16 Oct 2026); old links forward, keeping the rest of the path
+assert.deepEqual(resolve('anaes.anawj.com', '/bis/'), { redirect: 'https://anantf.com/bis/' });
+assert.deepEqual(resolve('anaes.anawj.com', '/bis'), { redirect: 'https://anantf.com/bis/' });
+assert.deepEqual(resolve('anaes.anawj.com', '/bis/app.js'), { redirect: 'https://anantf.com/bis/app.js' });
+assert.deepEqual(resolve('anaes.anawj.com', '/ot/'), { redirect: 'https://anantf.com/ot/' });
+assert.deepEqual(resolve('anaes.anawj.com', '/ot'), { redirect: 'https://anantf.com/ot/' });
+assert.deepEqual(resolve('x.workers.dev', '/_sites/anaes.anawj.com/ot/'), { redirect: 'https://anantf.com/ot/' });
 assert.deepEqual(resolve('hand.anawj.com', '/handlog/'), { file: 'hand-log/' });
 assert.deepEqual(resolve('hand.anawj.com', '/handlog/js/app.js'), { file: 'hand-log/js/app.js' });
 assert.deepEqual(resolve('hand.anawj.com', '/handlog'), { redirect: '/handlog/' });
@@ -90,7 +91,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 for (const [h, s] of Object.entries(SITES)) {
-  for (const [pre, f] of s.root ? [['/', s.root]] : Object.entries(s.prefixes)) {
+  for (const [pre, f] of s.root ? [['/', s.root]] : Object.entries(s.prefixes || {})) {
     // an app folder has an index.html; the sign-in helper folders have their own files
     assert.ok(fs.existsSync(path.join(root, f, pre.startsWith('/__/') ? (pre === '/__/auth/' ? 'handler.html' : 'init.json') : pre === '/apmes/guidebook/' ? 'dops-expectations.md' : 'index.html')), `${h}: ${f} is missing its page`);
   }
