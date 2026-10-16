@@ -64,6 +64,14 @@ export function mount(el, app) {
     } catch (e) { console.error(e); app.toast(`Could not read this file: ${e.message || e}`, { kind: 'error', ms: 9000 }); }
   }
 
+  // is the day before the month's first day empty for the people in the sheet? (then postings that carry over look like they start on day 1)
+  function prevMissing(grid, month) {
+    const st = store.get(), before = M.addDays(M.monthDays(month)[0], -1);
+    const names = new Set(grid.people.map(p => (p.name || '').toLowerCase().replace(/[^a-z]/g, '')));
+    const ids = (st.staff || []).filter(p => names.has((p.name || '').toLowerCase().replace(/[^a-z]/g, ''))).map(p => p.id);
+    return !ids.some(id => (M.getCell(st, before, id)?.a || []).length);
+  }
+
   function readSheetRows(rows, from, tab = 'Request') {
     const grid = S.parseGrid(rows);
     if (!grid) { app.toast('No roster grid found: it needs the header row with S/N, Grade, Name and the days 1, 2, 3…', { kind: 'error', ms: 9000 }); return; }
@@ -83,6 +91,7 @@ export function mount(el, app) {
           h('li', null, `${ok.length} juniors: ${matched} already on People, ${ok.length - matched} new`),
           h('li', null, `${skipped.length} rows left alone (${[...new Set(skipped.map(p => p.grade || '?'))].join(', ')}: grades not on People › Groups)`),
           h('li', null, `Rows ${plan.people[0]?.row}–${plan.people[plan.people.length - 1]?.row}, days in columns ${S.colName(grid.firstCol)} to ${S.colName(grid.nextCol - 1)}`),
+          prevMissing(grid, month) ? h('li', { class: 'warn' }, `${M.fmtMonth(M.addMonths(month, -1))} isn't in the app yet, so everyone on ICU or cardiac looks like they start on day 1. Import last month's tab first, then this one.`) : null,
           plan.unknown.size ? h('li', null, `Codes the app didn't know (added as "other"): ${[...plan.unknown.keys()].join(', ')}`) : null),
         h('p', { class: 'muted' }, `${M.fmtMonth(month)} for these people is replaced by the sheet (Undo puts it back).`));
       return { plan, month };

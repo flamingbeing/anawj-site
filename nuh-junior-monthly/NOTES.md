@@ -80,8 +80,9 @@ anaesthesia residents it is a preference (`r-r1b-new-res`, weight 30). Saved sta
 `r-postcall`, `r-r1b-gap`, `r-c3-gap`). The day off after an ICU post call (PPC) and the 3-day cardiac gap give way only as a
 last resort: `r-ppc` and `r-c3-eod` are preferences at weight 500, so Auto-fill uses an EOD call only when no one else can cover
 the night, and Check lists each one. (Same-day rules now see the PPC day off: before this, PPC in a same-day rule matched
-nothing.) Saved states get this once (`rulesVersion` 3). Still open: a night with nobody eligible even for an EOD call
-(for example day 1 in ICU for everyone) is still left empty and flagged.
+nothing.) Saved states get this once (`rulesVersion` 3). A call on the first day of ICU (`r-r1b-d1`) is also a last resort now (preference, weight 400): at a rotation change everyone on ICU can
+be on day 1. Import last month's tab first so postings that carry over are not mistaken for new ones (the import review says
+so when last month is missing). A night with nobody eligible at all is still left empty and flagged.
 
 How to add a rule type: as in `ntf-roster/NOTES.md` ("How to add a new rule type"); the engine is the same file.
 

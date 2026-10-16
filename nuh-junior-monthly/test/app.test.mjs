@@ -64,7 +64,9 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   older.rules.find(r => r.id === 'r-postcall').params.codesA = ['x', 'PC', 'PPC'];
   older.rules = older.rules.filter(r => !['r-ppc', 'r-c3-eod'].includes(r.id));
   older.rules.find(r => r.id === 'r-r1b-gap').params.to = 2; older.rules.find(r => r.id === 'r-c3-gap').params.to = 2;
+  older.rules.find(r => r.id === 'r-r1b-d1').hard = true;
   const up3 = M.migrate(JSON.parse(JSON.stringify(older)));
+  ok(up3.rules.find(r => r.id === 'r-r1b-d1').hard === false, 'a day-1 ICU call becomes a last resort in an older saved state');
   ok(!up3.rules.find(r => r.id === 'r-postcall').params.codesA.includes('PPC') && up3.rules.some(r => r.id === 'r-ppc') && up3.rules.some(r => r.id === 'r-c3-eod') && up3.rules.find(r => r.id === 'r-r1b-gap').params.to === 1, 'an older saved state gets the EOD rules once');
   ok(up.rules.find(r => r.id === 'r-req-x').hard === false && up.rules.some(r => r.id === 'r-r1b-new-res') && up.rules.find(r => r.id === 'r-r1b-new').who.onlyGroups.includes('mopex'), 'an older saved state gets the rulings once');
 }
@@ -99,6 +101,15 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(r.after.hard === 0 && !(r.unfilled || []).length, `two people on ICU: every night covered with no must-fix problem (hard ${r.after.hard}, unfilled ${(r.unfilled || []).length})`);
   for (const [d, m] of Object.entries(r.assignments)) for (const [id, codes] of Object.entries(m)) if (codes.length) M.setCell(s, d, id, { a: [...(M.getCell(s, d, id)?.a || []), ...codes], auto: codes });
   ok(evalM(s).violations.some(v => v.ruleId === 'r-ppc'), 'and it says which nights are EOD calls');
+}
+// a rotation change: everyone on ICU starts on day 1 (nothing before it), yet night 1 still needs a call, so a day-1 call is the last resort
+{
+  const s = M.defaultState();
+  s.rules = s.rules.filter(r => !/^r-c3/.test(r.id));
+  for (let k = 0; k < 4; k++) s.staff.push({ id: 'n' + k, name: 'New Person ' + k, group: 'res2', tags: [], fte: 1, active: true });
+  for (const d of days) for (let k = 0; k < 4; k++) M.setCell(s, d, 'n' + k, { a: ['ICU'] });
+  const r = solve(s, { from: days[0], to: days[days.length - 1], timeMs: 3000 });
+  ok(r.after.hard === 0 && !(r.unfilled || []).length, `a rotation change: night 1 is still covered (hard ${r.after.hard}, unfilled ${(r.unfilled || []).length})`);
 }
 // the Google Sheet: parse, import, and give back the same cells when nothing changed
 {
