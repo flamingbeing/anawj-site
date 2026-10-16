@@ -273,6 +273,24 @@ export async function listVersions(m, n = 20) {
   return snap.docs.map(d => ({ id: d.id, ...d.data(), cells: cellsFromDoc(d.data().cells) }));
 }
 
+// Earlier saves of the staff list, rules and settings, newest first: { id, team, savedAt, savedBy }.
+export async function listTeamVersions(n = 20) {
+  const { db, F } = await sdk();
+  const snap = await F.getDocs(F.query(F.collection(db, 'team', 'main', 'versions'), F.orderBy('savedAt', 'desc'), F.limit(n)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// One line saying what an earlier save holds, for the restore list. kind: 'month' | 'team'.
+export function describeVersion(kind, v) {
+  if (kind === 'team') {
+    const t = (v && v.team) || {};
+    const n = k => (Array.isArray(t[k]) ? t[k].length : 0);
+    return `${n('staff')} staff, ${n('rules')} rules, ${n('duties')} duty codes`;
+  }
+  const days = Object.values(cellsFromDoc(v && v.cells)).filter(d => d && Object.keys(d).length).length;
+  return `${days} day${days === 1 ? '' : 's'} filled${v && v.status === 'published' ? ', locked' : ''}`;
+}
+
 // ---- members (admins only, enforced by the rules) ----
 
 export async function listMembers() {

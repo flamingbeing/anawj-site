@@ -116,3 +116,10 @@ How to add a rule type: as in `ntf-roster/NOTES.md` ("How to add a new rule type
 `node nuh-junior-monthly/test/app.test.mjs` (rules, PPC, auto-fill, sheet round trip) and
 `node nuh-junior-monthly/test/e2e.mjs` (static server on port 8080: every tab on desktop and phone, axe, Postings,
 Auto-fill). Both run in the Checks workflow.
+
+## Earlier saves (owner, 16 Oct 2026)
+
+More > Team sharing > **Earlier saves** lists the last 20 saves of the month on screen, or of the staff list and rules, with
+who saved and when. **Restore** brings that copy into the browser only (Undo puts the current one back); it reaches the team
+at the next Save to team. Every save is kept for good for now. Thinning (a Firestore TTL policy on an `expireAt` field: about
+60 days, keeping the first save of each week) is planned but not built; the owner asked for a reminder in December 2026.

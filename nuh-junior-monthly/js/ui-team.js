@@ -153,6 +153,43 @@ export function mountTeam(el, app) {
     });
   }
 
+  // Earlier saves: every save keeps a copy; pick one to bring into this browser (Undo brings back what was here). Nothing
+  // changes on the team until Save to team.
+  async function history() {
+    const m = month;
+    let months, teams;
+    try { [months, teams] = await Promise.all([cloud.listVersions(m, 20), cloud.listTeamVersions(20)]); } catch (e) { toastErr(e); return; }
+    let which = 'month';
+    const body = h('div', { class: 'team' });
+    let dlg = null;
+    const restore = (kind, v) => {
+      let next = app.store.get();
+      if (kind === 'team') next = cloud.mergeTeam(next, v.team);
+      else next = cloud.mergeMonth(next, m, v);
+      app.store.replace(next, 'Restore an earlier save');
+      if (dlg) dlg(); 
+      app.toast(kind === 'team' ? `Restored the staff list and rules saved ${when(v.savedAt)}. Save to team to share it.`
+        : `Restored ${fmtMonth(m)} as saved ${when(v.savedAt)}. Save to team to share it.`,
+      { action: { label: 'Undo', fn: () => app.store.undo() }, ms: 10000 });
+    };
+    const draw = () => {
+      body.textContent = '';
+      const list = which === 'month' ? months : teams;
+      const tabs = h('div', { class: 'team-row', role: 'group', 'aria-label': 'What to restore' },
+        h('button', { type: 'button', class: which === 'month' ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm', 'aria-pressed': String(which === 'month'), onclick: () => { which = 'month'; draw(); } }, fmtMonth(m)),
+        h('button', { type: 'button', class: which === 'team' ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm', 'aria-pressed': String(which === 'team'), onclick: () => { which = 'team'; draw(); } }, 'Staff list and rules'));
+      body.append(tabs, h('p', { class: 'team-p' }, 'Each Save to team keeps a copy. Restoring brings that copy into this browser only (Undo puts yours back); it reaches the team when you Save to team.'));
+      if (!list.length) { body.append(h('p', { class: 'team-p' }, 'No earlier saves yet.')); return; }
+      body.append(h('ul', { class: 'team-list', 'aria-label': 'Earlier saves' }, list.map((v, i) => h('li', { class: 'team-item' },
+        h('span', { class: 'team-who' }, `${when(v.savedAt)}${i === 0 ? ' (latest)' : ''}`,
+          h('small', null, `${byName(v.savedBy)}: ${cloud.describeVersion(which, v)}`)),
+        btn('Restore', () => restore(which, v), 'btn btn-ghost btn-sm')))));
+    };
+    draw();
+    const s = app.sheet({ title: 'Earlier saves', body, actions: [{ label: 'Close', primary: true }] });
+    dlg = typeof s === 'function' ? s : null;
+  }
+
   function conflictPrompt(e) {
     const what = e.what === 'team' ? 'the staff list and rules' : fmtMonth(e.month);
     app.sheet({
@@ -255,6 +292,7 @@ export function mountTeam(el, app) {
     root.append(h('div', { class: 'team-row' },
       editor ? btn(busy === 'Saving…' ? busy : 'Save to team', () => save(false), 'btn btn-primary') : null,
       btn(busy === 'Pulling…' ? busy : 'Pull from team', load),
+      btn('Earlier saves', history, 'btn btn-ghost'),
       btn('Refresh', () => refresh(), 'btn btn-ghost btn-sm')));
     root.append(h('p', { class: 'team-p' }, editor
       ? `Save to team sends the staff list, rules, duty codes, settings and ${fmtMonth(month)}; change month to save another.`
