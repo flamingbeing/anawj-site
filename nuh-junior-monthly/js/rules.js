@@ -99,6 +99,9 @@ export function buildContext(state, { from, to, rules }) {
     ctx.weekStart[d] = d - ((ctx.wd[d] + 6) % 7);   // index of that week's Monday (may be < 0)
   }
   const before = addDays(start, -1);
+  // which posting a call belongs to (C3 is cardiac C, R1B is ICU; the fair-share rules can name others)
+  const callPost = { C3: 'C', R1B: 'ICU' };
+  for (const r of (rules || state.rules || [])) if (r && r.type === 'spread' && r.params && (r.params.among || []).length) for (const c of r.params.codes || []) callPost[c] = r.params.among[0];
   // people the month's imported sheet left out are not in post that month (model.js notInSheet)
   const absentIn = {};
   for (const mk of new Set(ctx.month)) absentIn[mk] = notInSheet(state, mk);
@@ -114,6 +117,26 @@ export function buildContext(state, { from, to, rules }) {
       const cell = state.cells && state.cells[s] && state.cells[s][per.id];
       ctx.codes[i] = cell && Array.isArray(cell.a) ? cell.a : NONE;
       ctx.req[i] = cell && Array.isArray(cell.r) ? cell.r : NONE;
+    }
+    // On the sheet a call replaces the posting code that day (C3 on a cardiac week): a call day with no posting of its own on a
+    // person who has the call's posting within three days either side is read as on that posting, so the rules about being
+    // on cardiac / ICU are not tripped by the call itself. Only the rules see it; nothing is written to the roster.
+    for (let d = 0; d < n; d++) {
+      const i = p * n + d, cs = ctx.codes[i];
+      if (cs === NONE || !cs.length) continue;
+      const code = cs.find(c => callPost[c]);
+      if (!code) continue;
+      const post = callPost[code];
+      if (cs.some(c => ctx.posting.has(c))) continue;
+      let near = false;
+      for (let k = 1; k <= 3 && !near; k++) {
+        near = [d - k, d + k].some(e => {
+          if (e >= 0 && e < n) return ctx.codes[p * n + e].includes(post);
+          const c = getCell(state, addDays(days[d], e - d), per.id);   // past the edge of the window: the saved day
+          return !!c && Array.isArray(c.a) && c.a.includes(post);
+        });
+      }
+      if (near) ctx.codes[i] = cs.concat(post);
     }
     for (let d = 0; d < n; d++) refresh(ctx, p * n + d);
   }

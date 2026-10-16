@@ -521,4 +521,24 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const v = evaluate(t, { from: days[0], to: days[days.length - 1] }).violations.filter(x => x.ruleId === 'r-c3-fair');
   ok(v.some(x => x.staffId === 'c3'), 'a person whose cardiac days are all C3 calls is counted in the share (so they are over it)');
 }
+{
+  // a call that replaced the posting code on the sheet is not "a cardiac call off the cardiac posting" when the person is in cardiac that week
+  const t = team();
+  t.rules = [JSON.parse(JSON.stringify(M.DEFAULT_RULES.find(r => r.id === 'r-c3-onc')))];
+  M.setCell(t, days[5], 'c0', { a: ['C3'] });                       // C either side: in cardiac, the call replaced the C
+  for (const d of days) M.setCell(t, d, 'c1', { a: [] });
+  M.setCell(t, days[5], 'c1', { a: ['C3'] });                       // nowhere near cardiac
+  const v = evaluate(t, { from: days[0], to: days[days.length - 1] }).violations.filter(x => x.ruleId === 'r-c3-onc');
+  ok(!v.some(x => x.staffId === 'c0') && v.some(x => x.staffId === 'c1'), 'a C3 in the middle of a cardiac posting is fine, a C3 far from any cardiac day is still flagged');
+}
+{
+  // the call on the last day of the month, the posting's C days in the next month (the sheet's call replaced the C)
+  const s = M.defaultState();
+  s.staff.push({ id: 'j', name: 'J', group: 'res3', tags: [], fte: 1, active: true });
+  M.setCell(s, '2026-11-30', 'j', { a: ['C3'] });
+  M.setCell(s, '2026-12-02', 'j', { a: ['C'] });
+  const nov = M.monthDays('2026-11');
+  const v = evaluate(s, { from: nov[0], to: nov[nov.length - 1] }).violations.filter(x => x.staffId === 'j').map(x => x.ruleId);
+  ok(!v.includes('r-c3-onc'), 'a C3 on the last day of the month is on the cardiac posting when its C days start two days later');
+}
 console.log(`nuh-junior-monthly: ${n} checks passed`);
