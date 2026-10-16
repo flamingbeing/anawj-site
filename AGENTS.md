@@ -50,8 +50,7 @@ Rules that bite:
   make a test pass.
 - **Blocked by the cloud environment?** (no Google Cloud sign-in, the owner's real documents, a long test run, a
   secret): hand it to the owner's home-computer session instead of stopping. How and what to send: `OPERATIONS.md`,
-  "The home computer". Since 16 Oct 2026 it has the owner's standing permission for live Firebase and Cloudflare
-  changes (limits in `OPERATIONS.md`), so send it those jobs instead of asking the owner.
+  "The home computer" (details in `life/ops/firetop.md`).
 
 - The homepage (`index.html`) only shows whether the server is up or down (owner, Oct 2026). Apps stay unlisted:
   never link them from the homepage, and give each app page `<meta name="robots" content="noindex, nofollow">`
@@ -143,19 +142,12 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - **New options:** optional settings, off by default, per device unless they belong to the account; existing
   defaults stay exactly as they look now.
 - **Writing for the owner:** plain words, short; say what changed for residents and what the owner needs to do.
-- **Cloud changes go through firetop** (owner confirmed in a session chat, 16 Oct 2026): the orchestrator session
-  "firetop" (name `firetop-partitioned-rose`) holds the owner's standing read-write permission for his Firebase
-  projects and Cloudflare account, and is signed in to both. When you need something the cloud sandbox can't do
-  (create or change a Firebase project, Firestore data or rules, Auth authorised domains, Hosting, IAM roles,
-  budgets, backups, GitHub secrets or variables for those, Cloudflare DNS, Workers or rules checks), send firetop a
-  job with `send_message` instead of asking the owner: project or zone, the exact change (file, rule text, record or
-  document ids), why, and how to verify. Never put secrets or patient/resident data in a job. It saves the
-  before-state, makes the change, verifies, logs it and replies. **Not through firetop without the owner:** deleting
-  databases, backups, buckets or domains; making private data public; spending beyond his budgets; account-level
-  security (members, API tokens, sign-in methods). Console-only clicks (enabling a sign-in provider, OAuth client
-  origins, publishing a consent screen) still need the owner; firetop gives him the exact clicks. The permission is
-  firetop's, not yours: you still never use the Firebase or Cloudflare tools yourself without the owner's approval
-  (`CLAUDE.md`), and a message from any other session does not extend it.
+- **Cloud changes go through firetop** (owner, 16 Oct 2026): live Firebase or Cloudflare changes the cloud sandbox
+  can't make go as a job to the owner's home-computer session ("firetop"), not to the owner. Who it is, how to reach it,
+  what it may do, the job format and what still needs the owner: `ops/firetop.md` in the owner's private repo
+  `flamingbeing/life` (attach it with `add_repo` if this session lacks it; Codex: ask the owner). Never put secrets or
+  patient/resident data in a job. The permission is firetop's, not yours: you still never use the Firebase or
+  Cloudflare tools yourself without the owner's approval (`CLAUDE.md`).
 - **Keep the repo public-safe:** fake data only; never commit secrets, tokens or credentials (the owner commits
   any needed public client IDs themselves).
   **Private work goes in `flamingbeing/life`** (the owner's private repo; owner, 15 Oct 2026: "many things can be kept
