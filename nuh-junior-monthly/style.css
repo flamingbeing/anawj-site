@@ -1162,8 +1162,8 @@ body:not([data-tab="roster"]) #autofill { display: none; }
   .top-tools { flex: none; margin-left: 0; gap: 4px; }
   .ctx-row { flex: 1 1 100%; gap: 4px; padding: 0 0 2px; min-height: 48px; }
   .monthnav { display: contents; }   /* prev, month, next, Today, lock join the row beside Fill */
-  .month-title { font-size: 16px; min-width: 0; margin: 0 2px; flex: 0 1 auto; white-space: nowrap; }
-  #lockm { margin-left: auto; }
+  .month-title { font-size: 16px; min-width: 0; margin: 0 2px; flex: 1 1 auto; text-align: center; white-space: nowrap; }   /* takes the free width, so Today, lock and Fill sit at the right on every tab (Fill shows on the roster only) */
+  .monthnav #lockm { margin-left: 0; }
   /* one scale: 44 px squares and 44 px high buttons, one radius, one icon size */
   .top-tools .icon-btn, .ctx-row .icon-btn, #cloudbtn, #today, #lockm, #autofill {
     box-sizing: border-box; height: 44px; min-height: 44px; border-radius: 12px; margin: 0;
