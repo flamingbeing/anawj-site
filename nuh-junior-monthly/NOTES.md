@@ -141,6 +141,17 @@ month with no entry yet gets a locked one when it is opened (`store.ensureLocked
 sheet unlocks that one month (it is deliberate). Not in Practice. A month the cloud copy holds as unlocked comes in unlocked
 and is locked again at the next close or start. The stored status values are unchanged (`published` = locked), so no rules change.
 
+## Colours follow the department sheet (owner, 16 Oct 2026)
+
+People work on the sheet and this app side by side, so a code keeps the sheet's colour family (softened, same hue): calls orange
+(C3, R1B, R1 to R3, S1, S1B, OGC), OGN and OGD red, cardiac C magenta, ICU yellow, chronic pain green, acute pain bright green,
+liver transplant purple, leave blue, premed and Saturday ward round peach, post call, PPC, Z and NTF grey, blocked, no-call and
+no-premed requests red (outlined and tinted), call requests blue, KKH, TTSH, OG1/2 and AH plain. `PALETTE` in `js/model.js`; the
+colours before the change are in `BASE_DUTIES`, and a saved duty still in its old colours moves across once (`rulesVersion` 10);
+a colour the rosterer chose is kept. Text must still pass axe contrast (the e2e checks), so some are a shade darker than the sheet.
+The sheet's cyan "leave requested, not yet approved" is not in the app yet. The screenshots the palette came from are in the
+private repo (`data/nuh-junior-monthly/docs/sheet-screenshots/`: real names).
+
 ## The cloud (owner, 16 Oct 2026)
 
 **Save and Pull cover all the data** (owner, 16 Oct 2026): the staff list, rules and settings plus every month, each month with its days, status and the imported sheet layout (`months/{m}.layout`, a JSON string, so a second device can write to the sheet and hide people the sheet leaves out). A save writes only the months that changed since this browser last saved or pulled (a fingerprint per month in `nuhjm-team-seen`), each with its own conflict check; a pull brings in every month the cloud holds. Months only this browser has are kept.

@@ -44,7 +44,7 @@ const other = (code, name) => duty(code, name, 'other', '#e0e0e0', '#333');
 // The codes on the department's sheet (its legend and two years of rosters). Postings are planned by the week
 // (Postings tab); calls are what the app fills; PC (post call) and PPC (the day off after an ICU post call) are worked
 // out, never typed.
-export const DEFAULT_DUTIES = [
+const BASE_DUTIES = [
   call('C3', 'Cardiac call', '#b71c1c', { auto: true }),
   call('R1B', 'ICU call (SICU)', '#0d47a1', { auto: true, rest2: true }),
   call('R1', 'MO1 call', '#c62828'),
@@ -109,6 +109,28 @@ export const DEFAULT_DUTIES = [
   other('PPC', 'Day off after ICU post call (carried over)'),
   duty('x', 'Post call (PC)', 'derived', '#eeeeee', '#555'),
 ];
+
+// Colours follow the department sheet's legend (owner, 16 Oct 2026), so people who work on both read the same colours:
+// calls orange, obstetric calls red, cardiac magenta, ICU yellow, chronic pain green, acute pain bright green, liver
+// transplant purple, leave blue, premed duty peach, post call and "not on the roster" grey, blocked requests red, call
+// requests blue, postings away from NUH and the obstetric / Alexandra postings plain. Softened a little, the same hues.
+// BASE_DUTIES above holds the colours before that change: a saved duty still in its old colours is brought across once
+// (updateRules); one the rosterer changed is left alone.
+const CALL_OR = ['#ffab2e', '#3b2300'], PEACH = ['#fde3cc', '#5a3410'], LEAVE = ['#2c5fc6', '#ffffff'], PLAIN = ['#f6f6f6', '#1f2937'], GREY = ['#d0d0d0', '#333333'], RED_REQ = ['#c62828', '#ffffff'], BLUE_REQ = ['#1f5fd0', '#ffffff'];
+const PALETTE = {
+  ...Object.fromEntries(['C3', 'R1B', 'R1', 'R2', 'R3', 'S1', 'S1B', 'OGC', 'AHC'].map(c => [c, CALL_OR])),
+  OGN: ['#ee4b4b', '#ffffff'], OGD: ['#ee4b4b', '#ffffff'],
+  ...Object.fromEntries(['WR', 'P', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6'].map(c => [c, PEACH])),
+  C: ['#f06be8', '#3a0a36'], 'C-e': ['#f9d7f5', '#3a0a36'], 'C-p': ['#f9d7f5', '#3a0a36'],
+  ICU: ['#ffee3a', '#1f2937'], CP: ['#46b86a', '#10281a'], AP: ['#5fe37a', '#12301a'],
+  LI: ['#c9a2ff', '#2b1650'], LivOT: ['#f1e8ff', '#2b1650'],
+  ...Object.fromEntries(['OG1', 'OG2', 'AH', 'AH1', 'AH2', 'AH3', 'KKH', 'TTSH'].map(c => [c, PLAIN])), NTF: GREY,
+  ...Object.fromEntries(['AL', 'SL', 'TL', 'MC', 'ML', 'PL', 'HL', 'FCL', 'CCL', 'NS', '0.5'].map(c => [c, LEAVE])),
+  ...Object.fromEntries(['X', 'X!', 'X?', 'XX', 'NP'].map(c => [c, RED_REQ])),
+  ...Object.fromEntries(['R', 'R!', 'R?'].map(c => [c, BLUE_REQ])),
+  Z: GREY, PC: GREY, PPC: GREY, x: ['#d6d6d6', '#555555'],
+};
+export const DEFAULT_DUTIES = BASE_DUTIES.map(d => (PALETTE[d.code] ? { ...d, color: PALETTE[d.code][0], ink: PALETTE[d.code][1] } : d));
 
 // Default rules live here (data only) so defaultState() needs no import from rules.js (no circular import);
 // rules.js re-exports them as DEFAULT_RULES. Cardiac and ICU are on; the rest are predictions from the department's
@@ -240,9 +262,9 @@ export function cleanRule(r) {
 // One-time updates to rules that were already saved (the owner's rulings of 16 Oct 2026): requests and blocks become
 // preferences, "new to ICU" is strict only for rotating residents and MOPEXes. Only a rule still in its old form changes.
 function updateRules(s) {
-  if ((s.rulesVersion || 1) >= 9) return;
+  if ((s.rulesVersion || 1) >= 10) return;
   const from2 = (s.rulesVersion || 1) < 2;
-  s.rulesVersion = 9;
+  s.rulesVersion = 10;
   const find = id => s.rules.find(r => r.id === id);
   if (from2) for (const [id, w] of [['r-req-x', 60], ['r-req-xx', 80]]) { const r = find(id); if (r && r.hard) { r.hard = false; r.weight = w; } }
   const n = from2 && find('r-r1b-new');
@@ -286,6 +308,11 @@ function updateRules(s) {
   // blocked by the planner is already decided, so it outranks every request (owner, 16 Oct 2026): 80 -> 200
   const xx = find('r-req-xx');
   if (xx && !xx.hard && Number(xx.weight) === 80) xx.weight = 200;
+  // the sheet's colours (owner, 16 Oct 2026): a duty still in its old default colours takes the new ones
+  for (const b of BASE_DUTIES) {
+    const pal = PALETTE[b.code], du = (s.duties || []).find(d => d.code === b.code);
+    if (pal && du && du.color === b.color && du.ink === b.ink) { du.color = pal[0]; du.ink = pal[1]; }
+  }
 }
 
 export function migrate(s) {

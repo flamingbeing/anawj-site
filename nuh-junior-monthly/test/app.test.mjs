@@ -497,4 +497,16 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const keep = C.mergeMonth(st, '2026-10', { cells: '{}', status: 'draft' });
   ok(keep.sheets['2026-10'].rows.s1 === 3, 'cloud: a copy with no layout keeps this device\'s');
 }
+{
+  // the sheet's colours: a saved duty in its old colour moves across once; one the rosterer changed stays
+  const old = M.defaultState(); old.rulesVersion = 9;
+  const dd = c => old.duties.find(d => d.code === c);
+  Object.assign(dd('C3'), { color: '#b71c1c', ink: '#fff' }); Object.assign(dd('ICU'), { color: '#123456', ink: '#fff' });
+  const mig = M.migrate(JSON.parse(JSON.stringify(old)));
+  const md = c => mig.duties.find(d => d.code === c);
+  ok(md('C3').color === '#ffab2e', 'colours: calls are orange like the sheet');
+  ok(md('ICU').color === '#123456', 'colours: a colour the rosterer chose is kept');
+  const df = c => M.DEFAULT_DUTIES.find(d => d.code === c).color;
+  ok(df('ICU') === '#ffee3a' && df('X') === '#c62828' && df('R') === '#1f5fd0' && df('AL') === '#2c5fc6' && df('Z') === '#d0d0d0', 'colours: ICU yellow, blocked red, requests blue, leave blue, grey');
+}
 console.log(`nuh-junior-monthly: ${n} checks passed`);
