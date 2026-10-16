@@ -61,6 +61,8 @@ Last updated: 2026-10-16 by Claude Code (jm1).
 - 16 Oct 2026: Check shows only preferences that bear on what Fill places (C3, R1B), with a switch for the rest; equal calls
   weigh 40 (owner).
 - 16 Oct 2026: people the imported sheet leaves out are hidden and not given calls (owner).
+- 16 Oct 2026: shared calls use the rosterer's points (weekday 1, Fri 1.5, Sat 2, Sun 1.5, public holiday 1.5 or 2 when the next day is
+  off too), and echo and perfusion weeks (`C-e`, `C-p`, no calls) do not count as cardiac for the share or the posting filter (owner).
 - 16 Oct 2026: the R1 to R3 ladder, step-down calls, baby MOs, chronic pain and OG float rules, and leave approval needing OT
   manpower are recorded for later (NOTES.md "Beyond cardiac and ICU"; the department's own words are in the owner's private
   notes). Roles: admin manages members and can delete a month in the cloud; a rosterer reads and saves; a viewer reads.
