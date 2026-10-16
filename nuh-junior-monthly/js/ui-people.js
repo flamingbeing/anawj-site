@@ -4,6 +4,7 @@
 
 import * as M from './model.js';
 import { chipStyle, contrast } from './ui-rules.js';
+import * as Pools from './pools.js';
 
 const KIND_LABEL = { shift: 'Calls and shifts', posting: 'Postings', leave: 'Leave', request: 'Requests', other: 'Other', derived: 'Worked out (not stored)' };
 const KIND_HELP = {
@@ -286,6 +287,8 @@ export function mount(el, app) {
   function renderTags() {
     const st = app.store.get();
     body.append(h('p', { class: 'bx-help pv-intro' }, 'Tags mark people across groups (Baby MO, Part time). Rules can apply to a tag; give each a short line of help.'));
+    body.append(h('p', { class: 'bx-help pv-intro' }, 'The strong and weak MO1, MO2 and MO3 pools come from the manpower master list.'),
+      h('button', { type: 'button', class: 'btn', onclick: importPools }, 'Import the strong / weak list'));
     const ul = h('ul', { class: 'pv-edit-list' });
     (st.tags || []).forEach((t, i) => {
       const n = (st.staff || []).filter(p => (p.tags || []).includes(t.id)).length;
@@ -317,6 +320,41 @@ export function mount(el, app) {
       const id = slug(v, (st.tags || []).map(t => t.id));
       app.store.commit('Add tag', d => { d.tags.push({ id, name: v, help: '' }); });
     }));
+  }
+
+
+  // The strong / weak pools: paste the manpower master list (the sheet's table with its heading row); matched people get the pool
+  // tag and the call level, and the pool rules (one call request a day per pool) turn on.
+  function importPools() {
+    const tid = fid('pl');
+    const out = h('p', { class: 'bx-help', 'aria-live': 'polite' }, 'Copy the table from the sheet, heading row included (Strong MO1, Weak MO1, Strong MO2 ...), and paste it here.');
+    const ta = h('textarea', { id: tid, rows: '8', placeholder: 'Strong MO1\tWeak MO1\tStrong MO2\t...' });
+    const check = () => {
+      const st = app.store.get();
+      const r = Pools.parsePoolText(ta.value);
+      if (r.problem) return { r, text: r.problem };
+      const m = Pools.matchPools(r.found, (st.staff || []).filter(p => p.active !== false));
+      const bits = [`${m.assign.length} ${m.assign.length === 1 ? 'person' : 'people'} matched`];
+      if (m.unmatched.length) bits.push(`not on the staff list: ${m.unmatched.join(', ')}`);
+      if (m.ambiguous.length) bits.push(`more than one person fits: ${m.ambiguous.join(', ')}`);
+      if (m.twice.length) bits.push(`in two pools (first one kept): ${m.twice.join(', ')}`);
+      return { r, m, text: bits.join('. ') + '.' };
+    };
+    ta.addEventListener('input', () => { out.textContent = ta.value.trim() ? check().text : 'Copy the table from the sheet, heading row included, and paste it here.'; });
+    app.sheet({
+      title: 'Import the strong / weak list',
+      body: h('div', { class: 'bx-form' }, field('The table', tid, ta), out),
+      actions: [{ label: 'Cancel' }, {
+        label: 'Set the pools', primary: true,
+        fn: () => {
+          const c = check();
+          if (!c.m || !c.m.assign.length) { app.toast(c.m ? 'No one on the list matched the staff list' : c.text, { kind: 'warn' }); return false; }
+          let n = 0;
+          app.store.commit('Import the strong / weak pools', d => { n = Pools.applyPools(d, c.m.assign); });
+          app.toast(`Set the pools for ${n} ${n === 1 ? 'person' : 'people'}; the pool request rules are on`, { action: undoAct, ms: 7000 });
+        },
+      }],
+    });
   }
 
   // =============== Duty codes ===============

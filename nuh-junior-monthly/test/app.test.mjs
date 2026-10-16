@@ -9,6 +9,7 @@ import { demoState } from '../js/demo.js';
 import { apmesList } from '../js/apmes.js';
 import * as G from '../js/gsheets.js';
 import * as W from '../js/waitlist.js';
+import * as Pools from '../js/pools.js';
 import * as C from '../js/cloud.js';
 import { relevanceOf } from '../js/ui-check.js';
 import { applyAssignments, postingSet } from '../js/ui-roster.js';
@@ -661,5 +662,34 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   globalThis.fetch = keep;
   ok(got[1][0].bg === '' && got[1][1].bg === '#ff9900' && got[1][1].v === 'Alina' && got[0][1].v === 'Waitlist 1', 'waitlist: the colours come back as hex, white as no fill');
   ok(G.findTab([{ title: '1 - 30 Nov 26 Request' }, { title: 'Leave Waitlist' }], /wait\s*-?\s*list/i).title === 'Leave Waitlist', 'waitlist: the tab is found by its name');
+}
+
+// request screening and the strong / weak pools (Bridget's rules, 16 Oct 2026; made-up names)
+{
+  const s = M.defaultState();
+  for (const [id, nm, tags] of [['a', 'Alpha One', []], ['b', 'Bravo Two', []], ['c', 'Charlie Three', []], ['d', 'Delta Four', []]]) s.staff.push({ id, name: nm, group: 'res2', tags, fte: 1, active: true });
+  ok(s.rules.find(r => r.id === 'r-req-load').enabled && !s.rules.find(r => r.id === 'r-pool-1').enabled, 'pools: the count rules are on, the pool rules wait for the list');
+  const D = M.monthDays('2026-12');
+  // a: X, X/NP (one request, not two), R, R!, NP = 5 requests; b: X/NP x3 = 3 requests and 3 no-premed days
+  M.setCell(s, D[1], 'a', { r: ['X'] }); M.setCell(s, D[2], 'a', { r: ['X', 'NP'] }); M.setCell(s, D[3], 'a', { r: ['R'] }); M.setCell(s, D[4], 'a', { r: ['R!'] }); M.setCell(s, D[5], 'a', { r: ['NP'] });
+  for (const k of [7, 8, 9]) M.setCell(s, D[k], 'b', { r: ['X', 'NP'] });
+  const ev = rule => evaluate(s, { from: D[0], to: D[D.length - 1] }).violations.filter(v => v.ruleId === rule);
+  ok(ev('r-req-load').length === 1 && /Alpha/.test(ev('r-req-load')[0].message || ev('r-req-load')[0].text || JSON.stringify(ev('r-req-load')[0])), 'requests: five requests in a month is flagged, X/NP counts once');
+  ok(ev('r-req-npload').length === 1, 'requests: three no-premed days is flagged');
+  const text = 'Strong MO1\tWeak MO1\tStrong MO2\tWeak MO2\tStrong MO3\tWeak MO3\tResident\nAlpha One\tBravo Two\t\u2060\u2060Charlie Three \tDelta Four (GA)\t\t\tAlpha One\nNobody Known\t\t\t\t\t\t';
+  const pr = Pools.parsePoolText(text);
+  ok(pr.columns === 6 && pr.found.mo1s.length === 2 && pr.found.mo2s[0] === 'Charlie Three', 'pools: the table is read by its headings, odd spaces cleaned');
+  const m = Pools.matchPools(pr.found, s.staff);
+  ok(m.assign.length === 4 && m.unmatched.join() === 'Nobody Known', 'pools: names matched to staff, a stranger reported');
+  const n = Pools.applyPools(s, m.assign);
+  ok(n === 4 && s.staff.find(p => p.id === 'b').tags.join() === 'mo1,mo1w' && s.staff.find(p => p.id === 'c').tags.join() === 'mo2,mo2s', 'pools: each person gets the call level and the pool tag');
+  ok(s.rules.find(r => r.id === 'r-pool-1').enabled, 'pools: the import turns the pool rules on');
+  M.setCell(s, D[10], 'a', { r: ['R'] }); M.setCell(s, D[10], 'b', { r: ['R'] });   // two MO1s ask for the same day
+  M.setCell(s, D[12], 'c', { r: ['R'] }); M.setCell(s, D[12], 'd', { r: ['R'] });    // strong and weak MO2
+  M.setCell(s, D[14], 'a', { r: ['R'] }); M.setCell(s, D[14], 'c', { r: ['R'] });    // MO1 with MO2: no clash
+  ok(ev('r-pool-1').length === 1 && ev('r-pool-2').length === 1 && ev('r-pool-3').length === 0, 'pools: two call requests on one day in the same pool are flagged, different pools are not');
+  const old = M.defaultState(); old.rulesVersion = 16; old.tags = old.tags.filter(t => !/^mo\d[sw]$/.test(t.id)); old.rules = old.rules.filter(r => !/^r-(req-load|req-npload|pool-\d)$/.test(r.id));
+  const mg = M.migrate(JSON.parse(JSON.stringify(old)));
+  ok(mg.rulesVersion === 17 && mg.tags.some(t => t.id === 'mo3w') && mg.rules.some(r => r.id === 'r-pool-3' && !r.enabled), 'pools: a saved roster gains the tags and rules once');
 }
 console.log(`nuh-junior-monthly: ${n} checks passed`);

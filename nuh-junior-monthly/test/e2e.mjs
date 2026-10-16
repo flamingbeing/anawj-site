@@ -153,6 +153,17 @@ const noSideScroll = async (page, label) => {
   ok(await page.getByText(/no calls until/).first().isVisible(), 'People shows who has no calls until a date');
   await go(page, '#rules');
   ok(await page.getByText('To confirm').first().isVisible(), 'predicted rules say To confirm');
+  // People > Tags: the strong / weak list is pasted, matched people get the pool tag and the pool rules turn on
+  await go(page, '#people');
+  await page.waitForTimeout(300);
+  const nm = await page.evaluate(() => window.jmApp.store.get().staff.find(p => p.active !== false).name);
+  await page.getByRole('tab', { name: /Tags/ }).or(page.getByRole('button', { name: /^Tags/ })).first().click();
+  await page.getByRole('button', { name: 'Import the strong / weak list' }).click();
+  await page.getByLabel('The table').fill(`Strong MO1\tWeak MO1\n${nm}\t`);
+  await page.getByRole('button', { name: 'Set the pools' }).click();
+  await page.waitForTimeout(300);
+  const pooled = await page.evaluate(nm0 => { const s = window.jmApp.store.get(); const p = s.staff.find(x => x.name === nm0); return { tags: p.tags, on: s.rules.find(r => r.id === 'r-pool-1').enabled }; }, nm);
+  ok(pooled.tags.includes('mo1s') && pooled.tags.includes('mo1') && pooled.on, 'importing the strong / weak list tags the person and turns the pool rules on');
   // auto-fill next month: no must-fix problems left
   await page.evaluate(() => window.jmApp.setMonth(window.jmApp.model.addMonths(window.jmApp.month, 1)));
   await page.waitForTimeout(300);
