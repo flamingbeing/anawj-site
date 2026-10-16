@@ -1197,3 +1197,35 @@ body:not([data-tab="roster"]) #autofill, body.month-locked #autofill, body.month
   #today .ic { display: inline-block; }
   #today, #autofill, #cloudbtn { width: 44px; padding: 0; }
 }
+
+/* ---------- Leave (the leave waitlist, read only) ---------- */
+.wlv { display: grid; gap: 12px; padding: 12px; max-width: 980px; margin: 0 auto; }
+.wl-intro h2 { margin: 0 0 4px; font-size: 18px; }
+.wl-intro p { margin: 0 0 8px; }
+.wl-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.wl-when { font-size: 13px; }
+.wl-leg { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.wl-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 3px 10px; border-radius: 8px; border: 1px solid transparent; font-size: 14px; font-weight: 600; color: #1f2937; }
+.wl-chip .wl-stat, .wl-chip .wl-remark, .wl-chip .wl-n, .wl-chip .wl-q { font-size: 12px; font-weight: 500; }
+.wl-chip .wl-n { padding: 0 6px; border-radius: 6px; background: rgba(255, 255, 255, .6); font-weight: 700; }
+.wl-legend-long { display: none; }
+/* the sheet's colours in soft tints, with the status written on each chip (colour is never the only sign) */
+.wl-st-waitlisted { background: #ffdfc2; border-color: #f2a65a; }
+.wl-st-adhoc { background: #ffffff; border-color: #aab2bf; }
+.wl-st-expedited { background: #c8f7c5; border-color: #62c25b; }
+.wl-st-approved { background: #aecbfa; border-color: #5b8de6; }
+.wl-st-rejected { background: #f7c1c1; border-color: #d65a5a; }
+.wl-st-closed { background: #b8f3f5; border-color: #3fc3c9; }
+.wl-unmatched { border-style: dashed; }
+.wl-days { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.wl-day { display: flex; align-items: center; gap: 12px; padding: 6px 12px; min-height: 44px; border-bottom: 1px solid var(--line); }
+.wl-day:last-child { border-bottom: 0; }
+.wl-day.we { background: var(--we); }
+.wl-day.empty { color: var(--muted); }
+.wl-date { flex: none; width: 64px; font-size: 14px; }
+.wl-date strong { font-size: 16px; }
+.wl-ents { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.wl-none { font-size: 13px; }
+.wl-note { margin: 0; font-size: 13px; }
+@media (min-width: 721px) { .wl-legend-long { display: inline; font-weight: 400; font-size: 12px; } .wl-leg .wl-chip { flex: 1 1 260px; } }
+.view-more > .link-card:not(:last-of-type) { border-radius: var(--radius); }

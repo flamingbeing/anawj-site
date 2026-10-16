@@ -8,6 +8,7 @@ import { solve } from '../js/solver.js';
 import { demoState } from '../js/demo.js';
 import { apmesList } from '../js/apmes.js';
 import * as G from '../js/gsheets.js';
+import * as W from '../js/waitlist.js';
 import * as C from '../js/cloud.js';
 import { relevanceOf } from '../js/ui-check.js';
 import { applyAssignments, postingSet } from '../js/ui-roster.js';
@@ -616,5 +617,49 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   // the R1 to R3 share compares each grade with itself
   const r = M.DEFAULT_RULES.find(x => x.id === 'r-fair');
   ok(r.params.byGroup === 'yes' && r.params.alertPct === 40, 'the R1 to R3 share compares the same grade');
+}
+{
+  // the leave waitlist tab: names, remarks, statuses from fill colours, matching to the staff list
+  ok(W.statusOfColour('#ff9900').id === 'waitlisted' && W.statusOfColour('#4a86e8').id === 'approved' && W.statusOfColour('#00ff00').id === 'expedited'
+    && W.statusOfColour('#ff0000').id === 'rejected' && W.statusOfColour('#00ffff').id === 'closed' && W.statusOfColour('').id === 'adhoc' && W.statusOfColour('#ffffff').id === 'adhoc', 'waitlist: each legend colour is its status, no fill is ad hoc');
+  ok(W.statusOfColour('#e08a2a').id === 'waitlisted' && !W.statusOfColour('#e08a2a').exact && W.statusOfColour('#f4a000').exact, 'waitlist: a close shade still reads as the nearest status, marked not exact');
+  const sp = W.splitEntry('Alina (PM)'), sd = W.splitEntry('Ryan - medical appt');
+  ok(sp.name === 'Alina' && sp.remark === 'PM' && sd.name === 'Ryan' && sd.remark === 'medical appt', 'waitlist: a remark in brackets or after a dash is split from the name');
+  const staff = [{ id: 'a', name: 'Rachel Go', short: 'Rachel G' }, { id: 'b', name: 'Victoria Ng Ming Hui' }, { id: 'c', name: 'Gavin Soon Shi Hua' }, { id: 'd', name: 'Ryan Tay' }, { id: 'e', name: 'Ryan Lee' }];
+  ok(W.matchStaff('rachel go', staff).id === 'a' && W.matchStaff('Victoria', staff).id === 'b' && W.matchStaff('Gavin Soon', staff).id === 'c', 'waitlist: names as the sheet writes them (case, first name, first two words) match');
+  ok(W.matchStaff('Ryan', staff).ambiguous.length === 2 && W.matchStaff('Nobody Here', staff) === null, 'waitlist: two people fit -> which one; nobody fits -> not found');
+  const NOV = '2026-11';
+  const cell = (v, bg = '') => ({ v, bg });
+  const grid = [
+    [cell(''), cell('Day'), cell('Waitlist 1'), cell('Waitlist 2'), cell('Waitlist 3')],
+    [cell('1', '#ccffcc'), cell('Sun'), cell(''), cell(''), cell('')],
+    [cell('2'), cell('Mon'), cell('Victoria', '#ffffff'), cell('rachel go', '#4a86e8'), cell('')],
+    [cell('3'), cell('Tue'), cell('Alina (PM)', '#ff9900'), cell('Ryan - medical appt', '#ff0000'), cell('')],
+    [cell('4'), cell('Wed'), cell('Zed Unknown', '#00ffff'), cell(''), cell('')],
+  ];
+  const pw = W.parseWaitlist(grid, NOV, staff);
+  ok(pw.header === 0 && pw.columns.length === 3 && pw.days === 4 && pw.entries.length === 5, `waitlist: the tab is read (${pw.entries.length} names, ${pw.days} days)`);
+  const e = i => pw.entries[i];
+  ok(e(0).date === '2026-11-02' && e(0).cell === 'C3' && e(0).status === 'adhoc' && e(0).staffId === 'b', 'waitlist: day, cell, status and person of the first name');
+  ok(e(1).status === 'approved' && e(1).staffId === 'a' && e(2).remark === 'PM' && e(2).status === 'waitlisted' && e(3).status === 'rejected' && e(3).ambiguous.length === 2 && e(4).status === 'closed' && !e(4).staffId, 'waitlist: statuses, remarks, matches and non-matches');
+  const sm = W.summarize(pw.entries);
+  ok(sm.total === 5 && sm.counts.approved === 1 && sm.counts.closed === 1 && sm.unmatched === 3, 'waitlist: the legend counts');
+  ok(W.parseWaitlist([['x', 'y']], NOV, staff).problems.length === 1, 'waitlist: a tab with no Waitlist heading says so');
+  // reading the colours through the Sheets API (a fake)
+  const keep = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const u = decodeURIComponent(String(url));
+    if (!/includeGridData=true/.test(u)) throw new Error('read the colours with grid data');
+    if (!/effectiveFormat\.backgroundColor/.test(u) || /userEnteredValue|formula/i.test(u)) throw new Error('asks for more than text and colour');
+    return { ok: true, status: 200, json: async () => ({ sheets: [{ data: [{ rowData: [
+      { values: [{ formattedValue: 'Day' }, { formattedValue: 'Waitlist 1' }] },
+      { values: [{ formattedValue: '3', effectiveFormat: { backgroundColor: { red: 1, green: 1, blue: 1 } } }, { formattedValue: 'Alina', effectiveFormat: { backgroundColor: { red: 1, green: 0.6 } } }] },
+    ] }] }] }) };
+  };
+  G.hooks.getToken = async () => 'test-token';
+  const got = await G.readColoured('SHEETID', { title: 'Leave Waitlist', rows: 31, cols: 24 });
+  globalThis.fetch = keep;
+  ok(got[1][0].bg === '' && got[1][1].bg === '#ff9900' && got[1][1].v === 'Alina' && got[0][1].v === 'Waitlist 1', 'waitlist: the colours come back as hex, white as no fill');
+  ok(G.findTab([{ title: '1 - 30 Nov 26 Request' }, { title: 'Leave Waitlist' }], /wait\s*-?\s*list/i).title === 'Leave Waitlist', 'waitlist: the tab is found by its name');
 }
 console.log(`nuh-junior-monthly: ${n} checks passed`);

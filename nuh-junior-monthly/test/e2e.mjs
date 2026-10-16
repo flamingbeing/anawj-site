@@ -120,13 +120,21 @@ const noSideScroll = async (page, label) => {
     await page.getByRole('button', { name: 'Days around' }).click();
     ok(await page.locator('thead th.dh.ctx').count() >= 4, 'and on again');
   }
-  for (const t of ['roster', 'postings', 'day', 'people', 'rules', 'check', 'more']) {
+  for (const t of ['roster', 'postings', 'leave', 'day', 'people', 'rules', 'check', 'more']) {
     await go(page, '#' + t);
     await page.waitForTimeout(400);
     ok(await page.locator(`.view-${t}`).isVisible(), `${t} shows`);
     await axe(page, `desktop ${t}`);
     await shot(page, 'd-' + t);
   }
+  // Leave (read only): the legend counts match the names listed, the read button waits for a sheet, statuses are written on the chips
+  await go(page, '#leave');
+  await page.waitForTimeout(300);
+  const legendTotal = await page.locator('.wl-legend .wl-n').evaluateAll(els => els.reduce((a, e) => a + Number(e.textContent), 0));
+  ok(legendTotal > 0 && await page.locator('.wl-days .wl-chip').count() === legendTotal, `the Leave legend counts every name listed (${legendTotal})`);
+  ok(await page.locator('.wl-days .wl-chip .wl-stat').first().isVisible(), 'each name has its status written on it, not only a colour');
+  await page.getByRole('button', { name: 'Read from the Google Sheet' }).click();
+  ok(await page.getByText('The practice department has no Google Sheet to read.').count() >= 1, 'the practice department has no sheet to read, and says so');
   // Postings: change one week, the roster cells follow
   await go(page, '#postings');
   const sel = page.locator('.pv-sel').first();
@@ -189,7 +197,7 @@ const noSideScroll = async (page, label) => {
   const page = await newPage({ width: 390, height: 844 }, 'phone', { isMobile: true, hasTouch: true });
   await page.goto(BASE + '?demo#roster');
   await ready(page);
-  for (const t of ['roster', 'day', 'check', 'rules', 'more', 'postings']) {
+  for (const t of ['roster', 'day', 'check', 'rules', 'more', 'postings', 'leave']) {
     await go(page, '#' + t);
     await page.waitForTimeout(400);
     await noSideScroll(page, `phone ${t}`);
@@ -276,7 +284,13 @@ for (const w of [320, 360, 390, 430]) {
     const json = o => route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify(o) });
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
     if (!/^Bearer test-token$/.test(req.headers().authorization || '')) return route.fulfill({ status: 401, headers: CORS, body: '{}' });
-    if (/\/spreadsheets\/SHEETID[^/]*\?fields/.test(u)) return json({ properties: { title: 'Test roster' }, sheets: [{ properties: { sheetId: 7, title: 'Request', gridProperties: { rowCount: 50, columnCount: 40 } } }] });
+    if (/\/spreadsheets\/SHEETID[^/]*\?fields/.test(u)) return json({ properties: { title: 'Test roster' }, sheets: [{ properties: { sheetId: 7, title: 'Request', gridProperties: { rowCount: 50, columnCount: 40 } } }, { properties: { sheetId: 9, title: 'Leave Waitlist', gridProperties: { rowCount: 32, columnCount: 8 } } }] });
+    if (/includeGridData=true/.test(u)) {
+      const c = (v, bg) => ({ formattedValue: v, effectiveFormat: { backgroundColor: bg || { red: 1, green: 1, blue: 1 } } });
+      const rows = [{ values: [c(''), c('Day'), c('Waitlist 1'), c('Waitlist 2')] }];
+      for (let d = 1; d <= 31; d++) rows.push({ values: [c(String(d)), c('Mon'), d === 3 ? c('Icu Example', { red: 1, green: 0.6 }) : c(''), d === 3 ? c('Nobody Known (PM)', { red: 0.29, green: 0.53, blue: 0.91 }) : c('')] });
+      return json({ sheets: [{ data: [{ rowData: rows }] }] });
+    }
     if (/values\/'Request'!A1:/.test(u)) return json({ values: sheet.map(r => r.slice()) });
     if (/values:batchGet/.test(u)) return json({ valueRanges: [...u.matchAll(/ranges='Request'!([A-Z]+)(\d+)/g)].map(m => ({ values: [[(sheet[+m[2] - 1] || [])[colIdx(m[1])] ?? '']] })) });
     if (/values:batchUpdate/.test(u)) {
@@ -316,6 +330,15 @@ for (const w of [320, 360, 390, 430]) {
   });
   await page.waitForTimeout(300);
   ok(await page.getByRole('button', { name: /Check, then write 2 cells/ }).count() === 1, 'two cells to write: the call and its post call');
+  // the Leave tab reads the same sheet's Leave Waitlist (colours become statuses) and writes nothing
+  await go(page, 'leave');
+  await page.getByRole('button', { name: 'Read from the Google Sheet' }).click();
+  await page.waitForSelector('.wl-days .wl-chip');
+  ok(await page.locator('.wl-days .wl-chip').count() === 2, 'the Leave tab reads two names from the sheet\'s Leave Waitlist');
+  ok(await page.locator('.wl-days .wl-st-waitlisted', { hasText: 'Icu Example' }).count() === 1 && await page.locator('.wl-days .wl-st-approved.wl-unmatched', { hasText: 'Nobody Known' }).count() === 1, 'an orange cell is waitlisted, a blue one approved; a name not on the staff list is shown as written');
+  ok(writes.length === 0, 'reading the Leave Waitlist writes nothing to the sheet');
+  await axe(page, 'the Leave tab with a read waitlist');
+  await go(page, 'more');
   // the cloud button in the header: shows whether this browser's changes are saved; Auto-fill is only on the Roster tab
   ok(await page.locator('#cloudbtn').isVisible(), 'the header has a cloud button');
   ok((await page.locator('#cloudbtn').getAttribute('data-state')) === 'unsaved' && /Not saved/.test(await page.locator('#cloudbtn').innerText()), 'after a change it says Not saved');
