@@ -391,7 +391,7 @@ html body.a-app:has(.a-tabbar) .a-bar.top { margin-left: 0; }
 /* the days around the month: greyed and read-only, so you can see where people come from and go next */
 .grid th.dh.ctx { background: #ececf1; color: var(--muted); }
 .grid th.dh.ctx .dh-in .mo { font-size: 9px; font-weight: 700; text-transform: uppercase; color: var(--navy); }
-.grid td.c.ctx { background: #f3f3f7; opacity: .82; }
+.grid td.c.ctx { background: #f3f3f7; opacity: .92; }
 .grid td.c.ctx .cro { display: flex; align-items: center; justify-content: center; gap: 2px; height: 100%; }
 .grid td.cov.ctx { background: #f3f3f7; }
 .grid th.dh.ctx + th.dh:not(.ctx), .grid td.c.ctx + td.c:not(.ctx), .grid th.dh:not(.ctx) + th.dh.ctx, .grid td.c:not(.ctx) + td.c.ctx { border-left: 2px solid var(--navy); }
@@ -446,7 +446,7 @@ html body.a-app:has(.a-tabbar) .a-bar.top { margin-left: 0; }
   text-align: center; white-space: nowrap; overflow: hidden; text-overflow: clip; letter-spacing: -.01em;
 }
 .chip.sm { font-size: 10.5px; letter-spacing: -.05em; padding: 0 1px; }
-.chip.rq { background: transparent; color: var(--c, #0b5394); box-shadow: inset 0 0 0 1px var(--c, #0b5394); font-weight: 600; }
+.chip.rq { background: color-mix(in srgb, var(--c, #0b5394) 10%, #fff); color: color-mix(in srgb, var(--c, #0b5394) 80%, #000); box-shadow: inset 0 0 0 1px var(--c, #0b5394); font-weight: 600; }
 .chip.au { background-image: linear-gradient(to top, rgba(255, 255, 255, .5) 0 2px, transparent 2px); }
 .chip.dx { background: transparent; color: #262b33; font-weight: 600; min-width: 0; }
 td.c.pt { background-color: var(--pt); }

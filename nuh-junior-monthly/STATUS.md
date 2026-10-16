@@ -15,8 +15,7 @@ Last updated: 2026-10-16 by Claude Code (jm1).
 - Reminders set for the owner: 23 Oct (balance over a posting that straddles two months), 16 Dec (thinning old saves).
 
 ## Next (agreed order)
-1. ~~Share the sheet layout in the cloud copy~~ done with Save/Pull covering every month (see Recently done). Needs a
-   firetop check that the "Deploy Firestore rules" run succeeded (months got an optional `layout` field).
+1. ~~Share the sheet layout in the cloud copy~~ done with Save/Pull covering every month (see Recently done). Rules deployed.
 2. ~~A per-person "no calls until" date~~ done (see Recently done). Still to do: a suggested date for new people read from the
    sheet (first month they appear).
 3. **Highest call per person** (R1 most senior, R3 most junior, cumulative; default the highest, a lower one is a
@@ -39,7 +38,7 @@ Last updated: 2026-10-16 by Claude Code (jm1).
 - #712 Request importance: `X!` must have, `X?` nice to have.
 - #711 People the imported sheet leaves out are hidden and left out of Auto-fill; group headers fold.
 - #710 Paint cells with Lock; the lock at the top of the cell popup.
-- (this PR) Save and Pull cover every month and its sheet layout; rules: optional `layout` on months and versions.
+- #724 Save and Pull cover every month and its sheet layout (rules deployed). (this PR) Colours follow the sheet's legend.
 - #708 The cloud (Save and Pull to cloud) with a header button showing when it was last saved.
 - #707 Every month starts locked. #705 Earlier saves (restore from the cloud history).
 - #703 The import moves people to their new grade. #702 A month is saved as one JSON string (index-entry limit).
