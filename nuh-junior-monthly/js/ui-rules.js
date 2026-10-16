@@ -183,7 +183,7 @@ export function mount(el, app) {
     const groups = by === 'strength'
       ? [
         ['Must hold', 'Hard rules: auto-fill never breaks them if it can help it.', shown.filter(isHard)],
-        ['Preferences', 'Soft rules: weighed against each other; a higher number matters more.', shown.filter(r => !isHard(r))],
+        ['Preferences', 'Soft rules, highest priority first: weighed against each other, a higher number matters more.', shown.filter(r => !isHard(r)).sort((a, b) => Number(b.weight) - Number(a.weight))],
       ]
       : TOPICS.map(([id, title, sub]) => [title, sub, shown.filter(r => topicOf(r) === id), id]);
     for (const [title, sub, rs, topic] of groups) {
@@ -230,7 +230,7 @@ export function mount(el, app) {
         h('h4', { class: 'rv-title' }, h('button', { type: 'button', class: 'rv-open', onclick: () => openBuilder(r) }, title)),
         r.name ? h('p', { class: 'rv-sent' }, sentence) : null,
         h('p', { class: 'rv-meta' },
-          h('span', { class: `bx-badge ${hard ? 'hard' : 'soft'}` }, hard ? 'Must hold' : `Preference · ${clampW(r.weight)}`),
+          h('span', { class: `bx-badge ${hard ? 'hard' : 'soft'}` }, hard ? 'Must hold' : `Priority ${clampW(r.weight)}`),
           /Predicted/.test(r.note || '') ? h('span', { class: 'bx-badge soft', title: r.note }, 'To confirm') : null,
           t ? h('span', { class: 'rv-type' }, t.label) : null,
           meta ? h('span', { class: 'rv-who' }, meta) : null),

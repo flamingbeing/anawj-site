@@ -34,6 +34,9 @@ export function mount(el, app) {
   let view = ['problems', 'fairness', 'coverage'].includes(app.params.v) ? app.params.v : 'problems';
   let person = '';
   let hardOnly = false;
+  // how the rules with problems are ordered (kept on the device): by total impact (priority x how many), by the rule's own priority, or most problems first
+  let sortBy = 'impact';
+  try { const v = localStorage.getItem('nuhjm-check-sort'); if (['impact', 'priority', 'count'].includes(v)) sortBy = v; } catch (e) { /* default */ }
   // the things to improve that bear on what Fill places (C3, R1B): the rest is hidden unless asked for (owner, 16 Oct 2026)
   let fillOnly = true;
   try { fillOnly = localStorage.getItem('nuhjm-check-fillonly') !== '0'; } catch (e) { /* default */ }
@@ -94,8 +97,13 @@ export function mount(el, app) {
     const ho = h('input', { type: 'checkbox', checked: hardOnly, 'data-k': 'hardonly', onchange: () => { hardOnly = ho.checked; render(); } });
     const fo = h('input', { type: 'checkbox', checked: fillOnly, 'data-k': 'fillonly', onchange: () => { fillOnly = fo.checked; try { localStorage.setItem('nuhjm-check-fillonly', fillOnly ? '1' : '0'); } catch (e) { /* ignore */ } render(); } });
     const rmap = new Map((st.rules || []).map(r => [r.id, r]));
+    const sid = fid();
+    const sortSel = h('select', { id: sid, 'data-k': 'sort', onchange: () => { sortBy = sortSel.value; try { localStorage.setItem('nuhjm-check-sort', sortBy); } catch (e) { /* kept for this visit */ } render(); } },
+      [['impact', 'Biggest impact'], ['priority', 'Highest priority'], ['count', 'Most problems']].map(([v, l]) => h('option', { value: v }, l)));
+    sortSel.value = sortBy;
     panel.append(h('div', { class: 'cv-bar' },
       h('div', { class: 'cv-field' }, h('label', { for: pid }, 'Person'), sel),
+      h('div', { class: 'cv-field' }, h('label', { for: sid }, 'Order'), sortSel),
       h('label', { class: 'switch' }, ho, h('span', { class: 'sw-track' }), h('span', null, 'Only must-fix')),
       rel.codes.length ? h('label', { class: 'switch' }, fo, h('span', { class: 'sw-track' }), h('span', null, `Only ${rel.codes.join(', ')}${rel.hidden && fillOnly ? ` (${rel.hidden} hidden)` : ''}`)) : null,
       ruleFocus && rmap.has(ruleFocus) ? h('span', { class: 'bx-pill is-on cv-only' }, `Only: ${title(rmap.get(ruleFocus), st)}`,
@@ -111,7 +119,7 @@ export function mount(el, app) {
     const by = new Map();
     for (const v of vs) { const a = by.get(v.ruleId); if (a) a.push(v); else by.set(v.ruleId, [v]); }
     const groups = [...by.entries()].map(([id, list]) => ({ id, list, rule: rmap.get(id), hard: list.some(v => v.hard), pen: list.reduce((s, v) => s + (v.penalty || 0), 0) }))
-      .sort((a, b) => (b.hard - a.hard) || (b.pen - a.pen));
+      .sort((a, b) => (b.hard - a.hard) || (sortBy === 'priority' ? ((b.rule ? Number(b.rule.weight) : 0) - (a.rule ? Number(a.rule.weight) : 0)) || (b.pen - a.pen) : sortBy === 'count' ? (b.list.length - a.list.length) || (b.pen - a.pen) : (b.pen - a.pen)));
     const ul = h('div', { class: 'cv-groups' });
     for (const g of groups) {
       const t = g.rule && RULE_TYPES[g.rule.type];
@@ -123,7 +131,7 @@ export function mount(el, app) {
           h('span', { class: 'rv-ic', 'aria-hidden': 'true' }, t ? t.icon : '?'),
           h('div', { class: 'cv-gt' },
             h('h3', null, g.rule ? title(g.rule, st) : 'A rule that no longer exists'),
-            h('p', { class: 'rv-meta' }, h('span', { class: `bx-badge ${g.hard ? 'hard' : 'soft'}` }, g.hard ? 'Must hold' : `Preference · ${g.rule ? g.rule.weight : ''}`),
+            h('p', { class: 'rv-meta' }, h('span', { class: `bx-badge ${g.hard ? 'hard' : 'soft'}` }, g.hard ? 'Must hold' : `Priority ${g.rule ? g.rule.weight : ''}`),
               h('span', { class: `bx-tag ${g.hard ? 'bad' : 'warn'}` }, `${list.length} ${list.length === 1 ? 'problem' : 'problems'}`))),
           g.rule ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': `edit-${g.id}`, onclick: () => app.go('rules', { edit: g.id }), 'aria-label': `Edit rule: ${title(g.rule, st)}` }, 'Edit rule') : null),
         h('ul', { class: 'cv-vs' }, shown.map((v, i) => h('li', null,

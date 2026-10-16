@@ -175,6 +175,10 @@ const noSideScroll = async (page, label) => {
   await go(page, '#check');
   await page.waitForTimeout(300);
   ok(await page.locator('#autofill').isVisible(), 'the Check tab has the Fill button');
+  await page.locator('[data-k=sort]').selectOption('priority');
+  await page.waitForTimeout(200);
+  ok(await page.locator('[data-k=sort]').inputValue() === 'priority' && await page.locator('.cv-group').count() > 0, 'Check can order the problems by rule priority');
+  await page.locator('[data-k=sort]').selectOption('impact');
   await go(page, '#day');
   await page.waitForTimeout(300);
   ok(!(await page.locator('#autofill').isVisible()), 'the Day tab has no Fill button');
@@ -440,8 +444,15 @@ for (const w of [320, 360, 390, 430]) {
   await page.locator('#af-c-R1B').uncheck();
   for (const c of ['R1', 'R2', 'R3']) await page.locator('#af-c-' + c).check();
   ok(await page.getByText('turns the R1 to R3 rules on').count() >= 1, 'the dialog says ticking R1 to R3 turns the rules on');
+  await page.locator('#af-t-3000').check();   // the quick search
   await page.getByRole('button', { name: 'Start' }).click();
   await page.waitForFunction(() => /Apply/.test(document.body.innerText), null, { timeout: 40000 });
+  ok(await page.locator('.af-attempts').count() === 0, 'one draft: no comparison table yet');
+  // Try again: the two drafts are listed side by side with their scores, the best marked, and either can be applied
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await page.waitForSelector('.af-attempts', { timeout: 40000 });
+  ok(await page.locator('.af-attempts tbody tr').count() === 2 && await page.locator('.af-best').count() === 1, 'Try again lists both drafts with their scores and marks the best');
+  ok(await page.getByRole('button', { name: /^Apply attempt \d/ }).count() === 1, 'Apply names the draft it applies');
   const rules = await page.evaluate(() => window.jmApp.store.get().rules.filter(r => /^r-r[123]-cover$/.test(r.id)).map(r => r.enabled));
   ok(rules.every(e => e === true), 'starting Fill with R1 to R3 ticked turned the R1 to R3 cover rules on');
   await page.getByRole('button', { name: /^Apply/ }).first().click();
