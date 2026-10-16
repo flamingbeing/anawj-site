@@ -81,6 +81,20 @@ const noSideScroll = async (page, label) => {
     await page.locator('.grp-toggle').first().click();
     await page.waitForTimeout(600);   // rows are drawn a few at a time
     ok(await page.locator('tbody tr:not(.grp-row)').count() === rowsBefore, 'and opens them again');
+    // a mouse can move the grid sideways: week buttons, and the wheel over the dates
+    await page.setViewportSize({ width: 900, height: 700 });
+    await page.waitForTimeout(300);
+    const wide = await page.locator('.r-scroll').evaluate(el => el.scrollWidth > el.clientWidth + 50);
+    ok(wide, 'the grid is wider than a small window');
+    await page.getByRole('button', { name: 'Scroll forward a week' }).click();
+    await page.waitForTimeout(700);
+    const moved = await page.locator('.r-scroll').evaluate(el => el.scrollLeft);
+    ok(moved > 50, `the week button scrolls the grid (${moved}px)`);
+    await page.locator('.r-scroll thead th.nh').first().hover();
+    await page.mouse.wheel(0, 120);
+    await page.waitForTimeout(300);
+    ok(await page.locator('.r-scroll').evaluate((el, was) => el.scrollLeft > was, moved), 'the wheel over the dates moves it sideways too');
+    await page.setViewportSize({ width: 1366, height: 900 });
     await page.getByRole('button', { name: 'Days around' }).click();
     ok(await page.locator('thead th.dh.ctx').count() >= 4, 'and on again');
   }

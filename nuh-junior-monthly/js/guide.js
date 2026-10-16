@@ -90,7 +90,7 @@ function allSetCard(app) {
     h('span', { class: 'gs-allset-ic', html: icon('ok') }),
     h('div', { class: 'gs-headtext' },
       h('h2', { class: 'gs-title', id: 'gs-h' }, 'All set'),
-      h('p', { class: 'gs-sub' }, 'Every first step is done. Help (?) has the tour and this checklist if you want them again.')));
+      h('p', { class: 'gs-sub' }, 'Every first step is done. More › Help has the tour and this checklist if you want them again.')));
 }
 
 function card(app, st, { welcome, collapsed, open }) {
@@ -189,7 +189,7 @@ function tourButton(app, cls, key) {
 function hideChecklist(app) {
   keepOpen = false;
   app.store.mark({ hidden: true });
-  app.toast('Getting started hidden. Help (?) brings it back.', { action: { label: 'Undo', fn: () => app.store.mark({ hidden: false }) } });
+  app.toast('Getting started hidden. More › Help brings it back.', { action: { label: 'Undo', fn: () => app.store.mark({ hidden: false }) } });
 }
 
 export function showChecklist(app) {

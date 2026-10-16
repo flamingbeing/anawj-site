@@ -17,8 +17,9 @@ const TABS = {
   check: { label: 'Check', icon: 'check', mod: './ui-check.js' },
   more: { label: 'More', icon: 'more', mod: './ui-more.js' },
 };
-const DESKTOP_TABS = ['roster', 'postings', 'day', 'people', 'rules', 'check', 'more'];
-const PHONE_TABS = ['roster', 'day', 'check', 'rules', 'more'];
+// the month's work (Roster, Check, Day), then the set-up screens after a separator (Postings, People, Rules, More)
+const DESKTOP_TABS = ['roster', 'check', 'day', 'postings', 'people', 'rules', 'more'];
+const PHONE_TABS = ['roster', 'check', 'day', 'rules', 'more'];
 const PHONE_MQ = '(max-width: 720px)';
 
 // Line icons (24 px grid, stroke = currentColor). Views get them through app.icon(name).
@@ -301,10 +302,9 @@ function renderNav() {
   bb.innerHTML = PHONE_TABS.map(t => `<a href="#${t}" class="bb-tab" data-tab="${t}" data-tour="tab-${t}">${icon(TABS[t].icon)}<span class="bb-label">${TABS[t].label}</span>${t === 'check' ? '<span class="bb-badge" hidden></span>' : ''}</a>`).join('');
   $('#undo').innerHTML = icon('undo');
   $('#redo').innerHTML = icon('redo');
-  $('#help').innerHTML = icon('help');
   $('#prevm').innerHTML = icon('left');
   $('#nextm').innerHTML = icon('right');
-  $('#autofill').innerHTML = `${icon('spark')}<span class="lbl">Auto-fill</span>`;
+  $('#autofill').innerHTML = `${icon('spark')}<span class="lbl">Fill</span>`;   // the name read out stays "Auto-fill" (aria-label)
 }
 
 function markTabs() {
@@ -353,7 +353,7 @@ function renderHeader() {
   setHTML($('#month'), `<span class="m-long">${esc(longM)}</span><span class="m-short" aria-hidden="true">${esc(longM.slice(0, 3) + ' ' + app.month.slice(0, 4))}</span>`);
   $('#today').title = 'Go to today (' + M.fmtDay(M.iso(new Date())) + ')';
   const lk = $('#lockm'), isLocked = M.isMonthLocked(state, app.month);
-  lk.textContent = isLocked ? 'Locked' : 'Lock';
+  setHTML(lk, `${icon('lock')}<span class="lk-t">${isLocked ? 'Locked' : 'Lock'}</span>`);
   lk.setAttribute('aria-pressed', String(isLocked));
   lk.title = isLocked ? `${longM} is locked: nothing in it can change. Press to unlock.` : `Lock ${longM} so nothing in it can be changed by accident`;
   document.body.classList.toggle('month-locked', isLocked);
@@ -525,7 +525,7 @@ function welcomeCard() {
         h('li', null, 'Bring the month in: More › Import from the Google Sheet (people, postings, leave and requests come with it).'),
         h('li', null, 'Check each person\'s posting by the week under Postings.'),
         h('li', null, `Check the rules: ${(app.store.get().rules || []).filter(r => r.enabled !== false).length} default rules are already on; the ones marked To confirm are guesses.`),
-        h('li', null, 'Press Auto-fill, look at the preview, then Apply. Then put the calls back in the sheet (More).')),
+        h('li', null, 'Press Fill, look at the preview, then Apply. Then put the calls back in the sheet (More).')),
       h('div', { class: 'welcome-actions' },
         h('button', { type: 'button', class: 'btn btn-primary', onclick: () => go('more'), html: `${icon('upload')}<span>Import from the Google Sheet</span>` }),
         h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => go('people'), html: `${icon('plus')}<span>Add staff</span>` }),
@@ -662,7 +662,7 @@ function doRedo() {
 }
 
 async function openAutofill() {
-  if (M.isMonthLocked(app.store.get(), app.month)) { toast(`${M.fmtMonth(app.month)} is locked. Unlock it (the Locked button at the top) to use Auto-fill.`, { kind: 'warn', ms: 7000 }); return; }
+  if (M.isMonthLocked(app.store.get(), app.month)) { toast(`${M.fmtMonth(app.month)} is locked. Unlock it (the padlock at the top) to use Fill.`, { kind: 'warn', ms: 7000 }); return; }
   try {
     const mod = await import('./ui-roster.js');
     mod.openAutofill(app);
@@ -716,7 +716,7 @@ async function start() {
     const cloudMod = await import('./cloud.js');
     if (cloudMod.enabled && !demo) CS = await import('./cloudstate.js');
   } catch (e) { console.warn('cloud.js not loaded; no cloud button', e); }
-  app.store.onLocked = months => toast(`${M.fmtMonth(months[0])} is locked, so nothing was changed. Press Locked at the top to unlock it first.`, { kind: 'warn', ms: 7000 });
+  app.store.onLocked = months => toast(`${M.fmtMonth(months[0])} is locked, so nothing was changed. Press the padlock at the top to unlock it first.`, { kind: 'warn', ms: 7000 });
   if (app.store.damaged) showDamaged();
   if (demo) document.title = 'NUH Junior Monthly (practice)';
 
@@ -732,7 +732,6 @@ async function start() {
 
   $('#undo').addEventListener('click', doUndo);
   $('#redo').addEventListener('click', doRedo);
-  $('#help').addEventListener('click', () => (G ? G.openHelp(app) : shortcutsSheet()));
   $('#prevm').addEventListener('click', () => setMonth(M.addMonths(app.month, -1)));
   $('#nextm').addEventListener('click', () => setMonth(M.addMonths(app.month, 1)));
   $('#today').addEventListener('click', goToday);

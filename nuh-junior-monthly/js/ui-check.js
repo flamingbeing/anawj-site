@@ -9,11 +9,34 @@ import { whoMatches, whenMatches, chipStyle } from './ui-rules.js';
 
 const PAGE = 6;   // problems shown per rule before "Show all"
 
+// Which problems bear on what Fill places? A must-fix problem always does. A preference does when a cell it names holds
+// one of the codes (C3, R1B), or when its rule is about them and no cell is named (fairness, cover), or it wants one of them.
+export function relevanceOf(st, ev, fillOnly) {
+  const auto = (st.duties || []).filter(d => d.auto).map(d => d.code);
+  const rmap = new Map((st.rules || []).map(r => [r.id, r]));
+  const ruleCodes = id => { const r = rmap.get(id), out = new Set(); if (r) for (const v of Object.values(r.params || {})) if (Array.isArray(v)) v.forEach(c => typeof c === 'string' && out.add(c)); return out; };
+  const has = (d, sid) => { const c = M.getCell(st, d, sid); return !!c && (c.a || []).some(x => auto.includes(x)); };
+  const keep = v => {
+    if (v.hard || !fillOnly || !auto.length) return true;
+    const rc = ruleCodes(v.ruleId), about = auto.some(c => rc.has(c)), r = rmap.get(v.ruleId);
+    const dates = [v.date, ...(v.dates || [])].filter(Boolean), ids = [v.staffId, ...(v.staffIds || [])].filter(Boolean);
+    if (dates.length && ids.length) return dates.some(d => ids.some(s => has(d, s))) || (about && r && r.params && r.params.mode === 'want');
+    return about;
+  };
+  const all = ev.violations || [];
+  const shown = all.filter(keep);
+  return { keep, codes: auto, soft: shown.filter(v => !v.hard).length, hidden: all.filter(v => !v.hard).length - shown.filter(v => !v.hard).length };
+}
+
+
 export function mount(el, app) {
   const { h } = app;
   let view = ['problems', 'fairness', 'coverage'].includes(app.params.v) ? app.params.v : 'problems';
   let person = '';
   let hardOnly = false;
+  // the things to improve that bear on what Fill places (C3, R1B): the rest is hidden unless asked for (owner, 16 Oct 2026)
+  let fillOnly = true;
+  try { fillOnly = localStorage.getItem('nuhjm-check-fillonly') !== '0'; } catch (e) { /* default */ }
   let ruleFocus = app.params.rule || '';
   const expanded = new Set();
 
@@ -25,6 +48,7 @@ export function mount(el, app) {
     const ev = app.evaluation();
     const keepFocus = document.activeElement && root.contains(document.activeElement) ? focusKey(document.activeElement) : null;
     root.innerHTML = '';
+    const rel = relevanceOf(st, ev, fillOnly);
     const rulesOn = (st.rules || []).filter(r => r.enabled !== false).length;
     root.append(
       h('div', { class: 'bx-head' }, h('div', { class: 'bx-head-text' },
@@ -33,7 +57,7 @@ export function mount(el, app) {
           h('a', { href: '#rules' }, 'Change the rules')))),
       h('div', { class: 'cv-sum', 'data-tour': 'check' },   // (data-tour: the first-time tour, tour.js)
         stat(ev.hard, 'must fix', 'Hard rules broken', ev.hard ? 'bad' : 'ok'),
-        stat(ev.soft, 'to improve', 'Preferences not met', ev.soft ? 'warn' : 'ok'),
+        stat(rel.soft, 'to improve', rel.hidden ? `Preferences not met that bear on ${rel.codes.join(' and ')}; ${rel.hidden} more about other calls are hidden` : 'Preferences not met', rel.soft ? 'warn' : 'ok'),
         stat(fmtScore(ev.score), 'penalty · lower is better', 'Each must-fix problem counts 1000, each thing to improve its weight', 'plain')));
     // a rule that couldn't be checked (a damaged or odd rule from a file) must not pass for "no problems"
     const nFailed = (ev.failed || []).length;
@@ -61,19 +85,22 @@ export function mount(el, app) {
 
   // ---------- problems ----------
   function renderProblems(panel, st, ev) {
+    const rel = relevanceOf(st, ev, fillOnly);
     const people = M.staffInMonth(st, app.month);
     const pid = fid();
     const sel = h('select', { id: pid, 'data-k': 'person', onchange: () => { person = sel.value; render(); } },
       h('option', { value: '' }, 'Everyone'), people.map(p => h('option', { value: p.id }, p.name)));
     sel.value = person;
     const ho = h('input', { type: 'checkbox', checked: hardOnly, 'data-k': 'hardonly', onchange: () => { hardOnly = ho.checked; render(); } });
+    const fo = h('input', { type: 'checkbox', checked: fillOnly, 'data-k': 'fillonly', onchange: () => { fillOnly = fo.checked; try { localStorage.setItem('nuhjm-check-fillonly', fillOnly ? '1' : '0'); } catch (e) { /* ignore */ } render(); } });
     const rmap = new Map((st.rules || []).map(r => [r.id, r]));
     panel.append(h('div', { class: 'cv-bar' },
       h('div', { class: 'cv-field' }, h('label', { for: pid }, 'Person'), sel),
       h('label', { class: 'switch' }, ho, h('span', { class: 'sw-track' }), h('span', null, 'Only must-fix')),
+      rel.codes.length ? h('label', { class: 'switch' }, fo, h('span', { class: 'sw-track' }), h('span', null, `Only ${rel.codes.join(', ')}${rel.hidden && fillOnly ? ` (${rel.hidden} hidden)` : ''}`)) : null,
       ruleFocus && rmap.has(ruleFocus) ? h('span', { class: 'bx-pill is-on cv-only' }, `Only: ${title(rmap.get(ruleFocus), st)}`,
         h('button', { type: 'button', class: 'bx-x', 'aria-label': 'Show every rule', onclick: () => { ruleFocus = ''; render(); } }, '×')) : null));
-    const vs = (ev.violations || []).filter(v => (!hardOnly || v.hard) && (!ruleFocus || v.ruleId === ruleFocus)
+    const vs = (ev.violations || []).filter(v => rel.keep(v) && (!hardOnly || v.hard) && (!ruleFocus || v.ruleId === ruleFocus)
       && (!person || v.staffId === person || (v.staffIds || []).includes(person)));
     if (!vs.length) {
       const any = (ev.violations || []).length;

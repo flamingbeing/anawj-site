@@ -164,7 +164,10 @@ export function mount(el, app) {
   const keyBtn = h('button', { type: 'button', class: 'tbtn', title: 'What the marks in the grid mean', onclick: showKey, 'data-tour': 'layers' }, 'Key');
   // people on the staff list that this month's imported sheet leaves out: hidden (and left out of Auto-fill) until shown
   const absentBtn = h('button', { type: 'button', class: 'tbtn', hidden: true });
-  tb.append(paintBtn, searchWrap, groupSel, tagSel, hiSel, reqBtn, ctxBtn, absentBtn, keyBtn);
+  // sideways scrolling for a mouse (a touch screen swipes): week buttons, the wheel over the dates, dragging the dates
+  const panBtn = (dir) => h('button', { type: 'button', class: 'tbtn tbtn-pan', title: dir < 0 ? 'Scroll back a week' : 'Scroll forward a week', 'aria-label': dir < 0 ? 'Scroll back a week' : 'Scroll forward a week',
+    html: icon(dir < 0 ? 'left' : 'right'), onclick: () => { const w = scroll.querySelector('th.dh')?.offsetWidth || 32; scroll.scrollBy({ left: dir * 7 * w, behavior: 'smooth' }); } });
+  tb.append(paintBtn, searchWrap, groupSel, tagSel, hiSel, reqBtn, ctxBtn, absentBtn, panBtn(-1), panBtn(1), keyBtn);
   function showKey() {
     const row = (mark, text) => h('li', { class: 'gk-row' }, h('span', { class: 'gk-mark', html: mark }), h('span', null, text));
     app.sheet({
@@ -192,6 +195,19 @@ export function mount(el, app) {
   const lockNote = h('div', { class: 'lock-note', role: 'note', hidden: true });
   const body = h('div', { class: 'r-body', 'data-tour': 'grid' });
   const scroll = h('div', { class: 'r-scroll', tabindex: '-1' });
+  scroll.addEventListener('wheel', e => {   // the wheel over the dates (or Shift anywhere) moves sideways
+    if (e.ctrlKey || !e.target.closest || !e.target.closest('thead')) return;
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? 0 : e.deltaY;
+    if (d) { scroll.scrollLeft += d; e.preventDefault(); }
+  }, { passive: false });
+  scroll.addEventListener('pointerdown', e => {   // drag the dates with a mouse to pan the grid
+    if (e.pointerType !== 'mouse' || e.button !== 0 || !e.target.closest('thead') || e.target.closest('button, a')) return;
+    const x0 = e.clientX, s0 = scroll.scrollLeft;
+    scroll.classList.add('panning');
+    const move = ev => { scroll.scrollLeft = s0 - (ev.clientX - x0); };
+    const up = () => { scroll.classList.remove('panning'); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  });
   const styleEl = h('style');
   body.append(scroll);
   root.append(styleEl, tb, paintBar, lockNote, banner, body);

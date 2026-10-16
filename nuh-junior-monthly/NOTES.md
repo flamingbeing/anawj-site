@@ -197,3 +197,17 @@ and a month with no sheet use the current grade (`staff[].group`), which still m
 (the review's ticks); an unticked move stays in People but the month still shows what its sheet said. Someone listed twice
 takes the grade of the row that is kept. Not done: a dated change in the middle of a month, and showing "from February" in
 People for a future month's sheet.
+
+## Header, tabs and Check (owner, 16 Oct 2026)
+
+- **Tabs:** Roster, Check, Day, a separator, then Postings, People, Rules, More (phones: Roster, Check, Day, Rules, More).
+  The header has no Help button any more (Help and shortcuts are under More › Help, and `?` opens the shortcuts); the Lock
+  button is a padlock icon; Auto-fill reads "Fill" (its name read out is still "Auto-fill"). From tablet width up the header
+  stays on one row: the app name shrinks first.
+- **Check shows what Fill places.** "Things to improve" lists only preferences that bear on the codes Fill places (C3, R1B): a
+  cell it names holds one of them, or its rule is about them. Must-fix problems always show. A switch ("Only C3, R1B"), on by
+  default, brings the rest back (`ui-check.js` `relevanceOf`). A list of every call reads "any call" in messages.
+- **Sideways scrolling with a mouse:** week buttons in the roster toolbar, the wheel over the dates, dragging the dates, and
+  a visible scrollbar.
+- **Equal calls matter more:** the cardiac and ICU fairness rules are weight 40 (were 10; an older saved roster still at 10 is
+  raised once, `rulesVersion` 7).
