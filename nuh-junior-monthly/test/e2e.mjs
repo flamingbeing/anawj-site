@@ -153,6 +153,13 @@ const noSideScroll = async (page, label) => {
   ok(await page.getByText(/no calls until/).first().isVisible(), 'People shows who has no calls until a date');
   await go(page, '#rules');
   ok(await page.getByText('To confirm').first().isVisible(), 'predicted rules say To confirm');
+  const toConfirm = await page.getByText('To confirm', { exact: true }).count();
+  await page.getByRole('button', { name: /^Confirm:/ }).first().click();
+  await page.waitForTimeout(300);
+  ok(await page.getByText('To confirm', { exact: true }).count() === toConfirm - 1, 'Confirm takes the To confirm tag off one rule');
+  await page.locator('[data-k=confirm-all]').click();
+  await page.waitForTimeout(300);
+  ok(await page.getByText('To confirm', { exact: true }).count() === 0 && await page.locator('[data-k=confirm-all]').isHidden(), 'Confirm all takes every To confirm tag off');
   ok(await page.getByText('How the rules work, in order').isVisible() && await page.getByRole('heading', { name: /^Cardiac calls/ }).isVisible(), 'the Rules tab explains the order and groups rules by topic');
   await page.getByRole('button', { name: /R1 to R3 rules/ }).first().click();
   await page.waitForTimeout(300);

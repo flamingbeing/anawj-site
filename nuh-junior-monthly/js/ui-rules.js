@@ -18,7 +18,7 @@ const TOKEN_HELP = {
   x: 'The day after a call', PPC: 'Two days after an ICU call, while still in ICU', '@posting': 'Cardiac, ICU, pain, obstetrics…', '@any': 'Any code at all',
 };
 const KIND_LABEL = { shift: 'Calls and shifts', posting: 'Postings', leave: 'Leave', request: 'Requests', other: 'Other', derived: 'Worked out' };
-const LOG_WORDS = { add: 'Added', edit: 'Changed', delete: 'Deleted', enable: 'Turned on', disable: 'Turned off' };
+const LOG_WORDS = { add: 'Added', edit: 'Changed', delete: 'Deleted', enable: 'Turned on', disable: 'Turned off', confirm: 'Confirmed' };
 
 // Params shown only when they matter (a ParamSpec.showIf in rules.js, if one is ever added, wins).
 const SHOW_IF = {
@@ -79,6 +79,11 @@ const COMBO_TEMPLATES = [
 let nid = 0;
 const fid = p => `${p}-${++nid}`;
 
+
+// A rule marked "Predicted from the roster guide: confirm or change" carries a To confirm tag until the rosterer confirms it
+// (Confirm on the rule, or Confirm all). Confirming drops that sentence from the note; any other note text stays.
+export const isPredicted = r => /Predicted/.test((r && r.note) || '');
+export const confirmedNote = note => String(note || '').replace(/\s*Predicted[^.]*\.?/g, '').trim();
 
 // ---------- the rules, in plain words ----------
 // Rules are shown by topic (which calls they are about) or by strength. A rule's topic follows the duties it names.
@@ -143,7 +148,8 @@ export function mount(el, app) {
     options: [['topic', 'Topic'], ['strength', 'Strength']],
     onChange: v => { by = v; try { localStorage.setItem('nuhjm-rules-by', v); } catch (e) { /* kept for this visit only */ } renderList(); },
   });
-  const tools = h('div', { class: 'rv-tools' },
+  const confirmAll = h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': 'confirm-all', onclick: () => confirmRules((app.store.get().rules || []).filter(isPredicted).map(r => r.id)) });
+  const tools = h('div', { class: 'rv-tools' }, confirmAll,
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => openLog(), html: `${app.icon('list')}<span>Rules log</span>` }),
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => exportRules(), html: `${dlIcon()}<span>Export</span>` }),
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => importRules(), html: `${app.icon('upload')}<span>Import</span>` }));
@@ -158,6 +164,9 @@ export function mount(el, app) {
     const ev = app.evaluation();
     list.innerHTML = '';
     const rules = state.rules || [];
+    const nPred = rules.filter(isPredicted).length;
+    confirmAll.hidden = nPred < 2;
+    confirmAll.textContent = `Confirm all ${nPred} to-confirm rules`;
     const count = r => (r.enabled === false ? 0 : ((ev.byRule && ev.byRule.get(r.id)) || []).length);
     const shown = rules.filter(r => {
       const t = RULE_TYPES[r.type];
@@ -238,6 +247,7 @@ export function mount(el, app) {
       h('div', { class: 'rv-side' },
         countEl,
         h('div', { class: 'rv-acts' },
+          isPredicted(r) ? h('button', { type: 'button', class: 'btn btn-sm', onclick: () => confirmRules([r.id]), title: 'Take off the To confirm tag: this rule is right as it is', 'aria-label': `Confirm: ${title}` }, 'Confirm') : null,
           h('label', { class: 'switch rv-sw', title: off ? 'Turn on' : 'Turn off' }, sw, h('span', { class: 'sw-track' }), h('span', { class: 'sr-only' }, 'On')),
           h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => openBuilder(r), 'aria-label': `Edit: ${title}` }, 'Edit'),
           h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => duplicate(r), 'aria-label': `Duplicate (copy): ${title}` }, h('span', { class: 'rv-long' }, 'Duplicate'), h('span', { class: 'rv-short', 'aria-hidden': 'true' }, 'Copy')),
@@ -251,6 +261,21 @@ export function mount(el, app) {
     if (d.rulesLog.length > 200) d.rulesLog.splice(0, d.rulesLog.length - 200);
   }
   const undoAct = { label: 'Undo', fn: () => app.store.undo() };
+
+  function confirmRules(ids) {
+    let n = 0;
+    app.store.commit(ids.length > 1 ? 'Confirm the predicted rules' : 'Confirm rule', d => {
+      for (const id of ids) {
+        const r = d.rules.find(x => x.id === id);
+        if (!r || !isPredicted(r)) continue;
+        r.note = confirmedNote(r.note);
+        log(d, 'confirm', r);
+        n++;
+      }
+      if (!n) return false;
+    });
+    if (n) app.toast(n === 1 ? 'Confirmed' : `Confirmed ${n} rules`, { action: undoAct, ms: 4000 });
+  }
 
   function toggleRule(id, on) {
     app.store.commit(on ? 'Turn rule on' : 'Turn rule off', d => {
