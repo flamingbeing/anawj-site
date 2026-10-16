@@ -1,9 +1,9 @@
 # The merge checklist from AGENTS.md, run on every PR (and on main): the repo check, every unit test, the proof-read,
 # and the quick browser tests of the page editor, the feedback button, the hand pages and the NUH roster (Practice). The long browser suites
 # (logbook, prewarm, evals) stay with the session that changes those apps (AGENTS.md lists them).
-# On a PR, four browser suites run only when the PR changes their app (owner, 15 Oct 2026): BIS to DSA (bis-dsa/), OT simulator (ot-sim/),
+# On a PR, two browser suites run only when the PR changes their app (owner, 15 Oct 2026):
 # feedback button (feedback/ or worker/) and hand pages (hand-babies/ or edit/, since the hand test opens the editor). A PR that changes
-# this workflow, and every push to main, runs them all. The browser suites run side by side, one job each (the five BIS files too);
+# this workflow, and every push to main, runs them all. The browser suites run side by side, one job each;
 # the job named "browser" sums them up.
 name: Checks
 
@@ -32,10 +32,6 @@ jobs:
         run: node tools/check.mjs
       - name: Unit tests
         run: for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs ntf-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs nuh-junior-monthly/test/*.test.mjs; do echo "== $f"; node "$f" || exit 1; done
-      - name: BIS to DSA engine tuning
-        run: node bis-dsa/test/engine.check.mjs
-      - name: OT simulator model tests
-        run: for f in ot-sim/test/*.test.mjs; do echo "== $f"; node "$f" || exit 1; done
       - name: Proof-read (pages and documents)
         run: node tools/proofread.mjs
 
@@ -47,8 +43,6 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      bis: ${{ steps.ch.outputs.bis }}
-      ot: ${{ steps.ch.outputs.ot }}
       feedback: ${{ steps.ch.outputs.feedback }}
       hand: ${{ steps.ch.outputs.hand }}
     steps:
@@ -62,18 +56,16 @@ jobs:
         run: |
           # not a PR, or the file list can't be read: run everything
           if [ "$EVENT" != "pull_request" ] || ! files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename'); then
-            for k in bis ot feedback hand; do echo "$k=true" >> "$GITHUB_OUTPUT"; done; exit 0
+            for k in feedback hand; do echo "$k=true" >> "$GITHUB_OUTPUT"; done; exit 0
           fi
           all=false; echo "$files" | grep -qE '^\.github/workflows/checks\.yml$' && all=true
           has() { if [ "$all" = true ] || echo "$files" | grep -qE "$1"; then echo true; else echo false; fi; }
-          echo "bis=$(has '^bis-dsa/')" >> "$GITHUB_OUTPUT"
-          echo "ot=$(has '^ot-sim/')" >> "$GITHUB_OUTPUT"
           echo "feedback=$(has '^(feedback|worker)/')" >> "$GITHUB_OUTPUT"
           echo "hand=$(has '^(hand-babies|edit)/')" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
 
-  # the browser suites side by side, one job each (owner, 15 Oct 2026): a failure no longer stops the suites after it,
-  # and the five BIS files (about 8 minutes in a row) run in parallel. `run: always` means every PR.
+  # the browser suites side by side, one job each (owner, 15 Oct 2026): a failure no longer stops the suites after it.
+  # `run: always` means every PR.
   browser-suite:
     needs: changes
     runs-on: ubuntu-latest
@@ -85,15 +77,6 @@ jobs:
           - { name: page editor and Ask Claude, run: always, cmd: "node edit/test/e2e.mjs && node ask/test/e2e.mjs" }
           - { name: feedback button, run: feedback, cmd: "node feedback/test/e2e.mjs" }
           - { name: hand pages, run: hand, cmd: "node hand-babies/test/e2e.mjs" }
-          - { name: BIS Medtronic and Teaching (phone), run: bis, cmd: "BIS_SPLIT=1 BIS_VIEW=phone node bis-dsa/test/e2e.mjs" }
-          - { name: BIS Medtronic and Teaching (desktop), run: bis, cmd: "BIS_SPLIT=1 BIS_VIEW=desktop node bis-dsa/test/e2e.mjs" }
-          - { name: BIS Advance (phone), run: bis, cmd: "BIS_VIEW=phone node bis-dsa/test/adv.e2e.mjs" }
-          - { name: BIS Advance (desktop), run: bis, cmd: "BIS_VIEW=desktop node bis-dsa/test/adv.e2e.mjs" }
-          - { name: BIS SedLine (phone), run: bis, cmd: "BIS_VIEW=phone node bis-dsa/test/sed.e2e.mjs" }
-          - { name: BIS SedLine (desktop), run: bis, cmd: "BIS_VIEW=desktop node bis-dsa/test/sed.e2e.mjs" }
-          - { name: BIS IntelliVue, run: bis, cmd: "node bis-dsa/test/pv.e2e.mjs" }
-          - { name: BIS timeline, run: bis, cmd: "node bis-dsa/test/timeline.e2e.mjs" }
-          - { name: OT simulator, run: ot, cmd: "node ot-sim/test/e2e.mjs" }
           - { name: NUH roster, run: always, cmd: "node nuh-roster/test/e2e.mjs" }
           # speed budgets: timings vary, so perf fails only if a second run is over too
           - { name: NTF roster, run: always, cmd: "node ntf-roster/test/e2e.mjs && node ntf-roster/test/tour.e2e.mjs && (node ntf-roster/test/perf.e2e.mjs || node ntf-roster/test/perf.e2e.mjs)" }

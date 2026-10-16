@@ -25,6 +25,8 @@ Nothing agreed. Ideas for later are in `ROADMAP.md`; nothing there is a task unt
 
 ## Recently done
 
+- 16 Oct: the **BIS to DSA and OT simulators moved to anantf.com** (`/bis/`, `/ot/`; NTF-Anaesthesia/anantf-site #130,
+  with their own Checks). `anaes.anawj.com/bis/`, `/ot/` and `anawj.com/bis-dsa/`, `/ot-sim/` forward there.
 - #489, #555, #557, #558: **Ask Claude** at `ask.anawj.com` (owner only, behind Cloudflare Access; a request becomes a
   `Page edits:` issue that the instant workflow drafts); weekly AI proof-read routine; the page-edits workflow says on
   the issue or PR when it fails. Home computer (14 Oct): NAS uptime check of all 11 addresses, Monday drift check.
