@@ -636,7 +636,8 @@ portfolio content.
 - **Recover** (More; owner, 15 Oct 2026): one page for Needs attention (unsynced or clashing changes: Retry, Keep mine
   / Keep theirs), Recently deleted (the recycle bin, all devices), Unfinished drafts and Earlier versions (this device),
   each folded with a count. The bin is no longer in Settings; search "recycle" finds it here.
-- **Case box height** (this device): the grab bar under the box sets a kept height (`display().boxHeight`; double-tap
+- **Case box height** (this device): the grab bar under the box sets a kept height (`display().boxHeight`; the List
+  box, paste a list, has its own bar and `listHeight`, owner 16 Oct 2026; double-tap
   resets); Grow as I type (`boxGrow`, on by default) grows it to two thirds of the screen.
 - **Totals Compact** (this device, on by default): initials across the top (`analytics.js` shortNames; a tap names the
   person), short category names, a key under the table; Show targets at the bottom. Excel keeps full names.
@@ -681,7 +682,8 @@ portfolio content.
   (`display().lbGroup` / `lbSort`, unset = the defaults). The default looks exactly as before (Jump on each month);
   any other choice draws headings that fold (tap) and say how many cases, "(continued)" across a page, and "Select
   these N" while selecting. Pure grouping in `lb-group.js` (unit-tested); pages count the rows shown.
-- **Search** (log2 9e, first part): 🔍 in the header on every tab, or / on a computer (not while typing), opens
+- **Search** (log2 9e, first part): a line magnifier (`ic('search')`, never an emoji: it follows the theme; owner,
+  16 Oct 2026) in the header on every tab, or / on a computer (not while typing), opens
   `#search` (`ui-search.js`; the engine `global-search.js`, unit-tested). One box over cases (planned ones too),
   reflections and notes (loaded the first time Search opens; offline works on what is on the device). The Logbook's
   search language plus in:, status:, is:interesting / is:planned, has:reflection / has:note, no:tag, linked:yes / no,
@@ -690,7 +692,7 @@ portfolio content.
   Search); a case found links its reflection and notes. Chips (Cases / Reflections / Notes, Dates, Tag…, Drafts,
   Interesting) add or take out their operator in the box (after: / before: for dates) and light up from what is typed:
   the box is the one source. Saved searches are the Logbook's list (`settings.savedSearches`); one saved on Search has
-  `global: true` and a 🔍, and runs in Search when tapped on the Logbook. Select ticks results into bulk edit: one
+  `global: true` and the magnifier icon, and runs in Search when tapped on the Logbook. Select ticks results into bulk edit: one
   kind opens its own popup; several kinds share the date (`ui-bulk-mixed.js`), with Copy and Move to the bin.
 
 ## Data, roles and photos (`firestore.rules`)

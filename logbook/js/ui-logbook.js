@@ -277,7 +277,7 @@ export function renderLogbook() {
       if (x.scope) setOpts(x.scope, !!settings().lbFuzzy);
       const [f, t] = filters.querySelectorAll('input[type=date]'); if (f) f.value = view.from; if (t) t.value = view.to;
       filters.hidden = false; refresh();
-    } }, x.global ? '🔍 ' : ic('star'), x.name, h('span', { class: 'x', role: 'button', tabindex: '0', 'aria-label': 'Delete saved search', onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); e.target.click(); } }, onclick: async e => {
+    } }, x.global ? ic('search') : ic('star'), x.name, h('span', { class: 'x', role: 'button', tabindex: '0', 'aria-label': 'Delete saved search', onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); e.target.click(); } }, onclick: async e => {
       e.stopPropagation();
       if (!(await confirmBox('Delete saved search', `Delete “${x.name}”?`, 'Delete', true))) return;
       await patchLogbook({ settings: { savedSearches: (settings().savedSearches || []).filter(y => y.id !== x.id) } }); paintSaved();

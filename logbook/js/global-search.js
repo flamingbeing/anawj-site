@@ -1,4 +1,4 @@
-// Global search (🔍 in the header, or / on a computer; log2 9e): one box over cases (and planned ones), reflections and
+// Global search (the magnifier in the header, or / on a computer; log2 9e): one box over cases (and planned ones), reflections and
 // notes. The Logbook's search language (search-ops.js parseQuery: words, "phrases", -leave out, OR) plus:
 //
 //   in:cases | in:reflections | in:notes   only that kind          heading:lap      a reflection's heading
