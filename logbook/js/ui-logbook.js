@@ -24,9 +24,10 @@ import { labelsOn, parseParts, rowSegments, findLabel, takeHas } from './parts.j
 import { cloud, shows } from './ui-core.js';
 import { evalRequestUrl, evalsBase } from './eval-link.js';
 import { bulkEditDialog } from './ui-bulk.js';
+import { pagesOf, pageSize, clampPage, PAGE_SIZES } from './paging.js';
 
 // has: tags a case must all have; not: tags it must have none of ('c:16' or a personal tag key); from/to: dates
-const FRESH = () => ({ q: '', has: [], not: [], from: '', to: '', flag: '', mode: null, limit: 150, month: null, day: null });
+const FRESH = () => ({ q: '', has: [], not: [], from: '', to: '', flag: '', mode: null, page: 0, month: null, day: null });
 const view = FRESH();
 resetters.push(() => Object.assign(view, FRESH()));   // next user starts unfiltered
 // Select (List and the calendar's day list): press and hold a row, or the Select button; the bar at the bottom says
@@ -38,7 +39,7 @@ hooks.showDay = iso => { view.month = iso.slice(0, 7); view.day = iso; };
 // open the Logbook (List) on the cases behind a number in Analytics: a tag ('c:16' or a personal tag key) and/or a
 // date range. Other filters are cleared so the list matches the number tapped.
 hooks.showCases = ({ tag = null, from = '', to = '' } = {}) => {
-  Object.assign(view, { q: '', has: tag ? [tag] : [], not: [], from, to, flag: '', limit: 150, mode: 'list' });
+  Object.assign(view, { q: '', has: tag ? [tag] : [], not: [], from, to, flag: '', page: 0, mode: 'list' });
 };
 const hasTag = (c, k) => (k.startsWith('c:') ? (c.cats || []).includes(k.slice(2)) : (c.tags || []).includes(k));
 export const keyName = k => (k.startsWith('c:') ? catShort(k.slice(2)) : tagName(k));
@@ -174,7 +175,7 @@ export function renderLogbook() {
   };
   sel.paint = paintSel;
   const openBulk = () => bulkEditDialog(S.cases.filter(c => sel.ids.has(c.id)), { tags: tagChoices(), name: keyName, onDone: () => endSel() });
-  const paintSoon = debounce(() => { view.limit = 150; paint(); }, 150);
+  const paintSoon = debounce(() => { view.page = 0; paint(); }, 150);   // (a new search starts at page 1)
 
   const nFlag = f => S.cases.filter(c => flagsOf(c).includes(f)).length;
   // with Labelled parts on, one more for each label: "Has learning point (12)"
@@ -284,7 +285,7 @@ export function renderLogbook() {
     await patchLogbook({ settings: { savedSearches: [...list, x].slice(-20) } });
     paintSaved(); toast(`Saved “${name}”`);
   }
-  function refresh() { flagSel.value = view.flag; paintFilterBtn(); repaintFilters(); view.limit = 150; paint(); }
+  function refresh() { flagSel.value = view.flag; paintFilterBtn(); repaintFilters(); view.page = 0; paint(); }
   function active() { return !!(view.has.length || view.not.length || view.from || view.to || view.flag || (settings().lbScope || 'all') !== 'all' || settings().lbFuzzy || settings().lbCase); }
   const filterBtn = h('button', { class: 'small ib', title: 'Filter', 'aria-expanded': String(!filters.hidden), onclick: () => {
     const open = filters.hidden; view.showFilters = open; reveal(filters, open); filterBtn.setAttribute('aria-expanded', String(open));
@@ -332,7 +333,7 @@ export function renderLogbook() {
   return wrap;
 
   function setMode(m) {
-    view.mode = m; view.limit = 150; paint();
+    view.mode = m; view.page = 0; paint();
     wrap.querySelectorAll('.seg button').forEach((b, i) => b.setAttribute('aria-pressed', String(modes()[i][0] === m)));
     if (settings().logbookView !== m) patchLogbook({ settings: { logbookView: m } });  // remembered per user
   }
@@ -355,16 +356,37 @@ function listView(rows, flagsOf, repaint) {
   if (!S.cases.length) return emptyState('logbook', 'No cases yet', 'Cases you log show here, newest first.', h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
   if (!rows.length) return emptyState('search', 'No cases match', 'Try fewer words, or clear the filters.');
   const ul = h('ul', { class: 'cases' });
+  const pg = pager(rows, repaint);
   let month = '';
-  for (const c of rows.slice(0, view.limit)) {
+  for (const c of pg.rows) {
     const m = c.date ? fmtDate(c.date).replace(/^\d+ /, '') : 'No date';
     if (m !== month) { month = m; add(ul, monthHead(m, ul)); }
     add(ul, caseRow(c, flagsOf));
   }
-  const more = rows.length > view.limit
-    ? h('div', { class: 'bar', style: 'justify-content:center;margin-top:12px' }, h('button', { onclick: () => { view.limit += 300; repaint(); } }, `Show more (${rows.length - view.limit} left)`))
-    : null;
-  return h('div', {}, ul, more);
+  return h('div', {}, pg.bar(), ul, pg.bar(true));
+}
+
+// Pages (log2 11; owner, 15 Oct 2026): 100 cases a page by default (25 / 50 / 100 / 300 / All, this device);
+// "‹ Page 2 of 14 ›" with a list of the pages and their dates to jump to. A new search or filter starts at page 1.
+// -> { rows (this page's), bar(bottom) }
+function pager(rows, repaint) {
+  const size = pageSize(display().pageSize), pages = pagesOf(rows, size);
+  view.page = clampPage(view.page, pages.length);
+  const cur = pages[view.page];
+  const go = i => { view.page = clampPage(i, pages.length); repaint(); window.scrollTo({ top: 0 }); };
+  const span = pg => (pg.from && pg.to ? (pg.from === pg.to ? fmtDate(pg.from) : `${fmtDate(pg.from)} – ${fmtDate(pg.to)}`) : 'No date');
+  const bar = (bottom = false) => {
+    if (pages.length <= 1 && (bottom || rows.length <= PAGE_SIZES[0])) return null;
+    return h('div', { class: 'bar lb-pager' + (bottom ? ' bottom' : '') },
+      pages.length > 1 ? h('button', { class: 'small icon-btn', 'aria-label': 'Previous page', disabled: view.page === 0, onclick: () => go(view.page - 1) }, '‹') : null,
+      pages.length > 1 ? h('select', { class: 'lb-pagesel', 'aria-label': 'Page', onchange: e => go(Number(e.target.value)) },
+        pages.map((pg, i) => h('option', { value: String(i), selected: i === view.page }, `Page ${i + 1} of ${pages.length} · ${span(pg)}`))) : null,
+      pages.length > 1 ? h('button', { class: 'small icon-btn', 'aria-label': 'Next page', disabled: view.page >= pages.length - 1, onclick: () => go(view.page + 1) }, '›') : null,
+      bottom ? null : h('span', { class: 'grow' }),
+      bottom ? null : h('select', { class: 'lb-pagesize', 'aria-label': 'Cases per page', onchange: e => { setDisplay({ pageSize: Number(e.target.value) === 100 ? null : Number(e.target.value) }); view.page = 0; repaint(); } },
+        PAGE_SIZES.map(n => h('option', { value: String(n), selected: n === size }, n ? `${n} per page` : 'All on one page'))));
+  };
+  return { rows: rows.slice(cur.start, cur.end), bar };
 }
 
 // One case: date, details, procedure tags, flags. Tap to edit. Shared by the list and the calendar.
@@ -615,7 +637,8 @@ function gridView(rows, repaint) {
   const fitAll = () => tbody.querySelectorAll('textarea.g-details').forEach(fitCell);
   const fitCell = ta => { if (lines !== 'fit') return; ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
   const tbody = h('tbody');
-  for (const c of rows.slice(0, view.limit)) {
+  const pg = pager(rows, repaint);
+  for (const c of pg.rows) {
     const p = caseParts(c);
     // dates come from a date picker and categories from the case's edit dialog: nothing free-text gets in
     const row = { date: c.date || '', initials: p.initials, details: p.details };
@@ -672,14 +695,14 @@ function gridView(rows, repaint) {
   add(table, h('thead', {}, head), tbody);
   const linesSel = h('select', { 'aria-label': 'Lines per row', onchange: e => { setDisplay({ gridLines: e.target.value === '1' ? null : e.target.value }); repaint(); } },
     LINE_OPTS.map(([v, t]) => h('option', { value: v, selected: lines === v }, t)));
-  const more = rows.length > view.limit ? h('button', { onclick: () => { view.limit += 300; repaint(); } }, `Show more (${rows.length - view.limit} left)`) : null;
   requestAnimationFrame(fitAll);
   return h('div', {},
     h('p', { class: 'hint help' }, 'Edit the date, initials and details directly; changes save when you leave a cell. Tap the tags to change them. Drag a heading’s edge to resize a column (double-tap it to reset).'),
     h('div', { class: 'bar grid-opts' }, h('label', { class: 'refl-view' }, h('span', { class: 'hint' }, 'Lines per row '), linesSel),
       Object.keys(widths).length ? h('button', { class: 'small linkish', onclick: () => { setDisplay({ gridCols: null }); repaint(); } }, 'Reset column widths') : null),
+    pg.bar(),
     h('div', { class: 'scroll' }, table),
-    more,
+    pg.bar(true),
     pasteRows());
 }
 
