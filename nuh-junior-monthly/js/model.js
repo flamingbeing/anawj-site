@@ -135,7 +135,9 @@ export const DEFAULT_RULES = [
   R('r-r1b-gap', 'sequence', 'No ICU call on post call or the day off', { ifCodes: ['R1B'], thenCodes: ['R1B'], mode: 'forbid', from: 1, to: 2 }),
   R('r-r1b-gap4', 'sequence', 'An ICU day between the day off and the next call', { ifCodes: ['R1B'], thenCodes: ['R1B'], mode: 'forbid', from: 3, to: 3 }, soft(15)),
   R('r-r1b-d1', 'postingStart', 'No ICU call on day 1 in ICU', { codes: ['R1B'], posting: 'ICU', days: 1 }),
-  R('r-r1b-new', 'postingStart', 'New to ICU: calls from day 4', { codes: ['R1B'], posting: 'ICU', days: 3 }, { who: { tags: ['icunew'] } }),
+  // strict only for non-anaesthesia residents (rotating residents) and MOPEXes; anaesthesia residents new to ICU: a preference (owner, 16 Oct 2026)
+  R('r-r1b-new', 'postingStart', 'New to ICU: calls from day 4 (rotating residents, MOPEX)', { codes: ['R1B'], posting: 'ICU', days: 3 }, { who: { tags: ['icunew'], onlyGroups: ['rr', 'mopex'] } }),
+  R('r-r1b-new-res', 'postingStart', 'New to ICU: calls from day 4 (anaesthesia residents)', { codes: ['R1B'], posting: 'ICU', days: 3 }, soft(30, { who: { tags: ['icunew'], onlyGroups: ['r', 'res3', 'res2', 'res1', 'nhg', 'rp', 'loc', 'fellow'] } })),
   R('r-r1b-rr', 'postingStart', 'Ortho / HRM residents: ICU calls from day 8', { codes: ['R1B'], posting: 'ICU', days: 7 }, soft(40, { who: { tags: ['rrlate'] }, note: 'SICU rules: day 4 or 5 when manpower is short, never a weekend first call.' })),
   R('r-r1b-super', 'limit', 'Supernumerary: no ICU calls', { codes: ['R1B'], period: 'month', window: 7, min: null, max: 0, fte: false, prorate: false }, { who: { tags: ['supernum'] } }),
   R('r-r1b-fellow', 'limit', 'Fellows: at most 2 weekend ICU calls a month', { codes: ['R1B'], period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(30, { who: { groups: ['fellow'] }, when: { days: [0, 6] } })),
@@ -146,8 +148,9 @@ export const DEFAULT_RULES = [
   R('r-postcall', 'sameDay', 'Post call is a day off', { codesA: ['x', 'PC', 'PPC'], codesB: ['@shift'], mode: 'forbid' }),
   R('r-notroster', 'sameDay', 'No calls when not on the roster (Z)', { codesA: ['Z'], codesB: ['@shift'], mode: 'forbid' }),
   R('r-preleave', 'sequence', 'No post call into leave', { ifCodes: CALLS, thenCodes: ['@leave'], mode: 'forbid', from: 1, to: 1 }, soft(50, { note: PREDICTED })),
-  R('r-req-x', 'requests', 'No call when asked (X)', { request: 'X', codes: CALLS, mode: 'avoid', span: 'day' }),
-  R('r-req-xx', 'requests', 'No call when blocked by the planner', { request: 'XX', codes: CALLS, mode: 'avoid', span: 'day' }),
+  // call requests and blocks are softer than the rules above: kept when there is room, given up first when a night would be empty (owner, 16 Oct 2026)
+  R('r-req-x', 'requests', 'No call when asked (X)', { request: 'X', codes: CALLS, mode: 'avoid', span: 'day' }, soft(60)),
+  R('r-req-xx', 'requests', 'No call when blocked by the planner', { request: 'XX', codes: CALLS, mode: 'avoid', span: 'day' }, soft(80)),
   R('r-req-r', 'requests', 'Call when asked (R)', { request: 'R', codes: CALLS, mode: 'want', span: 'day' }, soft(10)),
   R('r-req-np', 'requests', 'No premed when asked (NP)', { request: 'NP', codes: ['P', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6'], mode: 'avoid', span: 'day' }, soft(30)),
   R('r-sat2', 'limit', 'At most 2 Saturday calls a month', { codes: CALLS, period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(20, { when: { days: [6] }, note: PREDICTED })),
@@ -221,6 +224,20 @@ export function cleanRule(r) {
     when: { from: '', to: '', holidays: 'any', ...when, days: looseList(when.days).map(Number).filter(x => Number.isInteger(x) && x >= 0 && x <= 6) },
   };
 }
+// One-time updates to rules that were already saved (the owner's rulings of 16 Oct 2026): requests and blocks become
+// preferences, "new to ICU" is strict only for rotating residents and MOPEXes. Only a rule still in its old form changes.
+function updateRules(s) {
+  if ((s.rulesVersion || 1) >= 2) return;
+  s.rulesVersion = 2;
+  const find = id => s.rules.find(r => r.id === id);
+  for (const [id, w] of [['r-req-x', 60], ['r-req-xx', 80]]) { const r = find(id); if (r && r.hard) { r.hard = false; r.weight = w; } }
+  const n = find('r-r1b-new');
+  if (n && !(n.who && n.who.onlyGroups) && n.who && n.who.tags.length === 1 && n.who.tags[0] === 'icunew' && !n.who.groups.length) {
+    n.who.onlyGroups = ['rr', 'mopex'];
+    n.name = 'New to ICU: calls from day 4 (rotating residents, MOPEX)';
+    if (!find('r-r1b-new-res')) s.rules.push(cleanRule(clone(DEFAULT_RULES.find(r => r.id === 'r-r1b-new-res'))));
+  }
+}
 export function migrate(s) {
   if (!isObj(s)) return defaultState();
   s.v = 1;
@@ -249,6 +266,7 @@ export function migrate(s) {
   }));
   if (!Array.isArray(s.rules)) s.rules = clone(DEFAULT_RULES);
   s.rules = s.rules.filter(r => isObj(r) && typeof r.type === 'string').map(cleanRule);
+  updateRules(s);
   if (!Array.isArray(s.rulesLog)) s.rulesLog = [];
   s.rulesLog = s.rulesLog.filter(isObj);
   if (s.rulesLog.length > 200) s.rulesLog = s.rulesLog.slice(-200);

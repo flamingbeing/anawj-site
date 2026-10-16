@@ -72,6 +72,15 @@ break them often); fair shares weight 10, counting echo/perfusion weeks as cardi
 under leave and blank days inside a posting and across the month boundary; someone listed twice keeps the row with
 their roster; copy-back never writes a posting the sheet didn't show, and leave beats PC.
 
+**Owner's rulings, 16 Oct 2026** (the order of what gives way): (1) a night with nobody on cardiac or ICU call is never
+acceptable; (2) post call as a day off (and the ICU day off after it) is a must-hold that is never waived; (3) call
+requests (X) and planner blocks (XX) are preferences (weights 60 and 80), kept when there is room and given up first when
+a night would otherwise be empty; (4) "new to ICU: calls from day 4" is a must-hold only for rotating residents and
+MOPEXes (rule `r-r1b-new`, `who.onlyGroups`: the person must be in one of those groups and also match the tags); for
+anaesthesia residents it is a preference (`r-r1b-new-res`, weight 30). Saved states from before get this once
+(`rulesVersion` 2 in `model.js`). Still to build: when nobody is eligible, Auto-fill should name the least-bad person
+(the one breaking only preferences) instead of leaving the night empty; waits on what an "EOD call" is.
+
 How to add a rule type: as in `ntf-roster/NOTES.md` ("How to add a new rule type"); the engine is the same file.
 
 ## Tests
