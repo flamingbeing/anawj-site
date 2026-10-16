@@ -58,3 +58,24 @@ const s = snippet(long, ['airway']);
 assert.ok(s[0][0].startsWith('…'), 'cut at the front'); assert.ok(s.some(([t, on]) => on && t === 'airway'));
 assert.deepEqual(snippet('', ['x']), []);
 console.log('global-search: ok');
+
+// dates, and the chips' helpers
+{
+  const { hasOp, opValue, setOp, toggleOp } = await import('../js/global-search.js');
+  assert.deepEqual(ids(search(idx, 'lap after:2026-10-01')), ['c1', 'n1', 'r1']);
+  assert.deepEqual(ids(search(idx, 'lap before:2026-09')), ['c3']);
+  assert.equal(hasOp('lap in:notes', 'in', 'notes'), true);
+  assert.equal(hasOp('lap -in:notes', 'in', 'notes'), false, 'left out is not on');
+  assert.equal(hasOp('lap in:notes', 'in'), true);
+  assert.equal(opValue('x tag:"general surgery" y', 'tag'), 'general surgery');
+  assert.equal(setOp('lap in:notes', 'in', 'cases'), 'lap in:cases');
+  assert.equal(setOp('lap in:notes', 'in', ''), 'lap');
+  assert.equal(setOp('lap', 'tag', 'general surgery'), 'lap tag:"general surgery"');
+  assert.equal(toggleOp('lap in:notes', 'in', 'notes'), 'lap');
+  assert.equal(toggleOp('lap', 'is', 'interesting'), 'lap is:interesting');
+  console.log('global-search chips: ok');
+}
+{
+  const { setOp } = await import('../js/global-search.js');
+  assert.equal(setOp('lap tag:"general surgery"', 'tag', 'ent'), 'lap tag:ent', 'a quoted value goes whole');
+}

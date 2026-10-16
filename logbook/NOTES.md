@@ -641,8 +641,11 @@ portfolio content.
   search language plus in:, status:, is:interesting / is:planned, has:reflection / has:note, no:tag, linked:yes / no,
   heading:, tag:, diagnosis:; ⓘ lists them and a tap adds one. Results grouped by kind with counts, Best match or
   Newest, the words marked; a tap opens the case (edit page), the reflection (editor) or the note (Done comes back to
-  Search); a case found links its reflection and notes. Still to do (second part): filter chips kept in step with the
-  operators, saved searches shared with the Logbook, results into bulk select.
+  Search); a case found links its reflection and notes. Chips (Cases / Reflections / Notes, Dates, Tag…, Drafts,
+  Interesting) add or take out their operator in the box (after: / before: for dates) and light up from what is typed:
+  the box is the one source. Saved searches are the Logbook's list (`settings.savedSearches`); one saved on Search has
+  `global: true` and a 🔍, and runs in Search when tapped on the Logbook. Select ticks results into bulk edit: one
+  kind opens its own popup; several kinds share the date (`ui-bulk-mixed.js`), with Copy and Move to the bin.
 
 ## Data, roles and photos (`firestore.rules`)
 

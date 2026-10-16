@@ -43,6 +43,55 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('button', { name: 'Search operators' }).click();
   await p.locator('.gs-help code', { hasText: 'in:reflections' }).waitFor();
 
+  // chips: add or take out their operator, and light up from the box
+  await box().fill('fakesrch');
+  const chipBtn = name => p.locator('.gs-chips button', { hasText: new RegExp(`^${name}$`) });
+  await chipBtn('Notes').click();
+  assert.equal(await box().inputValue(), 'fakesrch in:notes');
+  assert.equal(await chipBtn('Notes').getAttribute('aria-pressed'), 'true');
+  await poll(async () => (await p.locator('.gs-group').count()) === 1, 'the chip filters');
+  await chipBtn('Notes').click();
+  assert.equal(await box().inputValue(), 'fakesrch');
+  await box().fill('fakesrch status:draft');
+  await poll(async () => (await chipBtn('Drafts').getAttribute('aria-pressed')) === 'true', 'typed operator lights the chip');
+  await box().fill('fakesrch');
+  await chipBtn('Dates').click();
+  await p.locator('.gs-dates input[type=date]').first().fill('2020-06-02');
+  await poll(async () => /after:2020-06-02/.test(await box().inputValue()), 'From adds after:');
+  await poll(async () => (await p.locator('.gs-group').count()) === 2, 'the case (1 June) drops out');
+  await box().fill('fakesrch');
+
+  // save it: it shows on the Logbook (🔍) and runs here from there
+  p.once('dialog', d => d.accept('Fake everywhere'));
+  await p.getByRole('button', { name: 'Save search' }).click();
+  await p.locator('.gs-saved .chip', { hasText: 'Fake everywhere' }).waitFor();
+  await p.evaluate(() => { location.hash = '#logbook'; });
+  await p.locator('.lb-saved .chip', { hasText: 'Fake everywhere' }).click();
+  await poll(async () => (await p.evaluate(() => location.hash)) === '#search' && (await box().inputValue()) === 'fakesrch', 'runs in Search');
+  await poll(async () => (await p.locator('.gs-group').count()) === 3, 'three groups again');
+
+  // select results of different kinds: Bulk edit shares the date
+  await p.locator('.gs-selbtn').click();
+  await p.locator('.sel-bar').getByRole('button', { name: /^Select all 3$/ }).click();
+  await p.locator('.sel-bar').getByRole('button', { name: 'Bulk edit…' }).click();
+  await p.locator('dialog[open] h2', { hasText: 'Bulk edit 3 items' }).waitFor();
+  await p.locator('dialog[open]').getByLabel('Date', { exact: true }).selectOption('set');
+  await p.locator('dialog[open]').getByLabel('New date').fill('2020-07-07');
+  await p.locator('dialog[open]').getByRole('button', { name: 'Review changes' }).click();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Save' }).click();
+  await poll(async () => /3 items updated/.test(await p.locator('#toast').innerText()), 'toast');
+  const dates = await p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); return [S.cases.find(c => c.id === 'fake-gs-case')?.date, S.reflections.find(r => r.id === 'fake-gs-refl')?.date, S.notes.find(n => n.id === 'fake-gs-note')?.date]; });
+  assert.deepEqual(dates, ['2020-07-07', '2020-07-07', '2020-07-07']);
+  await p.locator('#toast button', { hasText: 'Undo' }).click();
+  await poll(async () => (await p.evaluate(async () => (await import('./js/ui-core.js')).S.cases.find(c => c.id === 'fake-gs-case')?.date)) === '2020-06-01', 'undone');
+  // one kind: its own popup
+  await p.locator('.gs-selbtn').click();
+  await group('Notes').locator('.gs-item').first().click();
+  await p.locator('.sel-bar').getByRole('button', { name: 'Bulk edit…' }).click();
+  await p.locator('dialog[open] h2', { hasText: 'Bulk edit 1 note' }).waitFor();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Cancel' }).click();
+  await p.locator('.sel-bar').getByRole('button', { name: 'Done' }).click();
+
   // a tap opens: the case (its edit page), the note (back comes back here), the reflection
   await box().fill('fakesrch');
   await group('Cases').locator('.gs-item').first().click();

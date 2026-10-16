@@ -139,7 +139,7 @@ export function bulkEditDialog(cases, { tags = [], name = k => k, onDone = () =>
 const summary = c => [c.date ? fmtDate(c.date) : '', caseText(c).slice(0, 80), (c.cats || []).map(catShort).join(' '), c.reflectTag ? '☆' : ''].filter(Boolean).join(' · ');
 
 // Undo: each case back as it was, unless it has changed since the bulk edit (on this device or another)
-async function undo(pairs) {
+export async function undo(pairs) {
   const now = Date.now(), back = [];
   let moved = 0;
   for (const p of pairs) {

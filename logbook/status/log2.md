@@ -1,9 +1,9 @@
 # Now: Claude Code, Logbook 2 (log2)
 
 **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): the 15 Oct batch is merged (#651–#664). Owner said
-go on the next queue (15 Oct): #665 Logbook, #667 Notes and #669 Reflections Select and Bulk edit (9–9d) merged; **now building 9e Search, part 1**
-(the page, engine, operators, results); part 2 next (filter chips, saved searches, results into bulk select).
-Not started: 9e part 2, 10–14, Markdown.
+go on the next queue (15 Oct): #665 Logbook, #667 Notes and #669 Reflections Select and Bulk edit (9–9d) merged; #671 Search part 1 merged; **now building 9e part 2** (filter chips, saved searches shared with the Logbook, results
+into bulk select). Then 10–14 and Markdown, in order.
+Not started: 10–14, Markdown.
 Waiting on the owner: a real-phone check of sign-in (installed app and Firefox for Android).
 
 Agreed queue (one PR each, in order, once he says go):
@@ -87,7 +87,7 @@ Agreed queue (one PR each, in order, once he says go):
    Select none · Bulk edit… · Done"; the popup has Change (a row per field, each "Unchanged" until chosen) and Actions
    (export or share just these, merge (Notes), move to the bin); Review changes → warning → Save; the same popup on
    Logbook, Notes and Reflections.
-9e. **Part 1 built (Search PR: page, engine, operators, grouped results, tap opens; part 2 to do: chips, saved searches, bulk select).** **Global search** (owner): a 🔍 in the header on every tab (can also go on the bar; `/` on a computer). The Logbook
+9e. **Built (Search PRs: page, engine, operators, grouped results, tap opens; chips, saved searches, bulk select).** **Global search** (owner): a 🔍 in the header on every tab (can also go on the bar; `/` on a computer). The Logbook
    search language (search-ops.js) plus `in:cases|reflections|notes`, `heading:`, `status:draft|complete`,
    `is:interesting|planned`, `has:reflection|note`, `no:tag`, `linked:`; an ⓘ list of them; filter chips (type, dates,
    tags, status, Interesting) kept in step with the typed operators. Results grouped by type with counts, Best match or
