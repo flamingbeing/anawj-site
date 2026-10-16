@@ -129,19 +129,34 @@ export function planImport(state, grid, month) {
   return { month, people, unknown };
 }
 
+// The calls (shifts) found in the rows that will be imported, by code: Map code -> count. For the import review, so a missing
+// call is visible straight away.
+export function countCalls(state, plan) {
+  const dmap = M.dutyMap(state), upper = new Map([...dmap.keys()].map(c => [c.toUpperCase(), c]));
+  const out = new Map();
+  for (const row of plan.people) {
+    if (row.skip) continue;
+    for (const t of row.texts) for (const c of codesFromText(t, dmap, upper).a) if (dmap.get(c)?.kind === 'shift') out.set(c, (out.get(c) || 0) + 1);
+  }
+  return new Map([...out.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
+}
+
 // Apply a planned import (inside a store commit): add new people, replace this month's cells for everyone in the
 // sheet, remember the sheet layout and each cell's original text (for the copy back). Unknown codes are added as
 // kind "other" when addUnknown is true, else kept as cell notes.
-export function applyImport(draft, plan, grid, { addUnknown = true, tab = '' } = {}) {
+export function applyImport(draft, plan, grid, { addUnknown = true, tab = '', source = null } = {}) {
   const month = plan.month;
   const days = M.monthDays(month);
   if (addUnknown) for (const code of plan.unknown.keys()) if (!draft.duties.some(d => d.code.toUpperCase() === code.toUpperCase())) draft.duties.push(M.cleanDuty({ code, name: code, kind: 'other' }));
   const dmap = M.dutyMap(draft);
   const upper = new Map([...dmap.keys()].map(c => [c.toUpperCase(), c]));
-  const layout = { tab, headerRow: grid.headerRow, firstCol: grid.firstCol, nextCol: grid.nextCol, rows: {}, orig: {}, importedAt: new Date().toISOString() };
+  // source: { id, gid, title } when it was read straight from a Google Sheet; names: the name in each row as read (to check the rows haven't moved)
+  const layout = { tab, headerRow: grid.headerRow, firstCol: grid.firstCol, nextCol: grid.nextCol, rows: {}, orig: {}, names: {}, importedAt: new Date().toISOString() };
+  if (source) layout.source = { id: String(source.id), gid: source.gid == null ? null : String(source.gid), title: String(source.title || tab) };
   let added = 0, cells = 0;
   for (const row of plan.people) {
     layout.orig[row.row] = [...row.texts, row.next];
+    layout.names[row.row] = row.name;
     if (row.skip) continue;
     let id = row.match;
     if (!id) {
@@ -246,7 +261,7 @@ export function exportBlock(state, month) {
       const want = cellText(state, d, id);
       if (sameMeaning(state, was, want)) { out.push(was); return; }
       out.push(want);
-      changes.push({ cell: `${colName(lay.firstCol + k)}${r}`, name: person.name, date: d, from: was.trim(), to: want });
+      changes.push({ cell: `${colName(lay.firstCol + k)}${r}`, row: r, k, name: person.name, date: d, from: was.trim(), to: want });
     });
     // the 1st of next month: post call (or the day off) after a call on the last days
     const nextOrig = orig[days.length] || '';
@@ -263,11 +278,30 @@ export function exportBlock(state, month) {
       // the 1st-of-next-month cell holds a marker (Z) in some sheets: leave anything that isn't blank or a PC/PPC as it is
       const nextKeep = norm(nextOrig) !== '' && !/^(PC|PPC)$/i.test(norm(nextOrig));
       if (want && !nextKeep && norm(nextOrig).toUpperCase() !== want) nx = want;
-      if (nx !== nextOrig) changes.push({ cell: `${colName(lay.nextCol)}${r}`, name: person.name, date: nextDay, from: nextOrig.trim(), to: nx });
+      if (nx !== nextOrig) changes.push({ cell: `${colName(lay.nextCol)}${r}`, row: r, k: days.length, name: person.name, date: nextDay, from: nextOrig.trim(), to: nx });
     }
     out.push(nx);
     lines.push(out.join('\t'));
   }
   const range = `${colName(lay.firstCol)}${first}:${colName(lay.nextCol)}${last}`;
   return { tsv: lines.join('\n'), range, first, last, topLeft: `${colName(lay.firstCol)}${first}`, changes, tab: lay.tab };
+}
+
+// After the changes were written to the Google Sheet: the sheet now holds these texts, so they become the "as imported"
+// copy (the next copy back then shows only what changed since). Inside a store commit.
+export function markWritten(draft, month, changes) {
+  const lay = draft.sheets && draft.sheets[month];
+  if (!lay) return;
+  for (const c of changes) if (lay.orig[c.row]) lay.orig[c.row][c.k] = c.to;
+  // kept so the write can be undone: exactly which cells, what was there, what was written
+  lay.lastWrite = { at: new Date().toISOString(), changes: changes.map(c => ({ cell: c.cell, row: c.row, k: c.k, name: c.name, date: c.date, from: c.from, to: c.to })) };
+}
+// After an undo of that write: the cells put back are "as read" again; cells left alone (edited since) stay in the record.
+export function markUndone(draft, month, restored, skipped) {
+  const lay = draft.sheets && draft.sheets[month];
+  if (!lay || !lay.lastWrite) return;
+  const back = new Set(restored.map(c => c.cell));
+  for (const c of lay.lastWrite.changes) if (back.has(c.cell) && lay.orig[c.row]) lay.orig[c.row][c.k] = c.from;
+  const left = lay.lastWrite.changes.filter(c => !back.has(c.cell));
+  lay.lastWrite = left.length ? { ...lay.lastWrite, changes: left } : null;
 }

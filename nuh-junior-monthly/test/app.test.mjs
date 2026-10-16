@@ -6,6 +6,7 @@ import * as S from '../js/sheet.js';
 import { evaluate, describeRule } from '../js/rules.js';
 import { solve } from '../js/solver.js';
 import { demoState } from '../js/demo.js';
+import * as G from '../js/gsheets.js';
 
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
@@ -133,6 +134,7 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(M.effectiveCodes(s, days[6], icu.id).includes('PPC'), 'PPC worked out after import');
   const ex = S.exportBlock(s, MONTH);
   ok(ex.changes.length === 0, `nothing changed, nothing differs (${ex.changes.map(c => c.cell + ' ' + c.from + '>' + c.to).join(', ')})`);
+  ok([...S.countCalls(s, plan)].join(';') === 'C3,1;R1B,1', `the import review counts the calls it found (${[...S.countCalls(s, plan)].join(';')})`);
   ok(ex.topLeft === 'D7' && ex.range === 'D7:AI10', `pastes at D7 (${ex.range})`);
   ok(ex.tsv.split('\n')[3].split('\t')[9] === 'X/NP', 'an unchanged cell goes back as typed');
   // a call on the last day: the sheet's marker (Z) in the 1st-of-next-month cell is left as it is
@@ -147,6 +149,94 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   M.setCell(s, days[20], card.id, { a: [...c.a, 'C3'] });
   const ex2 = S.exportBlock(s, MONTH);
   ok(ex2.changes.length === 2 && ex2.changes[0].to === 'C3' && ex2.changes[1].to === 'PC', 'a new call and its post call');
+}
+// reading and writing the Google Sheet (a fake Sheets API in memory): check it is unchanged before writing, write only the changes, read back
+{
+  const head = ['S/N', 'Grade', 'Name', ...days.map((d, i) => String(i + 1)), '1-Jan'];
+  const wd = ['', '', '', ...days.map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][M.weekday(d)]), ''];
+  const row = (sn, g, name, f) => [String(sn), g, name, ...days.map((d, i) => f(i)), 'Z'];
+  const sheet = [['legend'], ['legend 2'], ['', '', '', 'DEPARTMENT OF ANAESTHESIA STAFF ROSTER'], ['Dept', '', '', '1 to 31 December 26'], wd, head,
+    row(1, 'RES2', 'Icu Example', () => 'ICU'),
+    row(2, 'NHG', 'Cardiac Example', () => 'C')];
+  const colIdx = L => [...L].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+  const puts = [];
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = decodeURIComponent(String(url));
+    const json = o => ({ ok: true, status: 200, json: async () => o });
+    if (/\/spreadsheets\/SHEETID\?fields/.test(u)) return json({ properties: { title: 'Test roster' }, sheets: [{ properties: { sheetId: 7, title: 'Request', gridProperties: { rowCount: 50, columnCount: 40 } } }] });
+    if (/values\/'Request'!A1:/.test(u)) return json({ values: sheet.map(r => r.slice()) });
+    if (/values:batchGet/.test(u)) return json({ valueRanges: [...u.matchAll(/ranges='Request'!([A-Z]+)(\d+)/g)].map(m => ({ values: [[(sheet[+m[2] - 1] || [])[colIdx(m[1])] ?? '']] })) });
+    if (/values:batchUpdate/.test(u)) {
+      const body = JSON.parse(opts.body);
+      if (body.valueInputOption !== 'RAW') throw new Error('values must be written RAW');
+      for (const d of body.data) { const m = d.range.match(/!([A-Z]+)(\d+)$/); sheet[+m[2] - 1][colIdx(m[1])] = d.values[0][0]; puts.push(m[1] + m[2]); }
+      return json({});
+    }
+    return { ok: false, status: 404, json: async () => ({ error: { message: 'no' } }) };
+  };
+  G.hooks.getToken = async () => 'test-token';
+  const p = G.parseSheetUrl('https://docs.google.com/spreadsheets/d/SHEETID_0123456789abcdefgh/edit?gid=7#gid=7');
+  ok(p && p.id.startsWith('SHEETID') && p.gid === '7' && !G.parseSheetUrl('not a link'), 'a Google Sheet link gives its id and tab');
+  const SID = 'SHEETID';
+  const info = await G.getTabs(SID);
+  const tab = G.chooseTab(info.tabs, null);
+  ok(tab.title === 'Request', 'the Request tab is chosen');
+  const grid = S.parseGrid(await G.readGrid(SID, tab));
+  const s = M.defaultState();
+  S.applyImport(s, S.planImport(s, grid, MONTH), grid, { tab: tab.title, source: { id: SID, gid: tab.gid, title: tab.title } });
+  const lay = s.sheets[MONTH];
+  ok((await G.checkUnchanged({ id: SID, gid: tab.gid }, lay, days.length)).ok, 'right after reading, the sheet is unchanged');
+  const card = s.staff.find(x => x.name === 'Cardiac Example');
+  M.setCell(s, days[20], card.id, { a: [...M.getCell(s, days[20], card.id).a, 'C3'] });
+  const ex = S.exportBlock(s, MONTH);
+  ok(ex.changes.length === 2 && ex.changes.every(c => c.row && c.k != null), 'a new call and its post call are the changes');
+  // somebody edits the sheet in between: nothing may be written, and the cell is named
+  sheet[7][3 + 4] = 'AL';
+  const bad = await G.checkUnchanged({ id: SID, gid: tab.gid }, lay, days.length);
+  ok(!bad.ok && bad.diffs.length === 1 && bad.diffs[0].now === 'AL' && bad.diffs[0].cell === 'H8', `an edit made since is found (${bad.diffs.map(d => d.cell).join(',')})`);
+  // a row moved: the names no longer match
+  sheet[7][3 + 4] = 'C';
+  const moved = sheet.splice(6, 1)[0]; sheet.push(moved);
+  ok(!(await G.checkUnchanged({ id: SID, gid: tab.gid }, lay, days.length)).ok, 'rows that moved are found');
+  sheet.pop(); sheet.splice(6, 0, moved);
+  ok((await G.checkUnchanged({ id: SID, gid: tab.gid }, lay, days.length)).ok, 'put back, the sheet is unchanged again');
+  const w = await G.writeChanges({ id: SID }, lay, ex.changes);
+  ok(w.verified && puts.length === 2 && sheet[7][3 + 20] === 'C3' && sheet[7][3 + 21] === 'PC', `only the 2 changed cells were written and read back (${puts.join(',')})`);
+  ok(sheet[6].every((v, i) => v === row(1, 'RES2', 'Icu Example', () => 'ICU')[i]), 'the other rows are exactly as they were');
+  s.sheets[MONTH].orig = JSON.parse(JSON.stringify(s.sheets[MONTH].orig));
+  S.markWritten(s, MONTH, ex.changes);
+  ok(S.exportBlock(s, MONTH).changes.length === 0, 'after writing, nothing differs from the sheet');
+  ok(s.sheets[MONTH].lastWrite.changes.length === 2, 'the write is recorded so it can be undone');
+  // undo: a cell somebody edited since is left alone, the other goes back
+  sheet[7][3 + 21] = 'AL';
+  const preview = await G.checkCells({ id: SID }, s.sheets[MONTH], s.sheets[MONTH].lastWrite.changes);
+  ok(preview.skipped.length === 1 && preview.skipped[0].cell === 'Y8', 'the undo preview names the cell changed since');
+  const u = await G.undoChanges({ id: SID }, s.sheets[MONTH], s.sheets[MONTH].lastWrite.changes);
+  ok(u.restored.length === 1 && u.skipped.length === 1 && sheet[7][3 + 20] === 'C' && sheet[7][3 + 21] === 'AL' && u.verified, 'undo puts back only what the app wrote and leaves the other edit');
+  S.markUndone(s, MONTH, u.restored, u.skipped);
+  ok(s.sheets[MONTH].lastWrite.changes.length === 1 && s.sheets[MONTH].orig[8][3 + 20] === 'C', 'the undone cell is "as read" again, the other stays in the record');
+  // a cell holding a formula is never overwritten
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, o) => (/FORMULA/.test(String(url)) ? { ok: true, status: 200, json: async () => ({ valueRanges: [{ values: [['=A1']] }] }) } : realFetch(url, o));
+  let refused = '';
+  try { await G.writeChanges({ id: SID }, s.sheets[MONTH], [{ cell: 'X8', row: 8, k: 20, from: 'C', to: 'C3' }]); } catch (e) { refused = e.message; }
+  globalThis.fetch = realFetch;
+  ok(/holds a formula/.test(refused), 'a cell holding a formula is not overwritten'); 
+}
+// locking a month: nothing in it can change until it is unlocked
+{
+  const mem = {};
+  globalThis.localStorage = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: k => { delete mem[k]; } };
+  const { createStore } = await import('../js/store.js');
+  const store = createStore({ demo: true, fallback: () => M.defaultState() });
+  store.commit('add', d => { d.staff.push({ id: 'z1', name: 'Z', group: 'res2', tags: [], fte: 1, active: true }); });
+  store.commit('lock', d => { M.setMonthLocked(d, MONTH, true); });
+  ok(M.isMonthLocked(store.get(), MONTH), 'the month is locked');
+  let told = null; store.onLocked = m => { told = m; };
+  ok(store.commit('edit', d => { M.setCell(d, days[2], 'z1', { a: ['ICU'] }); }) === false && told && told[0] === MONTH && !M.getCell(store.get(), days[2], 'z1'), 'a change to a locked month is refused');
+  ok(store.commit('edit next month', d => { M.setCell(d, M.addDays(days[days.length - 1], 2), 'z1', { a: ['ICU'] }); }) === true, 'another month can still change');
+  store.commit('unlock', d => { M.setMonthLocked(d, MONTH, false); });
+  ok(store.commit('edit', d => { M.setCell(d, days[2], 'z1', { a: ['ICU'] }); }) === true, 'unlocked, it changes again');
 }
 // import fixes found by the backtest: leave inside a posting keeps the posting; someone listed twice
 {

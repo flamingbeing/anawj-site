@@ -14,9 +14,9 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `ntf-roster/`: NTF (Ng Teng Fong) anaesthesia monthly duty roster: calls, PM shifts, leave and requests on one grid,
   rules the owner adds in the app (combination restrictions included), and auto-fill; at `ntfroster.anawj.com`. Start with
   `ntf-roster/NOTES.md` (department codes, data model, how to add a rule type), then `ntf-roster/SPEC.md`.
-- `nuh-junior-monthly/`: NUH junior monthly roster helper: reads the department's monthly Google Sheet (paste or .xlsx),
+- `nuh-junior-monthly/`: NUH junior monthly roster helper: reads the department's monthly Google Sheet (straight from Google, paste or .xlsx),
   plans postings by the week, fills cardiac (C3) and ICU (R1B) calls with rules the rosterer edits in the app (built on
-  the NTF roster), and gives back only the day cells to paste over the sheet; at `nuhjuniormonthly.anawj.com`. NUHS
+  the NTF roster), and gives back only the day cells (written to the sheet after a check that it hasn't changed, with an undo, or pasted); at `nuhjuniormonthly.anawj.com`. NUHS
   design. Start with `nuh-junior-monthly/NOTES.md`. Real sheets, names and analyses stay in `flamingbeing/life`.
 - `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template); served at `prewarmstudy.anawj.com`. Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
 - The BIS to DSA and OT simulators moved to the anantf site (`NTF-Anaesthesia/anantf-site`, `bis/` and `ot/`) on 16 Oct 2026,
