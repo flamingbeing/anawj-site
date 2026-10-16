@@ -456,15 +456,23 @@ td.c.pt.we, td.c.pt.hol { background-color: var(--pt); background-image: linear-
 .chip.ghost { background: #eef1f6; color: var(--ink); }
 .no-req .chip.rq { display: none; }
 
-/* marks: violation corner, note dot, lock */
-.vx { position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 9px 9px 0; border-color: transparent; pointer-events: none; }
-.vx.vh { border-right-color: var(--hard); }
-.vx.vs { border-right-color: var(--soft); }
+/* marks: a problem is a ring inside the cell (never the corner, which is for notes, as in Google Sheets), a note, the lock.
+   Must fix: a solid red ring with a soft inner glow. To improve: a thin dashed amber ring. The two differ in shape, not only in
+   colour; there is no animation; the glow stays inside the cell. */
+.vx { position: absolute; inset: 0; box-sizing: border-box; pointer-events: none; }
+.vx.vh { box-shadow: inset 0 0 0 2px var(--hard), inset 0 0 8px 2px rgba(198, 40, 40, .5); }
+.vx.vs { border: 1.5px dashed var(--soft); }
 /* a problem about the person's whole month (fair share, monthly minimum): a dot after the name */
 .vx-nm { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-left: 2px; }
 .vx-nm.vh { background: var(--hard); }
 .vx-nm.vs { background: var(--soft); }
-.nd { position: absolute; left: 3px; top: 3px; width: 5px; height: 5px; border-radius: 50%; background: #1f5f9e; pointer-events: none; }
+/* a note: the small orange corner, like a note in Google Sheets */
+.nd { position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 9px 9px 0; border-color: transparent #f4a300 transparent transparent; pointer-events: none; }
+@media (forced-colors: active) {
+  .vx.vh { box-shadow: none; border: 3px solid CanvasText; }
+  .vx.vs { border: 2px dashed CanvasText; }
+  .nd { border-right-color: Highlight; }
+}
 .lk {
   position: absolute; right: 2px; bottom: 2px; width: 9px; height: 9px; pointer-events: none; opacity: .75;
   background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='4' y='10' width='16' height='12' rx='2' fill='%23384456'/%3E%3Cpath d='M8 10V7a4 4 0 018 0v3' fill='none' stroke='%23384456' stroke-width='3'/%3E%3C/svg%3E");
@@ -571,7 +579,7 @@ td.c.pt.we, td.c.pt.hol { background-color: var(--pt); background-image: linear-
 .cd-chips { display: flex; flex-wrap: wrap; gap: 3px; }
 .cd-chips .chip { font-size: 11.5px; line-height: 18px; padding: 0 5px; }
 .cd-note { font-size: 11px; color: var(--muted); line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.cal-day .vx { border-width: 0 12px 12px 0; }
+.cal-day .nd { border-width: 0 12px 12px 0; }
 .cal-day .lk { width: 11px; height: 11px; right: 4px; bottom: 4px; }
 .ps-probs h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
 .plist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
