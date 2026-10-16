@@ -136,7 +136,8 @@ export const DEFAULT_RULES = [
   R('r-r1b-next', 'sequence', 'Post call falls inside the ICU posting', { ifCodes: ['R1B'], thenCodes: ['ICU'], mode: 'require', from: 1, to: 1 }, soft(40)),
   R('r-r1b-gap', 'sequence', 'No ICU call on the post call day', { ifCodes: ['R1B'], thenCodes: ['R1B'], mode: 'forbid', from: 1, to: 1 }),
   R('r-r1b-gap4', 'sequence', 'An ICU day between the day off and the next call', { ifCodes: ['R1B'], thenCodes: ['R1B'], mode: 'forbid', from: 3, to: 3 }, soft(15)),
-  R('r-r1b-d1', 'postingStart', 'No ICU call on day 1 in ICU', { codes: ['R1B'], posting: 'ICU', days: 1 }),
+  // a call on the first day of ICU is the last resort for covering a night (real rosters: 4 times in 2 years, at a rotation change)
+  R('r-r1b-d1', 'postingStart', 'No ICU call on day 1 in ICU: only to cover a night', { codes: ['R1B'], posting: 'ICU', days: 1 }, soft(400, { note: 'Used only when no one else can cover the night.' })),
   // strict only for non-anaesthesia residents (rotating residents) and MOPEXes; anaesthesia residents new to ICU: a preference (owner, 16 Oct 2026)
   R('r-r1b-new', 'postingStart', 'New to ICU: calls from day 4 (rotating residents, MOPEX)', { codes: ['R1B'], posting: 'ICU', days: 3 }, { who: { tags: ['icunew'], onlyGroups: ['rr', 'mopex'] } }),
   R('r-r1b-new-res', 'postingStart', 'New to ICU: calls from day 4 (anaesthesia residents)', { codes: ['R1B'], posting: 'ICU', days: 3 }, soft(30, { who: { tags: ['icunew'], onlyGroups: ['r', 'res3', 'res2', 'res1', 'nhg', 'rp', 'loc', 'fellow'] } })),
@@ -246,6 +247,8 @@ function updateRules(s) {
   const add = id => { if (!find(id)) s.rules.push(cleanRule(clone(DEFAULT_RULES.find(r => r.id === id)))); };
   const pc = find('r-postcall');
   if (pc && pc.params && Array.isArray(pc.params.codesA) && pc.params.codesA.includes('PPC')) { pc.params.codesA = pc.params.codesA.filter(c => c !== 'PPC'); add('r-ppc'); }
+  const d1 = find('r-r1b-d1');
+  if (d1 && d1.hard && d1.params && +d1.params.days === 1) { d1.hard = false; d1.weight = 400; d1.name = 'No ICU call on day 1 in ICU: only to cover a night'; }
   const g1 = find('r-r1b-gap');
   if (g1 && g1.params && +g1.params.from === 1 && +g1.params.to === 2) g1.params.to = 1;
   const g3 = find('r-c3-gap');
