@@ -126,7 +126,7 @@ Agreed queue (one PR each, in order, once he says go):
     ☆ Interesting, Plan for later) / None; Sort Newest / Oldest / Initials A–Z / Most tags. Headings fold with counts;
     per device. Pages count cases ("(continued)" on a split group); when selecting, a group heading selects the
     group (a case in several groups is selected once). After paging.
-15. **Markdown, one PR** (Copy / Share, Send to, Sync, the notes zip, all alike): Settings → Markdown → "Reflections in
+15. **Built in part (Markdown PR 1: day heading styles, date formats and file dates, previews). Still to do (Markdown PR 2): reflections and linked notes in the day's note (None / Link / Embed / Full text) and Sync writing the reflection notes.** **Markdown, one PR** (Copy / Share, Send to, Sync, the notes zip, all alike): Settings → Markdown → "Reflections in
     the day's note": None / Link / Embed (Obsidian `![[…]]`) / Full text (copied under its case); the same for linked
     notes. **Sync also writes the reflection notes** (a Reflections folder, same names and folders as the zip) so Link
     and Embed work in a synced vault. Where no reflection note can exist (Copy / Share, Send to apps other than

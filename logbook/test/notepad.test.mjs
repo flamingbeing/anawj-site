@@ -75,10 +75,10 @@ const day = notesOn(notes, '2026-10-12');
 assert.equal(noteMd(day[0]), '### First today\n- [ ] read about TIVA');
 assert.equal(notesMd(day), '### First today\n- [ ] read about TIVA\n\n### Second today\nremifentanil');
 const cases = [{ id: 'case1', date: '2026-10-12', initials: 'ZZ', details: '40M fake lap chole', cats: ['01'], createdAt: 1 }];
-assert.equal(mdDay('2026-10-12', cases, null, {}, day), '[[2026-10-12]]\n1. ZZ\n40M fake lap chole\n\n## Notes\n\n### First today\n- [ ] read about TIVA\n\n### Second today\nremifentanil');
-assert.equal(mdDay('2026-10-12', cases, null, {}, []), '[[2026-10-12]]\n1. ZZ\n40M fake lap chole');
+assert.equal(mdDay('2026-10-12', cases, null, {}, day), '2026-10-12\n1. ZZ\n40M fake lap chole\n\n## Notes\n\n### First today\n- [ ] read about TIVA\n\n### Second today\nremifentanil');
+assert.equal(mdDay('2026-10-12', cases, null, {}, []), '2026-10-12\n1. ZZ\n40M fake lap chole');
 assert.equal(mdDay('2026-10-12', cases, { dayHead: '## {{date}}\n{{notes}}' }, {}, day.slice(1)), '## 2026-10-12\n### Second today\nremifentanil\n1. ZZ\n40M fake lap chole');
-assert.equal(mdDay('2026-10-12', [], null, {}, day.slice(0, 1)), '[[2026-10-12]]\n\n## Notes\n\n### First today\n- [ ] read about TIVA');
+assert.equal(mdDay('2026-10-12', [], null, {}, day.slice(0, 1)), '2026-10-12\n\n## Notes\n\n### First today\n- [ ] read about TIVA');
 
 // the zip: dated notes in their day's note (a notes-only day too), undated ones in Notes.md
 const files = exportNotes({ cases, notes, m: { caseNotes: 'day' }, opts: { progress: false, reflections: false } });
