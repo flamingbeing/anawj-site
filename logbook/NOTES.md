@@ -635,6 +635,10 @@ portfolio content.
   others still need), portfolio export in / out, JR, date. Actions: Copy, Share, Send to (Markdown, as Settings →
   Markdown makes it), Move to the bin. Word export of just these is not built: the portfolio export takes the ticked
   ones (use Portfolio export: in / out).
+- **Grid as a spreadsheet** (log2 10): thin cell lines, inputs without boxes; drag a heading's right edge to resize a
+  column (`display().gridCols`, this device; ← → on the focused edge too; a double-tap resets it, "Reset column
+  widths" resets all); Lines per row 1 / 2 / 3 / Fit to text (`display().gridLines`; the summary is a textarea that
+  grows to its text with Fit).
 - **Search** (log2 9e, first part): 🔍 in the header on every tab, or / on a computer (not while typing), opens
   `#search` (`ui-search.js`; the engine `global-search.js`, unit-tested). One box over cases (planned ones too),
   reflections and notes (loaded the first time Search opens; offline works on what is on the device). The Logbook's

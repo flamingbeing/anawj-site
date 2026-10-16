@@ -1180,7 +1180,7 @@ async function run(label, ctxOpts) {
     await p.locator('table.grid td.cats button').first().click();
     await p.locator('dialog[open]').waitFor();
     await p.keyboard.press('Escape'); await nap(200);
-    const cell = p.locator('table.grid tbody tr').first().locator('td').nth(2).locator('input');
+    const cell = p.locator('table.grid tbody tr').first().locator('td').nth(2).locator('textarea');   // (the summary is a textarea: lines per row)
     const v = await cell.inputValue();
     await cell.fill(v + ' g');
     await cell.press('Tab');

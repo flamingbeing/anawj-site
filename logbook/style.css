@@ -1724,3 +1724,20 @@ ul.cases li.refl-under button { min-height: 32px; text-align: left; }
 .gsearch.selecting .gs-list > li { position: relative; padding-left: 40px; }
 .gsearch .gs-list > li .sel-box { position: absolute; left: 6px; top: 14px; width: 24px; height: 24px; min-height: 0; margin: 0; accent-color: var(--accent); }
 .gsearch .gs-list > li.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* The Grid as a spreadsheet (log2 10): thin lines, cells without boxes, resizable columns, 1–3 lines or Fit per row */
+table.grid.sheet { border-collapse: collapse; width: 100%; }
+table.grid.sheet.sized { table-layout: fixed; width: max-content; min-width: 100%; }
+table.grid.sheet th, table.grid.sheet td { border: 1px solid var(--edge, var(--line)); padding: 0; vertical-align: top; }
+table.grid.sheet th { position: relative; text-align: left; font-size: calc(13px * var(--fs, 1)); padding: 6px 26px 6px 8px; background: var(--row-alt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+table.grid.sheet input, table.grid.sheet textarea { border: 0; border-radius: 0; background: transparent; width: 100%; min-height: 36px; padding: 7px 8px; box-shadow: none; font: inherit; }
+table.grid.sheet td.date input { width: 100%; }
+table.grid.sheet td.ini input { width: 100%; }
+table.grid.sheet textarea { height: auto; min-height: 36px; resize: none; display: block; line-height: 1.35; overflow: hidden; }
+table.grid.sheet.fit textarea { overflow: hidden; }
+table.grid.sheet input:focus, table.grid.sheet textarea:focus { outline: 2px solid var(--focus, var(--accent)); outline-offset: -2px; }
+table.grid.sheet td.cats { padding: 4px 6px; }
+table.grid.sheet .grid-cats { border: 0; background: transparent; padding: 2px; min-height: 32px; width: 100%; display: flex; flex-wrap: wrap; justify-content: flex-start; text-align: left; }
+.col-grip { position: absolute; right: 0; top: 0; bottom: 0; width: 24px; cursor: col-resize; touch-action: none; z-index: 2; }
+.col-grip::after { content: ''; position: absolute; right: 2px; top: 20%; bottom: 20%; width: 2px; border-radius: 1px; background: var(--muted); opacity: .35; }
+.col-grip:hover::after, .col-grip:focus-visible::after { opacity: 1; background: var(--accent); }
+.grid-opts { gap: 10px; margin: 0 0 8px; }
