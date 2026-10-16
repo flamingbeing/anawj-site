@@ -42,6 +42,32 @@ missing was one obvious screen to keep them, and an easy way to add the yearly b
 - No rules change: everything here was already allowed for admins and PDs (`logbook/firestore.rules`).
 - No service worker (an online admin tool). `anawj.com/people/` redirects to `apmes.anawj.com/people/`.
 
+## Rotations (read-only; owner, 16 Oct 2026)
+
+People › Rotations shows the department's master block rotation sheet (an .xlsx downloaded from Google Sheets) as a week by
+week grid, a person's weeks per posting across the year tabs, and people per posting per week. Plan, decisions and who may
+see it: `STATUS.md`. The sheet's real details (names, the code key's answers) are in the owner's private notes.
+
+- `js/rotations.js`: the reader and the code key, free of page code (`test/rotations.test.mjs`). `js/rotations-ui.js`: the
+  screen. Everything happens in the browser; the file is not uploaded or saved, and the sheet is not changed. Only admins
+  and PDs can open People, so only they see it (faculty and juniors are turned away at the door).
+- ExcelJS is loaded from `../logbook/vendor/exceljs.min.js` (same host), not copied again.
+- The tab layout: row 1 a date in the first column of each month, row 2 a week label (`13-19`, `3*-9` star = a holiday, `31-6`
+  across a month; the first may carry a note in brackets, some a note before the range, so the last `d-d` in the label is
+  the range). Column A names and section labels (SR2 RESIDENTS … CA1 Residents, FELLOWS, MOPEX, External Residents);
+  names are repeated inside the grid, and for External Residents that repeated cell is where the person comes from (ED,
+  SIG, TTSH…). "TOTAL PROJECTED MANPOWER" ends the people. Weeks usually start on a Monday; one after a holiday or a
+  changeover starts midweek. Tabs before 2024-25 are not read (other layouts, notes in the week columns); a tab with fewer
+  than 40 weeks or many midweek starts is listed as not read.
+- Notation: a `-E` suffix is the elective version of a posting (not always at the base code's place); a `KIV` prefix means
+  provisional; a slash joins two codes in one week (the first counts in the totals; resolve each by hand). Case and a
+  trailing dot are forgiven for codes of four letters or more (`PART B`, `ICU.`), not for short ones (`C-e` is the echo
+  week, `C-E` an elective). A bare number in a week cell is a count, not a posting. Codes not in the key are listed under the grid.
+- The code key (`CODE_KEY`: institution, type, meaning) comes from the owner's answers to a "Rotation Code Key" page, with
+  names and hedges removed. Add a code there when the sheet gains one.
+- Not built yet (stage 1, part 2): link sheet names to people (by hand once, kept in the browser) and the hand-off of the
+  critical postings to NUH Junior Monthly, which pulls them (`nuh-junior-monthly/NOTES.md`, "Rotations from People").
+
 ## Linked from
 
 - Logbook → Admin → "People (logbook and evals)".

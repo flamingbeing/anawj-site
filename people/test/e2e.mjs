@@ -5,6 +5,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/li
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 
 const AXE = new URL('../../tools/vendor/axe.min.js', import.meta.url).pathname;
 const root = new URL('../../', import.meta.url).pathname;
@@ -145,6 +146,62 @@ await send.click();
 await closed;
 await page.getByText('On the roster, not on the list here').waitFor();   // the practice department's made-up names
 assert.match(await page.inputValue('#p-roster'), /^NUH Junior Monthly staff, roster month \d{4}-\d{2}/);
+
+// 6b. Rotations: the made-up sample (grid, colours, filters, a person's history, people per posting)
+await page.goto(BASE + 'people/?demo=admin#rotations');
+await page.getByRole('button', { name: 'Use a made-up sample' }).click();
+await page.locator('.rt-table').first().waitFor();
+assert.ok(await page.locator('.rt-name', { hasText: 'Kim Placeholder' }).count(), 'a person shows');
+const ntf = page.locator('td.rt-c', { hasText: 'NTFGH-JR' }).first();
+assert.match(await ntf.getAttribute('class'), /rt-i-NTF/);
+assert.match(await page.locator('td.rt-c', { hasText: 'KIV ICU' }).first().getAttribute('class'), /rt-prov/);
+assert.match(await page.locator('td.rt-c', { hasText: 'Mystery' }).first().getAttribute('class'), /rt-unk/);
+assert.match(await page.textContent('main'), /Not in the code key \(1\): Mystery/);
+assert.ok(await page.locator('.rt-origin', { hasText: 'ED' }).count(), 'an external resident shows where they come from');
+await page.selectOption('#rt-code', 'ICU');
+assert.ok(await page.locator('td.rt-hit').count() > 0 && await page.locator('td.rt-dim').count() > 0, 'a posting filter highlights');
+assert.equal(await page.locator('.rt-who', { hasText: 'Jo Fictional' }).count(), 0, 'people without it are left out');
+await page.selectOption('#rt-code', '');
+await page.fill('#rt-q', 'robin');
+assert.equal(await page.locator('.rt-who').count(), 1);
+await page.locator('.rt-who').click();
+await page.locator('dialog[open]').getByText('Liver', { exact: true }).waitFor();
+await axe('rotations dialog');
+await page.keyboard.press('Escape');
+await page.fill('#rt-q', '');
+await page.locator('.rt-man summary').click();
+assert.ok(await page.locator('.rt-man tbody tr').count() > 3);
+await axe('rotations'); await shot('6-rotations');
+
+// 6c. Rotations: an .xlsx opened from disk (dates as real dates, a note in the week label, tabs that aren't read)
+{
+  const ExcelJS = createRequire(import.meta.url)('../../logbook/vendor/exceljs.min.js');
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('27-28 Block');
+  const start = Date.UTC(2027, 6, 5);   // Monday 5 July 2027
+  const wk = i => new Date(start + i * 7 * 86400000);
+  ws.getRow(1).getCell(2).value = new Date(Date.UTC(2027, 6, 1));
+  for (let i = 0; i < 44; i++) {
+    const d = wk(i), e = new Date(d.getTime() + 6 * 86400000);
+    ws.getRow(2).getCell(2 + i).value = `${i === 0 ? '(changeover)\n' : ''}${d.getUTCDate()}-${e.getUTCDate()}`;
+    if (i && d.getUTCDate() <= 7) ws.getRow(1).getCell(2 + i).value = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+  }
+  ws.getRow(3).getCell(1).value = 'CA1 Residents';
+  const row = (r, name, f) => { ws.getRow(r).getCell(1).value = name; for (let i = 0; i < 44; i++) ws.getRow(r).getCell(2 + i).value = f(i); };
+  row(4, 'Uma Upload', i => (i < 20 ? 'OG1' : 'ICU'));
+  row(5, 'Vic Upload', i => (i % 10 === 0 ? 'KIV ICU' : 'GC'));
+  ws.getRow(6).getCell(1).value = 'TOTAL PROJECTED MANPOWER';
+  wb.addWorksheet('Old Block').getRow(1).getCell(1).value = 'not a grid';
+  wb.addWorksheet('Notes').getRow(1).getCell(1).value = 'ignored';
+  const buffer = Buffer.from(await wb.xlsx.writeBuffer());
+  await page.goto(BASE + 'people/?demo=admin#rotations');
+  await page.locator('#rt-file').setInputFiles({ name: 'blocks.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer });
+  await page.locator('.rt-who', { hasText: 'Uma Upload' }).waitFor();
+  assert.match(await page.textContent('main'), /blocks\.xlsx: 2 people, 44 weeks from 5\/7\/2027/);
+  assert.match(await page.textContent('main'), /Older tabs not read.*Old Block/);
+  assert.equal(await page.locator('td.rt-c', { hasText: 'OG1' }).count(), 20);
+  assert.equal(await page.locator('td.rt-prov').count(), 5);   // KIV ICU every tenth week: 0, 10, 20, 30, 40
+}
 
 // 7. PDs: the admin adds one
 await page.goto(BASE + 'people/?demo=admin#pds');

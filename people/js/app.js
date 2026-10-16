@@ -8,6 +8,7 @@
 import { S, h, fill, add, toast, cloud, icon, initials, modal, confirmBox, download, segment, empty, applyTheme, errText, hooks, avatar } from '../../evals/js/ui-core.js';
 import { residentsPane, facultyPane, applicationsPane, clearResidentsCache, pasteDialog, field, input, select, cleanEmail, validEmail, nextRid } from '../../evals/js/ui-admin.js';
 import { residentYear, todayISO } from '../../evals/js/engine.js';
+import { rotationsScreen } from './rotations-ui.js';
 import { parseIntake, yearIssues, yearCounts, peopleCSV, academicYear, parseRosterList, rosterChanges, itemPatch } from './batch.js';
 
 applyTheme();
@@ -18,8 +19,8 @@ const subEl = document.getElementById('sub');
 const backEl = document.getElementById('back');
 const meEl = document.getElementById('me');
 
-const TABS = [['residents', 'Residents'], ['faculty', 'Faculty'], ['pds', 'PDs'], ['applications', 'Applications']];
-const SCREENS = { residents: 'Residents', faculty: 'Faculty', pds: 'Programme directors', applications: 'Applications', intake: 'Add a new intake', check: 'Year check', roster: 'Import from the monthly roster' };
+const TABS = [['residents', 'Residents'], ['faculty', 'Faculty'], ['pds', 'PDs'], ['rotations', 'Rotations'], ['applications', 'Applications']];
+const SCREENS = { residents: 'Residents', faculty: 'Faculty', pds: 'Programme directors', applications: 'Applications', rotations: 'Rotations', intake: 'Add a new intake', check: 'Year check', roster: 'Import from the monthly roster' };
 const route = () => { const r = location.hash.replace(/^#\/?/, '').split('/')[0]; return SCREENS[r] ? r : 'residents'; };
 const err = e => errText(e);
 
@@ -405,7 +406,7 @@ async function render() {
   onRosterList = null;
   const pending = data.apps.filter(a => a.status === 'pending').length;
   const tabbed = TABS.some(([id]) => id === r);
-  const body = r === 'intake' ? intakeScreen() : r === 'check' ? checkScreen() : r === 'roster' ? rosterScreen() : r === 'faculty' ? facultyPane({ fac: data.fac, reload })
+  const body = r === 'intake' ? intakeScreen() : r === 'check' ? checkScreen() : r === 'roster' ? rosterScreen() : r === 'rotations' ? rotationsScreen({ demo: cloud.demo }) : r === 'faculty' ? facultyPane({ fac: data.fac, reload })
     : r === 'pds' ? pdsScreen() : r === 'applications' ? applicationsPane({ apps: data.apps, fac: data.fac, res: data.res, reload }) : residentsScreen();
   // the app kit's large title, then the segmented control for the four lists
   fill(app, h('div', { class: 'e-admin e-wide' },
