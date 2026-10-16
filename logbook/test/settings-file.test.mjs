@@ -41,6 +41,8 @@ const shaped = readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: 
 assert.deepEqual(shaped.settings.savedSearches, []);
 assert.equal(typeof shaped.settings.shareFormat.dayHead, 'string');
 assert.ok(Array.isArray(shaped.settings.excelExport.caseCols));
+// a search saved on the Search page keeps its global flag (it runs in Search from the Logbook)
+assert.equal(readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: { savedSearches: [{ name: 'Everywhere', q: 'lap in:notes', global: true }, { name: 'Logbook', q: 'x', global: 'yes' }] } })).settings.savedSearches.map(x => x.global).join(), 'true,');
 const ss = readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: { savedSearches: [null, 3, { name: 'Blocks', has: ['c:26', 5], q: 'block' }] } })).settings.savedSearches;
 assert.equal(ss.length, 1); assert.deepEqual(ss[0].has, ['c:26']); assert.equal(ss[0].q, 'block');
 assert.equal('rYear' in settingsFile({ settings: { rYear: 4, compact: true } }).settings, false);
