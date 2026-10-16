@@ -78,7 +78,7 @@ export function mount(el, app) {
       const skipped = plan.people.filter(p => p.skip);
       body.append(
         h('label', { class: 'bx-field' }, h('span', null, 'Month'), sel),
-        fits ? null : h('p', { class: 'warn' }, `This grid has ${grid.nDays} days starting on a ${grid.firstWd || '?'}: check the month.`),
+        ...(fits ? [] : [h('p', { class: 'warn' }, `This grid has ${grid.nDays} days starting on a ${grid.firstWd || '?'}: check the month.`)]),
         h('ul', { class: 'more-list' },
           h('li', null, `${ok.length} juniors: ${matched} already on People, ${ok.length - matched} new`),
           h('li', null, `${skipped.length} rows left alone (${[...new Set(skipped.map(p => p.grade || '?'))].join(', ')}: grades not on People › Groups)`),
@@ -114,7 +114,7 @@ export function mount(el, app) {
       h('ol', { class: 'more-steps' },
         h('li', null, 'Copy the cells (the button below).'),
         h('li', null, `In the sheet's ${ex.tab || 'Request'} tab, click cell `, h('strong', null, ex.topLeft), ' (day 1 of the first row).'),
-        h('li', null, 'Paste (Ctrl+V or Cmd+V). Only the day cells ', h('strong', null, ex.range), ' are covered: names, totals, colours and formulas stay.')),
+        h('li', null, 'Paste values only (Ctrl+Shift+V, or Cmd+Shift+V). Only the day cells ', h('strong', null, ex.range), ' are covered: names, totals, colours and formulas stay.')),
       h('div', { class: 'more-row' },
         btn('Copy cells for the sheet', async () => {
           try { await navigator.clipboard.writeText(ex.tsv); app.toast(`Copied ${ex.range}: paste it at ${ex.topLeft}`, { kind: 'ok' }); app.onboard && app.onboard('shared'); }

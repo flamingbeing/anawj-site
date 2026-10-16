@@ -80,6 +80,12 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(ex.changes.length === 0, `nothing changed, nothing differs (${ex.changes.map(c => c.cell + ' ' + c.from + '>' + c.to).join(', ')})`);
   ok(ex.topLeft === 'D7' && ex.range === 'D7:AI10', `pastes at D7 (${ex.range})`);
   ok(ex.tsv.split('\n')[3].split('\t')[9] === 'X/NP', 'an unchanged cell goes back as typed');
+  // a call on the last day: the sheet's marker (Z) in the 1st-of-next-month cell is left as it is
+  const cardLast = s.staff.find(p => p.name === 'Cardiac Example');
+  const lastC = M.getCell(s, days[days.length - 1], cardLast.id);
+  M.setCell(s, days[days.length - 1], cardLast.id, { a: [...lastC.a, 'C3'] });
+  ok(!S.exportBlock(s, MONTH).changes.some(c => c.date === M.addDays(days[days.length - 1], 1)), 'a Z in the next-month column is not overwritten');
+  M.setCell(s, days[days.length - 1], cardLast.id, { a: lastC.a });
   // place a cardiac call: the cell and the next day's PC change
   const card = s.staff.find(p => p.name === 'Cardiac Example');
   const c = M.getCell(s, days[20], card.id);
