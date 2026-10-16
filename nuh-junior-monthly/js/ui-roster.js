@@ -808,7 +808,7 @@ export function mount(el, app) {
       h('span', { class: 'rb-text', title: 'Enter leave and requests first, then let Fill draft the calls and PM shifts around them.' },
         h('strong', null, h('span', { class: 'rb-l' }, `No calls or shifts in ${M.fmtMonth(app.month)} yet. `), h('span', { class: 'rb-s' }, 'No calls yet')),
         h('span', { class: 'rb-more' }, 'Enter leave and requests first, then let Auto-fill draft the calls and PM shifts around them.')),
-      h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => openAutofill(app) }, h('span', { class: 'rb-l' }, 'Auto-fill this month'), h('span', { class: 'rb-s' }, 'Fill')));
+      h('button', { type: 'button', class: 'btn btn-primary btn-sm rb-act', onclick: () => openAutofill(app) }, h('span', { class: 'rb-l' }, 'Auto-fill this month'), h('span', { class: 'rb-s' }, 'Fill')));
   }
 
   // Bring a day's column into view (only scrolls when it is hidden behind the name column or off the right edge).

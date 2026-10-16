@@ -1087,7 +1087,7 @@ body.has-taskcard .sheet { max-height: calc(100vh - var(--task-h, 0px) - 64px); 
 #cloudbtn[data-state="newer"] { border-color: var(--blue, #178fd7); color: #0b5f94; }
 #cloudbtn .cl-dot { position: absolute; top: 3px; right: 3px; width: 9px; height: 9px; border-radius: 50%; background: #e57200; }
 #cloudbtn[data-state="newer"] .cl-dot { background: var(--blue, #178fd7); }
-body:not([data-tab="roster"]) #autofill { display: none; }
+body:not([data-tab="roster"]) #autofill, body.month-locked #autofill, body.month-locked .r-banner .rb-act { display: none; }   /* Fill only where it can work: the Roster tab, in a month that is not locked */
 @media (max-width: 720px) {
   #cloudbtn { min-height: 44px; padding: 0 8px; max-width: 120px; }
   #cloudbtn .cl-long { display: none; }
