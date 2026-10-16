@@ -374,8 +374,14 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(res.moved === 2 && group('up') === 'res2' && group('two') === 'res2', 'a new grade moves them to that group on Import');
   ok(group('kept') === 'res1', 'an unticked move stays where it was');
   ok(group('stay') === 'res1', 'listed twice: the row with the roster decides the grade');
-  ok(M.staffInMonth(s, '2027-07').filter(p => p.group === 'res2').map(p => p.name).join(', ') === 'Res Two First, Res Two Last, Year Up, Twice Moved',
-    'they go to the end of the new group, so the sheet order stays grouped');
+  // the sheet is the source of truth for grades: each month shows the grade its own sheet gave, whatever People holds now
+  ok(M.staffInMonth(s, '2027-07').filter(p => p.group === 'res2').map(p => p.name).join(', ') === 'Kept Back, Res Two First, Res Two Last, Year Up, Twice Moved',
+    'July shows the grades July\'s sheet gave (Kept Back too, though his move to the current grade was unticked)');
+  ok(M.staffInMonth(s, '2027-06').find(p => p.name === 'Year Up').group === 'res1' && M.staffInMonth(s, '2027-07').find(p => p.name === 'Year Up').group === 'res2',
+    'an older month keeps the grade it had');
+  ok(M.staffInMonth(s, '2027-08').find(p => p.name === 'Kept Back').group === 'res1', 'a month with no sheet uses the current grade');
+  const gradeInCtx = m => { const d = M.monthDays(m); return buildContext(s, { from: d[0], to: d[d.length - 1] }).people.find(p => p.id === 'up').group; };
+  ok(gradeInCtx('2027-06') === 'res1' && gradeInCtx('2027-07') === 'res2', 'the rules see each month\'s own grades (a rule about a group follows it)');
   ok(s.staff.map(p => p.id).join(',') === 'kept,stay,r2a,r2b,up,two,r1', `in the staff list too, right after the group's last person (${s.staff.map(p => p.id).join(',')})`);
   // an older month never moves anyone back
   const pOld = S.planImport(s, june, '2027-06');

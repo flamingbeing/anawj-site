@@ -185,6 +185,7 @@ export function applyImport(draft, plan, grid, { addUnknown = true, tab = '', so
   const layout = { tab, headerRow: grid.headerRow, firstCol: grid.firstCol, nextCol: grid.nextCol, rows: {}, orig: {}, names: {}, importedAt: new Date().toISOString() };
   if (source) layout.source = { id: String(source.id), gid: source.gid == null ? null : String(source.gid), title: String(source.title || tab) };
   let added = 0, cells = 0;
+  layout.grades = {};   // the grade (group) each person has in this month's sheet
   const inSheet = new Set();   // everyone the sheet lists, even a row left alone (someone listed twice)
   for (const row of plan.people) {
     layout.orig[row.row] = [...row.texts, row.next];
@@ -197,6 +198,7 @@ export function applyImport(draft, plan, grid, { addUnknown = true, tab = '', so
       added++;
     }
     layout.rows[row.row] = id;
+    layout.grades[id] = row.group;
     inSheet.add(id);
     // the sheet shows only the call (or PC / PPC) on a posting day: the posting underneath comes from the days around
     const parsedRow = row.texts.map(t => codesFromText(t, dmap, upper));

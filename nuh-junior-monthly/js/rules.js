@@ -26,7 +26,7 @@
 // ---------------------------------------------------------------------------------------------------------------
 
 import {
-  DEFAULT_RULES, dutyMap, addDays, monthDays, monthOf, fmtDay, fmtMonth, uid, isHoliday, getCell, TOKENS, notInSheet,
+  DEFAULT_RULES, dutyMap, addDays, monthDays, monthOf, fmtDay, fmtMonth, uid, isHoliday, getCell, TOKENS, notInSheet, personIn,
 } from './model.js';
 
 const NO_ABSENT = new Set();
@@ -66,7 +66,8 @@ export function buildContext(state, { from, to, rules }) {
   const days = [];
   for (let s = start; s <= end; s = addDays(s, 1)) days.push(s);
   const n = days.length;
-  const people = (state.staff || []).filter(p => p && p.active !== false);
+  // each person with the grade the month's imported sheet showed (model.js gradeIn): rules about groups follow it
+  const people = (state.staff || []).filter(p => p && p.active !== false).map(p => personIn(state, monthOf(from), p));
   const P = people.length;
   const ctx = {
     state, dm, days, n, people, P, from, to,
