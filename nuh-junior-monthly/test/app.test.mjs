@@ -134,6 +134,7 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   ok(M.effectiveCodes(s, days[6], icu.id).includes('PPC'), 'PPC worked out after import');
   const ex = S.exportBlock(s, MONTH);
   ok(ex.changes.length === 0, `nothing changed, nothing differs (${ex.changes.map(c => c.cell + ' ' + c.from + '>' + c.to).join(', ')})`);
+  ok([...S.countCalls(s, plan)].join(';') === 'C3,1;R1B,1', `the import review counts the calls it found (${[...S.countCalls(s, plan)].join(';')})`);
   ok(ex.topLeft === 'D7' && ex.range === 'D7:AI10', `pastes at D7 (${ex.range})`);
   ok(ex.tsv.split('\n')[3].split('\t')[9] === 'X/NP', 'an unchanged cell goes back as typed');
   // a call on the last day: the sheet's marker (Z) in the 1st-of-next-month cell is left as it is

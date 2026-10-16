@@ -129,6 +129,18 @@ export function planImport(state, grid, month) {
   return { month, people, unknown };
 }
 
+// The calls (shifts) found in the rows that will be imported, by code: Map code -> count. For the import review, so a missing
+// call is visible straight away.
+export function countCalls(state, plan) {
+  const dmap = M.dutyMap(state), upper = new Map([...dmap.keys()].map(c => [c.toUpperCase(), c]));
+  const out = new Map();
+  for (const row of plan.people) {
+    if (row.skip) continue;
+    for (const t of row.texts) for (const c of codesFromText(t, dmap, upper).a) if (dmap.get(c)?.kind === 'shift') out.set(c, (out.get(c) || 0) + 1);
+  }
+  return new Map([...out.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
+}
+
 // Apply a planned import (inside a store commit): add new people, replace this month's cells for everyone in the
 // sheet, remember the sheet layout and each cell's original text (for the copy back). Unknown codes are added as
 // kind "other" when addUnknown is true, else kept as cell notes.

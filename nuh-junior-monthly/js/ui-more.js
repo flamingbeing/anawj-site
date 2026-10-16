@@ -116,6 +116,7 @@ export function mount(el, app) {
           h('li', null, `${ok.length} juniors: ${matched} already on People, ${ok.length - matched} new`),
           h('li', null, `${skipped.length} rows left alone (${[...new Set(skipped.map(p => p.grade || '?'))].join(', ')}: grades not on People › Groups)`),
           h('li', null, `Rows ${plan.people[0]?.row}–${plan.people[plan.people.length - 1]?.row}, days in columns ${S.colName(grid.firstCol)} to ${S.colName(grid.nextCol - 1)}`),
+          (() => { const c = S.countCalls(store.get(), plan); return h('li', null, c.size ? `Calls found: ${[...c].map(([k, v]) => `${k} ${v}`).join(', ')}` : 'No calls found in the sheet yet'); })(),
           prevMissing(grid, month) ? h('li', { class: 'warn' }, `${M.fmtMonth(M.addMonths(month, -1))} isn't in the app yet, so everyone on ICU or cardiac looks like they start on day 1. Import last month's tab first, then this one.`) : null,
           plan.unknown.size ? h('li', null, `Codes the app didn't know (added as "other"): ${[...plan.unknown.keys()].join(', ')}`) : null),
         h('p', { class: 'muted' }, `${M.fmtMonth(month)} for these people is replaced by the sheet (Undo puts it back).`));

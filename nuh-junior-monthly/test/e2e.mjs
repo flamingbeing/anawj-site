@@ -130,6 +130,7 @@ const noSideScroll = async (page, label) => {
   await page.getByRole('button', { name: 'Read from Google' }).click();
   await page.waitForSelector('text=Import Google: Request');
   ok(await page.getByText('2 juniors').count() === 1, 'reading from Google finds the people');
+  ok(await page.getByText('Calls found: ').count() === 1 || await page.getByText('No calls found in the sheet yet').count() === 1, 'the import review says how many calls it found');
   await page.getByRole('button', { name: 'Import', exact: true }).click();
   await page.waitForTimeout(500);
   await axe(page, 'more with the Google Sheet buttons');
