@@ -10,7 +10,7 @@ import { REFLECTION_HEADINGS, REFLECTION_SECTIONS, yearName } from './categories
 import { reflectionProgress, reflectionCounts, HEADING_BY_ID, splitDetails, completeProblems, isLegacy, isFreeText, joinPoints, LIMITS, IMAGE_MAX_B64, IMAGE_MAX_SIDE, IMAGE_QUALITY, PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, imageKb, fmtMb, wordCount, MIN_WORDS, suggestHeadings, moveToHeading, inExport, exportSummary, pickJustEnough } from './reflections.js';
 export { completeProblems };
 import { fmtDate, caseText, procedureText, caseParts } from './engine.js';
-import { S, h, ic, emptyState, toast, cloud, writes, transients, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, displayName, byNewest, catName, updateCase, settings, patchLogbook, info, basicHides, REFLECTION_DRAFT_KEY } from './ui-core.js';
+import { S, h, fill, ic, emptyState, toast, cloud, writes, transients, debounce, hooks, rYear, effectiveIntake, residentSmo, todayISO, confirmBox, add, resetters, displayName, byNewest, catName, updateCase, settings, patchLogbook, info, basicHides, REFLECTION_DRAFT_KEY } from './ui-core.js';
 import { renderExportButton, caseRYear, countsByYear } from './portfolio.js';
 import { parseQuery, matchQuery, REFL_FIELDS, REFL_OPERATOR_HELP } from './search-ops.js';
 import { opsHelp } from './ui-logbook.js';
@@ -391,27 +391,33 @@ function list() {
     h('div', { class: 'bar refl-headbar' },
       h('h2', { style: 'margin:0' }, 'Reflections'),
       h('span', { class: 'refl-actions' },
-        h('button', { class: em ? 'primary' : '', 'aria-pressed': String(em), onclick: () => { rv.editMode = !em; rv.sel.clear(); hooks.render(); } }, em ? 'Done' : 'Edit'),
+        h('button', { class: em ? 'primary' : '', 'aria-pressed': String(em), title: em ? null : 'Select reflections to edit, export or move to the bin together, or drag them between headings', onclick: () => { rv.editMode = !em; rv.sel.clear(); hooks.render(); } }, em ? 'Done' : 'Select'),
         em ? null : h('button', { class: 'primary', title: 'New reflection', 'aria-label': 'New reflection', onclick: () => openPicker() }, '+ New'))),
     h('p', { class: 'hint', style: 'margin:6px 0 0' }, `${p.totals.counted} / ${p.totals.min} counted · ${p.totals.done} complete · ${p.totals.drafts} draft${p.totals.drafts === 1 ? '' : 's'}`),
     em ? null : readyLine(p),
     searchPart);
 
-  // edit-mode toolbar: select all / clear / complete / export in or out / delete selected
+  // selecting (the Select button, or press and hold a row): the bar at the bottom, as on the Logbook and Notes:
+  // N selected · Select all · Select none · Bulk edit… · Done (ui-bulk-refl.js); dragging between headings stays here
   const checks = [];
-  const delBtn = h('button', { class: 'danger', onclick: () => deleteSelected() });
-  const doneBtn = h('button', { class: 'primary', onclick: () => completeSelected() });
+  const found = () => (narrowed ? all.filter(match) : all).filter(r => r.id);
+  const selBar = em ? h('div', { class: 'sel-bar', role: 'region', 'aria-label': 'Selected reflections' }) : null;
   const paintSel = () => {
-    delBtn.textContent = `Delete selected (${rv.sel.size})`; delBtn.disabled = !rv.sel.size;
-    doneBtn.textContent = `Mark complete (${rv.sel.size})`; doneBtn.disabled = !rv.sel.size;
     for (const [cb, li, id] of checks) { cb.checked = rv.sel.has(id); li.classList.toggle('sel', cb.checked); }
+    if (!selBar) return;
+    const rows = found(), n = rv.sel.size;
+    fill(selBar,
+      h('span', { class: 'sel-n', 'aria-live': 'polite' }, `${n} selected`),
+      h('button', { class: 'small', disabled: !rows.length || rows.every(r => rv.sel.has(r.id)), onclick: () => { rows.forEach(r => rv.sel.add(r.id)); paintSel(); } }, rows.length === all.length ? `Select all ${rows.length}` : `Select all ${rows.length} found`),
+      h('button', { class: 'small', disabled: !n, onclick: () => { rv.sel.clear(); paintSel(); } }, 'Select none'),
+      h('span', { class: 'grow' }),
+      h('button', { class: 'small primary', disabled: !n, onclick: async () => {
+        const { reflBulkDialog } = await import('./ui-bulk-refl.js');
+        reflBulkDialog(all.filter(r => rv.sel.has(r.id)), { onDone: () => { rv.editMode = false; rv.sel.clear(); hooks.render(); } });
+      } }, 'Bulk edit…'),
+      h('button', { class: 'small', onclick: () => { rv.editMode = false; rv.sel.clear(); hooks.render(); } }, 'Done'));
   };
-  const toolbar = em ? h('section', { class: 'card refl-editbar' },
-    h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Drag ', h('span', { class: 'refl-handle-ico' }, '⠿'), ' onto another heading to move a reflection. Tick reflections to mark them complete or delete them.'),
-    h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px' },
-      h('button', { class: 'small', onclick: () => { all.forEach(r => r.id && rv.sel.add(r.id)); paintSel(); } }, 'Select all'),
-      h('button', { class: 'small', onclick: () => { rv.sel.clear(); paintSel(); } }, 'Clear'),
-      h('span', { class: 'grow' }), doneBtn, delBtn)) : null;
+  const toolbar = em && grp === 'heading' ? h('p', { class: 'hint help refl-draghint' }, 'Drag ', h('span', { class: 'refl-handle-ico' }, '⠿'), ' onto another heading to move a reflection.') : null;
 
   const row = (r, showHeading = false) => {
     const cb = em ? h('input', { type: 'checkbox', class: 'refl-cb', 'aria-label': `Select ${r.initials || 'reflection'} ${r.diagnosis || ''}`, onclick: e => e.stopPropagation(),
@@ -428,6 +434,7 @@ function list() {
         showHeading ? h('span', { class: 'muted refl-hd' }, labelOf(HEADING_BY_ID[r.headingId])) : null),
       pts.length ? h('div', { class: 'refl-points' }, ...pts.map((t, i) => h('div', {}, `${i + 1}. ${t}`))) : null);
     if (cb) checks.push([cb, li, r.id]);
+    else holdToSelect(li, () => { rv.editMode = true; rv.sel.clear(); rv.sel.add(r.id); hooks.render(); });
     return li;
   };
 
@@ -478,7 +485,7 @@ function list() {
     }
     if (!shown) add(body, narrowed ? emptyState('search', 'No reflections match') : emptyState('reflect', 'No reflections yet', 'Write one from a case: its details are filled in for you.'));
     if (em) paintSel();
-    return pinHead(head, h('div', {}, head, toolbar, body, foot));
+    return pinHead(head, h('div', {}, head, toolbar, body, foot, selBar));
   }
   for (const hp of p.headings) {
     const items = sorted(all.filter(r => r.headingId === hp.id));
@@ -522,7 +529,7 @@ function list() {
   if (narrowed && !shown) add(body, emptyState('search', 'No reflections match'));
   if (em) paintSel();
   if (!em) body.classList.add('refl-topics');
-  return pinHead(head, h('div', {}, head, toolbar, body, notesSwitch, foot));
+  return pinHead(head, h('div', {}, head, toolbar, body, notesSwitch, foot, selBar));
 }
 
 // Pinned search (html.pin-search): refl-top sticks with its top at minus the height above the search row, so only
@@ -565,39 +572,22 @@ async function justEnough() {
   hooks.render();
 }
 
-async function deleteSelected() {
-  const pick = (S.reflections || []).filter(r => rv.sel.has(r.id));
-  if (!pick.length) return;
-  const n = pick.length, word = n === 1 ? 'reflection' : 'reflections';
-  if (!await confirmBox(`Delete ${n} ${word}?`, `Move ${n} ${word} to the recycle bin? They can be restored for 30 days.`, 'Move to bin', true)) return;
-  const done = await binReflections(pick);
-  rv.sel.clear();
-  if (done) toast(`${done} ${done === 1 ? 'reflection' : 'reflections'} moved to the recycle bin`, { action: 'Recycle bin', onaction: () => openView('bin') });
-  hooks.render();
-}
-
-// Mark the ticked reflections complete. Ones still missing something (case, initials, date, …) stay
-// drafts and are listed, so nothing is marked complete that couldn't be marked one by one.
-async function completeSelected() {
-  const pick = (S.reflections || []).filter(r => rv.sel.has(r.id));
-  if (!pick.length) return;
-  const ready = pick.filter(r => r.status !== 'complete' && !completeProblems(r).length);
-  const already = pick.filter(r => r.status === 'complete').length;
-  const blocked = pick.filter(r => r.status !== 'complete' && completeProblems(r).length);
-  let done = 0;
-  for (const r of ready) {
-    try { await cloud.saveReflection(mine(), { ...r, status: 'complete' }); done++; }
-    catch (err) { toast('Could not save: ' + err.message); break; }
-  }
-  rv.sel.clear();
-  const parts = [`${done} marked complete`];
-  if (already) parts.push(`${already} already complete`);
-  if (blocked.length) {
-    const why = [...new Set(blocked.flatMap(completeProblems))].slice(0, 3).join(', ');
-    parts.push(`${blocked.length} still need${blocked.length === 1 ? 's' : ''} ${why}`);
-  }
-  toast(parts.join(' · '));
-  hooks.render();
+// Press and hold a row (outside Select): half a second without moving starts selecting with it; the click that comes
+// with lifting the finger is swallowed. Android's long press (contextmenu) may come a moment sooner and starts it then.
+function holdToSelect(li, start) {
+  let t = 0, x = 0, y = 0, held = 0;
+  const stop = () => { clearTimeout(t); t = 0; };
+  const go = () => {
+    t = 0; held = Date.now();
+    const eat = e => { e.stopPropagation(); e.preventDefault(); window.removeEventListener('click', eat, true); };
+    window.addEventListener('click', eat, true); setTimeout(() => window.removeEventListener('click', eat, true), 700);
+    try { navigator.vibrate?.(10); } catch { /* not allowed */ }
+    start();
+  };
+  li.addEventListener('pointerdown', e => { if (e.button !== 0 || e.target.closest('button, a, input')) return; x = e.clientX; y = e.clientY; stop(); t = setTimeout(go, 500); });
+  li.addEventListener('pointermove', e => { if (t && Math.hypot(e.clientX - x, e.clientY - y) > 10) stop(); });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) li.addEventListener(ev, stop);
+  li.addEventListener('contextmenu', e => { if (t) { e.preventDefault(); stop(); go(); } else if (Date.now() - held < 1000) e.preventDefault(); });
 }
 
 // ---------- drag between headings (edit mode; pointer events so it works with touch on iOS) ----------

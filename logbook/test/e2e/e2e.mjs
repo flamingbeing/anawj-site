@@ -287,7 +287,7 @@ async function run(label, ctxOpts) {
     fs.mkdirSync(R4, { recursive: true });
     const shot4 = async name => { if (phone) await p.screenshot({ path: R4 + name + '.png', fullPage: false }); else await p.screenshot({ path: R4 + 'desk-' + name + '.png' }); };
     const backToList = async () => { for (let i = 0; i < 3; i++) { const b2 = p.locator('main button', { hasText: /^← (Reflections|Cases)$/ }).first(); if (await b2.count()) { await b2.click(); await nap(400); } else break; } };
-    const editBtn = () => p.locator('main button', { hasText: /^(Edit|Done)$/ }).first();
+    const editBtn = () => p.locator('main button', { hasText: /^(Select|Done)$/ }).first();
     const rowsOf = id => p.locator(`.refl-h[data-heading="${id}"] li.refl-row`);
     const hId = async n => p.locator('.refl-h').nth(n).getAttribute('data-heading');
 
@@ -405,19 +405,20 @@ async function run(label, ctxOpts) {
       });
     }
 
-    await step('r4: select 2 -> delete -> confirm -> bin lists them -> restore one', async () => {
+    await step('r4: select 2 -> Bulk edit -> Move to the bin -> bin lists them -> restore one', async () => {
       await editBtn().click(); await nap(300);
       const n0 = await p.locator('li.refl-row').count();
       assert(n0 >= 2, 'need 2 reflections, have ' + n0);
       await p.locator('.refl-cb').nth(0).check();
       await p.locator('.refl-cb').nth(1).check();
       await shot4('edit-mode-selection');
-      await p.locator('button', { hasText: 'Delete selected (2)' }).click();
-      await p.locator('dialog[open]').waitFor();
-      const dt = await p.locator('dialog[open]').innerText();
-      assert(/recycle bin/i.test(dt), 'confirm text ' + dt);
-      await p.locator('dialog[open] button', { hasText: 'Move to bin' }).click();
+      assert(/2 selected/.test(await p.locator('.sel-bar').innerText()), 'the bar counts 2');
+      await p.locator('.sel-bar').getByRole('button', { name: 'Bulk edit…' }).click();
+      await p.locator('dialog[open]').getByRole('button', { name: 'Move to the bin' }).click();
       await nap(800);
+      assert(/2 reflections moved to the recycle bin/.test(await toastText()), 'toast ' + await toastText());
+      // (selecting ends after the move; counted with every heading open, as before)
+      if (await editBtn().innerText() === 'Select') { await editBtn().click(); await nap(300); }
       assert(await p.locator('li.refl-row').count() === n0 - 2, 'rows not removed');
       if (await editBtn().innerText() === 'Done') await editBtn().click();
       await nap(300);
