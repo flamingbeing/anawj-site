@@ -135,6 +135,14 @@ const noSideScroll = async (page, label) => {
   const st = await stored(page);
   ok(Object.values(st.cells).some(day => Object.values(day).some(c => (c.a || []).includes('ICU'))), 'a posting set for a week is stored');
   // rules marked as predictions are labelled
+  // People: a "No calls until" date on a person
+  await go(page, '#people');
+  await page.waitForTimeout(400);
+  await page.locator('.pv-main').first().click();
+  await page.getByLabel('No calls until (optional)').fill('2026-12-20');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.waitForTimeout(400);
+  ok(await page.getByText(/no calls until/).first().isVisible(), 'People shows who has no calls until a date');
   await go(page, '#rules');
   ok(await page.getByText('To confirm').first().isVisible(), 'predicted rules say To confirm');
   // auto-fill next month: no must-fix problems left

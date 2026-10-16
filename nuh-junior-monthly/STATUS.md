@@ -18,8 +18,8 @@ Last updated: 2026-10-16 by Claude Code (jm1).
 1. **Share the sheet layout in the cloud copy.** `sheets[month]` (which sheet and rows a month came from, who the sheet
    lists, grades) lives only on the device that imported, so a second device cannot write back to Google or hide people
    the sheet leaves out.
-2. **A per-person "no calls until" date** (blank = allowed; baby MOs and very new people get a suggested date; leave is
-   projected as if they pass).
+2. ~~A per-person "no calls until" date~~ done (see Recently done). Still to do: a suggested date for new people read from the
+   sheet (first month they appear).
 3. **Highest call per person** (R1 most senior, R3 most junior, cumulative; default the highest, a lower one is a
    step-down needing explicit approval), inferred from 6 months of imported sheets, shown "inferred" with Confirm; a
    settings box "What the app fills" (default cardiac and ICU only); R1 to R3 Auto-fill last (rules in NOTES, "Beyond
@@ -31,6 +31,8 @@ Last updated: 2026-10-16 by Claude Code (jm1).
    firetop job). Autosync was deliberately not built: the header cloud button shows the state instead.
 
 ## Recently done
+- No calls until: a date on each person; a hard rule and Fill respect it (People › edit a person).
+- #721 Fill lets you pick which calls to draft; #719 shared calls use the rosterer's points and `C-e`/`C-p` do not count as cardiac.
 - #716 Tabs reordered, one-row header (no Help button, padlock, "Fill"), Check shows what Fill places, posting filter and
   Clear filters, mouse scrolling, locks reset when the app closes, equal calls weighted 40.
 - #714 Blocked by the planner is the strongest request; `R!` and `R?` call requests.

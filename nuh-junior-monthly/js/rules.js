@@ -1097,6 +1097,38 @@ export const RULE_TYPES = {
     },
   },
 
+  // Calls before the date set on each person ("No calls until", People › edit a person): baby MOs until they pass the test, very new
+  // people. Hard: the date is the rosterer's own decision.
+  noCallsUntil: {
+    label: 'No calls until their date', icon: '🚫', scope: 'person',
+    help: 'People with a "No calls until" date (People › edit a person) take no calls before it: baby MOs until they pass the test, very new people.',
+    example: 'No calls before the date set on each person',
+    params: [P.codes('codes', 'Calls')],
+    defaults: () => ({ codes: [] }),
+    describe(r, T) { return withWhen(`No ${T.codes(r.params.codes).replace(/^any /, '')} before the "no calls until" date set on each person`, r, T); },
+    compile(r, X) {
+      const m = X.codes(r.params.codes);
+      if (m.empty) return null;
+      const { ctx, u } = X, n = ctx.n, ok = X.when, act = ctx.act, inWho = X.W.inWho;
+      const until = ctx.people.map(p => String(p.noCallsUntil || ''));
+      return {
+        info: { m, ok, inWho, until },
+        person(pi, out) {
+          if (!until[pi] || !inWho[pi]) return 0;
+          const base = pi * n;
+          let pen = 0;
+          for (let d = ctx.lo; d <= ctx.hi; d++) {
+            const i = base + d;
+            if (!ok[d] || !act[i] || ctx.days[d] >= until[pi] || !m(i)) continue;
+            pen += u; ctx.n2++;
+            if (out) out.push(X.V(u, `${X.day(d)}: ${X.name(pi)} has ${X.T.codes(r.params.codes)}, no calls until ${fmtDay(until[pi])}`, { staffId: ctx.people[pi].id, date: X.iso(d) }));
+          }
+          return pen;
+        },
+      };
+    },
+  },
+
   // Each person in who has codes every day in when (unless away).
   // No call in the first days of a posting block ("no ICU call on day 1", "new to ICU: calls from day 4").
   postingStart: {

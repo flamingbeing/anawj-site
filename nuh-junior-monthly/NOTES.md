@@ -243,3 +243,12 @@ The Fill dialog lists the auto-fill calls (C3 and R1B today) with a tick each (t
 ticked calls are drafted (`solve(..., { only: [...] })`, `applyAssignments(..., only)`); every other call, posting, leave and
 request stays exactly as it is, but the solver still counts them for all rules (post call, gaps, who is already on call,
 cover), so a cardiac-only fill respects the ICU calls already there. Start is off until something is ticked.
+
+## No calls until (owner, 16 Oct 2026)
+
+Each person can have a **No calls until** date (People › edit a person; blank = calls allowed; a button sets it a month after
+their start date, for a baby MO or a very new person). The hard rule `r-nocalls` (type `noCallsUntil`, on every call) makes a
+call before the date a must-fix problem, and Fill never places one (`solver.js` `hardUntil`). Their leave and postings are
+planned as usual (leave can be projected as if they pass the test); if one fails, move the date. The staff list in the cloud copy
+carries the date (`staff[].noCallsUntil`, `YYYY-MM-DD`); the rule type is in `rules.js`. Saved rosters gain the rule once
+(`rulesVersion` 9).
