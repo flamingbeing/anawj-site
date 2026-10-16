@@ -54,7 +54,7 @@ service cloud.firestore {
     function validMonth(m) {
       return m.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
         && request.resource.data.month == m
-        && request.resource.data.cells is map
+        && (request.resource.data.cells is map || (request.resource.data.cells is string && request.resource.data.cells.size() <= 900000))
         && request.resource.data.get('status', 'draft') in ['draft', 'published']
         && shortText('publishedAt', 40) && shortText('note', 2000);
     }

@@ -104,6 +104,11 @@ the first working day before it, at least two days; on to the first working day 
 where they go next and who is post call. They show what is in the app for those dates (so import last month too). "Days around"
 in the toolbar turns them off (per device). They are not part of editing, Auto-fill or the copy back to the sheet.
 
+**Team copy of a month = one JSON string** (16 Oct 2026): Save to team failed with "too many index entries for entity /months/…/versions/…":
+Firestore indexes every field of a map, and a month's days (days × people × codes) went over its limit of 40,000 index entries a
+document. `cells` is now saved as one JSON string (`cloud.js` `cellsFromDoc` reads either form; the rules accept a map or a string
+up to 900,000 characters). More shows Team sharing first, with Save to team and Pull from team.
+
 How to add a rule type: as in `ntf-roster/NOTES.md` ("How to add a new rule type"); the engine is the same file.
 
 ## Tests

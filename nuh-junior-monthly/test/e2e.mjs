@@ -139,11 +139,11 @@ const noSideScroll = async (page, label) => {
   // a device with nothing on it: the welcome screen offers sign in first, and its steps can be hidden
   await page.goto(BASE + '#roster');
   await ready(page);
-  ok(await page.getByRole('button', { name: "Sign in and load the team's roster" }).count() === 1, 'an empty device offers to sign in and load the team roster');
+  ok(await page.getByRole('button', { name: "Sign in and pull the team's roster" }).count() === 1, 'an empty device offers to sign in and pull the team roster');
   ok(await page.locator('.gs').count() === 1, 'the getting started steps show at first');
   await axe(page, 'the welcome screen with sign in');
   await page.getByRole('button', { name: 'Hide the getting started steps' }).click();
-  ok(await page.locator('.gs').count() === 0 && await page.getByRole('button', { name: "Sign in and load the team's roster" }).count() === 1, 'the steps can be hidden, sign in stays');
+  ok(await page.locator('.gs').count() === 0 && await page.getByRole('button', { name: "Sign in and pull the team's roster" }).count() === 1, 'the steps can be hidden, sign in stays');
   await page.getByRole('button', { name: 'Show the getting started steps' }).click();
   ok(await page.locator('.gs').count() === 1, 'and shown again');
   await page.getByRole('button', { name: 'Hide the getting started steps' }).click();

@@ -6,7 +6,7 @@
 // Data (SPEC.md "Team sync"):
 //   team/main                 { settings, groups, tags, staff, duties, rules, rulesLog, updatedAt, updatedBy }
 //   team/main/versions/*      { team, savedAt, savedBy }                       (a copy of each save, never changed)
-//   months/{YYYY-MM}          { month, cells, status, publishedAt, note, updatedAt, updatedBy }
+//   months/{YYYY-MM}          { month, cells (a JSON string of the days), status, publishedAt, note, updatedAt, updatedBy }
 //   months/{m}/versions/*     { month, cells, status, publishedAt, note, savedAt, savedBy }   (never changed)
 //   members/{email}           { role: 'admin' | 'rosterer' | 'viewer', name, staffId? }   (viewers only read)
 //   accessRequests/{email}    { email, name, requestedAt }                     (people asking to join)
@@ -156,6 +156,12 @@ export function pickTeam(state) {
   return plain(out);
 }
 
+// A month's days as stored (a JSON string; older or test documents may hold the map itself) back to { date: { staffId: Cell } }.
+export function cellsFromDoc(v) {
+  if (typeof v === 'string') { try { const o = JSON.parse(v); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; } }
+  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+}
+
 // One month's days and its status from a state: { cells: { '2026-11-03': { staffId: Cell } }, meta }.
 export function pickMonth(state, m) {
   const cells = {};
@@ -179,7 +185,7 @@ export function mergeTeam(state, doc) {
 export function mergeMonth(state, m, doc) {
   const cells = {};
   for (const [d, day] of Object.entries(state.cells || {})) if (!d.startsWith(m + '-')) cells[d] = day;
-  for (const [d, day] of Object.entries((doc && doc.cells) || {})) {
+  for (const [d, day] of Object.entries(cellsFromDoc(doc && doc.cells))) {
     if (d.startsWith(m + '-') && day && typeof day === 'object' && Object.keys(day).length) cells[d] = plain(day);
   }
   const months = { ...(state.months || {}) };
@@ -199,7 +205,7 @@ export async function loadMonth(m) {
   if (!MONTH_RE.test(m)) throw new Error('Not a month: ' + m);
   const { db, F } = await sdk();
   const snap = await F.getDoc(F.doc(db, 'months', m));
-  return snap.exists() ? snap.data() : null;
+  return snap.exists() ? { ...snap.data(), cells: cellsFromDoc(snap.data().cells) } : null;
 }
 
 // Who saved last and when, for the status line: { team: {updatedAt, updatedBy} | null, month: … | null }.
@@ -224,7 +230,7 @@ export async function saveAll({ team = null, month = null } = {}, { teamAt = nul
     const meta = month.meta || {};
     monthRef = F.doc(db, 'months', month.m);
     monthDoc = checkDoc(plain({
-      month: month.m, cells: month.cells || {},
+      month: month.m, cells: JSON.stringify(month.cells || {}),   // one string: as a map, Firestore made an index entry for every field of every cell (over its 40,000 a document)
       status: meta.status === 'published' ? 'published' : 'draft', publishedAt: meta.publishedAt || '', note: meta.note || '',
       updatedAt: at, updatedBy: by,
     }), 'month');
@@ -264,7 +270,7 @@ export async function listVersions(m, n = 20) {
   const { db, F } = await sdk();
   const q = F.query(F.collection(db, 'months', m, 'versions'), F.orderBy('savedAt', 'desc'), F.limit(n));
   const snap = await F.getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data(), cells: cellsFromDoc(d.data().cells) }));
 }
 
 // ---- members (admins only, enforced by the rules) ----

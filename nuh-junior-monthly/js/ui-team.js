@@ -1,5 +1,5 @@
 // NUH Junior Monthly: the Team sharing panel (inside More). Sign in with Google, see your role, Save to team (the staff list,
-// rules, codes and settings, plus the month on screen), Load from team, who saved last and when, a prompt when
+// rules, codes and settings, plus the month on screen), Pull from team, who saved last and when, a prompt when
 // someone else saved first, and for admins the members list and people asking to join.
 // Off (a short note instead) until js/firebase-config.js is filled in, and always off in practice mode (?demo).
 import * as cloud from './cloud.js';
@@ -49,12 +49,12 @@ export async function joinAndLoad(app) {
     let next = app.store.get();
     if (t) next = cloud.mergeTeam(next, t);
     if (mo) next = cloud.mergeMonth(next, m, mo);
-    app.store.replace(next, 'Load from team');
+    app.store.replace(next, 'Pull from team');
     const seen = readSeen();
     if (t) seen.team = t.updatedAt ?? null;
     if (mo) seen.months[m] = mo.updatedAt ?? null;
     writeSeen(seen);
-    app.toast(mo ? `Loaded the team's roster and ${fmt(m)}.` : `Loaded the team's roster. ${fmt(m)} is not on the team yet.`, { action: { label: 'Undo', fn: () => app.store.undo() } });
+    app.toast(mo ? `Pulled the team's roster and ${fmt(m)}.` : `Pulled the team's roster. ${fmt(m)} is not on the team yet.`, { action: { label: 'Undo', fn: () => app.store.undo() } });
   } catch (e) {
     console.error(e);
     app.toast(cloud.friendly(e), { kind: 'error', ms: 9000 });
@@ -134,21 +134,21 @@ export function mountTeam(el, app) {
 
   async function load() {
     const m = month;
-    const ok = await app.confirm(`Load the team's copy? It replaces the staff list, rules, duty codes, settings and ${fmtMonth(m)} in this browser. Other months stay as they are. Undo brings yours back.`, { ok: 'Load from team' });
+    const ok = await app.confirm(`Pull the team's copy? It replaces the staff list, rules, duty codes, settings and ${fmtMonth(m)} in this browser. Other months stay as they are. Undo brings yours back.`, { ok: 'Pull from team' });
     if (!ok) return;
-    return work('Loading…', async () => {
+    return work('Pulling…', async () => {
       const [t, mo] = await Promise.all([cloud.loadTeam(), cloud.loadMonth(m)]);
       if (!t && !mo) { app.toast('Nothing has been saved to the team yet.', { kind: 'warn' }); return; }
       let next = app.store.get();
       if (t) next = cloud.mergeTeam(next, t);
       if (mo) next = cloud.mergeMonth(next, m, mo);
-      app.store.replace(next, 'Load from team');
+      app.store.replace(next, 'Pull from team');
       const seen = readSeen();
       if (t) seen.team = t.updatedAt ?? null;
       if (mo) seen.months[m] = mo.updatedAt ?? null;
       writeSeen(seen);
       status = { team: t ? { updatedAt: t.updatedAt, updatedBy: t.updatedBy } : null, month: mo ? { updatedAt: mo.updatedAt, updatedBy: mo.updatedBy } : null };
-      app.toast(mo ? `Loaded the team's copy and ${fmtMonth(m)}.` : `Loaded the team's copy. ${fmtMonth(m)} isn't on the team yet, so yours is kept.`,
+      app.toast(mo ? `Pulled the team's copy and ${fmtMonth(m)}.` : `Pulled the team's copy. ${fmtMonth(m)} isn't on the team yet, so yours is kept.`,
         { action: { label: 'Undo', fn: () => app.store.undo() } });
     });
   }
@@ -159,10 +159,10 @@ export function mountTeam(el, app) {
       title: 'Someone else saved first',
       body: h('div', { class: 'team' },
         h('p', { class: 'team-p' }, `${byName(e.current && e.current.updatedBy)} saved ${what} to the team ${when(e.current && e.current.updatedAt)}, after this browser last loaded or saved it.`),
-        h('p', { class: 'team-p' }, 'Load theirs to see it first (undo brings yours back), or save yours over it. Their save stays in the team history either way.')),
+        h('p', { class: 'team-p' }, 'Pull theirs to see it first (undo brings yours back), or save yours over it. Their save stays in the team history either way.')),
       actions: [
         { label: 'Cancel' },
-        { label: 'Load theirs', fn: () => { load(); } },
+        { label: 'Pull theirs', fn: () => { load(); } },
         { label: 'Save mine anyway', danger: true, fn: () => { save(true); } },
       ],
     });
@@ -254,11 +254,11 @@ export function mountTeam(el, app) {
     const editor = cloud.canEdit(member);
     root.append(h('div', { class: 'team-row' },
       editor ? btn(busy === 'Saving…' ? busy : 'Save to team', () => save(false), 'btn btn-primary') : null,
-      btn(busy === 'Loading…' ? busy : 'Load from team', load),
+      btn(busy === 'Pulling…' ? busy : 'Pull from team', load),
       btn('Refresh', () => refresh(), 'btn btn-ghost btn-sm')));
     root.append(h('p', { class: 'team-p' }, editor
       ? `Save to team sends the staff list, rules, duty codes, settings and ${fmtMonth(month)}; change month to save another.`
-      : `Load from team brings in the staff list, rules and ${fmtMonth(month)}.`));
+      : `Pull from team brings in the staff list, rules and ${fmtMonth(month)}.`));
 
     if (member.role === 'admin') renderAdmin(email);
   }

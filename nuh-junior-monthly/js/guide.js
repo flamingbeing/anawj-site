@@ -151,7 +151,7 @@ export function welcomeScreen(app) {
   const slot = h('div', { class: 'guide-slot' });
   // a device with nothing on it yet: sign in and the team's roster comes down; or hide the steps and just import
   const signInBtn = cloud.enabled
-    ? h('button', { type: 'button', class: 'btn btn-primary', 'data-gs': 'join', onclick: async () => { signInBtn.disabled = true; try { await (await import('./ui-team.js')).joinAndLoad(app); } finally { signInBtn.disabled = false; } } }, "Sign in and load the team's roster")
+    ? h('button', { type: 'button', class: 'btn btn-primary', 'data-gs': 'join', onclick: async () => { signInBtn.disabled = true; try { await (await import('./ui-team.js')).joinAndLoad(app); } finally { signInBtn.disabled = false; } } }, "Sign in and pull the team's roster")
     : null;
   const toggle = h('button', { type: 'button', class: 'linkish welcome-toggle', 'data-gs': 'toggle-steps' }, loadUi().welcomeHidden ? 'Show the getting started steps' : 'Hide the getting started steps');
   toggle.addEventListener('click', () => {
