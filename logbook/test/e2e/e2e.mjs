@@ -1053,7 +1053,7 @@ async function run(label, ctxOpts) {
     await items.first().locator('.t').click();
     assert(await p.locator('dialog[open] button', { hasText: 'Share case' }).count() === 0, 'Share case still in the dialog');
     const md = await p.evaluate(async () => { const m = await import('/logbook/js/share.js'); const { S } = await import('/logbook/js/ui-core.js'); return m.dayText(S.cases[0].date); });
-    assert(/^\[\[\d{4}-\d{2}-\d{2}\]\]\n1\./.test(md) && !/#apmes/.test(md), 'day text ' + md.slice(0, 120));
+    assert(/^\d{4}-\d{2}-\d{2}\n1\./.test(md) && !/#apmes/.test(md), 'day text ' + md.slice(0, 120));
     await p.locator('dialog[open] button', { hasText: 'Cancel' }).click();
     // backup, delete a case, restore brings it back
     await tab('data');
@@ -1079,7 +1079,7 @@ async function run(label, ctxOpts) {
 
   await step('markdown: format in Settings, Copy uses it, notes zip', async () => {
     await tab('sharefmt');
-    assert(/^\[\[\d{4}-\d{2}-\d{2}\]\]\n1\./.test(await p.locator('pre.fmt-preview').first().innerText()), 'default preview');
+    assert(/^\d{4}-\d{2}-\d{2}\n1\./.test(await p.locator('pre.fmt-preview').first().innerText()), 'default preview');
     await p.locator('select[aria-label="Tags ({{categories}})"]').selectOption('tags');
     await p.locator('textarea[aria-label="Each case in a day"]').fill('- {{initials}} {{details}} {{categories}}');
     await nap(100);
@@ -1088,7 +1088,7 @@ async function run(label, ctxOpts) {
     const md = await p.evaluate(() => JSON.parse(localStorage.getItem('apmes-logbook-demo-v1')).logbooks['demo@example.com'].doc.settings.markdown);
     assert(md && md.cats === 'tags' && Object.keys(md).length === 2, 'saved only the changes: ' + JSON.stringify(md));
     const txt = await p.evaluate(async () => { const m = await import('/logbook/js/share.js'); const { S } = await import('/logbook/js/ui-core.js'); return m.dayText(S.cases[0].date); });
-    assert(/^\[\[\d{4}-\d{2}-\d{2}\]\]\n- /.test(txt) && /#\S/.test(txt), 'copy uses the format: ' + txt.slice(0, 120));
+    assert(/^\d{4}-\d{2}-\d{2}\n- /.test(txt) && /#\S/.test(txt), 'copy uses the format: ' + txt.slice(0, 120));
     // the notes zip
     await tab('data');
     await p.locator('button', { hasText: 'Download Markdown export' }).click();

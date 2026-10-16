@@ -1,6 +1,6 @@
 // Markdown format and the notes export (js/markdown.js).
 import assert from 'node:assert/strict';
-import { DEFAULT_MARKDOWN, cleanMarkdown, storedMarkdown, fill, fmtMdDate, tagSlug, catsText, noteLink, mdCase, mdDay, safeName, frontMatter,
+import { fmtPattern, mdDate, fileDate, dateLink, HEAD_STYLES, DEFAULT_MARKDOWN, cleanMarkdown, storedMarkdown, fill, fmtMdDate, tagSlug, catsText, noteLink, mdCase, mdDay, safeName, frontMatter,
   reflectionPath, reflectionNote, caseNotes, progressNote, exportNotes, MAX_JSON } from '../js/markdown.js';
 import { formatDay, formatCase } from '../js/share-format.js';
 import { progress } from '../js/engine.js';
@@ -12,11 +12,11 @@ const cases = [
   { id: 'c', date: '2026-10-11', details: 'GH 45F lap chole', cats: ['08', '13'], createdAt: 3 },   // older case: initials in the details
 ];
 
-// the default reads exactly like Copy / Share day did before (share-format.js defaults)
-assert.equal(mdDay('2026-10-10', cases.slice(0, 2), null), formatDay('2026-10-10', cases.slice(0, 2), null));
-assert.equal(mdCase(cases[0], null), formatCase(cases[0], null));
-assert.equal(mdDay('2026-10-10', cases.slice(0, 2), null), '[[2026-10-10]]\n1. AB\n34F LSCS spinal\n\n2.\nTKR ACB');
-assert.equal(mdCase(cases[2], null), '[[2026-10-11]]\nGH\n45F lap chole');
+// the Link heading reads exactly like Copy / Share did before (share-format.js defaults); Plain is the default now
+assert.equal(mdDay('2026-10-10', cases.slice(0, 2), { dayHeadStyle: 'link' }), formatDay('2026-10-10', cases.slice(0, 2), null));
+assert.equal(mdCase(cases[0], { dayHeadStyle: 'link' }), formatCase(cases[0], null));
+assert.equal(mdDay('2026-10-10', cases.slice(0, 2), null), '2026-10-10\n1. AB\n34F LSCS spinal\n\n2.\nTKR ACB');
+assert.equal(mdCase(cases[2], null), '2026-10-11\nGH\n45F lap chole');
 
 // a Copy & share format someone saved carries over, single-brace fill-ins included
 const legacy = { dayHead: '## {day} ({count})', dayCase: '- {initials} {case}' };
@@ -82,7 +82,7 @@ assert.ok(freeNote.includes('## Learning points\n\nOne flowing discussion.') && 
 // case notes by month and by day
 const months = caseNotes(cases, DEFAULT_MARKDOWN);
 assert.deepEqual(months.map(x => x.path), ['Cases/2026-10.md']);
-assert.ok(months[0].text.includes('# October 2026 (3 cases)\n\n[[2026-10-10]]\n1. AB') && months[0].text.includes('[[2026-10-11]]\n1. GH'), months[0].text);
+assert.ok(months[0].text.includes('# October 2026 (3 cases)\n\n2026-10-10\n1. AB') && months[0].text.includes('2026-10-11\n1. GH'), months[0].text);
 const days = caseNotes(cases, { ...DEFAULT_MARKDOWN, caseNotes: 'day', frontMatter: false });
 assert.deepEqual(days.map(x => x.path), ['Cases/2026-10/2026-10-10.md', 'Cases/2026-10/2026-10-11.md']);
 assert.deepEqual(caseNotes([{ id: 'z', date: null, dateText: 'March', details: 'XY lap' }], DEFAULT_MARKDOWN).map(x => x.path), ['Cases/No date.md']);
@@ -118,10 +118,45 @@ assert.ok(MAX_JSON >= 8000);
   assert.equal(cleanMarkdown({}).boldLabels, false);
   assert.equal(cleanMarkdown({ boldLabels: 'yes' }).boldLabels, false);
   assert.deepEqual(storedMarkdown({ boldLabels: true }), { boldLabels: true });
-  assert.equal(mdCase(c, {}, { labels }), '[[2026-10-10]]\nAB\nlap chole\nPlan: GA ETT\nlp: cuff');              // as typed
-  assert.equal(mdCase(c, { boldLabels: true }, {}), '[[2026-10-10]]\nAB\nlap chole\nPlan: GA ETT\nlp: cuff');   // the setting off
-  assert.equal(mdCase(c, { boldLabels: true }, { labels }), '[[2026-10-10]]\nAB\nlap chole\n**Plan:** GA ETT\n**Learning point:** cuff');
+  assert.equal(mdCase(c, {}, { labels }), '2026-10-10\nAB\nlap chole\nPlan: GA ETT\nlp: cuff');              // as typed
+  assert.equal(mdCase(c, { boldLabels: true }, {}), '2026-10-10\nAB\nlap chole\nPlan: GA ETT\nlp: cuff');   // the setting off
+  assert.equal(mdCase(c, { boldLabels: true }, { labels }), '2026-10-10\nAB\nlap chole\n**Plan:** GA ETT\n**Learning point:** cuff');
   assert.match(mdDay('2026-10-10', [c], { boldLabels: true }, { labels }), /\*\*Plan:\*\* GA ETT/);
 }
 
 console.log('markdown tests passed');
+
+// the day heading's styles (log2 15): Plain (default), Heading, Link, Custom; one case follows unless typed
+{
+  const c = cases[0];
+  assert.equal(mdCase(c, { dayHeadStyle: 'heading' }), '# 2026-10-10\nAB\n34F LSCS spinal');
+  assert.equal(mdDay('2026-10-10', [c], { dayHeadStyle: 'link' }).split('\n')[0], '[[2026-10-10]]');
+  assert.equal(mdCase(c, { dayHeadStyle: 'heading', oneCase: '{{initials}} only' }), 'AB only', 'a typed one-case format stays');
+  assert.equal(cleanMarkdown({ dayHead: '## {{day}}' }).dayHeadStyle, 'custom', 'a heading typed before the styles is Custom');
+  assert.equal(mdDay('2026-10-10', [c], { dayHead: '## {{day}}' }).split('\n')[0], '## 10 Oct 2026');
+  assert.equal(cleanMarkdown({ dayHeadStyle: 'heading', dayHead: 'ignored' }).dayHead, '# {{date}}');
+  // stored: only the style, not the heading it writes; switching style later moves the one-case line too
+  assert.deepEqual(storedMarkdown(cleanMarkdown({ dayHeadStyle: 'link' })), { dayHeadStyle: 'link' });
+  assert.equal(storedMarkdown(cleanMarkdown({ dayHeadStyle: 'plain' })), null);
+  assert.equal(cleanMarkdown({ dayHeadStyle: 'heading', oneCase: '[[{{date}}]]\n{{initials}}\n{{details}}' }).oneCase, '# {{date}}\n{{initials}}\n{{details}}');
+}
+// dates: presets, a custom pattern ([text] literal), and file names / link targets of their own
+{
+  assert.equal(fmtPattern('2026-10-05', 'dddd D MMMM YYYY [wk] YY.MM.DD M'), 'Monday 5 October 2026 wk 26.10.05 10');
+  assert.equal(fmtPattern('2026-10-05', ''), '2026-10-05');
+  const f = k => cleanMarkdown(k);
+  assert.equal(mdDate('2026-10-10', f({ dateFormat: 'compact' })), '20261010');
+  assert.equal(mdDate('2026-10-10', f({ dateFormat: 'wlong' })), 'Sat 10 Oct 2026');
+  assert.equal(mdDate('2026-10-10', f({ dateFormat: 'custom', datePattern: 'D/M/YY' })), '10/10/26');
+  assert.equal(fileDate('2026-10-10', f({ dateFormat: 'dmy' })), '10 10 2026', 'no slashes in a file name');
+  assert.equal(fileDate('2026-10-10', f({ dateFormat: 'long', fileDate: 'iso' })), '2026-10-10');
+  assert.equal(dateLink('2026-10-10', f({ dateFormat: 'long', fileDate: 'iso' })), '[[2026-10-10|10 Oct 2026]]', 'the link shows the date, targets the file');
+  assert.equal(dateLink('2026-10-10', f({ links: 'md', fileDate: 'compact' })), '[2026-10-10](20261010.md)');
+  assert.equal(cleanMarkdown({ dateFormat: 'custom', datePattern: 'x'.repeat(200) }).datePattern.length, 60);
+  assert.deepEqual(storedMarkdown(cleanMarkdown({ dateFormat: 'iso', datePattern: 'YYYY' })), null, 'a pattern only with Custom');
+  // the export's day notes take the file date; a reflection's case link shows the date
+  const files = exportNotes({ cases: cases.slice(0, 1), reflections: [{ id: 'r', caseId: 'a', date: '2026-10-10', title: 'T', points: [] }], m: { caseNotes: 'day', fileDate: 'compact', dateFormat: 'long' } });
+  assert.ok(files.some(x => x.path === 'Cases/2026-10/20261010.md'), files.map(x => x.path).join());
+  assert.ok(files.find(x => x.path.startsWith('Reflections/')).text.includes('Case: [[Cases/2026-10/20261010|10 Oct 2026]]'));
+}
+console.log('markdown styles and dates: ok');

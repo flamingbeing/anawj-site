@@ -10,7 +10,7 @@ import { recentCount as snapRecent } from './logging.js';
 import { OPERATOR_HELP } from './search-ops.js';
 import { DEFAULT_ACCENT, cleanAccent, SWATCHES } from './colors.js';
 import { THEMES, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, SPACINGS, TAB_STYLES, BANDS, HEAD_FONTS } from './themes.js';
-import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS } from './markdown.js';
+import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS, HEAD_STYLES, mdDate, fileDate } from './markdown.js';
 import { checkCss } from './custom-css.js';
 import { FONTS, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont } from './fonts.js';
 import { SWITCHES, switchLabel, switchChanges, applyPatch, resetPatch, tabsAfter } from './profiles.js';
@@ -378,8 +378,28 @@ export function renderMarkdownSettings() {
   const dayList = latest ? S.cases.filter(c => c.date === latest.date).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)) : SAMPLE;
   const refl = [...(S.reflections || [])].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0] || SAMPLE_REFL;
   const ctx = { catName, catShort, labels: labelsOn(settings()) };
+  // the day heading's style (Plain by default); Custom shows the heading's box. The date formats: presets or a pattern,
+  // each with a live example
+  const headBox = area('dayHead', 'Your day heading', 1), oneBox = area('oneCase', 'One case', 3);
+  const headWrap = h('div', { hidden: m.dayHeadStyle !== 'custom' }, lbl('Your heading', headBox, 'For example ## {{date}} or ## [[{{date}}]].'));
+  const headPick = pick('dayHeadStyle', 'Day heading', [['plain', 'Plain (2026-10-10)'], ['heading', 'Heading (# 2026-10-10)'], ['link', 'Link to the day’s note ([[2026-10-10]])'], ['custom', 'Custom…']]);
+  headPick.querySelector('select').addEventListener('change', () => {
+    if (m.dayHeadStyle !== 'custom') { m.dayHead = HEAD_STYLES[m.dayHeadStyle]; const one = cleanMarkdown({ ...m, oneCase: '' }).oneCase; if (!oneTyped) { m.oneCase = one; oneBox.value = one; } }
+    headBox.value = m.dayHead; headWrap.hidden = m.dayHeadStyle !== 'custom'; paint();
+  });
+  let oneTyped = !Object.values(HEAD_STYLES).some(t => m.oneCase === `${t}\n{{initials}}\n{{details}}`);
+  oneBox.addEventListener('input', () => { oneTyped = true; });
+  const patternBox = (k, label) => h('input', { type: 'text', value: m[k] || '', 'aria-label': label, spellcheck: 'false', placeholder: 'ddd D MMM YYYY', style: mono, oninput: e => { m[k] = e.target.value; paint(); } });
+  const datePat = h('div', { hidden: m.dateFormat !== 'custom' }, lbl('Date pattern', patternBox('datePattern', 'Date pattern'), 'YYYY 2026 · YY 26 · MMMM October · MMM Oct · MM 10 · M 10 · DD 05 · D 5 · dddd Saturday · ddd Sat · [text] as typed.'));
+  const filePat = h('div', { hidden: m.fileDate !== 'custom' }, lbl('File date pattern', patternBox('fileDatePattern', 'File date pattern')));
+  const dateEx = h('p', { class: 'hint', style: 'margin:4px 0 0', 'aria-live': 'polite' });
+  const datePick = pick('dateFormat', 'Dates ({{date}})', [['iso', '2026-10-10'], ['compact', '20261010'], ['long', '10 Oct 2026'], ['wlong', 'Sat 10 Oct 2026'], ['dmy', '10/10/2026'], ['custom', 'Custom pattern…']]);
+  const filePick = pick('fileDate', 'File names and link targets', [['same', 'As the dates'], ['iso', '2026-10-10'], ['compact', '20261010'], ['long', '10 Oct 2026'], ['wlong', 'Sat 10 Oct 2026'], ['custom', 'Custom pattern…']]);
+  datePick.querySelector('select').addEventListener('change', () => { datePat.hidden = m.dateFormat !== 'custom'; });
+  filePick.querySelector('select').addEventListener('change', () => { filePat.hidden = m.fileDate !== 'custom'; });
   const paint = () => {
     const f = cleanMarkdown(m);
+    dateEx.textContent = `10 Oct 2026 is written ${mdDate('2026-10-10', f)}; its day note is named ${fileDate('2026-10-10', f)}.md.`;
     dayOut.textContent = mdDay(dayList[0].date, dayList, f, ctx);
     oneOut.textContent = mdCase(dayList[dayList.length - 1], f, ctx);
     const path = reflectionPath(refl, f);
@@ -404,15 +424,15 @@ export function renderMarkdownSettings() {
       h('h2', {}, 'Markdown'),
       h('p', { class: 'hint help', style: 'margin:0' }, 'One format for Copy and Share on the Logbook tab and for the Markdown export (More → Export / Import). The default copies the date, initials and case, never the tags.'),
       h('h3', { style: 'margin:14px 0 0' }, 'Copy and share'),
-      lbl('Day heading', area('dayHead', 'Day heading', 1), 'For example ## {{date}} or ## [[{{date}}]].'),
+      headPick, h('p', { class: 'hint help', style: 'margin:4px 0 0' }, 'Plain by default. Sync (Settings → Sync) writes a new heading into each synced day the next time it runs; your own edits there stay.'), headWrap,
       lbl('Each case in a day', area('dayCase', 'Each case in a day', 3), 'A blank line goes between cases when each takes more than one line.'),
       fillins(CASE_FILLINS),
       lbl('A day’s notes (More → Notes)', area('dayNotes', 'A day’s notes', 2), 'Follows the cases when the day has notes. {{notes}} is each note (### title, then its text). Or put {{notes}} in the day heading to place them there.'),
       h('div', { class: 'hint', style: 'margin:8px 0 2px' }, latest ? 'Preview (your latest day)' : 'Preview'), dayOut,
-      lbl('One case', area('oneCase', 'One case', 3)),
+      lbl('One case', oneBox),
       h('div', { class: 'hint', style: 'margin:8px 0 2px' }, 'Preview'), oneOut,
       h('h3', { style: 'margin:14px 0 0' }, 'Dates, tags and links'),
-      pick('dateFormat', 'Dates ({{date}})', [['iso', '2026-10-10'], ['long', '10 Oct 2026'], ['dmy', '10/10/2026']]),
+      datePick, datePat, filePick, filePat, dateEx,
       pick('cats', 'Tags ({{categories}})', [['names', 'Names (Lower Segment Caesarean Section)'], ['codes', 'Codes (16)'], ['tags', '#tags (#LSCS)']]),
       pick('links', 'Links between notes', [['wiki', 'Wiki links [[note]] (Obsidian)'], ['md', 'Markdown links [note](note.md)']]),
       // labelled parts (Settings → Advanced logging): "Plan: GA" written as "**Plan:** GA" in {{details}}; off by default

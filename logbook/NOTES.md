@@ -339,7 +339,15 @@ portfolio content.
   fill-ins are all empty goes; a value is never read again as a template. Options: date format, categories as
   names / codes / #tags, wiki or Markdown links, case notes per month or day, reflection folders (month, heading,
   flat), file name pattern, front matter fields, the reflection templates (title, summary, each point, figure,
-  references). Default day: `[[YYYY-MM-DD]]`, then `1. AB` / case, a blank line between cases; no tags. An older
+  references). Default day: `YYYY-MM-DD` (plain since log2 15; it was `[[YYYY-MM-DD]]`), then `1. AB` / case, a blank
+  line between cases; no tags. **Day heading** (`dayHeadStyle`): Plain / Heading (`# date`) / Link (`{{dateLink}}`,
+  `[[file date|date]]` or a Markdown link) / Custom (the `dayHead` box; a heading typed before the styles existed is
+  Custom); one case follows the style unless its box was typed. **Dates** (`dateFormat`): 2026-10-10, 20261010,
+  10 Oct 2026, Sat 10 Oct 2026, 10/10/2026 or Custom (`datePattern`: YYYY YY MMMM MMM MM M DD D dddd ddd, [text]
+  literal; `fmtPattern`). **File names and link targets** (`fileDate`): As the dates (slashes become spaces) or their
+  own; they name the export's day notes, reflection files' {{date}} and what Link points to. Sync's own file name
+  pattern (Settings → Sync) is separate. Changing the heading makes Sync rewrite each synced day once (3-way merge
+  keeps the user's edits). e2e: `md-format.mjs`. An older
   `settings.shareFormat` (the Copy & share format) carries over until the Markdown page is saved; `share-format.js`
   is kept for that and its tests. Previews use the user's own latest day and reflection.
 - **Sync** (Settings → Sync, `#sync`; `ui-sync.js` page + run, `sync-remote.js` calls, `sync-md.js` pure and tested;

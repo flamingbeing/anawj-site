@@ -18,12 +18,18 @@ import { boldLabels } from './parts.js';
 
 export const DEFAULT_MARKDOWN = {
   // Copy / Share (the same as the Copy & share format's default before this page existed)
-  dayHead: '[[{{date}}]]',
+  // the day heading: 'plain' 2026-10-10 (default since log2 15; was a [[link]]) | 'heading' # 2026-10-10 |
+  // 'link' [[2026-10-10]] (to the day's note, named by fileDate) | 'custom' (dayHead and oneCase as typed)
+  dayHeadStyle: 'plain',
+  dayHead: '{{date}}',
   dayCase: '{{n}}. {{initials}}\n{{details}}',
-  oneCase: '[[{{date}}]]\n{{initials}}\n{{details}}',
+  oneCase: '{{date}}\n{{initials}}\n{{details}}',
   // the day's own notes (More → Notes), after its cases; or put {{notes}} in the day heading to place them there
   dayNotes: '## Notes\n\n{{notes}}',
-  dateFormat: 'iso',            // 'iso' 2026-10-10 | 'long' 10 Oct 2026 | 'dmy' 10/10/2026
+  dateFormat: 'iso',            // 'iso' 2026-10-10 | 'compact' 20261010 | 'long' 10 Oct 2026 | 'wlong' Sat 10 Oct 2026 | 'dmy' 10/10/2026 | 'custom' (datePattern)
+  datePattern: '',              // custom: YYYY YY MMMM MMM MM M DD D dddd ddd ([text] stays as typed)
+  fileDate: 'same',             // file names and [[link]] targets: 'same' as dateFormat (slashes become spaces), or their own
+  fileDatePattern: '',
   cats: 'names',                // {{categories}}: 'names' | 'codes' | 'tags' (#LSCS)
   links: 'wiki',                // 'wiki' [[note]] | 'md' [note](note.md)
   boldLabels: false,            // labelled parts (Settings → Advanced logging) as **Plan:** … in {{details}}
@@ -39,11 +45,14 @@ export const DEFAULT_MARKDOWN = {
   reflFigure: '{{image}}\n*{{caption}}*',
   reflRefs: '## References\n\n{{references}}',
 };
-export const CASE_FILLINS = ['date', 'iso', 'day', 'weekday', 'n', 'count', 'initials', 'details', 'categories', 'categoryCodes', 'tags', 'reflection'];
+export const CASE_FILLINS = ['date', 'dateLink', 'iso', 'day', 'weekday', 'n', 'count', 'initials', 'details', 'categories', 'categoryCodes', 'tags', 'reflection'];
 export const REFL_FILLINS = ['title', 'date', 'iso', 'day', 'initials', 'diagnosis', 'heading', 'status', 'summary', 'point', 'text', 'n', 'image', 'caption', 'references'];
 export const FM_FIELDS = ['date', 'heading', 'status', 'tags', 'initials', 'diagnosis', 'jr'];
 const TEXT_KEYS = ['dayHead', 'dayCase', 'dayNotes', 'oneCase', 'fileName', 'reflTitle', 'reflSummary', 'reflPoint', 'reflFigure', 'reflRefs'];
-const CHOICES = { dateFormat: ['iso', 'long', 'dmy'], cats: ['names', 'codes', 'tags'], links: ['wiki', 'md'], caseNotes: ['month', 'day'], folders: ['month', 'heading', 'flat'] };
+export const HEAD_STYLES = { plain: '{{date}}', heading: '# {{date}}', link: '{{dateLink}}' };
+const OLD_ONE = '[[{{date}}]]\n{{initials}}\n{{details}}';   // the one-case default before the styles
+const oneCaseFor = style => `${HEAD_STYLES[style]}\n{{initials}}\n{{details}}`;
+const CHOICES = { dayHeadStyle: ['plain', 'heading', 'link', 'custom'], dateFormat: ['iso', 'compact', 'long', 'wlong', 'dmy', 'custom'], fileDate: ['same', 'iso', 'compact', 'long', 'wlong', 'custom'], cats: ['names', 'codes', 'tags'], links: ['wiki', 'md'], caseNotes: ['month', 'day'], folders: ['month', 'heading', 'flat'] };
 const MAX_FIELD = 1000;
 export const MAX_JSON = 8 * 1024;   // what settings.markdown may take in the account
 
@@ -59,6 +68,15 @@ export function cleanMarkdown(m, shareFormat = null) {
     if (t.trim()) out[k] = t;
   }
   for (const [k, ok] of Object.entries(CHOICES)) if (ok.includes(src[k])) out[k] = src[k];
+  for (const k of ['datePattern', 'fileDatePattern']) if (typeof src[k] === 'string') out[k] = src[k].replace(/[\r\n]+/g, ' ').slice(0, 60);
+  // the day heading: a heading typed before the styles existed (or in the old Copy & share format) is Custom;
+  // otherwise the style writes dayHead, and oneCase too unless that was typed
+  const typed = k => [src[k], legacy[k]].some(v => typeof v === 'string' && v.trim());
+  if (!CHOICES.dayHeadStyle.includes(src.dayHeadStyle)) out.dayHeadStyle = typed('dayHead') ? 'custom' : 'plain';
+  if (out.dayHeadStyle !== 'custom') {
+    out.dayHead = HEAD_STYLES[out.dayHeadStyle];
+    if (!typed('oneCase') || [...Object.keys(HEAD_STYLES).map(oneCaseFor), OLD_ONE].includes(out.oneCase)) out.oneCase = oneCaseFor(out.dayHeadStyle);
+  }
   if (typeof src.frontMatter === 'boolean') out.frontMatter = src.frontMatter;
   if (typeof src.boldLabels === 'boolean') out.boldLabels = src.boldLabels;
   if (Array.isArray(src.fmFields)) out.fmFields = FM_FIELDS.filter(f => src.fmFields.includes(f));
@@ -68,6 +86,10 @@ export function cleanMarkdown(m, shareFormat = null) {
 export function storedMarkdown(m) {
   const c = cleanMarkdown(m), out = {};
   for (const [k, v] of Object.entries(c)) if (JSON.stringify(v) !== JSON.stringify(DEFAULT_MARKDOWN[k])) out[k] = v;
+  // a style's own heading and one-case line follow the style (not kept as typed)
+  if (c.dayHeadStyle !== 'custom') { delete out.dayHead; if (c.oneCase === oneCaseFor(c.dayHeadStyle)) delete out.oneCase; }
+  if (c.dateFormat !== 'custom') delete out.datePattern;
+  if (c.fileDate !== 'custom') delete out.fileDatePattern;
   if (JSON.stringify(out).length > MAX_JSON) throw new Error('The Markdown format is too long');
   return Object.keys(out).length ? out : null;
 }
@@ -89,11 +111,34 @@ export function fill(tpl, vals) {
 const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const isIso = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '');
 const weekday = iso => { if (!isIso(iso)) return ''; const [y, m, d] = iso.split('-').map(Number); return WD[new Date(y, m - 1, d).getDay()]; };
-export function fmtMdDate(iso, style = 'iso') {
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+// a date in a pattern: YYYY 2026 · YY 26 · MMMM October · MMM Oct · MM 10 · M 10 · DD 05 · D 5 · dddd Saturday · ddd Sat;
+// [text] stays as typed. An empty pattern is the ISO date.
+export function fmtPattern(iso, pattern) {
+  if (!isIso(iso)) return '';
+  if (!String(pattern || '').trim()) return iso;
+  const [y, m, d] = iso.split('-').map(Number), wd = new Date(y, m - 1, d).getDay();
+  const v = { YYYY: String(y), YY: String(y).slice(-2), MMMM: MONTHS_FULL[m - 1], MMM: MON[m - 1], MM: String(m).padStart(2, '0'), M: String(m), DD: String(d).padStart(2, '0'), D: String(d), dddd: DAYS[wd], ddd: DAYS[wd].slice(0, 3) };
+  return String(pattern).replace(/\[([^\]]*)\]|YYYY|YY|MMMM|MMM|MM|M|DD|D|dddd|ddd/g, (t, lit) => (lit != null ? lit : v[t]));
+}
+const PRESET = { compact: 'YYYYMMDD', wlong: 'ddd D MMM YYYY' };
+export function fmtMdDate(iso, style = 'iso', pattern = '') {
   if (!isIso(iso)) return '';
   if (style === 'long') return fmtDate(iso);
   if (style === 'dmy') { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; }
+  if (PRESET[style]) return fmtPattern(iso, PRESET[style]);
+  if (style === 'custom') return fmtPattern(iso, pattern);
   return iso;
+}
+// {{date}} as the format chooses; the day note's name (and [[link]] target), without slashes
+export const mdDate = (iso, f) => fmtMdDate(iso, f.dateFormat, f.datePattern);
+export const fileDate = (iso, f) => (isIso(iso) ? safeName(f.fileDate === 'same' || !f.fileDate ? mdDate(iso, f) : fmtMdDate(iso, f.fileDate, f.fileDatePattern)) : '');
+// {{dateLink}}: a link to the day's note, showing {{date}} when the name differs
+export function dateLink(iso, f) {
+  if (!isIso(iso)) return '';
+  const name = fileDate(iso, f), shown = mdDate(iso, f);
+  return f.links === 'md' ? `[${shown.replace(/[[\]]/g, '\\$&')}](${encodeURIComponent(name)}.md)` : name === shown ? `[[${name}]]` : `[[${name}|${shown}]]`;
 }
 
 // #tags: letters, digits, - and _ only ("CNB(Obs)" -> "#CNB-Obs")
@@ -122,7 +167,7 @@ function caseVals(c, n, count, f, ctx) {
   const p = caseParts(c);
   const text = String(p.details || '').trim(), details = f.boldLabels && ctx.labels ? boldLabels(text, ctx.labels) : text;
   return {
-    date: fmtMdDate(c.date, f.dateFormat) || c.dateText || '', iso: c.date || '', day: c.date ? fmtDate(c.date) : (c.dateText || ''), weekday: weekday(c.date),
+    date: mdDate(c.date, f) || c.dateText || '', dateLink: dateLink(c.date, f), iso: c.date || '', day: c.date ? fmtDate(c.date) : (c.dateText || ''), weekday: weekday(c.date),
     n: n ?? '', count: count ?? '', initials: p.initials, details, case: details,
     categories: catsText(c.cats, f.cats, ctx), categoryCodes: sortCodes(c.cats || []).join(', '),
     tags: (c.tags || []).map(k => (ctx.tagName ? ctx.tagName(k) : k)).filter(Boolean).join(', '),
@@ -138,7 +183,7 @@ export function mdCase(c, m, ctx = {}) { const f = cleanMarkdown(m); return fill
 export function mdDay(date, cases, m, ctx = {}, notes = []) {
   const f = cleanMarkdown(m);
   const nText = notesMd(notes);
-  const vals = { date: fmtMdDate(date, f.dateFormat), iso: date || '', day: date ? fmtDate(date) : 'No date', weekday: weekday(date), count: cases.length };
+  const vals = { date: mdDate(date, f), dateLink: dateLink(date, f), iso: date || '', day: date ? fmtDate(date) : 'No date', weekday: weekday(date), count: cases.length };
   const inHead = /\{\{?notes\}?\}/.test(f.dayHead);
   const head = fill(f.dayHead, inHead ? { ...vals, notes: nText } : vals);
   const sep = f.dayCase.includes('\n') ? '\n\n' : '\n';
@@ -158,9 +203,10 @@ export function frontMatter(fields) {
   return rows.length ? `---\n${rows.map(([k, v]) => `${k}: ${yaml(v)}`).join('\n')}\n---\n\n` : '';
 }
 
+const MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 export function reflectionPath(r, f, used = new Set()) {
-  const base = safeName(fill(f.fileName, { date: fmtMdDate(r.date, f.dateFormat) || 'No date', iso: r.date || '', initials: r.initials || '', heading: headingLabel(r.headingId), title: r.title || '', diagnosis: r.diagnosis || '' }).replace(/\n/g, ' '));
+  const base = safeName(fill(f.fileName, { date: fileDate(r.date, f) || 'No date', iso: r.date || '', initials: r.initials || '', heading: headingLabel(r.headingId), title: r.title || '', diagnosis: r.diagnosis || '' }).replace(/\n/g, ' '));
   const folder = f.folders === 'heading' ? `Reflections/${safeName(headingLabel(r.headingId))}` : f.folders === 'month' ? `Reflections/${r.date ? r.date.slice(0, 7) : 'No date'}` : 'Reflections';
   let p = `${folder}/${base}.md`, i = 2;
   while (used.has(p.toLowerCase())) p = `${folder}/${base} (${i++}).md`;
@@ -171,7 +217,7 @@ export function reflectionPath(r, f, used = new Set()) {
 // one reflection as a note. images: { [figureImageId]: 'images/<file>' } for the figures included in the zip
 export function reflectionNote(r, m, { path = '', images = {}, caseLink = '' } = {}) {
   const f = cleanMarkdown(m);
-  const base = { title: r.title || r.diagnosis || 'Reflection', date: fmtMdDate(r.date, f.dateFormat), iso: r.date || '', day: r.date ? fmtDate(r.date) : '', initials: r.initials || '', diagnosis: r.diagnosis || '', heading: headingLabel(r.headingId), status: r.status || 'draft', summary: String(r.summary || '').trim() };
+  const base = { title: r.title || r.diagnosis || 'Reflection', date: mdDate(r.date, f), iso: r.date || '', day: r.date ? fmtDate(r.date) : '', initials: r.initials || '', diagnosis: r.diagnosis || '', heading: headingLabel(r.headingId), status: r.status || 'draft', summary: String(r.summary || '').trim() };
   const fm = f.frontMatter ? frontMatter(Object.fromEntries(f.fmFields.map(k => [k,
     k === 'date' ? (r.date || '') : k === 'heading' ? base.heading : k === 'status' ? base.status : k === 'initials' ? base.initials : k === 'diagnosis' ? base.diagnosis
       : k === 'jr' ? !!r.jr : ['apmes/reflection', tagSlug(base.heading).slice(1)]]))) : '';
@@ -210,7 +256,7 @@ export function caseNotes(cases, m, ctx = {}, notes = []) {
   const dayText = (date, list) => (date ? mdDay(date, list, f, ctx, notesBy.get(date) || []) : `## No date\n${list.map((c, i) => fill(f.dayCase, caseVals(c, i + 1, list.length, f, ctx))).join('\n')}`);
   if (f.caseNotes === 'day') {
     for (const [date, list] of byDay) {
-      const path = date ? `Cases/${date.slice(0, 7)}/${date}.md` : 'Cases/No date.md';
+      const path = date ? `Cases/${date.slice(0, 7)}/${fileDate(date, f)}.md` : 'Cases/No date.md';
       const fm = f.frontMatter ? frontMatter({ date, cases: String(list.length), ...(notesBy.has(date) ? { notes: String(notesBy.get(date).length) } : {}), tags: ['apmes/cases'] }) : '';
       files.push({ path, text: fm + dayText(date, list) + '\n' });
     }
@@ -259,7 +305,7 @@ export function exportNotes({ cases = [], reflections = [], notes = [], m = null
   if (o.reflections) for (const r of reflections) {
     const path = reflPath.get(r.id);
     const c = r.caseId && o.cases ? cases.find(x => x.id === r.caseId) : null;
-    const caseLink = c && c.date ? 'Case: ' + noteLink(f.caseNotes === 'day' ? `Cases/${c.date.slice(0, 7)}/${c.date}` : `Cases/${c.date.slice(0, 7)}`, c.date, f.links, path) : '';
+    const caseLink = c && c.date ? 'Case: ' + noteLink(f.caseNotes === 'day' ? `Cases/${c.date.slice(0, 7)}/${fileDate(c.date, f)}` : `Cases/${c.date.slice(0, 7)}`, mdDate(c.date, f), f.links, path) : '';
     files.push({ path, text: reflectionNote(r, f, { path, images, caseLink }) });
   }
   if (o.progress && progress) files.push({ path: 'Progress.md', text: progressNote(progress.rows, progress.refl, { year: progress.year, today: progress.today, ctx }) });
