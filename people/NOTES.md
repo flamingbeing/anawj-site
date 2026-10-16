@@ -30,6 +30,9 @@ missing was one obvious screen to keep them, and an easy way to add the yearly b
     Grades: RES1–RES3 are R1–R3, R/SR is R4 or R5 (the user picks; R3 now suggests R4), AC means graduated; other
     grades (MOPEX, RR, NHG, Fellow, consultants) are ignored. Years are compared on the 1st of the roster month and
     fixed through the intake (`rYear` cleared), so they keep moving up each July.
+    The staff list's grades are only as current as the roster app's People › Staff: since #703 its sheet import moves
+    people to the group the month's sheet shows (ticked in its review, newest month only), so import the new month there
+    first (after July, the new July tab), then send the list here.
     Matching is by name (the roster has no emails): the same words in any order, or one name's words (two or more) all
     in the other, and only when there is one candidate both ways. Anyone else on the roster is listed as new: the user
     says who they are (similar names first) or adds them with their email. Ticked by default: year changes and
