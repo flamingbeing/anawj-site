@@ -42,11 +42,11 @@ const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
 page.on('console', m => { if (m.type() === 'error' && !/favicon|404/.test(m.text())) errors.push(m.text()); });
 
-const axe = async label => {
+const axe = async (label, pg = page) => {
   if (!fs.existsSync(AXE)) return;
-  if (!(await page.evaluate(() => !!window.axe))) await page.addScriptTag({ path: AXE });
-  await page.waitForTimeout(300);   // let a toast finish fading in (0.2 s): half-faded text reads as low contrast
-  const r = await page.evaluate(() => window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] }));
+  if (!(await pg.evaluate(() => !!window.axe))) await pg.addScriptTag({ path: AXE });
+  await pg.waitForTimeout(300);   // let a toast finish fading in (0.2 s): half-faded text reads as low contrast
+  const r = await pg.evaluate(() => window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] }));
   const bad = r.violations.filter(v => v.impact === 'serious' || v.impact === 'critical');
   assert.equal(bad.length, 0, `axe (${label}): ` + bad.map(v => v.id + ' ' + v.nodes[0]?.target).join('; '));
 };
@@ -201,6 +201,59 @@ await axe('rotations'); await shot('6-rotations');
   assert.match(await page.textContent('main'), /Older tabs not read.*Old Block/);
   assert.equal(await page.locator('td.rt-c', { hasText: 'OG1' }).count(), 20);
   assert.equal(await page.locator('td.rt-prov').count(), 5);   // KIV ICU every tenth week: 0, 10, 20, 30, 40
+}
+
+// 6d. Pull: NUH Junior Monthly (practice) opens People, People says nothing until the user links names and taps Send,
+// and the postings land in the roster's Paste rotations box
+{
+  const jm2 = await ctx.newPage();
+  jm2.on('pageerror', e => errors.push('NUH Junior Monthly: ' + e));
+  await jm2.goto('https://nuhjuniormonthly.anawj.com/?demo#postings');
+  await jm2.waitForFunction(() => !!window.jmApp);
+  await jm2.evaluate(() => window.jmApp.setMonth('2027-03'));
+  await jm2.evaluate(() => { location.hash = '#postings'; });
+  const [pp] = await Promise.all([ctx.waitForEvent('page'), jm2.getByRole('button', { name: 'Pull from APMES People…' }).click()]);
+  pp.on('pageerror', e => errors.push('People (pull): ' + e));
+  assert.match(pp.url(), /^https:\/\/apmes\.anawj\.com\/people\/\?demo&pull=rotations#rotations$/);
+  await pp.getByText('Waiting for NUH Junior Monthly to say what it needs…').or(pp.getByText(/It asked for/)).first().waitFor();
+  await pp.getByRole('button', { name: 'Use a made-up sample' }).click();
+  await pp.locator('#rt-pullcard').waitFor();
+  assert.equal(await pp.locator('#rt-send').isDisabled(), true, 'nobody is linked yet: nothing to send');
+  assert.match(await pp.textContent('#rt-pullcard'), /Kim Placeholder/);
+  assert.doesNotMatch(await pp.textContent('#rt-pullcard'), /Alex Example/, 'people with no critical posting are not listed');
+  const pick = async (sheetName, optionIndex) => {
+    const sel = pp.getByLabel('Roster name for ' + sheetName);
+    await sel.selectOption({ index: optionIndex });
+  };
+  await pick('Kim Placeholder', 2);                    // 0 is the prompt, 1 is "Not in the roster", 2 the first roster name
+  await pick('Dana Visitor', 1);                       // not in the roster
+  const chosen = await pp.getByLabel('Roster name for Kim Placeholder').evaluate(el => el.value);
+  assert.ok(chosen && chosen !== '__none', 'a roster name is chosen');
+  await pp.getByLabel('Roster name for Pat Madeup').selectOption({ index: 3 });
+  await pp.getByLabel('Roster name for Robin Testcase').selectOption({ index: 4 });
+  await pp.getByRole('button', { name: /^Send 3 people to NUH Junior Monthly$/ }).waitFor();
+  assert.equal(await jm2.locator('.pv-paste').count(), 0, 'nothing arrives before Send');
+  await axe('rotations pull', pp);
+  const closedPull = pp.waitForEvent('close');
+  await pp.locator('#rt-send').click();
+  const ta = jm2.locator('.pv-paste');
+  await ta.waitFor();
+  const text = await ta.inputValue();
+  assert.match(text, /^Name\t2027-03-01\t2027-03-08\t/);
+  assert.ok(text.includes(chosen + '\t'), 'the roster\'s own name is used');
+  assert.match(text, /\tICU\t/);
+  assert.doesNotMatch(text, /Dana|Kim Placeholder/);
+  await closedPull;
+  // the link is remembered in this browser: a second visit starts with it chosen
+  const links = await page.evaluate(() => JSON.parse(localStorage.getItem('people-rot-links-v1') || '{}'));
+  assert.equal(links.kimplaceholder, chosen);
+  assert.equal(links.danavisitor, '');
+  await jm2.getByRole('button', { name: 'Apply' }).click();
+  await jm2.waitForTimeout(300);
+  const applied = await jm2.evaluate(() => JSON.parse(localStorage.getItem('nuhjm-demo')));
+  assert.ok(Object.values(applied.cells).some(day => Object.values(day).some(c => (c.a || []).includes('ICU'))), 'the pulled postings are applied');
+  await jm2.close();
+  await page.evaluate(() => localStorage.removeItem('people-rot-links-v1'));
 }
 
 // 7. PDs: the admin adds one

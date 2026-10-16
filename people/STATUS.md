@@ -23,13 +23,12 @@ check `evals/` work in progress too.
 
 ## Next (agreed queue)
 
-1. **Rotations, stage 1, part 1 is built** (read-only grid, people per posting, a person's history, in the browser; People ›
-   Rotations, owner's go 16 Oct 2026). **Part 2, next:** link sheet names to people (by hand once, kept in the browser; the
-   sheet often has first names only), then the hand-off of the postings the monthly roster needs (ICU, cardiac, the OG
-   floats) in the layout NUH Junior Monthly's Paste rotations takes (names down, Mondays across), named as the roster app
-   names people. The roster app **pulls** it (it opens People, which sends after the user taps Send): the roster app's side is
-   in `nuh-junior-monthly/NOTES.md`, "Rotations from People". Open: reading the sheet straight from Google (the owner has no
-   link yet) instead of a downloaded .xlsx. The reader is a standalone module (`js/rotations.js`) so it can move.
+1. **Rotations, stage 1 is built** (owner's go 16 Oct 2026): part 1, the read-only grid, people per posting and a person's
+   history, in the browser; part 2, linking sheet names to roster names by hand once (kept in this browser) and the pull by
+   NUH Junior Monthly (Postings › Pull from APMES People…: it opens People, People sends ICU, cardiac and OG float postings
+   only after the user taps Send, and they land in the roster's Paste rotations box to look over and Apply). Open: reading the
+   sheet straight from Google (the owner has no link yet) instead of a downloaded .xlsx; a real run with the owner's sheet and
+   the real roster. The reader is a standalone module (`js/rotations.js`) so it can move.
 2. **Rotations store with access control** (owner, 16 Oct 2026; the empty project `apmes-rotations` exists, locked, with the owner as
    its only member): see the decisions log. Not needed for stage 1.
 3. Later, and only with the rotation planner's say: editing rotations in the app (stage 2), then retiring the sheet.

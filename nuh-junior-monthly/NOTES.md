@@ -386,7 +386,7 @@ desktop and in their description. `test/e2e.mjs` checks 320, 360, 390 and 430 px
 slim banners, axe on the header and the Filters sheet.
 
 
-## Rotations from People (planned; owner, 16 Oct 2026)
+## Rotations from People (built 16 Oct 2026; owner's plan)
 
 APMES People will hold the department's rotations (who is placed where, week by week), read at first from the master
 block rotation sheet (plan and decisions: `people/STATUS.md`, Next and decisions log; the sheet's real details are in the
@@ -398,7 +398,10 @@ owner's private notes). The owner wants **this app to pull** them, to help plan 
 - It carries only the postings this app uses: ICU, cardiac (`C`, `C-e`, `C-p`) and the OG floats; people named as this app names
   them (People holds the link from the sheet's name to the person); weeks as Mondays. The layout is the one Postings › Paste
   rotations already reads (names down, Mondays across), so `parseRotations` should take it unchanged.
-- Not built, and not to be built before People's side exists. Until then the rosterer types these postings by hand.
+- Built: Postings › **Pull from APMES People…** (`js/people-pull.js`) opens People in pull mode, answers its hello with the
+  staff names, the posting codes this app has and the Mondays shown, and receives the text only when the user taps Send there.
+  It lands in the Paste rotations box (`pasteDialog(prefill)`), so the rosterer looks it over and taps Apply: unknown names
+  and codes are skipped as with any paste. Details of People's side: `people/NOTES.md`, "Rotations".
 - Open questions for when it is built: how provisional weeks (the sheet's `KIV` prefix) and elective weeks (`-E` suffix, mostly
   not counted toward manpower) show on Postings; whether the OG floats (`OGDF`, `OGNF1`, `OGNF2`) are postings or calls here.
 
