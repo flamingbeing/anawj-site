@@ -647,6 +647,12 @@ portfolio content.
   All, this device: `display().pageSize`, unset = 100); "‹ Page 2 of 14 ›" with a list of the pages and each page's
   dates to jump to (`paging.js`, unit-tested); a new search, filter or view goes back to page 1; the Calendar stays
   monthly. Replaces "Show more".
+- **Group by and Sort** (log2 14): in the Filter panel while the List shows (so the List looks as before), Group by Month (default) / Day / Week / Residency year / APMES tag
+  (a case under each of its tags; the heading has "12 of 20 for the target") / Your tags / Flags (No tag yet,
+  ☆ Interesting, Plan for later) / None, and Sort Newest (default) / Oldest / Initials A–Z / Most tags; this device
+  (`display().lbGroup` / `lbSort`, unset = the defaults). The default looks exactly as before (Jump on each month);
+  any other choice draws headings that fold (tap) and say how many cases, "(continued)" across a page, and "Select
+  these N" while selecting. Pure grouping in `lb-group.js` (unit-tested); pages count the rows shown.
 - **Search** (log2 9e, first part): 🔍 in the header on every tab, or / on a computer (not while typing), opens
   `#search` (`ui-search.js`; the engine `global-search.js`, unit-tested). One box over cases (planned ones too),
   reflections and notes (loaded the first time Search opens; offline works on what is on the device). The Logbook's

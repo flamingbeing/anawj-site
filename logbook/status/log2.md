@@ -1,9 +1,8 @@
 # Now: Claude Code, Logbook 2 (log2)
 
 **Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): the 15 Oct batch is merged (#651–#664). Owner said
-go on the next queue (15 Oct): #665 Logbook, #667 Notes and #669 Reflections Select and Bulk edit (9–9d) merged; #671 and #674 Search (9e) merged; #677 the Grid (10) merged; #679 paging (11) open; **12, Send to presets, built on top**. Then 14 (Group by and
-Sort) and 15 (Markdown), in order.
-Not started: 14, 15 (Markdown).
+go on the next queue (15 Oct): #665 Logbook, #667 Notes and #669 Reflections Select and Bulk edit (9–9d) merged; #671 and #674 Search (9e) merged; #677 the Grid (10) merged; #679 paging (11) merged; #680 Send to presets (12) open; **14, Group by and Sort, built on top**. Then 15 (Markdown).
+Not started: 15 (Markdown).
 Waiting on the owner: a real-phone check of sign-in (installed app and Firefox for Android), and of each new Send to
 preset on an iPhone (Apple Notes Shortcut, Email, Telegram, Drafts, Bear, Things, Day One).
 
@@ -122,7 +121,7 @@ Agreed queue (one PR each, in order, once he says go):
     link), Email (mailto), Telegram, Drafts, Bear, Things, Day One; a line for apps with no link (Keep, Notion, OneNote):
     use Share. Check each link on a real iPhone first (owner or Firetop).
 
-14. **Group by and Sort in the Logbook List view** (as Reflections has): Group by Month (default) / Day / Week / Residency
+14. **Built (Group by PR).** **Group by and Sort in the Logbook List view** (as Reflections has): Group by Month (default) / Day / Week / Residency
     year / APMES tag (a case under each of its tags; heading shows count vs target) / Your tags / Flags (No tag yet,
     ☆ Interesting, Plan for later) / None; Sort Newest / Oldest / Initials A–Z / Most tags. Headings fold with counts;
     per device. Pages count cases ("(continued)" on a split group); when selecting, a group heading selects the
