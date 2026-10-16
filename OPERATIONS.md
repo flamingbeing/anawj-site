@@ -89,9 +89,20 @@ near zero (the APMES apps are a demo). Rough projections, not measurements:
 ## The home computer ("firetop" helper)
 
 The owner's always-on Claude Code session at home (Remote Control): session `session_01F92cPiysiT5WAFPXMga7f4`,
-"firetop-partitioned-rose". Cloud sessions hand it work with `send_message`; it does each change to a live
-project only with the owner's explicit OK, and reports back by message or through the owner. Its own notes stay on
-that computer, never in this repo.
+"firetop-partitioned-rose". Cloud sessions hand it work with `send_message` and it reports back by message. Its own notes stay on that
+computer, never in this repo.
+
+**Standing permission (owner, 16 Oct 2026):** firetop has standing read-write permission for the owner's Firebase
+projects and Cloudflare account, and is signed in to both. So when a session needs a live change the cloud sandbox
+can't make, or one the owner used to do by hand, send firetop a job instead of asking the owner: creating or changing
+a Firebase project, Firestore data or rules, Auth settings and authorised domains, Hosting, IAM roles, budgets and
+backups, the GitHub secrets and variables for those, and Cloudflare DNS, Workers and rules checks. A job says the
+project or zone, the exact change (file, rule text, record or document ids), why, and how to verify; never put
+secrets or patient or resident data in it. Firetop saves the before-state, makes the change, verifies it, logs it in
+its own change log and replies. **Still the owner's call, not through firetop alone:** deleting databases, backups,
+buckets or domains; making private data public; spending beyond his budgets; account-level security (members, API
+tokens, sign-in methods). Console-only clicks (turning on a sign-in provider, OAuth client origins, publishing a
+consent screen) still need the owner; firetop gives him the exact clicks.
 
 Send it:
 

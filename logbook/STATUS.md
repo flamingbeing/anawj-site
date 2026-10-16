@@ -6,7 +6,7 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-16 by Claude Code, Logbook 1 (log1): #581 closed as superseded by #661; Cloudflare plugin (#673).
+Last updated: 2026-10-16 by Claude Code, Logbook 3 (log3).
 
 ## Now
 
@@ -134,6 +134,9 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Decisions log
 
+- 2026-10-16 (log3): Firetop (the home-computer session) has the owner's standing read-write permission for his Firebase
+  projects and Cloudflare account: sessions send it live-change jobs instead of asking the owner. Limits (deletions, making
+  data public, spending, account security, console-only clicks) and the job format: `OPERATIONS.md`, "The home computer".
 - 2026-10-16 (log1): Where two sessions built the same thing from different instructions, the newer one on main stands (owner, on
   Totals: #661's layout and labels win over the older #581, which was closed). Before pushing an older branch over main, check
   whether main already changed that area, and ask.
