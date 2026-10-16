@@ -218,6 +218,16 @@ const noSideScroll = async (page, label) => {
   await page.getByRole('button', { name: 'Unlock', exact: true }).click();
   await page.waitForTimeout(300);
   ok(await page.locator('#lockm').getAttribute('aria-pressed') === 'false', 'unlocked again');
+  // a new grade in the sheet: the import review lists the move, ticked, and Import makes it
+  sheet[6][1] = 'RES3';
+  await page.getByRole('button', { name: 'Read from Google' }).click();
+  await page.waitForSelector('text=1 person moves grade');
+  const move = page.getByRole('checkbox', { name: 'Icu Example RES2 → RES3' });
+  ok(await move.isChecked(), 'the import review lists the grade change, ticked');
+  await axe(page, 'the import review with a grade change', '[role="dialog"]');
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
+  await page.waitForTimeout(300);
+  ok(await page.evaluate(() => window.jmApp.store.get().staff.find(p => p.name === 'Icu Example').group) === 'res3', 'Import moved them to the new group');
   await page.close();
 }
 await b.close();
