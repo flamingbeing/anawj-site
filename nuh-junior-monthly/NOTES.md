@@ -151,3 +151,8 @@ saves, who saved last and when, when this browser last changed). `js/cloudstate.
 tab comes back, once the cloud has been used here). Auto-fill shows only on the Roster tab; a locked month says so on the
 roster with an Unlock button. After a verified write to the Google Sheet a toast offers to open the cloud. No autosync: the
 status is the safeguard (owner, 16 Oct 2026).
+
+## Locking cells (owner, 16 Oct 2026)
+
+A cell's lock (Auto-fill leaves it alone) is the first thing in the cell popup, and Paint has a **Lock** chip: tap or drag
+across cells to lock them, tap a locked cell to unlock it. Not to be confused with locking a month (header button).

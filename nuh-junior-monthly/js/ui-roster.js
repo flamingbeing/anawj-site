@@ -123,6 +123,13 @@ function cellHas(state, d, sid, code) {
   return !!c && ((c.a || []).includes(code) || (c.r || []).includes(code));
 }
 
+// What painting with `code` does to this cell: 'del' removes the code (or unlocks, or clears), 'add' adds it (or locks)
+function paintMode(state, d, sid, code) {
+  if (code === '__clear') return 'del';
+  if (code === '__lock') return state.cells?.[d]?.[sid]?.lock ? 'del' : 'add';
+  return cellHas(state, d, sid, code) ? 'del' : 'add';
+}
+
 // ---------- view ----------
 export function mount(el, app) {
   const { h, icon } = app;
@@ -218,7 +225,7 @@ export function mount(el, app) {
     if (!ui.paint) { paintKey = ''; return; }
     const duties = (state.duties || []).filter(d => d.kind !== 'derived');
     // ('__clear' is the Clear chip, not a duty: keep it)
-    if (ui.paintCode !== '__clear' && (!ui.paintCode || !duties.some(d => d.code === ui.paintCode))) ui.paintCode = (duties.find(d => d.code === 'AL') || duties[0] || {}).code || '';
+    if (ui.paintCode !== '__clear' && ui.paintCode !== '__lock' && (!ui.paintCode || !duties.some(d => d.code === ui.paintCode))) ui.paintCode = (duties.find(d => d.code === 'AL') || duties[0] || {}).code || '';
     const k = JSON.stringify([ui.paintCode, duties.map(d => [d.code, d.name, d.kind, d.color, d.ink])]);
     if (k === paintKey) return;
     paintKey = k;
@@ -241,7 +248,11 @@ export function mount(el, app) {
       type: 'button', class: 'pchip pchip-clear', 'aria-pressed': String(ui.paintCode === '__clear'), title: 'Clear cells',
       html: `${icon('eraser')}<span>Clear</span>`, onclick: () => { ui.paintCode = '__clear'; renderPaintBar(app.store.get()); },
     }));
-    paintBar.append(h('span', { class: 'pb-hint' }, ui.paintCode === '__clear' ? 'Tap (or drag with a mouse) to clear cells' : `Tap cells to add ${ui.paintCode} (drag with a mouse); tap a cell that has it to remove`));
+    paintBar.append(h('button', {
+      type: 'button', class: 'pchip pchip-lock', 'aria-pressed': String(ui.paintCode === '__lock'), title: 'Lock cells so Auto-fill leaves them alone (tap a locked cell to unlock it)',
+      html: `${icon('lock')}<span>Lock</span>`, onclick: () => { ui.paintCode = '__lock'; renderPaintBar(app.store.get()); },
+    }));
+    paintBar.append(h('span', { class: 'pb-hint' }, ui.paintCode === '__clear' ? 'Tap (or drag with a mouse) to clear cells' : ui.paintCode === '__lock' ? 'Tap cells to lock them so Auto-fill leaves them alone (drag with a mouse); tap a locked cell to unlock it' : `Tap cells to add ${ui.paintCode} (drag with a mouse); tap a cell that has it to remove`));
     paintBar.append(h('button', { type: 'button', class: 'btn btn-primary btn-sm pb-done', onclick: () => setPaint(false) }, `Done painting`));
   }
   function setPaint(on) {
@@ -861,7 +872,7 @@ export function mount(el, app) {
         if (ev.type !== 'pointerup' || Math.hypot(ev.clientX - x0, ev.clientY - y0) > 10) return;
         const state = app.store.get();
         const code = ui.paintCode;
-        paintDrag = { code, mode: code === '__clear' ? 'del' : cellHas(state, b.dataset.d, b.dataset.s, code) ? 'del' : 'add', cells: new Map(), last: null };
+        paintDrag = { code, mode: paintMode(state, b.dataset.d, b.dataset.s, code), cells: new Map(), last: null };
         addPaintCell(b);
         finishPaint();
       };
@@ -873,7 +884,7 @@ export function mount(el, app) {
     try { if (b.hasPointerCapture?.(e.pointerId)) b.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     const state = app.store.get();
     const code = ui.paintCode;
-    const mode = code === '__clear' ? 'del' : cellHas(state, b.dataset.d, b.dataset.s, code) ? 'del' : 'add';
+    const mode = paintMode(state, b.dataset.d, b.dataset.s, code);
     paintDrag = { code, mode, cells: new Map(), last: null };
     addPaintCell(b);
     const move = (ev) => {
@@ -914,7 +925,7 @@ export function mount(el, app) {
     if (paintDrag.cells.has(k)) return;
     paintDrag.cells.set(k, { d: b.dataset.d, s: b.dataset.s });
     b.classList.add(paintDrag.mode === 'add' ? 'p-add' : 'p-del');
-    if (paintDrag.mode === 'add') b.setAttribute('data-paint', paintDrag.code);
+    if (paintDrag.mode === 'add') b.setAttribute('data-paint', paintDrag.code === '__lock' ? '🔒' : paintDrag.code);
   }
 
   function finishPaint() {
@@ -923,19 +934,20 @@ export function mount(el, app) {
     scroll.querySelectorAll('.p-add, .p-del').forEach(b => { b.classList.remove('p-add', 'p-del'); b.removeAttribute('data-paint'); });
     if (!p || !p.cells.size) return;
     const n = p.cells.size;
-    const label = p.code === '__clear' ? `Clear ${n} cell${n > 1 ? 's' : ''}` : `${p.mode === 'add' ? 'Paint' : 'Remove'} ${p.code} on ${n} cell${n > 1 ? 's' : ''}`;
+    const label = p.code === '__clear' ? `Clear ${n} cell${n > 1 ? 's' : ''}` : p.code === '__lock' ? `${p.mode === 'add' ? 'Lock' : 'Unlock'} ${n} cell${n > 1 ? 's' : ''}` : `${p.mode === 'add' ? 'Paint' : 'Remove'} ${p.code} on ${n} cell${n > 1 ? 's' : ''}`;
     app.store.commit(label, draft => {
       const dmap = M.dutyMap(draft);
       for (const { d, s } of p.cells.values()) {
         if (p.code === '__clear') {
           if (draft.cells?.[d]?.[s]) { delete draft.cells[d][s]; if (!Object.keys(draft.cells[d]).length) delete draft.cells[d]; }
-        } else toggleCode(draft, d, s, p.code, p.mode === 'add', dmap);
+        } else if (p.code === '__lock') M.setCell(draft, d, s, { lock: p.mode === 'add' });
+        else toggleCode(draft, d, s, p.code, p.mode === 'add', dmap);
       }
     });
   }
 
   function paintOne(b) {
-    paintDrag = { code: ui.paintCode, mode: ui.paintCode === '__clear' || cellHas(app.store.get(), b.dataset.d, b.dataset.s, ui.paintCode) ? 'del' : 'add', cells: new Map(), last: null };
+    paintDrag = { code: ui.paintCode, mode: paintMode(app.store.get(), b.dataset.d, b.dataset.s, ui.paintCode), cells: new Map(), last: null };
     markPaint(b);
     finishPaint();
   }
@@ -957,6 +969,12 @@ export function mount(el, app) {
     function build(state, key) {
       wrap.innerHTML = '';
       const chips = [], secs = [];
+      // the lock first: it decides whether Auto-fill may touch this cell at all
+      const lockId = 'lk-' + Math.random().toString(36).slice(2, 7);
+      const lock = h('input', { type: 'checkbox', id: lockId });
+      lock.addEventListener('change', () => app.store.commit(`${lock.checked ? 'Lock' : 'Unlock'} ${who()}`, draft => M.setCell(draft, d, sid, { lock: lock.checked })));
+      wrap.append(h('div', { class: 'ced-row ced-lockrow' },
+        h('label', { class: 'switch', for: lockId }, lock, h('span', { class: 'sw-track', 'aria-hidden': 'true' }), h('span', null, 'Lock (auto-fill won\'t change it)'))));
       for (const [kind, title] of KIND_ORDER) {
         const list = (state.duties || []).filter(x => x.kind === kind);
         if (!list.length) continue;
@@ -985,14 +1003,10 @@ export function mount(el, app) {
         if (v === (cellNow().note || '')) return;
         app.store.commit(`Note · ${who()}`, draft => M.setCell(draft, d, sid, { note: v }));
       });
-      const lockId = 'lk-' + Math.random().toString(36).slice(2, 7);
-      const lock = h('input', { type: 'checkbox', id: lockId });
-      lock.addEventListener('change', () => app.store.commit(`${lock.checked ? 'Lock' : 'Unlock'} ${who()}`, draft => M.setCell(draft, d, sid, { lock: lock.checked })));
       const noteSec = h('div', { class: 'ced-sec' }, h('h3', { class: 'ced-h' }, 'Note'), note);
       wrap.append(noteSec);
       const clear = h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm', onclick: () => clearCell(d, sid) }, 'Clear');
       wrap.append(h('div', { class: 'ced-row' },
-        h('label', { class: 'switch', for: lockId }, lock, h('span', { class: 'sw-track', 'aria-hidden': 'true' }), h('span', null, 'Lock (auto-fill won\'t change it)')),
         h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { app.go('day', { d, m: app.month }); closeEditor(); } }, 'Open day'),
         clear));
       built = { key, chips, firstSec: secs[0] || noteSec, noteSec, note, lock, clear, extras: [] };
