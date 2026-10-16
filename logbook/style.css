@@ -1695,7 +1695,7 @@ ul.cases li.refl-under button { min-height: 32px; text-align: left; }
 /* a press and hold selects: no text selection or iOS callout under the finger (Copy is in the row menu) */
 @media (pointer: coarse) { .notes-page ul.notes-rows li, .lb-wrap ul.cases li:not(.monthhead) { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }
 /* Search (🔍 in the header; log2 9e) */
-.who-search { min-height: 36px; min-width: 36px; padding: 2px 8px; border-radius: 999px; background: transparent; border: 1px solid var(--edge, var(--line)); font-size: calc(15px * var(--fs, 1)); line-height: 1; }
+.who-search { min-height: 40px; min-width: 40px; padding: 2px 8px; border-radius: 999px; background: transparent; border: 1px solid var(--edge, var(--line)); font-size: calc(15px * var(--fs, 1)); line-height: 1; }
 .gs-help { list-style: none; margin: 8px 0; padding: 8px 10px; border: 1px solid var(--edge, var(--line)); border-radius: 8px; font-size: calc(13px * var(--fs, 1)); }
 .gs-help[hidden] { display: none; }
 .gs-help li { padding: 3px 0; }

@@ -115,7 +115,7 @@ try { for (const width of [390, 1280]) {
   await dlg.getByRole('button', { name: 'Move to the bin' }).click();
   await toastSays(/2 cases moved to the recycle bin/);
   await poll(async () => !(await server('fake-big-1')) && !(await server('fake-big-2')), 'binned');
-  assert.ok(await bar.isHidden());
+  await poll(() => bar.isHidden(), 'selecting stops once the move is done');   // (the server can be quicker than the page)
 
   // the calendar's day list selects too
   await p.getByLabel('Search cases').fill('');
