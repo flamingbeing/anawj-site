@@ -24,9 +24,19 @@ keeping. The goal: everything needed to carry on is on main, not only in this co
    - Update "Last updated" with the date and your session.
 3. **NOTES.md**: copy lasting rules, owner preferences and lessons (things true beyond this task) into the app's
    NOTES.md in its existing sections. Rules for every assistant go in `AGENTS.md`; Claude-only ones in `CLAUDE.md`.
-4. **Public repo**: no patient data, names, real evaluation records, secrets or tokens.
-5. **Commit and merge**: on your own session branch, from current main; a documentation-only PR may merge once
+4. **Public repo**: no patient data, names, real evaluation records, secrets or tokens. And nothing private about the
+   owner's setup: session or scheduled-task ids, private links, account, cost or budget details, how the home computer
+   is run, quoted personal remarks, findings about real people or real data. Those go in the owner's private repo
+   `flamingbeing/life` (step 5), and the public file keeps at most a neutral "(details in the owner's private notes)".
+5. **Private notes** (only if this session produced something private; skip otherwise): attach `life` if it isn't
+   already there (`add_repo`, clone it next to this repo; cloud sessions usually have it from the startup step) and
+   read its `README.md`. Put each item in the matching file, not a new parallel one: `repos/anawj-site.md` (owner-specific
+   instructions and notes), `ops/` (accounts, costs, firetop, ids), `data/<app>/` (real-data findings, resident ids only,
+   no patient details). Commit on a branch there and merge it (its `CLAUDE.md` rules: no secrets, no patient identifiers).
+   Never copy anything from `life` into this repo.
+6. **Commit and merge**: on your own session branch, from current main; a documentation-only PR may merge once
    `node tools/check.mjs` passes (unless it's part of a handover, which needs the owner's approval). If you have an
    open code PR, put the STATUS update in it instead.
-6. **Tell the owner** in one or two lines what was saved and that it's safe to compact. After compacting (or in a
+   Before committing, re-read the diff once for anything from step 4's private list.
+7. **Tell the owner** in one or two lines what was saved and that it's safe to compact (say if anything went to the private repo, without naming what). After compacting (or in a
    new session), read the app's STATUS.md and NOTES.md first and carry on from "Now" and "Next".
