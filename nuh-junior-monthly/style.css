@@ -1134,3 +1134,58 @@ body:not([data-tab="roster"]) #autofill { display: none; }
 .af-what { border: 0; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .af-what legend { padding: 0; margin-bottom: 6px; font-weight: 600; }
 .af-what-note { margin: 4px 0 0; font-size: 13px; }
+
+
+/* ---------- phones (320 to 720 px): one size scale for the header, a slim filter row, slim banners ---------- */
+#today .ic { display: none; }   /* only the narrowest phones show the icon instead of the word */
+.rb-s { display: none; }
+.fsheet { display: grid; gap: 10px; }
+.fs-row { display: grid; gap: 4px; font-weight: 600; font-size: 14px; }
+.fs-row:has(> [hidden]) { display: none; }
+.fs-row .r-sel { max-width: none; width: 100%; }
+.fs-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.ln-t { flex: 1 1 auto; min-width: 0; }
+@media (max-width: 720px) {
+  /* header: the name and the state on the first line (the name gives way), the month and the main action on the second */
+  .top-row { flex-wrap: wrap; padding: 2px 6px 4px 12px; gap: 0 4px; }
+  .brand { flex: 1 1 0; min-width: 0; }
+  .brand-text { min-width: 0; overflow: hidden; }
+  .brand-name { font-size: 16px; }
+  .top-tools { flex: none; margin-left: 0; gap: 4px; }
+  .ctx-row { flex: 1 1 100%; gap: 4px; padding: 0 0 2px; min-height: 48px; }
+  .monthnav { display: contents; }   /* prev, month, next, Today, lock join the row beside Fill */
+  .month-title { font-size: 16px; min-width: 0; margin: 0 2px; flex: 0 1 auto; white-space: nowrap; }
+  #lockm { margin-left: auto; }
+  /* one scale: 44 px squares and 44 px high buttons, one radius, one icon size */
+  .top-tools .icon-btn, .ctx-row .icon-btn, #cloudbtn, #today, #lockm, #autofill {
+    box-sizing: border-box; height: 44px; min-height: 44px; border-radius: 12px; margin: 0;
+  }
+  .top-tools .icon-btn, .ctx-row .icon-btn, #lockm { width: 44px; min-width: 44px; padding: 0; justify-content: center; }
+  #cloudbtn { padding: 0 10px; max-width: none; gap: 5px; }
+  #today, #autofill { padding: 0 12px; min-width: 44px; justify-content: center; }
+  #today { background: var(--a-tint-soft); color: var(--a-tint); }
+  #today .ic { display: none; }
+  .top-tools .ic, .ctx-row .ic { width: 20px; height: 20px; }
+  .ctx-tools { margin-left: 0; }
+  /* the filter row: Paint, Find and one Filters button */
+  .r-toolbar { overflow: visible; gap: 6px; }
+  .r-toolbar > .r-searchwrap { flex: 1 1 0; min-width: 0; }
+  .r-searchwrap .r-search { width: 100%; }
+  .tbtn { min-height: 44px; }
+  .r-searchwrap .r-search, .r-sel { min-height: 44px; }
+  /* banners: one slim line each (details in their description, and in full on desktop) */
+  .lock-note { flex-wrap: nowrap; min-height: 40px; margin: 6px 8px 0; padding: 0 4px 0 12px; gap: 8px; border-radius: 10px; }
+  .lock-note .ln-more { display: none; }
+  .lock-note .btn { min-height: 40px; padding: 0 10px; }
+  .r-banner { flex-wrap: nowrap; min-height: 40px; margin: 6px 8px 0; padding: 0 4px 0 12px; gap: 8px; border-radius: 10px; }
+  .r-banner .rb-ic, .r-banner .rb-more, .r-banner .rb-l { display: none; }
+  .r-banner .rb-s { display: inline; }
+  .r-banner .rb-text { flex: 1 1 auto; min-width: 0; font-size: 14px; }
+  .r-banner .btn { min-height: 40px; padding: 0 12px; }
+}
+@media (max-width: 359px) {
+  /* the narrowest phones: Today and Fill become icons, the Saved chip loses its word */
+  #today .lbl, #autofill .lbl, #cloudbtn .cl-short { display: none; }
+  #today .ic { display: inline-block; }
+  #today, #autofill, #cloudbtn { width: 44px; padding: 0; }
+}

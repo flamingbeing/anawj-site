@@ -179,7 +179,27 @@ export function mount(el, app) {
   const panBtn = (dir) => h('button', { type: 'button', class: 'tbtn tbtn-pan', title: dir < 0 ? 'Scroll back a week' : 'Scroll forward a week', 'aria-label': dir < 0 ? 'Scroll back a week' : 'Scroll forward a week',
     html: icon(dir < 0 ? 'left' : 'right'), onclick: () => { const w = scroll.querySelector('th.dh')?.offsetWidth || 32; scroll.scrollBy({ left: dir * 7 * w, behavior: 'smooth' }); } });
     const clearBtn = h('button', { type: 'button', class: 'tbtn tbtn-clear', hidden: true, title: 'Show everyone again: clears the search, group, tag and posting' }, 'Clear filters');
-  tb.append(paintBtn, searchWrap, groupSel, tagSel, postSel, clearBtn, hiSel, reqBtn, ctxBtn, absentBtn, panBtn(-1), panBtn(1), keyBtn);
+  // On a phone the filters and toggles live in one sheet behind a Filters button (with a count), so nothing is cut off the row.
+  const filtersBtn = h('button', { type: 'button', class: 'tbtn tbtn-filters', 'aria-haspopup': 'dialog' });
+  const movable = [groupSel, tagSel, postSel, clearBtn, hiSel, reqBtn, ctxBtn, absentBtn, panBtn(-1), panBtn(1), keyBtn];
+  const phoneMq = window.matchMedia('(max-width: 720px)');
+  const layoutToolbar = () => { tb.textContent = ''; if (phoneMq.matches) tb.append(paintBtn, searchWrap, filtersBtn); else tb.append(paintBtn, searchWrap, ...movable); };
+  phoneMq.addEventListener('change', layoutToolbar);
+  const paintFilters = () => {
+    const n = (ui.group ? 1 : 0) + (ui.tag ? 1 : 0) + (ui.post ? 1 : 0) + (ui.hi ? 1 : 0);
+    filtersBtn.innerHTML = `${icon('list')}<span>Filters${n ? ` · ${n}` : ''}</span>`;
+    filtersBtn.setAttribute('aria-label', n ? `Filters, ${n} on` : 'Filters');
+  };
+  filtersBtn.addEventListener('click', () => {
+    const row = (label, el) => h('label', { class: 'fs-row' }, h('span', null, label), el);
+    app.sheet({
+      title: 'Filters',
+      body: h('div', { class: 'fsheet' }, row('Group', groupSel), row('Tag', tagSel), row('Posting', postSel), row('Highlight', hiSel),
+        h('div', { class: 'fs-btns' }, reqBtn, ctxBtn, absentBtn, keyBtn), clearBtn),
+      actions: [{ label: 'Done', primary: true }],
+    });
+  });
+  layoutToolbar();
   function showKey() {
     const row = (mark, text) => h('li', { class: 'gk-row' }, h('span', { class: 'gk-mark', html: mark }), h('span', null, text));
     app.sheet({
@@ -541,6 +561,7 @@ export function mount(el, app) {
     dutyStyles(state);
     const staff = filteredStaff(state);
     clearBtn.hidden = !filtersOn();
+    paintFilters();
     const all = M.staffInMonth(state, app.month);
     {
       const away = M.notInSheet(state, app.month, true).size, on = state.settings.hideNotInSheet !== false;
@@ -761,10 +782,14 @@ export function mount(el, app) {
     // a locked month says so here, with the way out (the Lock button in the header does the same)
     const locked = M.isMonthLocked(state, app.month);
     lockNote.hidden = !locked;
-    if (locked) {
-      const text = `${M.fmtMonth(app.month)} is locked: nothing in it can change, so it cannot be edited by accident.`;
-      if (!lockNote.firstChild) lockNote.append(h('span', null, text), h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => document.getElementById('lockm').click() }, 'Unlock to edit'));
-      else lockNote.firstChild.textContent = text;
+    if (locked && lockNote.dataset.m !== app.month) {
+      // one slim line: the month and the way out; the explanation is on desktop in the line, on a phone in its description
+      lockNote.dataset.m = app.month;
+      lockNote.textContent = '';
+      lockNote.title = 'Nothing in a locked month can change, so it cannot be edited by accident.';
+      lockNote.setAttribute('aria-description', lockNote.title);
+      lockNote.append(h('span', { class: 'ln-t' }, `${M.fmtMonth(app.month)} is locked`, h('span', { class: 'ln-more' }, ': nothing in it can change, so it cannot be edited by accident.')),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => document.getElementById('lockm').click() }, 'Unlock to edit'));
     }
     // Offer auto-fill in the roster itself when nothing in this month was auto-filled or entered yet.
     let any = false;
@@ -780,8 +805,10 @@ export function mount(el, app) {
     banner.innerHTML = '';
     banner.append(
       h('span', { class: 'rb-ic', html: icon('spark') }),
-      h('span', { class: 'rb-text' }, h('strong', null, `No calls or shifts in ${M.fmtMonth(app.month)} yet. `), 'Enter leave and requests first, then let Auto-fill draft the calls and PM shifts around them.'),
-      h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => openAutofill(app) }, 'Auto-fill this month'));
+      h('span', { class: 'rb-text', title: 'Enter leave and requests first, then let Fill draft the calls and PM shifts around them.' },
+        h('strong', null, h('span', { class: 'rb-l' }, `No calls or shifts in ${M.fmtMonth(app.month)} yet. `), h('span', { class: 'rb-s' }, 'No calls yet')),
+        h('span', { class: 'rb-more' }, 'Enter leave and requests first, then let Auto-fill draft the calls and PM shifts around them.')),
+      h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => openAutofill(app) }, h('span', { class: 'rb-l' }, 'Auto-fill this month'), h('span', { class: 'rb-s' }, 'Fill')));
   }
 
   // Bring a day's column into view (only scrolls when it is hidden behind the name column or off the right edge).

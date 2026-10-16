@@ -252,3 +252,14 @@ call before the date a must-fix problem, and Fill never places one (`solver.js` 
 planned as usual (leave can be projected as if they pass the test); if one fails, move the date. The staff list in the cloud copy
 carries the date (`staff[].noCallsUntil`, `YYYY-MM-DD`); the rule type is in `rules.js`. Saved rosters gain the rule once
 (`rulesVersion` 9).
+
+## Phone header, filters and banners (owner, 16 Oct 2026)
+
+On phones (320 to 720 px) the header is two rows: the name (it gives way, with an ellipsis) beside the cloud, undo and redo
+buttons, then month back / Oct 2026 / forward / Today, the lock and Fill. Every header control is 44 px high with one radius and one
+icon size; below 360 px Today and Fill become icons and the cloud button loses its word (their names are still read out). The
+roster's filter row is Paint, Find and one **Filters** button (with a count) that opens a sheet holding the group, tag, posting and
+highlight selects and the Requests, Days around and Key buttons (the same elements move between the row and the sheet when the
+window crosses 720 px). The locked-month and empty-month banners are one slim line each (40 px); the full wording is on
+desktop and in their description. `test/e2e.mjs` checks 320, 360, 390 and 430 px: nothing clipped or overlapping, 44 px,
+slim banners, axe on the header and the Filters sheet.
