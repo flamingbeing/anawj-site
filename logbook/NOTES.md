@@ -455,7 +455,9 @@ portfolio content.
     (owner, 15 Oct 2026): **Case logs** first (`#caselogs`, `ui-caselogs.js`: residents by year with total cases, tags
     behind / due, reflections; tap → `#caselog`, that resident's counts per tag against the targets (`totalsTable` with
     one column), reflection headings met, Excel download), then **Analytics** as programme analytics (`renderProgramme`:
-    who's behind, the tags most residents are behind on; no totals), then their own Case, Logbook, Reflections. All from the counts
+    who's behind, the tags most residents are behind on, and the **Year comparison**: each target tag's median in the
+    year picked, the target due next, residents with half the median or less from a median of 4 (`year-compare.js`,
+    unit-tested); no totals), then their own Case, Logbook, Reflections. All from the counts
     summaries, never case details. The rules let active
     faculty read `summaries/` (counts are no secret, owner); they still can't read the residents list, cases,
     reflections or notes. Case logs is listed in More for them in other profiles.

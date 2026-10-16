@@ -1,8 +1,10 @@
 # Now: Claude Code, Logbook 2 (log2)
 
-**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): the 15 Oct batch is merged (#651–#664). Owner said
-go on the next queue (15 Oct): #665 Logbook, #667 Notes and #669 Reflections Select and Bulk edit (9–9d) merged; #671 and #674 Search (9e) merged; #677 the Grid (10) merged; #679 paging (11) merged; #680 Send to presets (12) open; **14, Group by and Sort, built on top**. Then 15 (Markdown).
-Not started: 15 (Markdown).
+**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): the 15 Oct "what's left" queue is built and merged:
+#665/#667/#669 Select and Bulk edit (9–9d), #671/#674 Search (9e), #677 Grid (10), #679 paging (11), #680 Send to
+presets (12), #686 Group by and Sort (14), #689/#690 Markdown (15), #691 BMI highlight (2), Year comparison (5b, this
+PR). Card style (raised / outlined / flat) left as is: Borders, Shadows and Flat already cover it.
+Open question for the owner: Sync writing the reflection notes (item 15's last part; see 15 below).
 Waiting on the owner: a real-phone check of sign-in (installed app and Firefox for Android), and of each new Send to
 preset on an iPhone (Apple Notes Shortcut, Email, Telegram, Drafts, Bear, Things, Day One).
 
@@ -43,7 +45,7 @@ Agreed queue (one PR each, in order, once he says go):
 5. **Built (Analytics Edit PR; 5b new cards next).** **Analytics Edit mode:** Edit at the top; cards fold to rows; drag handle (plus Move up / down) to reorder; eye to
    hide, a "Hidden cards" list to bring back; Reset layout; Done. Saved for the account. Cards a profile can't use
    aren't listed.
-5b. **Built (Analytics cards PR; Faculty Year comparison still to do).** **More Analytics cards** (owner: build them all, show only the most important by default; the rest start hidden in
+5b. **Built (Analytics cards PR; Faculty Year comparison in its own PR).** **More Analytics cards** (owner: build them all, show only the most important by default; the rest start hidden in
    the Edit mode's "Hidden cards"). Shown by default: Finish line (per tag, the date your pace reaches its target vs
    its due year), This posting / this month (cases, top tags, new tags, targets met), Reflection material (☆ cases by
    the heading they'd fit, for headings still short), Milestones (firsts, round numbers, targets met, dated). Hidden by
