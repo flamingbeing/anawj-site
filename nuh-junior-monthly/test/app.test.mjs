@@ -34,7 +34,10 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   M.setCell(s, days[5], 'i0', { a: ['CP'] });
   ok(!M.effectiveCodes(s, days[5], 'i0').includes('PPC'), 'no PPC once the ICU posting ended');
   M.setCell(s, days[5], 'i0', { a: ['ICU', 'R1B'] });
-  ok(ids(s, 'r-r1b-gap').length >= 1, 'no ICU call on the day off');
+  ok(ids(s, 'r-ppc').length >= 1 && ids(s, 'r-ppc').every(v => v.hard === false), 'a call on the day off after post call is an EOD call: a preference, not a must-hold');
+  M.setCell(s, days[5], 'i0', { a: ['ICU'] });
+  M.setCell(s, days[4], 'i0', { a: ['ICU', 'R1B'] });
+  ok(ids(s, 'r-r1b-gap').length >= 1 && ids(s, 'r-r1b-gap').every(v => v.hard !== false), 'a call on the post call day is never allowed');
 }
 // the owner's rulings (16 Oct 2026): requests and blocks are preferences; "new to ICU" is strict only for rotating residents and MOPEXes
 {
@@ -56,6 +59,13 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   const x = old.rules.find(r => r.id === 'r-req-x'); x.hard = true; x.weight = 10;
   old.rules = old.rules.filter(r => r.id !== 'r-r1b-new-res'); delete old.rules.find(r => r.id === 'r-r1b-new').who.onlyGroups;
   const up = M.migrate(JSON.parse(JSON.stringify(old)));
+  const older = M.defaultState();
+  older.rulesVersion = 2;
+  older.rules.find(r => r.id === 'r-postcall').params.codesA = ['x', 'PC', 'PPC'];
+  older.rules = older.rules.filter(r => !['r-ppc', 'r-c3-eod'].includes(r.id));
+  older.rules.find(r => r.id === 'r-r1b-gap').params.to = 2; older.rules.find(r => r.id === 'r-c3-gap').params.to = 2;
+  const up3 = M.migrate(JSON.parse(JSON.stringify(older)));
+  ok(!up3.rules.find(r => r.id === 'r-postcall').params.codesA.includes('PPC') && up3.rules.some(r => r.id === 'r-ppc') && up3.rules.some(r => r.id === 'r-c3-eod') && up3.rules.find(r => r.id === 'r-r1b-gap').params.to === 1, 'an older saved state gets the EOD rules once');
   ok(up.rules.find(r => r.id === 'r-req-x').hard === false && up.rules.some(r => r.id === 'r-r1b-new-res') && up.rules.find(r => r.id === 'r-r1b-new').who.onlyGroups.includes('mopex'), 'an older saved state gets the rulings once');
 }
 // a cardiac call needs a cardiac day; first days of a posting
@@ -77,6 +87,18 @@ const ids = (s, rule) => evalM(s).violations.filter(v => v.ruleId === rule);
   let c3 = 0, r1b = 0;
   for (const m of Object.values(r.assignments)) for (const codes of Object.values(m)) { c3 += codes.filter(c => c === 'C3').length; r1b += codes.filter(c => c === 'R1B').length; }
   ok(c3 === days.length && r1b === days.length, 'one cardiac and one ICU call every night');
+}
+// EOD calls: with only two people on ICU a night can only be covered by a call right after the post call day, so Auto-fill uses one
+// (and never a call on the post call day itself)
+{
+  const s = M.defaultState();
+  s.rules = s.rules.filter(r => !/^r-c3/.test(r.id));
+  for (let k = 0; k < 2; k++) s.staff.push({ id: 'e' + k, name: 'Eod Person ' + k, group: 'res2', tags: [], fte: 1, active: true });
+  for (const d of [M.addDays(days[0], -3), M.addDays(days[0], -2), M.addDays(days[0], -1), ...days]) for (let k = 0; k < 2; k++) M.setCell(s, d, 'e' + k, { a: ['ICU'] });
+  const r = solve(s, { from: days[0], to: days[days.length - 1], timeMs: 4000 });
+  ok(r.after.hard === 0 && !(r.unfilled || []).length, `two people on ICU: every night covered with no must-fix problem (hard ${r.after.hard}, unfilled ${(r.unfilled || []).length})`);
+  for (const [d, m] of Object.entries(r.assignments)) for (const [id, codes] of Object.entries(m)) if (codes.length) M.setCell(s, d, id, { a: [...(M.getCell(s, d, id)?.a || []), ...codes], auto: codes });
+  ok(evalM(s).violations.some(v => v.ruleId === 'r-ppc'), 'and it says which nights are EOD calls');
 }
 // the Google Sheet: parse, import, and give back the same cells when nothing changed
 {
