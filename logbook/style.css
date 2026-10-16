@@ -1417,6 +1417,7 @@ ul.cases .c-tags { -webkit-mask-image: linear-gradient(to right, #000 calc(100% 
 .box-wrap .box-marks { position: absolute; z-index: 1; margin: 0; box-sizing: border-box; border-style: solid; border-color: transparent; color: transparent; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; overflow: hidden; pointer-events: none; }
 .box-wrap .box-marks mark { color: transparent; border-radius: 4px; box-shadow: 0 0 0 1px transparent; }
 .box-wrap .box-marks mark.m-ini { background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: inset 0 -2px 0 var(--accent); border-radius: 2px; }
+.box-wrap .box-marks mark.m-bmi { background: color-mix(in srgb, #7c3aed 9%, transparent); box-shadow: inset 0 -2px 0 #7c3aed; border-radius: 2px; }
 .box-wrap .box-marks mark.m-age { background: color-mix(in srgb, var(--warn, #b45309) 10%, transparent); box-shadow: inset 0 -2px 0 var(--warn, #b45309); border-radius: 2px; }
 .box-wrap .paste-btn, .box-wrap .clear-btn { z-index: 2; }
 /* the line under the box: only what the age was read as */

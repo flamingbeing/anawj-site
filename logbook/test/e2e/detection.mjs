@@ -30,6 +30,11 @@ try { for (const width of [390, 1280]) {
   // (the box's marks repaint just after the tap: wait for it, as a check made at once raced it on a busy machine)
   await p.waitForFunction(() => !document.querySelector('.box-marks mark.m-ini'), null, { timeout: 3000 }).catch(() => { throw new Error('still marked in the box'); });
   await ini.click(); assert.equal(await ini.innerText(), 'ZQ = initials');
+  // the BMI is marked in the box too, in order with the initials and age (log2 2)
+  await box.fill('ZQ 45F BMI 42 fake sleeve gastrectomy');
+  await p.waitForFunction(() => [...document.querySelectorAll('.box-marks mark')].map(m => m.className + ':' + m.textContent).join() === 'm-ini:ZQ,m-age:45F,m-bmi:BMI 42', null, { timeout: 3000 })
+    .catch(async () => { throw new Error('marks: ' + await p.evaluate(() => [...document.querySelectorAll('.box-marks mark')].map(m => m.className + ':' + m.textContent).join())); });
+  await box.fill('ZQ 45F fake hernia repair');
   await ini.click();
   assert.deepEqual(await saveCase(), { initials: '', details: 'ZQ 45F fake hernia repair' });
   // the next case reads initials again

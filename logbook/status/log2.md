@@ -25,7 +25,7 @@ Agreed queue (one PR each, in order, once he says go):
    `why: 'keyword'`); no age: trigger words still suggest. Pasted lists follow Settings → Logging → "Tick confident
    suggestions automatically" (off by default) instead of always ticking (`parseBulk` STRONG), plus a "Tick all
    suggestions" button. Fake test case: an adult with "circumcision".
-2. **Built (Detection PR): initials and age tap-to-undo, skip starts, one-letter, off; BMI not highlighted yet.** **Detection settings** (Settings → Logging → Detection): highlight what was detected (initials, age, BMI) in the
+2. **Built (Detection PR): initials and age tap-to-undo, skip starts, one-letter, off; BMI highlighted in the box (BMI PR).** **Detection settings** (Settings → Logging → Detection): highlight what was detected (initials, age, BMI) in the
    review and tap to undo (Todoist-style); a list of starts to skip before initials (`===`, `Pt:`); "Allow one-letter
    initials" (I and A still need an age, "/" or "(" after them); detection off switch. Later, maybe, a typed template.
 2b. **Built (initials line, lighter highlights; age cap done in #652).** **The line under the Case box shows the initials too** (owner): "ABM = initials · 72M = 72 years · male", the
