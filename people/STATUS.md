@@ -26,9 +26,10 @@ check `evals/` work in progress too.
 1. **Rotations, stage 1: read-only** (owner, 16 Oct 2026; waits on the owner's go). Read the department's master block
    rotation sheet (from Google with the owner's own sign-in, or an uploaded file) in the browser and show rotations,
    who has done what, and manpower. No Firebase, nothing written to the sheet. First import hand-linked (sheet name to
-   person), the links kept in the browser. Plus a one-way export of the postings the monthly roster needs (ICU, cardiac,
+   person), the links kept in the browser. Plus a one-way hand-off of the postings the monthly roster needs (ICU, cardiac,
    the OG floats) in the layout NUH Junior Monthly's Paste rotations takes (names down, Mondays across), named as the
-   roster app names people. The sheet reader should be a standalone module with no screen of its own, so People can reuse
+   roster app names people. The roster app **pulls** it (it opens People, which sends after the user taps Send): the
+   roster app's side is noted in `nuh-junior-monthly/NOTES.md`, "Rotations from People". The sheet reader should be a standalone module with no screen of its own, so People can reuse
    it. Code meanings and the sheet's layout: the owner's private notes (code key, 66 codes).
 2. Later, and only with the rotation planner's say: editing rotations in the app (stage 2), then retiring the sheet.
 

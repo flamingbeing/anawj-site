@@ -384,3 +384,21 @@ highlight selects and the Requests, Days around and Key buttons (the same elemen
 window crosses 720 px). The locked-month and empty-month banners are one slim line each (40 px); the full wording is on
 desktop and in their description. `test/e2e.mjs` checks 320, 360, 390 and 430 px: nothing clipped or overlapping, 44 px,
 slim banners, axe on the header and the Filters sheet.
+
+
+## Rotations from People (planned; owner, 16 Oct 2026)
+
+APMES People will hold the department's rotations (who is placed where, week by week), read at first from the master
+block rotation sheet (plan and decisions: `people/STATUS.md`, Next and decisions log; the sheet's real details are in the
+owner's private notes). The owner wants **this app to pull** them, to help plan future months, not People to push them:
+
+- The staff-list hand-off (`js/apmes.js`), reversed: this app opens People with a request, People shows what it would send,
+  and sends it by `postMessage` only after the user taps Send, only to this app's own address. No shared database is needed
+  for People's first stage (it works in the browser); if People later gets a shared store, this app could read it directly.
+- It carries only the postings this app uses: ICU, cardiac (`C`, `C-e`, `C-p`) and the OG floats; people named as this app names
+  them (People holds the link from the sheet's name to the person); weeks as Mondays. The layout is the one Postings › Paste
+  rotations already reads (names down, Mondays across), so `parseRotations` should take it unchanged.
+- Not built, and not to be built before People's side exists. Until then the rosterer types these postings by hand.
+- Open questions for when it is built: how provisional weeks (the sheet's `KIV` prefix) and elective weeks (`-E` suffix, mostly
+  not counted toward manpower) show on Postings; whether the OG floats (`OGDF`, `OGNF1`, `OGNF2`) are postings or calls here.
+

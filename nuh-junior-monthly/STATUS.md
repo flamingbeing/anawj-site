@@ -28,6 +28,10 @@ Last updated: 2026-10-16 by Claude Code (jm1).
 6. Cloud: thin old saves (Firestore TTL on `expireAt`, keep the first save of each week; needs a small rules change and a
    firetop job). Autosync was deliberately not built: the header cloud button shows the state instead.
 
+7. **Pull rotations from APMES People** (owner's plan, 16 Oct 2026; not started, waits on People's side being built, then the
+   owner's go): the postings this app needs (ICU, cardiac, the OG floats) for the months being planned, so the rosterer
+   no longer types them by hand. Design in NOTES.md, "Rotations from People".
+
 ## Recently done
 - No calls until: a date on each person; a hard rule and Fill respect it (People › edit a person).
 - #721 Fill lets you pick which calls to draft; #719 shared calls use the rosterer's points and `C-e`/`C-p` do not count as cardiac.
@@ -71,3 +75,6 @@ Last updated: 2026-10-16 by Claude Code (jm1).
 - 16 Oct 2026: the R1 to R3 ladder, step-down calls, baby MOs, chronic pain and OG float rules, and leave approval needing OT
   manpower are recorded for later (NOTES.md "Beyond cardiac and ICU"; the department's own words are in the owner's private
   notes). Roles: admin manages members and can delete a month in the cloud; a rosterer reads and saves; a viewer reads.
+
+- 16 Oct 2026: this app will **pull** rotations from APMES People, not have People push them (owner). Same tab-to-tab hand-off
+  as the staff list, reversed; People stage 1 (read-only, browser) comes first. Nothing to build here yet.
