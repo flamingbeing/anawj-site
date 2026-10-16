@@ -1694,3 +1694,21 @@ ul.cases li.refl-under button { min-height: 32px; text-align: left; }
 @media (max-width: 560px) { .bulk-row { grid-template-columns: 1fr; } .bulk-l { padding-top: 0; } }
 /* a press and hold selects: no text selection or iOS callout under the finger (Copy is in the row menu) */
 @media (pointer: coarse) { .notes-page ul.notes-rows li, .lb-wrap ul.cases li:not(.monthhead) { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }
+/* Search (🔍 in the header; log2 9e) */
+.who-search { min-height: 40px; min-width: 40px; padding: 2px 8px; border-radius: 999px; background: transparent; border: 1px solid var(--edge, var(--line)); font-size: calc(15px * var(--fs, 1)); line-height: 1; }
+.gs-help { list-style: none; margin: 8px 0; padding: 8px 10px; border: 1px solid var(--edge, var(--line)); border-radius: 8px; font-size: calc(13px * var(--fs, 1)); }
+.gs-help[hidden] { display: none; }
+.gs-help li { padding: 3px 0; }
+.gs-sortbar { margin: 8px 0 0; }
+.gs-group { margin-top: 14px; }
+.gs-h { margin: 0 0 4px; font-size: calc(15px * var(--fs, 1)); }
+.gs-list { list-style: none; margin: 0 0 6px; padding: 0; }
+.gs-list > li { border-bottom: 1px solid var(--edge, var(--line)); padding: 2px 0 6px; }
+.gs-item { display: flex; flex-direction: column; align-items: stretch; gap: 2px; width: 100%; text-align: left; background: transparent; border: 0; padding: 8px 4px 2px; min-height: 44px; color: inherit; font: inherit; cursor: pointer; }
+.gs-item:hover { background: var(--row-alt); }
+.gs-top { display: flex; gap: 8px; justify-content: space-between; align-items: baseline; }
+.gs-date { white-space: nowrap; font-size: calc(13px * var(--fs, 1)); }
+.gs-snip { font-size: calc(14px * var(--fs, 1)); color: var(--ink); overflow-wrap: anywhere; }
+.gs-meta { font-size: calc(12px * var(--fs, 1)); }
+.gs-item mark, .gs-title mark { background: color-mix(in srgb, var(--accent) 22%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.gs-links { display: flex; gap: 12px; padding: 0 4px; }

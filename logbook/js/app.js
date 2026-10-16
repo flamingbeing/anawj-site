@@ -29,7 +29,7 @@ const MODS = {
   sync: () => import('./ui-sync.js'), settingsFile: () => import('./settings-file.js'), account: () => import('./ui-account.js'),
   admin: () => import('./ui-admin.js'), recovery: () => import('./ui-recovery.js'), notesExport: () => import('./ui-notes.js'),
   cloudSave: () => import('./cloud-save.js'), backup: () => import('./backup.js'), shareIn: () => import('./ui-share-in.js'),
-  parts: () => import('./ui-parts.js'), feedback: () => import('./ui-feedback.js'),
+  parts: () => import('./ui-parts.js'), feedback: () => import('./ui-feedback.js'), search: () => import('./ui-search.js'),
 };
 const mod = {}, loading = {};   // name → the module once loaded; → its promise while loading
 function need(name) {
@@ -134,6 +134,8 @@ const TABS = [
   { id: 'settings', bar: true, label: 'Settings', render: page(['settings', 'send', 'sync', 'settingsFile'], () => renderSettingsMenu()), hidden: true, under: 'more', desc: 'Profile, look, logging, reflections, notes and sharing, data' },
   { id: 'recovery', bar: true, short: 'Recover', label: 'Recover', render: page(['recovery'], m => m.recovery.renderRecovery()), hidden: true, under: 'more', desc: 'Changes waiting to sync, recently deleted, unfinished drafts and earlier versions' },
   { id: 'data', bar: true, short: 'Export', label: 'Export / Import', render: page(['logbook', 'notesExport', 'cloudSave', 'backup'], () => renderDataPage()), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
+  // Search (log2 9e): the 🔍 in the header, or / on a computer
+  { id: 'search', label: 'Search', render: page(['search'], m => m.search.renderSearch()), hidden: true, unlisted: true },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
   { id: 'themes', label: 'Themes', render: page(['settings'], m => m.settings.renderThemes()), hidden: true, under: 'settings', unlisted: true, desc: 'Ready-made looks, colour, light or dark, the top band' },
@@ -936,6 +938,15 @@ function flushRender() {
 
 // The header is always one line (title left, name right), so it never changes height between
 // loading, signed out and signed in. Demo / offline show as a small tag beside the name.
+// 🔍 Search: on every tab (log2 9e); / opens it on a computer when you're not typing
+const searchBtn = () => h('button', { type: 'button', class: 'who-search', title: 'Search cases, reflections and notes (/)', 'aria-label': 'Search',
+  onclick: () => go('search') }, h('span', { 'aria-hidden': 'true' }, '🔍'));
+addEventListener('keydown', e => {
+  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || !S.user || e.defaultPrevented) return;
+  const t = e.target;
+  if (t && (t.closest?.('input, textarea, select, [contenteditable="true"], dialog[open]'))) return;
+  e.preventDefault(); go('search');
+});
 function paintWho() {
   const flags = [cloud.demo ? 'demo' : '', navigator.onLine ? '' : 'offline'].filter(Boolean).join(' · ');
   // the demo is a small badge in the header (tap for Reset / Leave), so the app looks as it does for real
@@ -952,7 +963,7 @@ function paintWho() {
   document.documentElement.classList.toggle('who-alert', !S.user || !navigator.onLine || !!S.pending);
   if (!S.user) { fill(whoEl, flag); return; }
   document.body.dataset.cases = String(S.cases.length);   // not shown; read by tests
-  fill(whoEl, sync, flag, h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
+  fill(whoEl, sync, flag, searchBtn(), h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
 }
 hooks.writesChanged = () => { paintWho(); if (S.tab === 'recovery') render(); };
 window.addEventListener('online', paintWho);

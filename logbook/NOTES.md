@@ -635,6 +635,14 @@ portfolio content.
   others still need), portfolio export in / out, JR, date. Actions: Copy, Share, Send to (Markdown, as Settings →
   Markdown makes it), Move to the bin. Word export of just these is not built: the portfolio export takes the ticked
   ones (use Portfolio export: in / out).
+- **Search** (log2 9e, first part): 🔍 in the header on every tab, or / on a computer (not while typing), opens
+  `#search` (`ui-search.js`; the engine `global-search.js`, unit-tested). One box over cases (planned ones too),
+  reflections and notes (loaded the first time Search opens; offline works on what is on the device). The Logbook's
+  search language plus in:, status:, is:interesting / is:planned, has:reflection / has:note, no:tag, linked:yes / no,
+  heading:, tag:, diagnosis:; ⓘ lists them and a tap adds one. Results grouped by kind with counts, Best match or
+  Newest, the words marked; a tap opens the case (edit page), the reflection (editor) or the note (Done comes back to
+  Search); a case found links its reflection and notes. Still to do (second part): filter chips kept in step with the
+  operators, saved searches shared with the Logbook, results into bulk select.
 
 ## Data, roles and photos (`firestore.rules`)
 
