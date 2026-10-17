@@ -22,9 +22,8 @@ as in the department's Google Form it replaces ("360 feedback on residency appli
   **link/device** (stage 1: private link, answers to the Google Form or the device). The app uses the open shared round
   first, else the newest closed one (read-only), else a link/device round. `js/store.js` has both backends (the demo
   keeps its own copy in `sel-demo-store`).
-- **Nothing in the original form was required**, so nothing blocks Send here either. The review screen only flags a score
-  without a comment (and the reverse), or an applicant not answered. "I haven't worked with this applicant" is the new
-  explicit answer for a blank.
+- **Nothing blocks Send.** Review lists only applicants who still need an answer (never "a score without a comment"); a comment is
+  never needed unless the admin marked that question required. "I haven't worked with them" is the explicit answer for a blank.
 - **Autosave on the device** while typing (`sel-ans-<cycle>-<email>`), so a dropped signal or closed tab loses nothing.
   Demo data uses `sel-demo-…` keys and never touches a real round.
 - UI is the NUHS app kit through evals' `style.css` (like People): top band, `.a-*` classes, 44px+ targets, axe-checked.
@@ -50,7 +49,7 @@ as in the department's Google Form it replaces ("360 feedback on residency appli
   (`encodeRound` / `readRoundText`), answers and their status, warnings, the Google Form body (`formBody`, `formUrl`),
   results summary and CSV (formula-safe).
 - `js/app.js`: screens (home list, one applicant, review and send, thank you; Set up and Results for staff).
-- A round is `{ title, cycle, applicants: [{ id, name, entry? }], form? }`. `form: { id, nameEntry }` plus each applicant's
+- A round is `{ title, cycle, applicants: [{ id, name, entry? }], questions, form? }`. `form: { id, nameEntry }` plus each applicant's
   `entry: { score, comment }` wires the round to a Google Form's public id and question ids; without them, Send keeps the
   answers on the device.
 - **Send, link/device rounds** (stage 1) is a `no-cors` POST to the Form's `formResponse` address. The browser can't read the reply, so "sent"
@@ -58,3 +57,15 @@ as in the department's Google Form it replaces ("360 feedback on residency appli
   answers go into the real sheet): the first real send needs a look in the sheet.
 - Tests: `node applicants/test/model.test.mjs`, `node applicants/test/e2e.mjs` (phone size, demo, axe on each screen, the link
   round trip, CSV).
+
+## Lessons
+
+- **Rules edits:** merge `main` into the branch first, run `tools/test-rules.sh`, and merge only on green Checks, then confirm the "Deploy
+  Firestore rules" run. The rules engine allows 1000 expressions per request and the role paths are near it (`people/NOTES.md`, "Roles").
+- **Applicant ids come from names** (`a1`, `a2`… kept for an unchanged name): renaming someone in Set up makes a new applicant, so their old answers
+  and photo stop matching. Fix typos before answers arrive.
+- **Photos are stored as bare base64 in a `jpeg` field**, not a data URL: the rules then only check type and size (no regex on a long string);
+  the app adds the `data:image/jpeg;base64,` prefix and refuses anything else (`photoSrc`).
+- **A published round beats a link round** in `loadRound`; to test the link path in the browser test, seed `sel-demo-store` as `{"seeded":true}`
+  (the demo otherwise seeds a published round).
+- Preview links serve folders by name (`<preview>/applicants/?demo`); only the production worker maps addresses (`worker/routes.js`).
