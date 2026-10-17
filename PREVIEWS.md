@@ -5,9 +5,9 @@ change can be checked on a phone before it is merged. anawj.com itself stays on 
 merge to `main`, as before. (Cloudflare now steers new projects to Workers rather than Pages: "Start new
 projects with Workers".)
 
-- Each branch gets a steady preview address, `https://<branch>-anawj-preview.kohwenjun.workers.dev/`, and each
+- Each branch gets a steady preview address, `https://<branch>-anawj-preview.<account>.workers.dev/`, and each
   build a one-off one. Cloudflare posts the links on the PR (a comment and a Workers Builds check) and updates
-  them on every push. The copy of `main` is at <https://anawj-preview.kohwenjun.workers.dev/>.
+  them on every push. The copy of `main` is at `https://anawj-preview.<account>.workers.dev/`.
 - **Open the apps in demo mode:** `…/logbook/?demo`, `…/evals/?demo`, `…/nuh-roster/?demo` (the roster as it will be at its own address: `…/_sites/nuhroster.anawj.com/?demo`). Demo mode keeps
   everything in the browser.
 - **Signing in does not work on previews, on purpose.** Google sign-in only works from domains listed in each

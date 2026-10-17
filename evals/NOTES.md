@@ -1,34 +1,16 @@
 # What we have learnt: MedHub, APMES evaluations and this project
 
-Current work and decisions: [`STATUS.md`](STATUS.md).
+This file collects what was learnt while building `/evals` (October 2026), so the next person or agent doesn't have to rediscover it. It sits alongside [`README.md`](README.md) (how to run the app and the data model), [`SPEC.md`](SPEC.md) (module contracts), [`PLAN.md`](PLAN.md) (the original UX plan) and [`/apmes/`](../apmes/) at the repo root (programme documents, transcribed, and the blank portfolio template). If this file disagrees with the code, the code wins; if it disagrees with the EPA Guidebook v8, the guidebook wins. Decisions, status, operations and open items are in the owner's private notes.
 
-This file collects what was learnt while building `/evals` (October 2026), so the next person or agent doesn't have to rediscover it. It sits alongside [`README.md`](README.md) (how to run the app and the data model), [`SPEC.md`](SPEC.md) (module contracts), [`PLAN.md`](PLAN.md) (the original UX plan) and [`/apmes/`](../apmes/) at the repo root (programme documents, transcribed, and the blank portfolio template). If this file disagrees with the code, the code wins; if it disagrees with the EPA Guidebook v8, the guidebook wins.
+## 1. Conventions that matter in code
 
-## 1. The owner's decisions (don't re-litigate)
-
-| Topic | Decision |
-|---|---|
-| Source of truth | **EPA Guidebook v8 (July 2024)**. It overrides the AY2023 tracking template and the MedHub screenshots. |
-| Scope | Evaluations first: request and complete **DOPS, Mini-CEX and EBD**. Other MedHub modules may come later and be harmonised. |
-| Who | A **trial app for all residents and all postings**, not a pilot. |
-| Sign-in | **Google only** (decided when we thought the project was on the free Spark plan; it is on **Blaze**, so email-link sign-in could now be switched on). The email-link and linked-emails code path is kept, switched off (`cloud.EMAIL_LINK = false`). |
-| Data | **Never delete resident data.** Admins change status instead of deleting. A resident can delete only their own draft. |
-| People | Admins **or PDs** keep the faculty list and the resident list, or people apply for a role and appear in the admin panel for approval. Only **listed, ACTIVE faculty** can be assessors. |
-| Feedback | Residents **see assessor comments** (the PD agreed). |
-| Notification | **Share link or QR code** sent by the resident. No automatic emails (possible on Blaze with a Cloud Function; not built). |
-| Form wording | Entrustment question label shortened to "Please briefly describe what was discussed", followed by the entrustment questions as a **plain, non-clickable list**. The "(discuss at least 2)" hint stays; it comes from the guidebook and MedHub ("centered around at least 2 entrustment questions"). |
-| Comments | **No 30-character minimum** (MedHub has one; we dropped it). |
-| Scale | The 9-point scale and the milestone scale are both **one uniform 1–9 row** of equal cells. The interface is compact. |
-| Flow | **Auto-scroll after every answer**, so the next question's answer row lands where the finger already is (tap, tap, tap). |
-| Demo | A **Reset** button on the demo banner (also `?demo=reset`). |
-| Home page | **No evals card** on the anawj.com home page. |
-| Design | Same design language as `/logbook`: white header with the 5px four-colour band, light grey page, rounded white cards, navy accent. |
-| Repo | Public. **No names, patient data or real evaluation data** in the repo. Programme originals stay with the programme. |
-| Merging | "automerge": evals PRs are squash-merged once tests pass. **Firestore rules auto-deploy on merge to main**, so never ask the owner to paste rules. |
-| Platform | Static web app (PWA) on GitHub Pages. Electron might come later; nothing in the app blocks that. |
-| Theme | **Light by default.** More → Settings → Theme is a Light / Dark / Auto toggle, saved **per device**. |
-| Keyboard | The bottom nav **stays visible above the phone keyboard**. |
-| More screen | The "Guide and forms" card is removed for now (the APMES files stay in `/apmes/`). |
+- **Source of truth:** the EPA Guidebook v8 (July 2024) overrides the AY2023 tracking template and the MedHub screenshots.
+- **Sign-in:** Google only. The email-link and linked-emails code path is kept, switched off (`cloud.EMAIL_LINK = false`).
+- **Data:** never delete resident data. Admins change status instead of deleting; a resident can delete only their own draft. Only listed, ACTIVE faculty can be assessors.
+- **Theme:** light by default; More → Settings → Theme is Light / Dark / Auto, saved per device. The bottom nav stays visible above the phone keyboard.
+- **Repo:** public. No names, patient data or real evaluation data. Programme originals stay with the programme.
+- **Rules:** Firestore rules auto-deploy on merge to main, so never ask for rules to be pasted by hand.
+- **Session status:** a session's "Now" lives in `evals/status/<session>.md`.
 
 ## 2. MedHub, as it works today (from the official Android app 1.4.8 and the resident guide)
 
@@ -180,7 +162,7 @@ Pickers are full-screen **Recent | All | Write-In** lists, with recents remember
   (`people/NOTES.md`, "Roles"). The evaluation rules sit near the 1000-expression limit per request: run `tools/test-rules.sh` after any
   change to them or to `isAdmin()`, `isPD()`, `isAppOwner()`, and merge main into a branch first.
 - **Not changed on purpose:** form questions, their order, required answers and scales are the programme's (APMES guidebook). Ideas that
-  would change them (pre-ticking, resident-filled context, moving the feedback box) are in `IMPROVEMENTS.md` for the PD to decide.
+  would change them (pre-ticking, resident-filled context, moving the feedback box) are kept in the owner's private notes for the PD to decide.
 
 ### Tests (run all before merging)
 
@@ -214,69 +196,15 @@ On `sw.js` VERSION conflicts, take the higher version and keep the prefix-only c
 
 A quick contrast check for both themes is worth running after any colour change: set `localStorage['evals-theme']` to `dark`/`light` with Playwright `addInitScript`, walk the routes, and compare each visible text node's colour against its background (WCAG AA). The last run passed on 13 screens in both themes.
 
-## 5. Operations
+## 5. Changing the domain
 
-- **Adding people:**
-  - Paste emails in **People → Faculty** or **People → Residents**, or approve applications there.
-  - Agents in the cloud session cannot write to production Firestore. The owner, a PD or an admin has to do it in the app.
-- **Backups:**
-  - **There is no Firestore backup today.** On Blaze, Firestore scheduled backups (or a nightly export) can be switched on in the console.
-  - The proposed fix is a nightly GitHub Action that exports with the service account and stores an encrypted copy. Not built yet.
-- **Paid plan (Blaze):** pay-as-you-go with the Spark free quota still included. At this app's scale Firestore cost is expected to be near zero. Blaze is what unlocks:
-  - email-link sign-in at volume and hospital email,
-  - Cloud Functions (automatic reminder emails),
-  - scheduled backups.
-  - Set a budget alert when upgrading.
-- **Changing the domain** (evals and the logbook moved to `apmes.anawj.com` in Oct 2026, `SUBDOMAINS.md` step 5; the roster to `nuhroster.anawj.com`). What to change:
-  - `CNAME` and DNS.
-  - Add the new domain to **Firebase Auth → Authorised domains** in both projects (`apmes-logbook`, `nuh-roster`). Otherwise sign-in fails.
-  - Change `authDomain` in `logbook/js/firebase-config.js`, `evals/js/firebase-config.js` and `/__/firebase/init.json`, and add `https://<new domain>/__/auth/handler` to the OAuth Web client's redirect URIs (see logbook/README.md, sign-in).
-  - The roster keeps data in localStorage, which is per origin, so users must export it before the move and import it after.
-  - Old share links and QR codes in chats break unless the old domain redirects (evals: the forward at the top of `index.html`).
-  - The new host must serve `/__/` (sign-in helper) and `/apmes/` (the DOPS expectations in the sw SHELL), or sign-in or the service worker fails.
-  - What a browser keeps (theme, unsent local drafts) belongs to the old address and doesn't move; answers are already in the cloud.
-  - Installed PWAs need reinstalling from the new domain.
+Evals and the logbook are at `apmes.anawj.com` (`SUBDOMAINS.md` step 5); the roster is at `nuhroster.anawj.com`. What to change when a domain moves:
 
-## 6. Working alongside the logbook session, and limits of this environment
-
-- **Session status files:** keep this session's "Now" in `evals/status/<session>.md`; run `/save-state` before compacting.
-- **The logbook has its own Claude session** (branch `claude/clever-gates-pm6sas`, title "APMES Logbook"). It owns `logbook/`.
-  - Before editing logbook files, check it isn't mid-change: `get_session` status, and its open PRs.
-  - Keep logbook edits small, merge them, then tell it with `send_message` (what changed, files, the sw VERSION) so it merges main before its next change.
-  - Twice it shipped the same feature first (logbook theme, keyboard nav); check main before building.
-- **Logbook roles, photos and its Drive / Dropbox / Claude connector setup** are in `logbook/NOTES.md` ("Data, roles and photos", and the Backup bullets).
-- **Privacy policy:** `privacy/index.html`, live at https://anawj.com/privacy/. Keep it in step with the rules when roles change.
-- **What this cloud agent can't do:**
-  - Commit a `client_secret`, even a non-confidential desktop one and even with the owner's go-ahead: the owner pastes it via a GitHub web edit.
-  - Write production Firestore.
-  - Edit its own permission settings.
-  - Delete remote branches.
-  - Push after a blocked credential attempt (the classifier stays wary for a while). Wait, or ask the owner.
-
-## 7. Open items
-
-The full ranked review (20 reviewers, 13 Oct 2026) is in [IMPROVEMENTS.md](IMPROVEMENTS.md); the list below is the older short list.
-
-- Linked emails / hospital-email sign-in (the project is on Blaze; code path present, off).
-- Nightly encrypted Firestore backup Action.
-- Linking an evaluation to a logbook case (MedHub triggers evaluations from the case log; we request them directly).
-- Auto-crediting mask holding and bag ventilation alongside the airway DOPS, if the PD wants it.
-- Flagging requests abandoned for more than 3 days, and the 24-hour / end-of-rotation deadlines in the PD overview.
-- Electron wrapper, if ever needed.
-- Firestore scheduled backups (switch on in the console; the project is on Blaze).
-- **Ease-of-use backlog** (from a review of other assessment apps and a phone test; the owner hasn't picked yet):
-  - **Consultant:**
-    - a dictation hint on comment boxes;
-    - the entrustment text box above the question list, or show 3 with "show all";
-    - "fill in on this phone" with later confirmation on the assessor's own account;
-    - assessor-started assessments with a resident "Assess me" QR;
-    - an add-to-home-screen prompt for faculty.
-  - **Resident:**
-    - the result screen leads with comments and the supervision level;
-    - a better Nudge (WhatsApp text filled in, a suggestion at 24 h);
-    - "what to get next" on Progress.
-  - **PD:**
-    - turnaround figures (form time, % within 24 h per assessor, stale requests);
-    - tappable Overview tiles;
-    - a CSV with per-form question labels;
-    - feedback-quality flags (empty comments, every item the same score).
+- `CNAME` and DNS.
+- Add the new domain to **Firebase Auth → Authorised domains** in both projects (`apmes-logbook`, `nuh-roster`). Otherwise sign-in fails.
+- Change `authDomain` in `logbook/js/firebase-config.js`, `evals/js/firebase-config.js` and `/__/firebase/init.json`, and add `https://<new domain>/__/auth/handler` to the OAuth Web client's redirect URIs (see logbook/README.md, sign-in).
+- The roster keeps data in localStorage, which is per origin, so users must export it before the move and import it after.
+- Old share links and QR codes in chats break unless the old domain redirects (evals: the forward at the top of `index.html`).
+- The new host must serve `/__/` (sign-in helper) and `/apmes/` (the DOPS expectations in the sw SHELL), or sign-in or the service worker fails.
+- What a browser keeps (theme, unsent local drafts) belongs to the old address and doesn't move; answers are already in the cloud.
+- Installed PWAs need reinstalling from the new domain.

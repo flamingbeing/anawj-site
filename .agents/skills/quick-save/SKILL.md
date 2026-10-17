@@ -17,8 +17,9 @@ screenshots, no re-reading large files.
    - the app's `NOTES.md`: only lasting rules, owner preferences and lessons, never task chatter.
 3. **Public repository rule.** Nothing private: no patient data, names, real evaluation records, secrets or tokens, and
    nothing private about the owner's setup (session or scheduled-task ids, private links, accounts, costs, how the home
-   computer is run). Those belong in the owner's private notes; the public file keeps at most a neutral pointer.
-   Re-read your diff once for these.
+   computer is run). Those belong in the owner's private notes (if they are attached, save private items there with their
+   own save skill; keep this repo free of them); the public file keeps at most a neutral pointer. Re-read your diff once
+   for these.
 4. **Docs-only check.** `git diff --name-only origin/main...HEAD` must list only `.md` files in app folders. If anything
    else changed, stop: this is not a quick save; use the normal PR flow and save-state.
 5. **Commit and push** your session branch, and open a PR against `main` titled `<App>: quick save (<date>)` with the body
@@ -28,5 +29,6 @@ screenshots, no re-reading large files.
    merge a PR that changes more than the docs above.
 7. **Unsubscribe from your PR** (`unsubscribe_pr_activity`) once it is merged or left open, so the session stops waking
    on PR events.
+   After unsubscribing, the subscription notice needs one line, "Subscription notice, no action."
 8. **Tell the owner in at most three lines:** the PR link, merged or not, anything half-done, and that it is safe to
    archive this session. After archiving, a new session reads the app's STATUS.md and NOTES.md first.

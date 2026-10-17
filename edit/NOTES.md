@@ -113,12 +113,7 @@ the feedback button's **Comment on PR** on that PR's preview, make it revise the
 any other PR, a comment of the owner's starting with `@claude` does the same (otherwise the session that made the PR
 handles its comments). Nobody else's comments start it.
 
-**Owner, to switch it on (once):**
-1. On your computer: `claude setup-token` (uses your Claude subscription; copy the token it prints).
-2. GitHub → anawj-site → Settings → Secrets and variables → Actions → **New repository secret**: name
-   `CLAUDE_CODE_OAUTH_TOKEN`, paste the token. (Or hand this to the home computer: never paste it into a cloud session.)
-3. GitHub → Settings → Actions → General → Workflow permissions: tick **Allow GitHub Actions to create and approve pull
-   requests**, Save.
+Setup steps (token, repository secret, workflow permission) are in the owner's private notes.
 
 **Switched on 14 Oct 2026** (secret and setting in place). Its PRs are opened with GitHub's own token, so the Checks
 and screenshot workflows don't run on them: run the checks yourself before merging one, or push any small commit
@@ -139,17 +134,7 @@ Anyone else gets Cloudflare's sign-in page and can't pass it.
 - Secrets live in the Worker, which also runs every branch's code on previews (they share the Worker's secrets), so
   only the owner and his sessions should push branches. The token can only open and read issues on this public repo.
 
-**Owner, to switch it on (once; the home computer can do steps 3–4 with you):**
-1. Cloudflare → Workers & Pages → `anawj-preview` → Settings → Domains & Routes → Add → Custom domain →
-   `ask.anawj.com`.
-2. Cloudflare Zero Trust (one.dash.cloudflare.com; pick a team name if asked; Free plan) → Access → Applications → Add
-   → Self-hosted: domain `ask.anawj.com`; policy **Allow** for the owner only; sign-in: one-time PIN.
-   Save, then copy the application's **Audience (AUD) tag**.
-3. GitHub → Settings → Developer settings → Fine-grained tokens → Generate: repository access **only anawj-site**;
-   permissions **Issues: Read and write**, **Pull requests: Read-only**; expiry a year.
-4. Cloudflare → `anawj-preview` → Settings → **Variables and Secrets** (the runtime table with "+ Add", **not** the
-   "Variables and secrets" box inside Settings → Build, which only the build sees) → add three **Secrets**, then Deploy: `GITHUB_ISSUES_TOKEN` (step 3),
-   `ACCESS_TEAM` (your Zero Trust team name, the part before `.cloudflareaccess.com`), `ACCESS_AUD` (step 2).
+Setup steps (custom domain, Cloudflare Access policy, token, Worker secrets `GITHUB_ISSUES_TOKEN`, `ACCESS_TEAM`, `ACCESS_AUD`) are in the owner's private notes.
 Check: open `ask.anawj.com` on your phone, enter the PIN emailed to you, and send a small ask; until step 4 the page
 answers "Ask Claude is not set up yet: the Worker has no …" (naming what's missing). **Set up and working 14 Oct 2026**
 (the first try put the secrets in the Build box by mistake).
@@ -163,18 +148,7 @@ nothing. Fix its list in one PR ("Site: proof-read fixes"). Run it any time with
 
 ## Daily check (routine)
 
-A Claude Code routine, **Page edits check** (set up 13 Oct 2026 at the owner's
-request; its id is in the owner's private notes), runs every day at 8:58 am Singapore time in a fresh cloud session:
-
-- It reads open `Page edits:` issues, skipping any already linked to a PR from an earlier run. With none, it stops
-  without posting.
-- Otherwise it opens **one PR, never merged**, with the changes and preview links, comments the PR link on each issue
-  and notifies the owner (push). The owner merges, then closes the issues.
-- It never applies clinical content (doses, techniques, cut-offs, safety advice), or more than wording, typo and layout
-  fixes from anyone but the owner. Those go in the PR under "Needs the owner's decision".
-- It was created without connectors and reaches GitHub through the environment's GitHub access. If a run can't reach
-  GitHub, recreate it from claude.ai/code → Routines with the GitHub connector. Pause or edit it there too.
-- Sessions handling page edits by hand should check for an open routine PR first, so the same issue isn't done twice.
+A daily routine drafts one never-merged PR for new `Page edits:` issues (details in the owner's private notes). Sessions handling page edits by hand should check for an open routine PR first, so the same issue isn't done twice. It never applies clinical content or more than wording, typo and layout fixes from anyone but the owner.
 
 ## Where it runs (after the subdomain moves, 13 Oct 2026)
 
@@ -183,16 +157,6 @@ The editor stays at `anawj.com/edit/`. It edits pages in a same-origin frame, an
 `nuhroster.` or `prewarmstudy.` are still edited through their `anawj.com/<folder>/` copy, which is the same files. Details and
 what would break it: `SUBDOMAINS.md`, "The page editor".
 
-## edit.anawj.com (Cloudflare; set up by the owner 13 Oct 2026, working)
+## edit.anawj.com
 
-The anawj.com DNS is on Cloudflare. The Cloudflare plugin in sessions can't make DNS records or rules, so this is
-two steps in the dashboard (anawj.com zone):
-
-1. **DNS → Records → Add record**: Type `AAAA`, Name `edit`, IPv6 `100::`, Proxy status **Proxied** (orange cloud).
-   (A placeholder address: the redirect rule answers before anything is fetched.)
-2. **Rules → Redirect Rules → "Redirect to a different domain" template**: request URL `*://edit.anawj.com/*` →
-   `https://anawj.com/edit/?page=/${2}`, status **302**, Preserve query string **off** (the wildcard already carries
-   the query, e.g. `?demo`). A dynamic rule (`concat("https://anawj.com/edit/?page=", http.request.uri.path)`) works too.
-
-Check: `edit.anawj.com/hand-babies/` opens the editor on the hand assessment page; `edit.anawj.com` opens it on the
-home page.
+A Cloudflare DNS record plus a redirect rule send `edit.anawj.com/<path>` to `https://anawj.com/edit/?page=/<path>` (302, query kept). Setup steps are in the owner's private notes. Check: `edit.anawj.com/hand-babies/` opens the editor on the hand page.

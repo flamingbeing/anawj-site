@@ -1,106 +1,11 @@
 # APMES People status
 
-Short and current: what is happening now, what waits on the owner, what is next, and the decisions made along the way.
-Lasting rules and lessons go in `NOTES.md`. "Recently done" is updated at save-state only, not in every PR (the PR
-list, filtered by the `people` label, has the rest).
-Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
-before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
-
-Last updated: 2026-10-17 by Claude Code, People app (people) (save-state).
-
-## Now
-
-Each session keeps its own line in `status/<session>.md` (`people.md`; a new session adds its own file), so sessions never
-edit the same lines. Read them all before starting; edit only yours. People reuses evals' code (`people/NOTES.md`), so
-check `evals/` work in progress too.
-
-## Waiting on the owner
-
-- **Check People › Access on the live app** (17 Oct; merged as #754): the older `owners/`, `admins/`, `pds/` lists still work but show on the
-  Access screen only once copied into `access/` (firetop's copy should cover it); see that your own roles appear and the log works.
-
-- **Try Import from roster with the real lists** (16 Oct): People › Residents › Import from roster › Get the list from NUH
-  Junior Monthly (import the newest month's sheet there first, so grades are current; use the browser that has the roster app's data, or sign in to its team sharing; otherwise copy it from
-  the roster app's More › Export and paste). Check the name matches and the suggested years before applying, and say if
-  the matching misses people or the defaults (what is ticked) should change.
-
-## Next (agreed queue)
-
-0. **Permissions and manpower for the APMES apps** (owner, 17 Oct 2026): this session is the orchestrator and takes requests from other
-   sessions on its own (`people/NOTES.md`, "Who runs permissions"). Access pane built and merged (#754; CCC 360 told). Open: retire the older role lists once `access/` is
-   confirmed on the live app. #757 (CCC 360, open, rules): any resident reads ACTIVE residents; no change for People.
-
-1. **Rotations, stage 1 is built** (owner's go 16 Oct 2026): part 1, the read-only grid, people per posting and a person's
-   history, in the browser; part 2, linking sheet names to roster names by hand once (kept in this browser) and the pull by
-   NUH Junior Monthly (Postings › Pull from APMES People…: it opens People, People sends ICU, cardiac and OG float postings
-   only after the user taps Send, and they land in the roster's Paste rotations box to look over and Apply). Open: reading the
-   sheet straight from Google (the owner has no link yet) instead of a downloaded .xlsx; a real run with the owner's sheet and
-   the real roster. The reader is a standalone module (`js/rotations.js`) so it can move.
-2. **Rotations store with access control** (owner, 16 Oct 2026; the empty project `apmes-rotations` exists, locked, with the owner as
-   its only member): see the decisions log. Not needed for stage 1.
-3. Later, and only with the rotation planner's say: editing rotations in the app (stage 2), then retiring the sheet.
+What is happening now, what waits on the owner, the next steps and the decisions log are kept in the owner's private
+notes, not in this public repo. Lasting rules and lessons go in [NOTES.md](NOTES.md). The PR list filtered by the
+`people` label has the full history.
 
 ## Recently done
 
-- #699 Import from the monthly roster: NUH Junior Monthly's staff list (one tap, or pasted; the department sheet's grid
-  tab works too) gives year changes, graduations, new residents and residents not on the roster, each ticked or not,
-  saved only after Apply and a confirm. The roster app's side: `nuh-junior-monthly/js/apmes.js`, More › Export.
-- #709 Notes: People becomes the source of truth for grade and postings; match by email; change-of-email merge later.
-- #704 Status notes for People and NUH Junior Monthly after #699.
-- 13 Oct: APMES People built (new-intake paste, year check, PDs, CSV export; Logbook 3 session).
-
-- #703 (nuh-junior-monthly) The roster app's sheet import now moves people to the group their new grade shows (ticked in
-  its review, newest month only), so after July the staff list sent here has the new grades.
-
-## Decisions log
-
-- 16 Oct 2026: residents' years can be brought up to date from NUH Junior Monthly's staff list (owner). Matched by name
-  (the roster has no emails); every change listed with a tick; nothing saved until Apply and its confirm.
-- 16 Oct 2026: roster grades: RES1–RES3 are R1–R3; R/SR is R4 or R5, picked by the user (R3 now suggests R4); AC means
-  graduated; other grades are not APMES residents. Years are fixed through the intake so they keep moving up each July.
-- 16 Oct 2026: faculty are not imported from the roster (no consultants on the junior roster, no emails).
-- 16 Oct 2026: before sending the list in July, import the new month's sheet in NUH Junior Monthly so everyone's grade is
-  current (owner asked the import to move grades; #703).
-- 16 Oct 2026: **People will become the source of truth for grade and postings** (owner: "in future i might migrate the grade
-  and postings to the peoples app too"). So no two-way sync with NUH Junior Monthly, no email field in the roster app and
-  no People → roster direction now: the one-way import (#699) is a bridge until that migration.
-- 16 Oct 2026: when linking people across apps, **match by email** (the logbook's official emails are the source; they are
-  login keys, so valid and unique) with the resident `rid` as the permanent ID underneath. No new hidden ID. Other apps
-  stay on their own Firebase projects and share an ID only where they genuinely need to talk.
-- 16 Oct 2026: a **change-of-email merge** is wanted in future (owner), as an explicit admin "Change email" action in People,
-  never automatic: copy the logbook to the new email (old kept as backup), rewrite the emails on evaluations, keep previous
-  emails; faculty and PDs have no permanent ID yet (give them one or keep a previous-emails list). It touches live data
-  (logbook): full tests, emulator, preview, owner approval and probably a job to firetop. Not started.
-- 16 Oct 2026: **rotations will live with People** (owner): the master block rotation sheet is both the plan (who is where,
-  week by week) and the record (who has done what), and rosters and APMES both need it. Model: a person has an identity
-  (ID, name, email, kind), a home (permanent staff belong to one institution; residents belong to the programme) and
-  placements (institution, from, to; a rotation is a new placement). Each roster asks "who is placed here this month".
-  Grid cells are placements; "who has done what" and manpower are worked out from them, never typed twice.
-- 16 Oct 2026: **stage 1 is read-only, in the browser, no Firebase** (owner: the live logbook's data is protected). Shared
-  storage (its own Firebase project, never the logbook's) comes only when others need to see the same rotations.
-- 16 Oct 2026: the sheet's notation (owner): a `-E` suffix is the elective version of a posting (an elective is not always at
-  the base code's place and mostly doesn't count toward manpower); a `KIV` prefix means provisional; a slash joins two
-  codes in one week and is ad hoc (resolve each by hand). Some codes are origin tags in the External Residents column
-  (where a rotating resident comes from), not postings. The reader must tell those rows apart.
-- 16 Oct 2026: the rotation planner's sheet and workflow stay as they are; nothing here edits the sheet, and the planner is
-  not involved until the owner says so. The monthly roster's rosterer writes only the critical postings by hand today; the
-  export replaces that.
-- 16 Oct 2026: **who may see rotations** (owner): PDs, PCs (admins) and rosterers only; faculty and juniors never. No shared
-  password: Google sign-in against a named list, as the other apps. Stage 1 stores nothing on a server (it shows what the
-  signed-in person's own Google access opens, or a file on their device), and People already lets in only admins and PDs.
-  Rosterers are not in People's lists (adding them means a change to the protected logbook project's rules, which we avoid), so
-  until the shared store exists an admin or PD sends the critical postings to the roster app (the pull above) and the
-  rosterer sees only those.
-- 16 Oct 2026: **a separate Firebase project for rotations**, `apmes-rotations` (owner; created through firetop the same day, locked
-  until rules are deployed, on the free plan for now because billing could not be linked; the owner decides that, details in his
-  private notes;
-  never the logbook's project). It copies the roster app's pattern: a member list with roles (admin, rosterer, viewer) that
-  admins manage inside the app, so only the very first admin is added by hand in the console, once. The owner does not want to
-  open Firebase to add rosterers. Rules (member-only read; deploy on merge via the rules workflow) and the app's sign-in
-  come when stage 2 is built; reusing the roster app's own project was the other option (its rosterers are already members),
-  but signing in from People's address to it needs extra setup that is not yet checked. Where the rotations screen lives
-  (People or the roster app) decides this; not decided.
-- 16 Oct 2026: rotations stage 1 part 1 built (owner approved free plan for `apmes-rotations`, so billing is not needed: the app
-  will hardly be opened). The sheet's sections (SR2/SR1/SMO, CA3 to CA1, Fellows, MOPEX, External Residents) say each person's
-  year, which could later replace or check the grade import from the monthly roster.
-
+- #754 People › Access (roles, access log, paste lists); #742 Rotations stage 1 (read-only, in the browser).
+- #699 Import from the monthly roster (year changes, graduations, new residents; saved only after Apply).
+- 13 Oct 2026: APMES People built (new-intake paste, year check, PDs, CSV export).
