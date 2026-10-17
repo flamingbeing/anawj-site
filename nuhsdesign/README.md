@@ -133,6 +133,9 @@ Add both files to the app's `sw.js` SHELL list so the app works offline.
   tabs as a strip under the bar. Use `.a-main--wide` for screens that need the full width (tables, the roster grid)
   and `.a-split` (`.a-split-list` + `.a-split-detail`, `data-show="detail"` on phones) to show a list and the open item
   side by side on a computer while phones open the item as its own screen (`app.html`, Requests).
+- **Check for sideways scroll with a wide font**: CI's browser uses a wider fallback font (DejaVu) than a phone, so a
+  row that fits on a phone can overflow in CI. Before merging an app, check 320 and 390px with a forced wide font
+  (the NUH roster date bar and Practice tools were caught this way). Give flex children `min-width: 0`.
 - **Dark mode**: add `data-theme="auto"` on `<html>` to follow the phone, once the app's own colours have been checked
   in dark. Light only until then.
 

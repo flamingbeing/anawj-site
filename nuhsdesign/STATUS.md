@@ -3,7 +3,7 @@
 Short and current, like `logbook/STATUS.md` (same layout and rules). The rules themselves are in `README.md` (the
 NUHS-style guide) and `tokens.css`. Update with `/save-state` (Claude Code) or `$save-state` (Codex).
 
-Last updated: 2026-10-15 by Claude Code, design session (branch `claude/inspiring-dijkstra-pctmrf`).
+Last updated: 2026-10-17 by Claude Code, design session (branch `claude/inspiring-dijkstra-pctmrf`).
 
 ## Now
 
@@ -40,6 +40,8 @@ Last updated: 2026-10-15 by Claude Code, design session (branch `claude/inspirin
 
 ## Decisions log
 
+- 2026-10-17: Kit apps are checked at 320 and 390px with a forced wide font before merging (CI's font is wider than a
+  phone's); recorded in the README "App kit".
 - 2026-10-15: The kit adapts to computers (sidebar, list and detail side by side, hover) as well as phones. Prewarm stays
   out of the restyle (live study). Apps that already have a dark theme (evals) keep it, on the kit's dark colours.
 - 2026-10-15: Apps use the app kit: the phone's own font (brand from colour and the band), inset grouped lists, bottom
