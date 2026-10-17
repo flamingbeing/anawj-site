@@ -10,9 +10,10 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `people/`: APMES People, the one place to keep the resident, faculty and PD lists that logbook and evals share
   (add a yearly intake, year check, CSV, import from the monthly roster, a read-only rotations view), at `apmes.anawj.com/people/`; admins and PDs only. It reuses evals' code. Start
   with `people/NOTES.md`.
-- `selection/`: APMES Selection 360, confidential feedback by residents and faculty on residency applicants (a 1-5 score and a
-  comment each), at `apmes.anawj.com/360/` (folder `selection/`); same sign-in as logbook, evals and People. Applicant names are never in the
-  repo (private notes). Start with `selection/NOTES.md`, then `selection/PLAN.md`.
+- `applicants/`: APMES residency applicants feedback, confidential feedback by residents and faculty on residency applicants (a 1-5 score and a
+  comment each), at `apmes.anawj.com/applicants/`; same sign-in as logbook, evals and People. Applicant names are never in the
+  repo (private notes). Start with `applicants/NOTES.md`, then `applicants/PLAN.md`. (`/360/` is reserved for a different app, the CCC
+  scholar-project and multisource-feedback collection; not built yet.)
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`), at `nuhroster.anawj.com` (the old `anawj.com/nuh-roster/` redirects). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
 - `ntf-roster/`: NTF (Ng Teng Fong) anaesthesia monthly duty roster: calls, PM shifts, leave and requests on one grid,
   rules the owner adds in the app (combination restrictions included), and auto-fill; at `ntfroster.anawj.com`. Start with
@@ -95,7 +96,7 @@ browser tests run only when the PR changes that app (owner, 15 Oct 2026; `.githu
 
 ```
 node tools/check.mjs
-for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs ntf-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs selection/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do node "$f"; done
+for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs ntf-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs applicants/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do node "$f"; done
 ```
 
 - Logbook changes: `tools/test-logbook.sh` runs all of the above plus the full e2e and every focused browser test
@@ -113,7 +114,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
   Checks workflow), `node ntf-roster/test/perf.e2e.mjs` (speed budgets on a slowed phone; also in the Checks workflow)
   and the unit tests in `ntf-roster/test/`.
 - Hand log changes: run `node hand-log/test/e2e.mjs`.
-- Selection changes: run `node selection/test/model.test.mjs` and `node selection/test/e2e.mjs`; its rules (in `logbook/firestore.rules`) have `selection/test/rules.emulator.mjs`, run by `tools/test-rules.sh`.
+- Applicants changes: run `node applicants/test/model.test.mjs` and `node applicants/test/e2e.mjs`; its rules (in `logbook/firestore.rules`) have `applicants/test/rules.emulator.mjs`, run by `tools/test-rules.sh`.
 - People changes, and evals changes to `cloud.js`, `ui-core.js` or the People panes in `ui-admin.js`: run `node people/test/e2e.mjs`.
 - Page editor changes (`edit/`): run `node edit/test/e2e.mjs` and `node hand-babies/test/e2e.mjs` (it opens the editor).
 - Feedback button or Worker changes (`feedback/`, `worker/`): run `node feedback/test/e2e.mjs` (through the real Worker).

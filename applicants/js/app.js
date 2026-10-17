@@ -1,4 +1,4 @@
-// APMES Selection 360: residents and faculty give confidential feedback on residency applicants (a 1-5 suitability score
+// APMES Applicants: residents and faculty give confidential feedback on residency applicants (a 1-5 suitability score
 // and a comment each). It reuses evals' sign-in and people lists (../../evals/js/), so the people who can answer are the
 // ones already in People; what is new is here and in model.js.
 // Stage 1 (PLAN.md): the round (title + applicants) lives on the device and travels as a private link; answers are saved on
@@ -84,7 +84,7 @@ const go = hash => { location.hash = hash; };
 
 function header(title, { back = false } = {}) {
   titleEl.textContent = title;
-  document.title = title === 'APMES Selection' ? title : `${title} · APMES Selection`;
+  document.title = title === 'APMES Applicants' ? title : `${title} · APMES Applicants`;
   subEl.textContent = 'Demo'; subEl.hidden = !cloud.demo;
   backEl.hidden = !back;
   backEl.onclick = () => { history.length > 1 && route().name !== 'home' ? history.back() : go('#'); };
@@ -365,7 +365,7 @@ async function render() {
   const n = ++seq;
   if (!S.user) return;
   if (!mayAnswer()) {
-    header('APMES Selection');
+    header('APMES Applicants');
     fill(app, empty('For residents and faculty', `${S.user.email} isn’t on the resident or faculty list yet. Ask to be added, or apply for access in evals.`, h('a', { class: 'a-btn', href: '../evals/' }, 'Open evals')));
     return;
   }
@@ -375,7 +375,7 @@ async function render() {
   if (r.name === 'a') return applicantScreen(r.id);
   if (r.name === 'review' && round) return reviewScreen();
   if (r.name === 'done') return doneScreen();
-  header(r.name === 'setup' ? 'Set up the round' : r.name === 'results' ? 'Results' : round ? round.title : 'APMES Selection');
+  header(r.name === 'setup' ? 'Set up the round' : r.name === 'results' ? 'Results' : round ? round.title : 'APMES Applicants');
   backEl.hidden = true;
   const body = r.name === 'setup' ? (setupScreen(), null) : r.name === 'results' ? (resultsScreen(), null) : homeScreen();
   if (body) fill(app, h('div', { class: 'e-stack sl-col' }, staffBar, body));
@@ -385,9 +385,9 @@ async function render() {
 window.addEventListener('hashchange', () => render());
 
 function signInScreen() {
-  header('APMES Selection');
+  header('APMES Applicants');
   fill(app, h('section', { class: 'e-card', style: 'max-width:520px;margin:0 auto' },
-    h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'APMES Selection'),
+    h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'APMES Applicants'),
     h('p', {}, 'Confidential feedback on residency applicants, for residents and faculty. Sign in with the account you use for the logbook and evals.'),
     h('button', { class: 'a-btn', type: 'button', onclick: async () => { try { await cloud.signIn(); } catch (e) { toast('Sign-in failed. ' + errText(e)); } } }, 'Sign in with Google'),
     cloud.demo ? h('p', { class: 'e-small' }, 'Demo: made-up applicants, kept only in this browser.') : null));

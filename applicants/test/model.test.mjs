@@ -1,4 +1,4 @@
-// Unit tests for selection/js/model.js. Run: node selection/test/model.test.mjs
+// Unit tests for applicants/js/model.js. Run: node applicants/test/model.test.mjs
 import assert from 'node:assert/strict';
 import { parseNames, cleanRound, encodeRound, decodeRound, readRoundText, cleanAnswers, statusOf, progress, warnings, formBody, formUrl, summary, resultsCSV, answersText, demoRound, blank } from '../js/model.js';
 
@@ -16,7 +16,7 @@ const round = cleanRound({ title: 'T', cycle: '2027', applicants: parseNames('Zo
 t('round survives a link, including non-ASCII names', () => {
   const back = decodeRound(encodeRound(round));
   assert.deepEqual(back, round);
-  assert.deepEqual(readRoundText('https://x/360/#r=' + encodeRound(round)), round);
+  assert.deepEqual(readRoundText('https://x/applicants/#r=' + encodeRound(round)), round);
   assert.deepEqual(readRoundText(JSON.stringify(round)), round);
   assert.equal(decodeRound('nonsense!!'), null);
   assert.equal(readRoundText('{bad'), null);
@@ -64,4 +64,4 @@ t('demo round has made-up names only', () => {
   assert.equal(demoRound().applicants.length, 6);
   assert.ok(cleanRound(demoRound()));
 });
-console.log(`selection model: ${n} groups passed`);
+console.log(`applicants model: ${n} groups passed`);

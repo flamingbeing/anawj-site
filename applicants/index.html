@@ -5,17 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
-<title>APMES Selection</title>
-<meta name="description" content="Confidential 360 feedback on residency applicants, for APMES residents and faculty.">
+<title>APMES Applicants</title>
+<meta name="description" content="Confidential feedback on residency applicants, for APMES residents and faculty.">
 <meta name="theme-color" content="#f9f9fb">
 <link rel="icon" type="image/png" sizes="32x32" href="../evals/icons/favicon-32.png">
 <link rel="apple-touch-icon" href="../evals/icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap" media="print" onload="this.media='all'">
 <script>
-  // Selection lives at apmes.anawj.com/360/ (one sign-in with the logbook, evals and People). Send visitors on from
+  // Applicants lives at apmes.anawj.com/applicants/ (one sign-in with the logbook, evals and People). Send visitors on from
   // anawj.com, keeping the part after # (a round link). A no-op on apmes.anawj.com, previews and localhost.
-  if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname)) location.replace('https://apmes.anawj.com/360/' + location.search + location.hash);
+  if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname)) location.replace('https://apmes.anawj.com/applicants/' + location.search + location.hash);
   // evals' theme choice applies here too
   try { var t = localStorage.getItem('evals-theme'); if (t === 'auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light'; } catch (e) {}
 </script>
@@ -56,7 +56,7 @@
   <div class="a-bar-row">
     <button type="button" id="back" class="a-bar-btn e-appbar__back" aria-label="Back" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span aria-hidden="true">Back</span></button>
     <div class="e-appbar__titles">
-      <h1 id="title" class="a-bar-title e-appbar__title">APMES Selection</h1>
+      <h1 id="title" class="a-bar-title e-appbar__title">APMES Applicants</h1>
       <p id="sub" class="e-appbar__sub" hidden></p>
     </div>
     <div id="me" class="e-appbar__right"></div>
