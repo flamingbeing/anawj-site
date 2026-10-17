@@ -13,7 +13,11 @@ a decision on who may read confidential feedback, and neither should be rushed i
 Known limits: results from Google-Form sends are not visible in the app; "sent" can't be confirmed from the browser; the
 round (with names) lives in a link and on devices; one device's Results screen only shows what was sent from that device.
 
-## Stage 2: a shared store (needs the owner's decisions)
+## Stage 2: a shared store (built 17 Oct 2026; text below is the plan it followed)
+
+Decided by the owner: PDs and the selection committee read every response, with names. Built as proposed below, in the
+logbook project: rounds, one response per respondent (readable by them too), a committee list kept by admins and PDs. Still
+open: reminders to people who haven't answered, open/close dates, retention (delete responses after the intake is decided).
 
 - **Where:** a new collection in the logbook project (`apmes-logbook`), like evals, or its own project (the owner keeps the
   logbook's Firebase protected: ask first). Proposed shape: `selection/{cycle}` (title, applicants, open/closed) written by
