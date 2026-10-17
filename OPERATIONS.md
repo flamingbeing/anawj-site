@@ -100,3 +100,10 @@ What a handover needs on top:
    and move billing to an institutional billing account.
 3. **Swap the app roles:** the `owners/` and `admins/` entries in each Firebase project (`logbook/NOTES.md`, Roles).
 4. **Update this file** with the new owner's details, and the consent screen's contact email.
+
+## Roles and handing over (17 Oct 2026)
+
+Roles (owner, admin staff, PC, PD) are kept in `access/` in the `apmes-logbook` project and edited in People, so handing over the
+apps' people and permissions needs no console or home-computer session. Still outside the apps, for a successor: Firebase and
+Google Cloud project ownership, billing and budgets, sign-in providers and authorised domains, the OAuth client origins, and
+Cloudflare DNS and Workers. Details: `people/NOTES.md`, "Roles".

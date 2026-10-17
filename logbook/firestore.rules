@@ -17,19 +17,27 @@ service cloud.firestore {
     function me() {
       return request.auth.token.email.lower();
     }
+    // access/{email}: roles kept in the app (People › Access), so they can be handed over without the console. A role
+    // here counts the same as the older lists (owners/, admins/, pds/). 'admin' is Admin staff; 'pc' is a programme
+    // coordinator and has the same powers as Admin staff (owner, 17 Oct 2026).
+    function hasAccess(roles) {
+      return exists(/databases/$(database)/documents/access/$(me()))
+        && get(/databases/$(database)/documents/access/$(me())).data.roles.hasAny(roles);
+    }
     function isAdmin() {
-      return signedIn() && exists(/databases/$(database)/documents/admins/$(me()));
+      return signedIn() && (exists(/databases/$(database)/documents/admins/$(me()))
+        || hasAccess(['admin', 'pc']));
     }
     // the app owner: may read every logbook and its cases and import cases (never reflections,
     // images or the recycle bin). Written only from the console; hand over by swapping the entry.
     function isAppOwner() {
-      return signedIn() && exists(/databases/$(database)/documents/owners/$(me()));
+      return signedIn() && (exists(/databases/$(database)/documents/owners/$(me())) || hasAccess(['owner']));
     }
     // programme directors: a role separate from admin, so their permissions can be tuned on their own.
     // Today a PD can read the resident list, the counts summaries and every evaluation, and maintain
     // the resident and faculty lists and decide applications (evals); nothing else.
     function isPD() {
-      return signedIn() && exists(/databases/$(database)/documents/pds/$(me()));
+      return signedIn() && (exists(/databases/$(database)/documents/pds/$(me())) || hasAccess(['pd']));
     }
     function isOwner(email) {
       return signedIn() && email == me();
@@ -39,6 +47,41 @@ service cloud.firestore {
     }
     function optNumber(d, k) {
       return !(k in d) || d[k] == null || d[k] is number;
+    }
+
+    // access/{email} { name, roles, updatedAt, updatedBy }: who holds which role (owner, admin, pc, pd). Owners grant and
+    // remove anything; Admin staff and PCs grant admin, pc and pd but never owner, and never change their own record.
+    // Nobody can remove their own owner role (so an owner always remains), and nobody removes an owner but an owner.
+    // accessLog/{id} is the append-only record of who changed what; the app writes it in the same batch.
+    match /access/{email} {
+      allow get: if isOwner(email);
+      allow list: if isAdmin() || isPD() || isAppOwner();
+      allow create: if email == email.lower() && validAccess(email, request.resource.data)
+        && (isAppOwner() ? (email != me() || 'owner' in request.resource.data.roles)
+                         : (isAdmin() && email != me() && !('owner' in request.resource.data.roles)));
+      allow update: if email == email.lower() && validAccess(email, request.resource.data)
+        && (isAppOwner() ? (email != me() || 'owner' in request.resource.data.roles)
+                         : (isAdmin() && email != me() && !('owner' in request.resource.data.roles)
+                            && !('owner' in resource.data.roles)));
+      allow delete: if isAppOwner() ? email != me()
+                                    : (isAdmin() && email != me() && !('owner' in resource.data.roles));
+    }
+    function validAccess(email, d) {
+      return d.keys().hasOnly(['email', 'name', 'roles', 'updatedAt', 'updatedBy'])
+        && d.email == email
+        && optString(d, 'name', 200)
+        && d.roles is list && d.roles.size() <= 4 && d.roles.hasOnly(['owner', 'admin', 'pc', 'pd'])
+        && d.updatedAt == request.time && d.updatedBy == me();
+    }
+    match /accessLog/{id} {
+      allow read: if isAdmin() || isAppOwner();
+      allow create: if (isAdmin() || isAppOwner())
+        && request.resource.data.keys().hasOnly(['by', 'to', 'change', 'at'])
+        && request.resource.data.by == me()
+        && request.resource.data.to is string && request.resource.data.to.size() <= 200
+        && request.resource.data.change is string && request.resource.data.change.size() <= 300
+        && request.resource.data.at == request.time;
+      allow update, delete: if false;
     }
 
     // owners: written only from the console. A user may check their own entry.
@@ -610,10 +653,12 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     function validFaculty(email, d) {
-      return d.keys().hasOnly(['email', 'name', 'status', 'updatedAt'])
+      return d.keys().hasOnly(['email', 'name', 'status', 'updatedAt', 'core', 'ccc', 'workEmail'])
         && d.email == email
         && optString(d, 'name', 200)
         && d.status in ['ACTIVE', 'INACTIVE']
+        && (!('core' in d) || d.core is bool) && (!('ccc' in d) || d.ccc is bool)
+        && optString(d, 'workEmail', 200)
         && optNumber(d, 'updatedAt');
     }
 
@@ -721,43 +766,32 @@ service cloud.firestore {
     }
 
     // CCC 360 (ccc/): what the programme coordinators (PCs) collect before a CCC meeting. A round is ccc/{round} (title,
-    // open or closed, deadline): admins, PDs and PCs write it; residents, PCs, PDs and admins read it. Each resident writes
+    // open or closed, deadline): PDs, Admin staff and PCs write it; residents and those staff read it. Each resident writes
     // only their own scholarly-project entry, ccc/{round}/entries/{email}, and their own nominees for multisource feedback,
     // ccc/{round}/msf/{email}, while the round is open. Nominees are third parties' contact details, so they sit apart from
     // the projects so they can be deleted on their own after the round (the app deletes them 60 days after closing).
-    // PCs (cccPCs/{email}, kept by admins and PDs) and PDs read every entry and nominee list; plain admins do not.
-    // ccc/{round}/review/{email} holds the PCs' marks on one resident's nominees (written by PCs and PDs only).
+    // PDs, Admin staff and PCs (access/{email}, People › Access; a PC has Admin staff's powers) read every entry and
+    // nominee list. ccc/{round}/review/{email} holds their marks on one resident's nominees.
     function cccResident() {
       return signedIn() && exists(/databases/$(database)/documents/members/$(me()))
         && isResident(get(/databases/$(database)/documents/members/$(me())).data.rid);
     }
-    function cccPC() {
-      return signedIn() && exists(/databases/$(database)/documents/cccPCs/$(me()));
-    }
     function cccStaff() {
-      return isPD() || cccPC();
+      return isPD() || isAdmin();
     }
     function cccOpen(round) {
       return get(/databases/$(database)/documents/ccc/$(round)).data.status == 'open';
     }
-    match /cccPCs/{email} {
-      allow get: if isOwner(email);
-      allow list: if isAdmin() || isPD();
-      allow create, update: if (isAdmin() || isPD()) && email == email.lower()
-        && request.resource.data.keys().hasOnly(['name'])
-        && optString(request.resource.data, 'name', 200);
-      allow delete: if isAdmin() || isPD();
-    }
     match /ccc/{round} {
-      allow read: if isAdmin() || cccStaff() || cccResident();
-      allow create, update: if (isAdmin() || cccStaff()) && round.size() <= 20 && validCccRound(round, request.resource.data);
-      allow delete: if isAdmin() || isPD();
+      allow read: if cccStaff() || cccResident();
+      allow create, update: if cccStaff() && round.size() <= 20 && validCccRound(round, request.resource.data);
+      allow delete: if cccStaff();
       match /entries/{email} {
         allow get: if isOwner(email);
         allow read: if cccStaff();
         allow create, update: if isOwner(email) && email == email.lower() && cccResident() && cccOpen(round)
           && validCccEntry(email, request.resource.data);
-        allow delete: if isPD();
+        allow delete: if cccStaff();
       }
       match /msf/{email} {
         allow get: if isOwner(email);

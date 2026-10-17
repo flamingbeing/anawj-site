@@ -1,4 +1,4 @@
-// Firestore rules checks for the CCC 360 app (collections cccPCs/ and ccc/) against the local emulator, fake accounts only.
+// Firestore rules checks for the CCC 360 app (collection ccc/ (staff are PDs, Admin staff and PCs; PCs come from access/)) against the local emulator, fake accounts only.
 // Rules: logbook/firestore.rules. Run from the repo root:  tools/test-rules.sh   (or, with the emulator on port 8085,
 //   npx firebase emulators:exec --only firestore --project demo-logbook "node 360/test/rules.emulator.mjs")
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
@@ -20,7 +20,7 @@ await env.withSecurityRulesDisabled(async ctx => {
   await setDoc(doc(db, 'admins', ADMIN), { name: 'Boss' });
   await setDoc(doc(db, 'admins', ADMIN2), { name: 'Admin Two' });
   await setDoc(doc(db, 'pds', PD), { name: 'PD' });
-  await setDoc(doc(db, 'cccPCs', PC), { name: 'PC' });
+  await setDoc(doc(db, 'access', PC), { email: PC, name: 'PC', roles: ['pc'], updatedAt: 1, updatedBy: 'x@example.com' });
   await setDoc(doc(db, 'residents', 'R1'), { rid: 'R1', name: 'Alice', email: RES, status: 'ACTIVE', intake: 2024 });
   await setDoc(doc(db, 'residents', 'R2'), { rid: 'R2', name: 'Bob', email: RES2, status: 'ACTIVE', intake: 2024 });
   await setDoc(doc(db, 'members', RES), { rid: 'R1' });
@@ -51,7 +51,7 @@ await t('resident cannot change a round', assertFails(setDoc(doc(res, 'ccc', 'r1
 await t('round id must match', assertFails(setDoc(doc(pc, 'ccc', 'r5'), round({ round: 'other' }))));
 await t('round status is checked', assertFails(setDoc(doc(pc, 'ccc', 'r6'), round({ round: 'r6', status: 'maybe' }))));
 await t('round takes no extra fields', assertFails(setDoc(doc(pc, 'ccc', 'r7'), round({ round: 'r7', secret: 1 }))));
-await t('pc cannot delete a round', assertFails(deleteDoc(doc(pc, 'ccc', 'r2'))));
+await t('pc deletes a round', assertSucceeds(deleteDoc(doc(pc, 'ccc', 'r2'))));
 await t('pd deletes a round', assertSucceeds(deleteDoc(doc(pd, 'ccc', 'r3'))));
 
 // ---- project entries ----
@@ -72,10 +72,9 @@ await t('resident reads only their own entry', assertSucceeds(getDoc(doc(res, 'c
 await t('resident cannot read another entry', assertFails(getDoc(doc(res, 'ccc', 'r1', 'entries', RES2))));
 await t('resident cannot list entries', assertFails(getDocs(collection(res, 'ccc', 'r1', 'entries'))));
 await t('faculty cannot list entries', assertFails(getDocs(collection(fac, 'ccc', 'r1', 'entries'))));
-await t('plain admin cannot list entries', assertFails(getDocs(collection(adm, 'ccc', 'r1', 'entries'))));
+await t('admin staff lists entries', assertSucceeds(getDocs(collection(adm, 'ccc', 'r1', 'entries'))));
 await t('pc lists entries', assertSucceeds(getDocs(collection(pc, 'ccc', 'r1', 'entries'))));
 await t('pd lists entries', assertSucceeds(getDocs(collection(pd, 'ccc', 'r1', 'entries'))));
-await t('pc cannot delete an entry', assertFails(deleteDoc(doc(pc, 'ccc', 'r1', 'entries', RES2))));
 await t('resident cannot delete their entry', assertFails(deleteDoc(doc(res, 'ccc', 'r1', 'entries', RES))));
 await t('pd deletes an entry', assertSucceeds(deleteDoc(doc(pd, 'ccc', 'r1', 'entries', RES2))));
 
@@ -90,7 +89,7 @@ await t('nominees are capped', assertFails(setDoc(doc(res, 'ccc', 'r1', 'msf', R
 await t('resident reads their own nominees', assertSucceeds(getDoc(doc(res, 'ccc', 'r1', 'msf', RES))));
 await t('resident cannot read another\'s nominees', assertFails(getDoc(doc(res, 'ccc', 'r1', 'msf', RES2))));
 await t('resident cannot list nominees', assertFails(getDocs(collection(res, 'ccc', 'r1', 'msf'))));
-await t('plain admin cannot list nominees', assertFails(getDocs(collection(adm, 'ccc', 'r1', 'msf'))));
+await t('admin staff lists nominees', assertSucceeds(getDocs(collection(adm, 'ccc', 'r1', 'msf'))));
 await t('pc lists nominees', assertSucceeds(getDocs(collection(pc, 'ccc', 'r1', 'msf'))));
 await t('pd lists nominees', assertSucceeds(getDocs(collection(pd, 'ccc', 'r1', 'msf'))));
 await t('pc cannot edit nominees', assertFails(setDoc(doc(pc, 'ccc', 'r1', 'msf', RES), msf(RES))));
@@ -105,20 +104,10 @@ await t('pc writes marks', assertSucceeds(setDoc(doc(pc, 'ccc', 'r1', 'review', 
 await t('pd reads marks', assertSucceeds(getDoc(doc(pd, 'ccc', 'r1', 'review', RES))));
 await t('resident cannot read marks', assertFails(getDoc(doc(res, 'ccc', 'r1', 'review', RES))));
 await t('resident cannot write marks', assertFails(setDoc(doc(res, 'ccc', 'r1', 'review', RES), rev(RES))));
-await t('plain admin cannot write marks', assertFails(setDoc(doc(adm, 'ccc', 'r1', 'review', RES), rev(RES))));
+await t('admin staff writes marks', assertSucceeds(setDoc(doc(adm, 'ccc', 'r1', 'review', RES), rev(RES))));
+await t('faculty cannot write marks', assertFails(setDoc(doc(fac, 'ccc', 'r1', 'review', RES), rev(RES))));
 await t('marks take no extra fields', assertFails(setDoc(doc(pc, 'ccc', 'r1', 'review', RES), rev(RES, { x: 1 }))));
 await t('pc clears marks', assertSucceeds(deleteDoc(doc(pc, 'ccc', 'r1', 'review', RES))));
-
-// ---- the PC list ----
-await t('pc checks own entry', assertSucceeds(getDoc(doc(pc, 'cccPCs', PC))));
-await t('resident cannot read the PC list', assertFails(getDocs(collection(res, 'cccPCs'))));
-await t('pd lists the PCs', assertSucceeds(getDocs(collection(pd, 'cccPCs'))));
-await t('admin adds a PC', assertSucceeds(setDoc(doc(adm, 'cccPCs', 'new@example.com'), { name: 'New' })));
-await t('pd removes a PC', assertSucceeds(deleteDoc(doc(pd, 'cccPCs', 'new@example.com'))));
-await t('resident cannot make themselves a PC', assertFails(setDoc(doc(res, 'cccPCs', RES), { name: 'me' })));
-await t('a PC cannot add others', assertFails(setDoc(doc(pc, 'cccPCs', RES), { name: 'x' })));
-await t('PC emails are lower case', assertFails(setDoc(doc(adm, 'cccPCs', 'Mixed@Example.com'), { name: 'x' })));
-await t('an admin who is a PC reads entries', assertSucceeds(setDoc(doc(adm2, 'cccPCs', ADMIN2), { name: 'Admin Two' })).then(() => assertSucceeds(getDocs(collection(adm2, 'ccc', 'r1', 'entries')))));
 
 await env.cleanup();
 console.log(fail ? `ccc rules: ${fail} of ${n} checks failed` : `ccc rules: ${n} checks passed`);

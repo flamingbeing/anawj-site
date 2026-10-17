@@ -16,7 +16,7 @@ if [ ! -e node_modules ]; then ln -s "$TOOLS/node_modules" node_modules; made_li
 cfg="$(mktemp -d)/firebase.json"
 echo '{ "firestore": { "rules": "logbook/firestore.rules" }, "emulators": { "firestore": { "port": 8085, "host": "127.0.0.1" }, "ui": { "enabled": false } } }' > "$cfg"
 "$TOOLS/node_modules/.bin/firebase" emulators:exec --config "$cfg" --only firestore --project demo-logbook \
-  "node evals/test/rules.emulator.mjs && node applicants/test/rules.emulator.mjs && node 360/test/rules.emulator.mjs && cd logbook && node test/rules.emulator.mjs" 2>&1 | grep -E 'checks passed|^FAIL|^Error:' ; rc=${PIPESTATUS[0]}
+  "node evals/test/rules.emulator.mjs && node applicants/test/rules.emulator.mjs && node 360/test/rules.emulator.mjs && node people/test/rules.emulator.mjs && cd logbook && node test/rules.emulator.mjs" 2>&1 | grep -E 'checks passed|^FAIL|^Error:' ; rc=${PIPESTATUS[0]}
 # prewarming study rules: own rules file and demo project
 cfg2="$(mktemp -d)/firebase.json"
 echo '{ "firestore": { "rules": "prewarm/firestore.rules" }, "emulators": { "firestore": { "port": 8085, "host": "127.0.0.1" }, "ui": { "enabled": false } } }' > "$cfg2"
