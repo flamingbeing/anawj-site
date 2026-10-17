@@ -11,6 +11,7 @@ assert.deepEqual(resolve('apmes.anawj.com', '/logbook/js/app.js'), { file: 'logb
 assert.deepEqual(resolve('apmes.anawj.com', '/evals/'), { file: 'evals/' });
 assert.deepEqual(resolve('apmes.anawj.com', '/people/js/app.js'), { file: 'people/js/app.js' });
 assert.deepEqual(resolve('apmes.anawj.com', '/applicants/js/app.js'), { file: 'applicants/js/app.js' });
+assert.deepEqual(resolve('apmes.anawj.com', '/360/js/app.js'), { file: '360/js/app.js' });
 assert.deepEqual(resolve('hand.anawj.com', '/babies'), { redirect: '/babies/' });
 // anaes.anawj.com: the BIS and OT simulators moved to anantf.com (16 Oct 2026); old links forward, keeping the rest of the path
 assert.deepEqual(resolve('anaes.anawj.com', '/bis/'), { redirect: 'https://anantf.com/bis/' });
