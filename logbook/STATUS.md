@@ -6,7 +6,7 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-16 by Claude Code, Logbook 3 (log3).
+Last updated: 2026-10-17 by Claude Code, Logbook 3 (log3): handover to APMES Logbook (`status/log3.md`).
 
 ## Now
 
@@ -30,7 +30,7 @@ its own file), so sessions never edit the same lines. Read them all before start
 - A weekly drift check runs on the home computer and messages the owner's phone (details in the owner's private notes).
 - **Delete the test "ZZ" case again** (14 Oct): its first delete hit the zombie-delete bug (fixed in #519); after the
   site updates, reload and delete it once more (the old attempt sits as a conflict in Recent changes on that phone).
-- The response sheet's link sharing (details in the owner's private notes).
+- The response sheet's public link was closed (16 Oct, owner OK): glance once at its Apps Script Executions page (`onFormSubmit`, `logbookOutboxRun`) and say "fine" or the error. Other log3 items: `status/log3.md`.
 - **Try the 6-hour build** (13–14 Oct): Settings → Profile → Personal; Logbook day → + Daily note; Settings → Advanced
   logging → Labelled parts; Settings → Sync (GitHub / Drive / Dropbox); Send to. Everything new is off until switched on.
   Notes with text open in Preview (⋯ → Edit to type): say if they should open ready to type instead.
@@ -82,6 +82,7 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Recently done
 
+- #487 APMES People (`people/`, shared resident/faculty/PD lists; `people/NOTES.md`). #684 #685 #687 #688 the public/private split: private details moved to the owner's private repo, neutral pointers left, sessions load it at start. #720 the save-state skill covers the split.
 - #583 #584 #586 #587 #589 Logbook reliability fixes from the 15 Oct audit: saves after a conflict sync or say so and devices show
   the server's copy; bulk tag/merge/re-import through the queue; backup restore never overwrites newer work; reflection bin deletes
   check the version; deleted Form cases stay deleted (rules `formGone`); fewer doubled edited Form responses; the sheet outbox never
@@ -130,6 +131,8 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Decisions log
 
+- 2026-10-17: log1, log2 and log3 merge into one session, APMES Logbook, which carries on from the `status/` files.
+- 2026-10-16 (log3): Public/private split (`AGENTS.md`, "Keep the repo public-safe"); git history left as it is on purpose; the shared anantf-site gets only neutral wording; roster example names in tests are made up; the response sheet's public link was closed.
 - 2026-10-16 (log3): Live Firebase and Cloudflare changes go as jobs to the home-computer session instead of to the owner
   (`OPERATIONS.md`, "The home computer").
 - 2026-10-16 (log1): Where two sessions built the same thing from different instructions, the newer one on main stands (owner, on
