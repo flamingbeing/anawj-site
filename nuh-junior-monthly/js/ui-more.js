@@ -8,6 +8,10 @@ import * as io from './io.js';
 import * as S from './sheet.js';
 import * as G from './gsheets.js';
 import * as cloud from './cloud.js';
+import { buildSheet } from './sheetgen.js';
+import { specFromState } from './sheetgen-state.js';
+import { toWorkbook } from './sheetgen-xlsx.js';
+import { toSpreadsheetBody } from './sheetgen-gsheets.js';
 import { SG_HOLIDAYS } from './demo.js';
 
 const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'person';
@@ -157,6 +161,38 @@ export function mount(el, app) {
       }],
     });
   }
+
+  // ---- Make the month's sheet from scratch (trial, owner 17 Oct 2026): the whole form with its formulas, for the people and
+  // days the app has. As an Excel file, or straight into a new Google Sheet (the Sheets scope the app already has).
+  const genBox = h('div', { class: 'sheet-gen' });
+  const genSec = section('more-sheet-gen', "Make this month's sheet from scratch (trial)", null, genBox);
+  function renderGen() {
+    genBox.innerHTML = '';
+    const state = store.get(), spec = specFromState(state, app.month), nP = spec.people.length;
+    const link = h('p', { class: 'ok-box', role: 'status', hidden: true });
+    genBox.append(
+      h('p', { class: 'more-p' }, `The department's roster form (names, grades, the day cells, the totals, the counts and the manpower rows, all with their formulas) built for ${M.fmtMonth(app.month)} and the ${nP} ${nP === 1 ? 'person' : 'people'} in the app. Consultants and others the app does not hold are not included. Nothing in your live sheet is touched: this makes a new file.`),
+      h('div', { class: 'more-row' },
+        btn('Download as an Excel file', async () => {
+          try {
+            const ExcelJS = await io.loadExcelJS();
+            const wb = toWorkbook(buildSheet(specFromState(store.get(), app.month)), ExcelJS);
+            const buf = await wb.xlsx.writeBuffer();
+            io.download(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `roster-${io.fileStamp(app.month)}.xlsx`);
+          } catch (e) { app.toast(e.message || 'Could not make the file.', { kind: 'error' }); }
+        }),
+        cloud.enabled ? btn('Create a new Google Sheet', async e => {
+          const b = e.currentTarget; b.disabled = true;
+          try {
+            const made = await G.createSpreadsheet(toSpreadsheetBody(buildSheet(specFromState(store.get(), app.month)), { title: `NUH junior roster ${M.fmtMonth(app.month)} (made by the app)` }));
+            link.hidden = false; link.textContent = '';
+            link.append('Made it: ', h('a', { href: made.url, target: '_blank', rel: 'noopener' }, 'open the new Google Sheet'), '. It is a new file in your Google Drive; the live sheet was not touched.');
+          } catch (err) { app.toast(err.message || 'Could not make the sheet.', { kind: 'error', ms: 9000 }); }
+          b.disabled = false;
+        }, 'btn btn-primary') : null),
+      link);
+  }
+  renderGen();
 
   const backBox = h('div', { class: 'sheet-return' });
   const exportSheetSec = section('more-sheet-back', 'Put the roster back in the Google Sheet', null, backBox);
@@ -625,7 +661,7 @@ export function mount(el, app) {
     if (out instanceof Node && !out.parentNode) foot.append(out);
   }).catch(() => { /* version helper not there yet: show nothing */ });
 
-  root.append(teamSec, importSec, exportSheetSec, exportSec, backupSec, settingsSec, helpSec, startSec, foot);
+  root.append(teamSec, importSec, exportSheetSec, genSec, exportSec, backupSec, settingsSec, helpSec, startSec, foot);
 
   return {
     update(state) {
@@ -633,6 +669,7 @@ export function mount(el, app) {
       renderHolidays();
       fillPeople();
       renderBack();
+      renderGen();
       if (teamView && typeof teamView.update === 'function') { try { teamView.update(state); } catch (e) { console.error(e); } }
     },
     unmount() {

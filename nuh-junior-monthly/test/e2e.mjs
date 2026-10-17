@@ -314,6 +314,7 @@ for (const w of [320, 360, 390, 430]) {
     row(1, 'RES2', 'Icu Example', () => 'ICU'), row(2, 'NHG', 'Cardiac Example', () => 'C')];
   const colIdx = L => [...L].reduce((x, ch) => x * 26 + ch.charCodeAt(0) - 64, 0) - 1;
   const writes = [];
+  let created = null;   // the body of a new-spreadsheet request
   const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,OPTIONS' };
   await page.context().route('https://sheets.googleapis.com/**', route => {
     const req = route.request(), u = decodeURIComponent(req.url());
@@ -329,6 +330,7 @@ for (const w of [320, 360, 390, 430]) {
     }
     if (/values\/'Request'!A1:/.test(u)) return json({ values: sheet.map(r => r.slice()) });
     if (/values:batchGet/.test(u)) return json({ valueRanges: [...u.matchAll(/ranges='Request'!([A-Z]+)(\d+)/g)].map(m => ({ values: [[(sheet[+m[2] - 1] || [])[colIdx(m[1])] ?? '']] })) });
+    if (req.method() === 'POST' && /\/v4\/spreadsheets\?fields=/.test(u)) { created = JSON.parse(req.postData()); return json({ spreadsheetId: 'NEWSHEET', spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/NEWSHEET/edit', sheets: [{ properties: { sheetId: 0 } }] }); }
     if (/values:batchUpdate/.test(u)) {
       const body = JSON.parse(req.postData());
       for (const d of body.data) { const m = d.range.match(/!([A-Z]+)(\d+)$/); sheet[+m[2] - 1][colIdx(m[1])] = d.values[0][0]; writes.push(m[1] + m[2]); }
@@ -434,6 +436,20 @@ for (const w of [320, 360, 390, 430]) {
   await page.getByRole('button', { name: 'Import', exact: true }).click();
   await page.waitForTimeout(300);
   ok(await page.evaluate(() => window.jmApp.store.get().staff.find(p => p.name === 'Icu Example').group) === 'res3', 'Import moved them to the new group');
+  // make the month's sheet from scratch: a new Google Sheet with the whole form and its formulas (a fake Sheets API)
+  await page.goto(BASE + '#more');
+  await page.waitForTimeout(500);
+  await page.getByRole('button', { name: 'Create a new Google Sheet' }).click();
+  await page.waitForSelector('a:has-text("open the new Google Sheet")');
+  ok((await page.locator('a:has-text("open the new Google Sheet")').getAttribute('href')).endsWith('/NEWSHEET/edit'), 'Create a new Google Sheet gives the link to the new file');
+  const sh = created && created.sheets[0], vals = sh ? sh.data[0].rowData.flatMap(r => r.values) : [];
+  ok(sh && vals.filter(v => v.userEnteredValue && v.userEnteredValue.formulaValue).length > 100 && sh.merges.length === 3 && sh.conditionalFormats.length > 20, 'the new sheet carries the formulas, merges and colour rules');
+  ok(vals.some(v => v.userEnteredValue && v.userEnteredValue.stringValue === 'Icu Example'), 'and the people the app has');
+  // the Excel file
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download as an Excel file' }).click()]);
+  const path = await dl.path();
+  const head = (await import('node:fs')).readFileSync(path).subarray(0, 2).toString();
+  ok(/^roster-.*\.xlsx$/.test(dl.suggestedFilename()) && head === 'PK', 'Download as an Excel file gives an .xlsx');
   await page.close();
 }
 // Fill can draft the R1 to R3 calls: ticking them turns the R1 to R3 rules on, and the calls are placed
