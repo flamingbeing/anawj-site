@@ -247,6 +247,10 @@ with a navy top rule, navy titles and primary buttons, only controls rounded), l
 - Test: `test/tour.e2e.mjs` (in Checks). `test/e2e.mjs` and `test/perf.e2e.mjs` mark the tour as seen first, so practice
   doesn't open it under them.
 
+Lesson (17 Oct 2026): a closed sheet or picker stays in the page for a moment with `.out` on its backdrop. Any code that
+looks for "the open sheet" (Show me in `js/guide.js`) must skip elements inside `.out`, or it picks the closing one and
+the tour test flakes on slow CI.
+
 ## Excel (`js/io.js`)
 
 Import reads the department sheet: the month row in column A (`DECEMBER 2026`) with day numbers across, including the
