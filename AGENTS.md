@@ -163,8 +163,8 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - **Keep the repo public-safe:** fake data only; never commit secrets, tokens or credentials (the owner commits
   any needed public client IDs themselves).
   **Private work goes in `flamingbeing/life`** (the owner's private repo, 15 Oct 2026). Claude Code cloud sessions load
-  it at start (`.claude/hooks/session-start.sh` clones it next to this repo; if that fails, attach it with `add_repo`);
-  read its `CLAUDE.md`, `README.md` and `repos/anawj-site.md` before starting. Codex should have it in its environment
+  it at start (the owner attaches it first; if it is missing, attach it with `add_repo`);
+  read its `CLAUDE.md`, `README.md` and `projects/anawj-site/INDEX.md` before starting. Codex should have it in its environment
   too (ask the owner if it doesn't). Before writing anything here, ask whether it needs to be public for the app to
   work; if not, and it is sensitive, put it there instead, and leave at most a short "(details in the owner's private
   notes)" here. That covers:
