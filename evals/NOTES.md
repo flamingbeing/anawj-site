@@ -173,6 +173,12 @@ Pickers are full-screen **Recent | All | Write-In** lists, with recents remember
 - **Data rules:** field whitelists and `clean*()`/`stampPatch` live in `js/schema.js` (production code; demo-backend re-exports them).
 - **Speed:** Firebase SDK `modulepreload` from an inline script in `index.html` (not in the demo; keep the version in step with `cloud.js`
   and `sw.js`); web font non-blocking; service worker registers on `load`; `qrSvg()` loads `vendor/qrcode.js` on first use.
+- **App version line (More, bottom):** `versionLine()` and `getLatest()` in `ui-more.js` read the saved copy's name from `caches.keys()`
+  (the one starting `evals-`); the button checks `sw.js` over the network first, asks if answers are unsent, then clears only evals' service
+  worker and caches (never the logbook's on the same origin) and reloads. Saved data (Firestore offline store, drafts) is not touched.
+- **Roles and rules:** `logbook/firestore.rules` also serves evals; roles can live in `access/{email}` and a PC counts as `isAdmin()`
+  (`people/NOTES.md`, "Roles"). The evaluation rules sit near the 1000-expression limit per request: run `tools/test-rules.sh` after any
+  change to them or to `isAdmin()`, `isPD()`, `isAppOwner()`, and merge main into a branch first.
 - **Not changed on purpose:** form questions, their order, required answers and scales are the programme's (APMES guidebook). Ideas that
   would change them (pre-ticking, resident-filled context, moving the feedback box) are in `IMPROVEMENTS.md` for the PD to decide.
 
