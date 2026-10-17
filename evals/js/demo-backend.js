@@ -333,6 +333,11 @@ export async function listResidents() {
   if (!isAdmin(s) && !isPD(s)) throw denied('admins and PDs only');
   return Object.values(s.residents).map(plain).sort((a, b) => String(a.rid).localeCompare(String(b.rid)));
 }
+export async function listActiveResidents() {
+  const s = load(), e = me();
+  if (!(isAdmin(s) || isPD(s) || Object.values(s.residents).some(r => r.email === e))) throw denied('residents, PDs and admins only');
+  return Object.values(s.residents).filter(r => r.status === 'ACTIVE').map(plain).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
 export async function saveResident(r) {
   const s = load();
   if (!isAdmin(s) && !isPD(s)) throw denied('admins and PDs only');

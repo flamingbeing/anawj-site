@@ -34,6 +34,7 @@ let sentSnap = null;   // snapshot of what was last sent (null: nothing sent yet
 let sentAt = 0;
 let carried = null;    // the earlier round whose projects were carried over, if any
 let faculty = [];      // for the nominee picker
+let people = [];       // the other active residents, for the peer picker
 
 const isResident = () => !!S.roles.resident;
 const isStaff = () => !!(S.roles.admin || S.roles.pd || S.roles.owner);   // PDs, Admin staff and PCs (getRoles reads access/ too)
@@ -43,13 +44,14 @@ const locked = () => !isOpen();
 // ---------- loading ----------
 
 async function loadAll() {
-  rounds = []; round = null; faculty = [];
+  rounds = []; round = null; faculty = []; people = [];
   entry = blankEntry(); nominees = []; sentSnap = null; sentAt = 0; carried = null;
   if (!S.user) return;
   if (!isResident()) return;
   rounds = await store.listRounds();
   round = rounds.find(r => r.status === 'open') || rounds[0] || null;
   cloud.listFaculty().then(l => { faculty = l || []; }).catch(e => console.warn('Faculty list unavailable', e));
+  cloud.listActiveResidents().then(l => { people = (l || []).filter(r => String(r.email).toLowerCase() !== String(S.user.email).toLowerCase()); }).catch(e => console.warn('Resident list unavailable', e));
   if (!round) return;
   const got = await store.mine(round.round, S.user.email);
   if (got) { entry = got.entry; nominees = got.nominees; sentSnap = snapshot(entry, nominees); sentAt = got.sentAt; }
@@ -214,10 +216,12 @@ function nomineesScreen() {
     const name = txt({ class: 'e-input cc-name', value: n.name, maxlength: 120, disabled: lock, autocapitalize: 'words', 'aria-label': `${g.one} name`, oninput: () => { n.name = name.value; n.fac = undefined; touch(); suggest(); } });
     const email = txt({ type: 'email', value: n.email, maxlength: 200, disabled: lock, autocapitalize: 'off', spellcheck: 'false', 'aria-label': `${g.one} email`, oninput: () => { n.email = email.value; touch(); } });
     const suggest = () => {
-      const list = g.id === 'senior' || g.id === 'other' ? suggestFaculty(faculty, name.value) : [];
+      const q = name.value;
+      const list = g.id === 'senior' ? suggestFaculty(faculty, q) : g.id === 'peer' ? suggestFaculty(people, q)
+        : g.id === 'other' ? [...suggestFaculty(faculty, q, 3), ...suggestFaculty(people, q, 3)] : [];
       sug.hidden = !list.length;
       fill(sug, list.map(f => h('li', {}, h('button', { type: 'button', onclick: () => {
-        n.name = f.name; n.email = contactEmail(f); n.fac = f.email; name.value = n.name; email.value = n.email; sug.hidden = true; touch(); email.focus();
+        n.name = f.name; n.email = contactEmail(f); n.fac = f.rid ? undefined : f.email; name.value = n.name; email.value = n.email; sug.hidden = true; touch(); email.focus();
       } }, h('span', {}, f.name), f.core || f.ccc ? h('span', { class: 'cc-badge' }, f.ccc ? 'CCC' : 'Core') : null))));
     };
     return h('div', { class: 'cc-card' },
@@ -232,7 +236,7 @@ function nomineesScreen() {
   fill(app, h('div', { class: 'e-stack cc-col' },
     h('section', { class: 'e-card' },
       h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'Who should give you feedback?'),
-      h('p', { class: 'e-small' }, 'List colleagues you worked with in the past 5 months. You decide who. The programme coordinators will email them. Start typing a faculty member’s name to pick them from the list.')),
+      h('p', { class: 'e-small' }, 'List colleagues you worked with in the past 5 months. You decide who. The programme coordinators will email them. Start typing a name to pick a faculty member or a resident from the list.')),
     box, lock ? null : note(),
     h('div', { class: 'e-actions' }, h('button', { class: 'a-btn e-go', type: 'button', onclick: () => { saveDraft(); go('#review'); } }, 'Review and send'))));
   window.scrollTo(0, 0);

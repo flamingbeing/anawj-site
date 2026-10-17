@@ -7,7 +7,7 @@ export const GROUPS = [
   { id: 'senior', label: 'Senior doctors', one: 'Senior doctor', max: 6, emailRequired: false,
     hint: 'Doctors you worked with in the past 5 months who are Associate Consultant or above.' },
   { id: 'peer', label: 'Peers', one: 'Peer', max: 2, emailRequired: false,
-    hint: 'Registrars, residents or MOPEX you worked with in the past 5 months.' },
+    hint: 'Registrars, residents or MOPEX you worked with in the past 5 months. Start typing to pick a resident.' },
   { id: 'allied', label: 'Allied health', one: 'Allied health', max: 4, emailRequired: true,
     hint: 'Nurses, therapists, pharmacists and others you worked with in the past 5 months. Their email is needed.' },
   { id: 'other', label: 'Others', one: 'Other', max: 2, emailRequired: false,
@@ -160,7 +160,8 @@ export function demoRound(today = new Date()) {
 
 // ---- the coordinators' side ----
 
-export const PURGE_DAYS = 60;    // nominees' contact details are deleted this long after a round closes
+export const PURGE_DAYS = 365;   // nominees' contact details are deleted this long after a round closes (owner, 17 Oct 2026: a year, since CCC meetings may be delayed)
+export const PURGE_TEXT = 'a year';
 export const MARKS = [['ok', 'Checked'], ['swap', 'Ask for a different person'], ['sent', 'Emailed']];
 export const markLabel = m => (MARKS.find(([k]) => k === m) || [, 'To check'])[1];
 

@@ -5,7 +5,7 @@
 
 import { S, h, fill, toast, cloud, modal, confirmBox, empty, errText, row, download, avatar } from '../../evals/js/ui-core.js';
 import {
-  GROUPS, GROUP, LISTS, MARKS, PURGE_DAYS, cleanEntry, cleanNominees, markLabel, roundId, cleanRoundInput, purgeAt,
+  GROUPS, GROUP, LISTS, MARKS, PURGE_TEXT, cleanEntry, cleanNominees, markLabel, roundId, cleanRoundInput, purgeAt,
   roster, rosterCounts, nomineesCSV, projectsCSV, mailto, emailList, monthText, dayText,
 } from './model.js';
 import * as store from './store.js';
@@ -16,7 +16,7 @@ const chip = (kind, text) => h('span', { class: `a-pill ${kind === 'ok' ? 'a-pil
 const statusChip = r => (r.status === 'open' ? chip('ok', 'Open') : chip('draft', 'Closed'));
 
 let rounds = [];
-let purged = false;   // the 60-day clean-up runs once per visit
+let purged = false;   // the clean-up of old nominees runs once per visit
 
 // ctx: { app, header, go }. parts: the hash after #staff, e.g. [], ['r2026-10'], ['r2026-10', 'amy@x.com'].
 export async function staffScreen(parts, ctx) {
@@ -25,7 +25,7 @@ export async function staffScreen(parts, ctx) {
   try { rounds = await store.listRounds(); } catch (e) { return fill(app, h('p', { class: 'e-alert' }, 'Couldn’t load the rounds: ' + errText(e))); }
   if (!purged) {
     purged = true;
-    try { const n = await store.purgeExpired(rounds); if (n) toast(`Deleted ${n} nominee list${n === 1 ? '' : 's'} from rounds closed more than ${PURGE_DAYS} days ago.`); }
+    try { const n = await store.purgeExpired(rounds); if (n) toast(`Deleted ${n} nominee list${n === 1 ? '' : 's'} from rounds closed more than ${PURGE_TEXT} ago.`); }
     catch (e) { console.warn('Clean-up of old nominees failed', e); }
   }
   const round = rounds.find(r => r.round === decodeURIComponent(parts[0] || ''));
@@ -94,7 +94,7 @@ async function roundScreen(round, ctx) {
   draw();
 
   const setStatus = async status => {
-    if (status === 'closed' && !await confirmBox('Close this round?', `Residents can no longer change what they sent. Nominees' contact details are deleted ${PURGE_DAYS} days after you close it.`, 'Close the round')) return;
+    if (status === 'closed' && !await confirmBox('Close this round?', `Residents can no longer change what they sent. Nominees' contact details are deleted ${PURGE_TEXT} after you close it.`, 'Close the round')) return;
     try { await store.saveRound({ round: round.round, title: round.title, deadline: round.deadline, status, closedAt: status === 'closed' ? Date.now() : 0 }); toast(status === 'closed' ? 'Round closed' : 'Round reopened'); ctx.render(); }
     catch (e) { toast('Couldn’t change it. ' + errText(e)); }
   };
@@ -125,7 +125,7 @@ async function roundScreen(round, ctx) {
       h('div', { class: 'cc-head' }, h('h2', { class: 'e-h2', style: 'margin:0' }, round.title), statusChip(round)),
       h('p', { class: 'e-small' }, `${sums.sent} of ${sums.total} active residents have sent · ${sums.nominees} nominees${sums.toCheck ? ` · ${sums.toCheck} to check` : ''}`),
       round.deadline ? h('p', { class: 'e-small' }, `Send by ${dayText(round.deadline)}.`) : null,
-      h('p', { class: 'e-hint' }, round.status === 'closed' ? (purgeAt(round) ? `Nominees' contact details are deleted on ${when(purgeAt(round))}.` : 'Closed.') : `Nominees' contact details are deleted ${PURGE_DAYS} days after you close the round.`),
+      h('p', { class: 'e-hint' }, round.status === 'closed' ? (purgeAt(round) ? `Nominees' contact details are deleted on ${when(purgeAt(round))}.` : 'Closed.') : `Nominees' contact details are deleted ${PURGE_TEXT} after you close the round.`),
       h('div', { class: 'e-actions e-actions--start' },
         round.status === 'open' ? h('button', { class: 'a-btn', type: 'button', onclick: () => setStatus('closed') }, 'Close the round') : h('button', { class: 'a-btn', type: 'button', onclick: () => setStatus('open') }, 'Reopen'),
         h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: edit }, 'Edit'))),

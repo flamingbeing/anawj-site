@@ -20,7 +20,7 @@ made-up residents). Same people and sign-in as logbook, evals and People. Not th
   owner, admin (Admin staff: non-medical, non-residency), pc (programme coordinator) and pd. **A PC has Admin staff's powers**
   (owner), so PDs, Admin staff and PCs all read every entry and nominee list; residents see only their own; faculty none.
   Residents' private logbooks, reflections and assessment comments stay out of reach of admin staff and PCs (as before).
-- Nominees' contact details are third-party personal data: deleted automatically 60 days after a round closes (a PC or PD
+- Nominees' contact details are third-party personal data: deleted automatically a year after a round closes (owner, 17 Oct 2026: CCC meetings may be delayed; a PC or PD
   can delete earlier); projects stay. Real data never goes in this repo; the demo is made up.
 
 ## Data (rules in `logbook/firestore.rules`, "CCC 360"; tests `360/test/rules.emulator.mjs`, run by `tools/test-rules.sh`)
@@ -60,8 +60,10 @@ after any change to them: a first version broke the evals decline and reassign c
 - `js/app.js`: home, Scholarly projects, Feedback nominees, Review and send. Typing is autosaved on the device (`ccc-draft-…`) and
   wins over the server copy until Send; the device copy is cleared on Send. A closed round is read-only. Everything typed is shown
   with `textContent`, never as HTML.
-- **Peers are typed in, not picked.** Residents can read the faculty list but not the residents' list (rules), so only senior doctors
-  (and others) are suggested from faculty. Opening the residents' list to residents would expose emails, so it is not done.
+- **Peers are picked from the active residents.** Since 17 Oct 2026 (owner: "residents should be able to see each others emails and see
+  the list of residents") any resident may read the ACTIVE residents (names and emails; the query must ask for `status == 'ACTIVE'`; people
+  on leave, graduated or attrited stay hidden; writes stay with admins and PDs). Senior doctors are suggested from faculty, peers from
+  residents, others from both; anyone can still be typed in. `cloud.listActiveResidents` in evals' `cloud.js` is the call.
 - Staff (PD, Admin staff, PC; `S.roles.admin/pd/owner` from `getRoles`, which reads `access/`) who are not residents go straight to the coordinators' view; residents who are also staff get a "Coordinators' view" button.
 - Tests: `node 360/test/model.test.mjs`, `node 360/test/e2e.mjs` (demo at 390 px, axe on each screen, a send and a change, carry-over,
   a closed round, nothing outside the site reached).
@@ -76,7 +78,7 @@ after any change to them: a first version broke the evals decline and reassign c
 - **One resident:** their projects and lists, and each nominee with Checked / Ask for a different person, kept in `review/`. "Email" is a
   `mailto:` link to the nominee with the text filled in (`mailto` in `model.js`; edit it in the mail app) and marks them Emailed. The app
   never sends mail.
-- **Retention:** nominees' contact details are deleted 60 days after a round closes. The check (`purgeExpired`) runs whenever staff open
+- **Retention:** nominees' contact details are deleted a year after a round closes (was 60 days; changed 17 Oct 2026 by the owner). The check (`purgeExpired`) runs whenever staff open
   the app; a round with no close time is never purged by guesswork. Staff can also delete one resident's nominees, or a round's, at once.
   Projects stay. Deleting a whole round is not offered; if it ever is, delete its nominees first (rules do not cascade).
 - **CSV safety:** every cell that starts with `=`, `+`, `-`, `@` or a tab gets a leading apostrophe (`csvCell`); all resident text is put on

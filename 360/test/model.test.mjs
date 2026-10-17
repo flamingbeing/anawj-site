@@ -115,7 +115,7 @@ const dr = demoRound(new Date('2026-10-17T00:00:00Z'));
 assert.deepEqual([dr.round, dr.status, dr.deadline], ['demo', 'open', '2026-11-07']);
 
 // ---- the coordinators' side ----
-assert.equal(PURGE_DAYS, 60);
+assert.equal(PURGE_DAYS, 365);
 assert.equal(markLabel('ok'), 'Checked'); assert.equal(markLabel(undefined), 'To check'); assert.equal(markLabel('x'), 'To check');
 assert.equal(roundId([], new Date('2026-10-17T00:00:00Z')), 'r2026-10');
 assert.equal(roundId(['r2026-10'], new Date('2026-10-17T00:00:00Z')), 'r2026-10-2');
@@ -124,14 +124,14 @@ assert.ok(roundId([], new Date()).length <= 20);
 assert.equal(cleanRoundInput({ title: '  ' }), null);
 assert.deepEqual(cleanRoundInput({ title: ' CCC  Dec ', deadline: '2026-12-01' }), { title: 'CCC Dec', deadline: '2026-12-01' });
 assert.equal(cleanRoundInput({ title: 'x', deadline: 'soon' }).deadline, '');
-// retention: nominees go 60 days after a round closes
+// retention: nominees go a year after a round closes
 const day = 86400000, t0 = Date.UTC(2026, 0, 1);
 assert.equal(purgeAt({ status: 'open', closedAt: t0 }), 0);
 assert.equal(purgeAt({ status: 'closed' }), 0, 'no close time: never purged by guesswork');
-assert.equal(purgeAt({ status: 'closed', closedAt: t0 }), t0 + 60 * day);
-assert.equal(purgeAt({ status: 'closed', closedAt: 0, updatedAt: t0 }), t0 + 60 * day, 'falls back to the last update');
-assert.ok(!purgeDue({ status: 'closed', closedAt: t0 }, t0 + 59 * day));
-assert.ok(purgeDue({ status: 'closed', closedAt: t0 }, t0 + 60 * day));
+assert.equal(purgeAt({ status: 'closed', closedAt: t0 }), t0 + 365 * day);
+assert.equal(purgeAt({ status: 'closed', closedAt: 0, updatedAt: t0 }), t0 + 365 * day, 'falls back to the last update');
+assert.ok(!purgeDue({ status: 'closed', closedAt: t0 }, t0 + 364 * day));
+assert.ok(purgeDue({ status: 'closed', closedAt: t0 }, t0 + 365 * day));
 assert.ok(!purgeDue({ status: 'open', closedAt: t0 }, t0 + 999 * day));
 
 // the roster: active residents, who has sent, nominee marks

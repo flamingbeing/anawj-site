@@ -205,6 +205,14 @@ export async function listResidents() {
     .sort((a, b) => String(a.rid).localeCompare(String(b.rid)));
 }
 
+// the ACTIVE residents (name, email, year): any resident may read these (rules: residents/); the query must ask for ACTIVE
+export async function listActiveResidents() {
+  if (demo) return D.listActiveResidents();
+  const { db, F } = await sdk();
+  return (await F.getDocs(F.query(F.collection(db, 'residents'), F.where('status', '==', 'ACTIVE')))).docs.map(d => d.data())
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
 export async function saveResident(r) {
   if (demo) return D.saveResident(r);
   const { db, F } = await sdk();

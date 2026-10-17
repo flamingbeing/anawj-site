@@ -15,7 +15,7 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
   repo (private notes). Start with `applicants/NOTES.md`, then `applicants/PLAN.md`. 
 - `360/`: APMES CCC 360, what the programme coordinators (PCs) collect from residents before a CCC meeting: scholarly projects and the
   people who should give multisource feedback (names and emails; the PCs email them), at `apmes.anawj.com/360/`; same sign-in as
-  logbook, evals and People. Nominees' contact details are third-party data: deleted 60 days after a round closes. Start with
+  logbook, evals and People. Nominees' contact details are third-party data: deleted a year after a round closes. Start with
   `360/NOTES.md`, then `360/STATUS.md`.
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`), at `nuhroster.anawj.com` (the old `anawj.com/nuh-roster/` redirects). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
 - `ntf-roster/`: NTF (Ng Teng Fong) anaesthesia monthly duty roster: calls, PM shifts, leave and requests on one grid,
