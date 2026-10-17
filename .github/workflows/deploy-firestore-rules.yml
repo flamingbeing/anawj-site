@@ -7,6 +7,7 @@ on:
       - 'logbook/firestore.rules'
       - 'nuh-roster/firestore.rules'
       - 'prewarm/firestore.rules'
+      - 'nuh-junior-monthly/firestore.rules'
   workflow_dispatch:
 
 jobs:
@@ -16,6 +17,7 @@ jobs:
       logbook: ${{ steps.filter.outputs.logbook }}
       roster: ${{ steps.filter.outputs.roster }}
       prewarm: ${{ steps.filter.outputs.prewarm }}
+      junior: ${{ steps.filter.outputs.junior }}
     steps:
       - uses: actions/checkout@v4
       - id: filter
@@ -25,6 +27,7 @@ jobs:
             logbook: 'logbook/firestore.rules'
             roster: 'nuh-roster/firestore.rules'
             prewarm: 'prewarm/firestore.rules'
+            junior: 'nuh-junior-monthly/firestore.rules'
 
   deploy:
     needs: changes
@@ -42,6 +45,9 @@ jobs:
           - dir: prewarm
             project: prewarm-study
             changed: prewarm
+          - dir: nuh-junior-monthly
+            project: nuh-junior-monthly
+            changed: junior
     steps:
       - uses: actions/checkout@v4
         if: github.event_name == 'workflow_dispatch' || needs.changes.outputs[matrix.changed] == 'true'

@@ -9,26 +9,26 @@ import { EPAS, GROUPS, itemById } from './catalogue.js';
 import { FORMS, questionsOf } from './forms.js';
 
 const CSS = `
-.e-admin .e-table-wrap { overflow-x: auto; background: var(--e-surface); border: 1px solid var(--n-line); -webkit-overflow-scrolling: touch; }
+.e-admin .e-table-wrap { overflow-x: auto; background: var(--a-surface); border-radius: var(--a-r); -webkit-overflow-scrolling: touch; }
 .e-table { width: 100%; border-collapse: collapse; font-size: var(--n-text-sm); }
-.e-table th { position: sticky; top: 0; background: var(--n-navy); color: var(--e-on-accent); font-weight: var(--n-semibold); text-align: left; padding: 8px; white-space: nowrap; }
-.e-table td { padding: 6px 8px; border-top: 1px solid var(--n-line); vertical-align: middle; }
+.e-table th { position: sticky; top: 0; background: var(--a-surface-2); color: var(--a-ink-2); font-weight: 600; text-align: left; padding: 8px; white-space: nowrap; }
+.e-table td { padding: 6px 8px; border-top: .5px solid var(--a-sep); vertical-align: middle; }
 .e-table th:first-child, .e-table td:first-child { position: sticky; left: 0; z-index: 1; }
 .e-table td:first-child { background: var(--e-surface); }
 .e-table th:first-child { z-index: 2; }
 .e-table td.e-num { text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.e-cg-name { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0; border: 0; background: none; color: var(--n-navy); font-weight: var(--n-semibold); text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-.e-cg-cell { display: inline-block; min-width: 44px; padding: 2px 6px; border-radius: var(--n-radius-sm); font-weight: var(--n-semibold); }
+.e-cg-name { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0; border: 0; background: none; color: var(--a-tint); font-weight: 600; text-align: left; cursor: pointer; }
+.e-cg-cell { display: inline-block; min-width: 44px; padding: 2px 6px; border-radius: 6px; font-weight: 600; }
 .e-cg--done { background: var(--e-ok-bg); color: var(--e-ok); }
 .e-cg--short { background: var(--n-alert-bg); color: var(--n-alert-ink); }
 .e-cg--part { background: var(--e-warn-bg); color: var(--e-warn); }
 .e-cg--none { color: var(--e-muted-on-grey); }
 .e-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 @media (min-width: 720px) { .e-stats { grid-template-columns: repeat(4, 1fr); } }
-.e-stat { background: var(--e-surface); border: 1px solid var(--n-line); border-top: 4px solid var(--n-navy); border-radius: 14px; padding: 10px 12px; }
-.e-stat b { display: block; font-size: var(--n-text-2xl); font-weight: var(--n-light); color: var(--n-navy); line-height: 1.2; }
-.e-stat span { font-size: var(--n-text-sm); color: var(--n-muted); }
-.e-stat--alert { border-top-color: var(--n-red); }
+.e-stat { background: var(--a-surface); border-radius: var(--a-r); padding: 12px 14px; }
+.e-stat b { display: block; font-size: 28px; font-weight: 700; color: var(--a-ink); line-height: 1.15; letter-spacing: -.02em; }
+.e-stat span { font-size: var(--a-text-sm); color: var(--a-ink-2); }
+.e-stat--alert b { color: var(--a-danger); }
 .e-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 8px; }
 .e-toolbar .e-input { flex: 1 1 180px; width: auto; }
 .e-toolbar label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--n-text-sm); min-height: 44px; }
@@ -36,16 +36,16 @@ const CSS = `
 .e-pg > .e-full { grid-column: 1 / -1; }
 .e-pg .e-label { margin-top: 8px; }
 .e-paste-res { margin: 8px 0 0; padding: 0; list-style: none; font-size: var(--n-text-sm); max-height: 40vh; overflow: auto; }
-.e-paste-res li { padding: 4px 0; border-top: 1px solid var(--n-line); overflow-wrap: anywhere; }
+.e-paste-res li { padding: 6px 0; border-top: .5px solid var(--a-sep); overflow-wrap: anywhere; }
 .e-paste-res .is-bad { color: var(--n-alert-ink); }
 .e-paste-res .is-dup { color: var(--e-warn); }
 .e-row--static { cursor: default; }
-.e-appl { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-top: 1px solid var(--n-line); background: var(--e-surface); }
+.e-appl { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-top: .5px solid var(--a-sep); background: var(--a-surface); }
 .e-appl:first-child { border-top: 0; }
 .e-appl .e-actions { margin-top: 4px; }
 .e-admin .e-row__meta { white-space: normal; overflow-wrap: break-word; }
-.e-admin .e-row .n-btn { flex: none; }
-.e-flag-why { color: var(--n-alert-ink); font-weight: var(--n-semibold); }
+.e-admin .e-row .a-btn { flex: none; }
+.e-flag-why { color: var(--a-danger); font-weight: 600; }
 `;
 function adminCSS() {
   if (typeof document === 'undefined' || document.getElementById('e-admin-css')) return;
@@ -120,10 +120,10 @@ export async function renderOverview() {
     h('h2', { class: 'e-h3' }, 'Export'),
     h('p', { class: 'e-small' }, `All ${all.length} evaluations as a CSV file (opens in Excel). Private notes are not included.`),
     h('div', { class: 'e-actions e-actions--start' },
-      h('button', { class: 'n-btn', type: 'button', onclick: () => exportCSV(all, res) }, 'Download CSV')),
+      h('button', { class: 'a-btn', type: 'button', onclick: () => exportCSV(all, res) }, 'Download CSV')),
     h('p', { class: 'e-small', style: 'margin-top:12px' }, 'Committee summary: one row per resident and EPA (done and required by now, overdue groups, flags, last submitted).'),
     h('div', { class: 'e-actions e-actions--start' },
-      h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: () => exportCommittee(res, all) }, 'Download committee summary'))));
+      h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: () => exportCommittee(res, all) }, 'Download committee summary'))));
   return root;
 }
 
@@ -160,7 +160,7 @@ const pendingLink = email => location.origin + location.pathname + (email && ema
 function reminderButtons(email, name, evs, now) {
   const text = () => reminderText(name, evs, now, pendingLink(email));
   const subject = `APMES Evals: ${evs.length} evaluation${evs.length === 1 ? '' : 's'} waiting`;
-  const btn = 'n-btn n-btn--outline e-btn-quiet e-btn-small';
+  const btn = 'a-btn a-btn--tinted a-btn--sm e-btn-quiet e-btn-small';
   return h('span', { class: 'e-remind' },
     email && email !== '?' ? h('a', { class: btn, href: `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text())}` }, 'Email') : null,
     h('a', { class: btn, href: 'https://wa.me/?text=' + encodeURIComponent(text()), target: '_blank', rel: 'noopener' }, 'WhatsApp'),
@@ -172,7 +172,7 @@ async function copyReminder(name, evs, now, url) {
   catch {
     // no clipboard permission: show it to copy by hand
     const ta = h('textarea', { class: 'e-textarea', rows: 8, readonly: true }, text);
-    const m = modal('Reminder', [ta, h('div', { class: 'e-actions' }, h('button', { class: 'n-btn', onclick: () => m.close() }, 'Done'))]);
+    const m = modal('Reminder', [ta, h('div', { class: 'e-actions' }, h('button', { class: 'a-btn', onclick: () => m.close() }, 'Done'))]);
     ta.select();
   }
 }
@@ -276,7 +276,7 @@ function cohortGrid(res, all) {
       h('p', { class: 'e-small', style: 'margin:0 0 8px' }, 'Done / required by now for each EPA (submitted forms, requirements due by the resident’s year). Tap a name for their evaluations.'),
       h('div', { class: 'e-toolbar e-cg-tools' }, field('Sort', sortSel), field('Year', yearSel)),
       hidden ? h('div', { class: 'e-toolbar' }, h('label', {}, h('input', { type: 'checkbox', checked: showLeavers, onchange: e => { showLeavers = e.target.checked; paint(); } }), `Show graduated and attrited (${hidden})`)) : null,
-      !list.length ? empty('No residents', 'Add residents in People.', h('a', { class: 'n-btn', href: '#people/residents' }, 'People')) :
+      !list.length ? empty('No residents', 'Add residents in People.', h('a', { class: 'a-btn', href: '#people/residents' }, 'People')) :
         h('div', { class: 'e-table-wrap' }, h('table', { class: 'e-table' },
           h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Resident'), h('th', { scope: 'col' }, 'Year'),
             h('th', { scope: 'col', title: 'Forms still needed for requirements due by now' }, 'Short'),
@@ -311,7 +311,7 @@ function residentSheet(r, evs) {
         h('span', { class: 'e-row__meta' }, h('span', { class: 'e-tag e-tag--tool' }, toolLabel(ev.tool)), ` EPA ${ev.epa || '?'} · ${ev.assessorName || ev.assessorEmail} · ${fmtDate(ev.submittedAt || ev.request?.date || ev.date || sentAt(ev))}`)),
       statusChip(ev), icon('chevron', 'e-row__chev'))))
       : h('p', {}, 'No evaluations yet.'),
-    h('div', { class: 'e-actions' }, h('button', { class: 'n-btn', onclick: () => m.close() }, 'Close')),
+    h('div', { class: 'e-actions' }, h('button', { class: 'a-btn', onclick: () => m.close() }, 'Close')),
   ]);
 }
 
@@ -427,7 +427,7 @@ export async function renderPeople(sub) {
   try {
     [apps, fac, res] = await Promise.all([cloud.listApplications(), cloud.listFaculty(), residents(true)]);
   } catch (e) {
-    root.append(h('p', { class: 'e-alert' }, 'Could not load the people lists: ' + err(e)), h('button', { class: 'n-btn', onclick: () => hooks.render() }, 'Try again'));
+    root.append(h('p', { class: 'e-alert' }, 'Could not load the people lists: ' + err(e)), h('button', { class: 'a-btn', onclick: () => hooks.render() }, 'Try again'));
     return root;
   }
   S.faculty = fac;
@@ -478,8 +478,8 @@ export function applicationsPane({ apps, fac, res, reload }) {
     a.note ? h('p', { class: 'e-small', style: 'margin:0' }, '“', a.note, '”') : null,
     (a.role === 'faculty' ? facEmails : resEmails).has(a.email) ? h('p', { class: 'e-small', style: 'margin:0;color:var(--e-warn)' }, `Already on the ${a.role === 'faculty' ? 'faculty' : 'resident'} list.`) : null,
     a.status === 'pending' ? h('div', { class: 'e-actions e-actions--start' },
-      h('button', { class: 'n-btn e-go e-btn-small', type: 'button', onclick: () => approve(a, res, reload) }, 'Approve'),
-      h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', type: 'button', onclick: () => reject(a, reload) }, 'Reject')) : null);
+      h('button', { class: 'a-btn a-btn--sm e-go e-btn-small', type: 'button', onclick: () => approve(a, res, reload) }, 'Approve'),
+      h('button', { class: 'a-btn a-btn--tinted a-btn--sm e-btn-quiet e-btn-small', type: 'button', onclick: () => reject(a, reload) }, 'Reject')) : null);
   wrap.append(h('p', { class: 'e-listhead' }, h('span', {}, `Waiting (${pending.length})`)),
     pending.length ? h('div', { class: 'e-card e-card--flush' }, pending.map(one)) : h('p', { class: 'e-small' }, 'Nothing waiting.'));
   if (done.length) wrap.append(h('p', { class: 'e-listhead' }, h('span', {}, 'Decided')), h('div', { class: 'e-card e-card--flush' }, done.slice(0, 50).map(one)));
@@ -514,8 +514,8 @@ async function approve(a, res, reload) {
     h('div', { class: 'e-pg' }, field('Resident ID', rid, 'e-full'), field('Intake year', intake), field('Residency year', ry)),
     msg,
     h('div', { class: 'e-actions' },
-      h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Cancel'),
-      h('button', { class: 'n-btn e-go', type: 'submit' }, 'Approve'))));
+      h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Cancel'),
+      h('button', { class: 'a-btn e-go', type: 'submit' }, 'Approve'))));
 }
 
 async function reject(a, reload) {
@@ -575,7 +575,7 @@ export function parseResidentLines(text, existing = []) {
 export function pasteDialog({ title, help, placeholder, parse, save, done }) {
   const ta = h('textarea', { class: 'e-textarea', rows: 6, placeholder, spellcheck: 'false', autocapitalize: 'off' });
   const out = h('ul', { class: 'e-paste-res', 'aria-live': 'polite' });
-  const btn = h('button', { class: 'n-btn e-go', type: 'button', disabled: true }, 'Add');
+  const btn = h('button', { class: 'a-btn e-go', type: 'button', disabled: true }, 'Add');
   let parsed = [];
   const check = () => {
     parsed = parse(ta.value);
@@ -598,7 +598,7 @@ export function pasteDialog({ title, help, placeholder, parse, save, done }) {
     done();
   });
   const m = modal(title, [h('p', { class: 'e-small' }, help), ta, out,
-    h('div', { class: 'e-actions' }, h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Cancel'), btn)]);
+    h('div', { class: 'e-actions' }, h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Cancel'), btn)]);
   return m;
 }
 
@@ -614,6 +614,7 @@ export function facultyPane({ fac, reload }) {
     fill(list, rows.length ? rows.map(f => h('button', { type: 'button', class: 'e-row', onclick: () => editFaculty(f, fac, reload) },
       avatar(f.name || f.email),
       h('span', { class: 'e-row__body' }, h('span', { class: 'e-row__title' }, f.name || '(no name)'), h('span', { class: 'e-row__meta' }, f.email)),
+      f.core ? h('span', { class: 'e-tag' }, 'Core') : null, f.ccc ? h('span', { class: 'e-tag' }, 'CCC') : null,
       f.status === 'INACTIVE' ? h('span', { class: 'e-chip e-chip--cancelled' }, 'Inactive') : null,
       icon('edit', 'e-row__chev'))) : h('p', { class: 'e-small', style: 'padding:12px 16px;margin:0' }, q ? 'No match.' : 'No faculty yet.'));
   };
@@ -622,8 +623,8 @@ export function facultyPane({ fac, reload }) {
   return h('div', { class: 'e-stack' },
     h('div', { class: 'e-toolbar' },
       searchBox('Search faculty', v => { q = v; paint(); }),
-      h('button', { class: 'n-btn e-btn-small', type: 'button', onclick: () => editFaculty(null, fac, reload) }, icon('plus'), 'Add'),
-      h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', type: 'button', onclick: () => pasteDialog({
+      h('button', { class: 'a-btn a-btn--sm e-btn-small', type: 'button', onclick: () => editFaculty(null, fac, reload) }, icon('plus'), 'Add'),
+      h('button', { class: 'a-btn a-btn--tinted a-btn--sm e-btn-quiet e-btn-small', type: 'button', onclick: () => pasteDialog({
         title: 'Paste faculty list',
         help: 'One per line: Name, email (or paste two columns from a spreadsheet). Emails are lower-cased; people already listed are skipped.',
         placeholder: 'Dr Alex Example, alex.example@example.com',
@@ -638,20 +639,26 @@ function editFaculty(f, fac, reload) {
   const name = input({ value: f?.name || '', autocomplete: 'name', required: true });
   const email = input({ type: 'email', value: f?.email || '', readonly: f ? true : null, required: true, autocapitalize: 'off', spellcheck: 'false' });
   const status = select([['ACTIVE', 'Active'], ['INACTIVE', 'Inactive (can’t be chosen as assessor)']], f?.status || 'ACTIVE');
+  const workEmail = input({ type: 'email', value: f?.workEmail || '', autocapitalize: 'off', spellcheck: 'false', placeholder: 'name@nuhs.edu.sg' });
+  const core = h('input', { type: 'checkbox', id: 'fac-core', checked: !!f?.core }), ccc = h('input', { type: 'checkbox', id: 'fac-ccc', checked: !!f?.ccc });
+  const tick = (box, label) => h('div', { class: 'e-check' }, box, h('label', { for: box.id }, label));
   const msg = h('p', { class: 'e-alert', hidden: true, role: 'alert' });
   const m = modal(f ? 'Edit faculty' : 'Add faculty', h('form', { onsubmit: async e => {
     e.preventDefault();
     const em = cleanEmail(email.value), nm = name.value.trim();
-    const bad = !nm ? 'Enter a name.' : !validEmail(em) ? 'Enter a valid email.' : !f && fac.some(x => x.email === em) ? `${em} is already on the list.` : null;
+    const we = cleanEmail(workEmail.value);
+    const bad = !nm ? 'Enter a name.' : !validEmail(em) ? 'Enter a valid email.' : !f && fac.some(x => x.email === em) ? `${em} is already on the list.`
+      : we && !validEmail(we) ? 'The work email isn’t a valid email.' : null;
     if (bad) { msg.hidden = false; msg.textContent = bad; return; }
-    try { await cloud.saveFaculty({ ...(f || {}), email: em, name: nm, status: status.value }); m.close(); toast(f ? 'Saved' : `${nm} added`); reload(); }
+    try { await cloud.saveFaculty({ ...(f || {}), email: em, name: nm, status: status.value, workEmail: we, core: core.checked, ccc: ccc.checked }); m.close(); toast(f ? 'Saved' : `${nm} added`); reload(); }
     catch (e2) { msg.hidden = false; msg.textContent = 'Couldn’t save. ' + err(e2); }
   } },
     field('Name', name), field('Google account email', email), f ? null : h('p', { class: 'e-hint' }, 'The email they sign in with.'),
-    field('Status', status), msg,
+    field('Status', status), field('Work email (optional)', workEmail), h('p', { class: 'e-hint' }, 'The NUHS address, if it isn’t the one they sign in with.'),
+    h('div', { class: 'e-checks' }, tick(core, 'Core faculty'), tick(ccc, 'CCC member')), msg,
     h('div', { class: 'e-actions' },
-      h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Cancel'),
-      h('button', { class: 'n-btn', type: 'submit' }, f ? 'Save' : 'Add'))));
+      h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Cancel'),
+      h('button', { class: 'a-btn', type: 'submit' }, f ? 'Save' : 'Add'))));
 }
 
 let resStatusFilter = 'current';
@@ -675,8 +682,8 @@ export function residentsPane({ res, reload }) {
   return h('div', { class: 'e-stack' },
     h('div', { class: 'e-toolbar' },
       searchBox('Search residents', v => { q = v; paint(); }),
-      h('button', { class: 'n-btn e-btn-small', type: 'button', onclick: () => editResident(null, res, reload) }, icon('plus'), 'Add'),
-      h('button', { class: 'n-btn n-btn--outline e-btn-quiet e-btn-small', type: 'button', onclick: () => pasteDialog({
+      h('button', { class: 'a-btn a-btn--sm e-btn-small', type: 'button', onclick: () => editResident(null, res, reload) }, icon('plus'), 'Add'),
+      h('button', { class: 'a-btn a-btn--tinted a-btn--sm e-btn-quiet e-btn-small', type: 'button', onclick: () => pasteDialog({
         title: 'Paste resident list',
         help: 'One per line: rid, name, email, intake year, residency year (the last two optional). Duplicate IDs or emails are skipped.',
         placeholder: `${nextRid(res)}, Sam Example, sam.example@example.com, ${todayISO().slice(0, 4)}, 1`,
@@ -716,6 +723,6 @@ function editResident(r, res, reload) {
     h('p', { class: 'e-hint' }, r ? 'Residents are kept for the record. Use status for leave, graduation or attrition.' : 'Residency year is worked out from intake (from 1 July) unless set.'),
     msg,
     h('div', { class: 'e-actions' },
-      h('button', { class: 'n-btn n-btn--outline e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Cancel'),
-      h('button', { class: 'n-btn', type: 'submit' }, r ? 'Save' : 'Add'))));
+      h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Cancel'),
+      h('button', { class: 'a-btn', type: 'submit' }, r ? 'Save' : 'Add'))));
 }

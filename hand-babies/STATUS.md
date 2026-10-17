@@ -25,6 +25,8 @@ Each session keeps its own line in `status/<session>.md` (`hand.md`). Read them 
 
 ## Recently done
 
+- 2026-10-15: app kit (native look): app bar with section chips, large title, sections as cards, cases as grouped rows; links `../nuhsdesign/` again (every subdomain serves it).
+
 - #312: tendon tests checked; EDC now all fingers then press each; EIP and EDM one at a time against resistance.
 - #309: Elson figure: finger rests on the table, middle joint over the edge (no clipping); see-through table.
 - #306: no-WebGL phones (Firefox) get the GIFs instead of blank boxes; checked in Firefox.
@@ -36,6 +38,7 @@ Each session keeps its own line in `status/<session>.md` (`hand.md`). Read them 
 
 ## Decisions
 
+- 2026-10-16: cloud changes (Firebase, Cloudflare, GitHub secrets) go to the firetop session as jobs; recorded in `AGENTS.md` (owner confirmed).
 - 2026-10-13: moved to `hand.anawj.com/babies/` (SUBDOMAINS.md step 2); old address redirects by a top-level-only host check; `hand/` folder deleted; tokens.css link dropped (not served there).
 - 2026-10-13: no Z-Anatomy / MakeHuman models (owner: too much effort); keep the primitive 3D hand.
 - 2026-10-13: EDC tested with all fingers straight, pressing each in turn (ring can't straighten alone); EIP and EDM tested separately.

@@ -34,6 +34,7 @@ function demoDoc(email, name) {
 // ---- storage ----
 
 let memory = null;            // fallback when localStorage is missing or throws
+const outbox = new Map();     // the response sheet's outbox (sheetOutbox), in memory only: see queueSheetRows
 function storage() {
   try { if (typeof localStorage !== 'undefined') { localStorage.getItem(KEY); return localStorage; } } catch { /* blocked */ }
   return null;
@@ -69,6 +70,7 @@ function mode() {
 // because IMAGES_KEY is declared further down and this can run while the module is loading.
 export function resetDemo({ seeded = true } = {}) {
   memory = null;
+  outbox.clear();
   const ls = storage();
   if (ls) { try { ls.removeItem(KEY); ls.removeItem(KEY + '-images'); ls.removeItem(KEY + '-submissions'); } catch { /* ignore */ } }
   const s = blank();
@@ -463,16 +465,18 @@ export async function fixCaseInitials(email, fixes, onProgress) {
   return fixes.length;
 }
 
-export async function importCases(email, rid, cases, onProgress) {
+export async function importCases(email, rid, cases, onProgress, { have = [] } = {}) {
   email = lc(email);
   const s = load();
   const prev = s.imports[rid];
   const known = new Set(prev && (!prev.email || prev.email === email) ? prev.keys || [] : []);
+  const there = new Set(have);
   const fresh = [];
   for (const c of cases) {
     if (!c.importKey || known.has(c.importKey)) continue;
     known.add(c.importKey);
-    fresh.push(cleanCase({ ...c, id: importDocId(c.importKey), source: 'import', createdAt: c.createdAt || c.timestamp }));
+    const id = importDocId(c.importKey);
+    if (!there.has(id)) fresh.push(cleanCase({ ...c, id, source: 'import', createdAt: c.createdAt || c.timestamp }));
   }
   const lb = book(s, email);
   for (const d of fresh) lb.cases[d.id] = d;
@@ -537,4 +541,18 @@ export async function deleteBinEntry(email, id) {
   save(s);
   notifyBin(email);
 }
+// Google Form cases deleted (logbooks/{email}/formGone/{caseId}; cloud.js filters the ids)
+export async function addFormGone(email, ids) {
+  email = lc(email);
+  const s = load(), lb = book(s, email), now = Date.now();
+  for (const id of ids) (lb.formGone ||= {})[id] = { id, deletedAt: now };
+  save(s);
+}
+export async function listFormGone(email) { const lb = load().logbooks[lc(email)]; return lb && lb.formGone ? Object.keys(lb.formGone) : []; }
 // ---- end recycle bin ----
+
+// The response sheet's outbox (sheet-outbox.js; `outbox`, near the top): in memory only, as no sheet script reads it here,
+// so it just shows the tests what the app queues and takes back. As the rules do, an entry already there is not replaced.
+export function queueSheetRows(entries) { for (const e of entries) if (!outbox.has(String(e.id))) outbox.set(String(e.id), plain(e)); }
+export function dropSheetRows(ids) { for (const id of ids) outbox.delete(String(id)); }
+export const sheetOutbox = () => [...outbox.values()].map(plain);

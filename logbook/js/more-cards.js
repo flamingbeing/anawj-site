@@ -1,20 +1,12 @@
-// The More page's cards: privacy, credits and Sign out (with the demo's Leave and Reset). Their own small file, so
+// The More page's fine print (privacy, credits) and Sign out (with the demo's Leave and Reset). Their own small file, so
 // More opens without loading the settings pages (ui-settings.js re-exports them).
 
 import { h, cloud, writes, confirmBox, hooks } from './ui-core.js';
 
-export const privacyCard = () => (
-    h('section', { class: 'card' },
-      h('h2', {}, 'Privacy'),
-      h('p', { class: 'hint', style: 'margin:0' },
-        'Your cases are stored in your own logbook in Google Cloud Firestore. Only you can read them (and the app owner, who runs the import from the old Google Form); programme admins cannot. ',
-        'Log patient initials only — no names, NRIC or hospital numbers. Programme residents share case counts per tag (Analytics → Compare with your intake); details are never shared. ',
-        'This device keeps an offline copy of your cases until you sign out — sign out on shared computers.')));
-export const creditsCard = () => (
-    h('section', { class: 'card credits' },
-      h('h2', {}, 'Credits'),
-      h('p', { style: 'margin:0' }, 'Code by ', h('b', {}, 'Abigail Sim')),
-      h('p', { style: 'margin:4px 0 0' }, 'Design and UX/UI by ', h('b', {}, 'Koh Wenjun'))));
+// Privacy and credits as plain fine print at the bottom of More (owner, 15 Oct 2026: shorter, no cards)
+export const finePrint = () => h('div', { class: 'fine-print' },
+  h('p', {}, h('b', {}, 'Privacy'), ' · Only you can read your cases (and the app owner, for the old Google Form import). Log initials only, never names or NRIC. Programme residents share counts per tag, never details. Sign out on shared devices.'),
+  h('p', {}, 'Code by Abigail Sim · Design and UX/UI by Koh Wenjun'));
 
 export function signOutCard() {
   return h('section', { class: 'card' },

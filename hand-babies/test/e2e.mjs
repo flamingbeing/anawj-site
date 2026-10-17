@@ -13,7 +13,8 @@ const SHOTS = process.env.SHOTS;
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
 // The real addresses are served from this checkout: anawj.com (GitHub Pages) as the whole repo, hand.anawj.com as the
-// Worker maps it (/babies/ -> hand-babies/, nothing else), so the move and the page editor can be tested offline.
+// Worker maps it (/babies/ -> hand-babies/, plus the shared /nuhsdesign/), so the move and the page editor can be
+// tested offline.
 const root = new URL('../../', import.meta.url).pathname;
 const MIME = { html: 'text/html', js: 'text/javascript', css: 'text/css', gif: 'image/gif', svg: 'image/svg+xml', json: 'application/json' };
 const serve = (map) => async route => {
@@ -26,7 +27,8 @@ const serve = (map) => async route => {
   await route.fulfill({ status: 200, contentType: MIME[f.split('.').pop()] || 'application/octet-stream', body: fs.readFileSync(f) });
 };
 await ctx.route(/^https:\/\/(www\.)?anawj\.com\//, serve(p => p.replace(/^\//, '')));
-await ctx.route(/^https:\/\/hand\.anawj\.com\//, serve(p => p.startsWith('/babies/') ? 'hand-babies/' + p.slice(8) : null));
+await ctx.route(/^https:\/\/hand\.anawj\.com\//, serve(p => p.startsWith('/babies/') ? 'hand-babies/' + p.slice(8)
+  : p.startsWith('/nuhsdesign/') ? p.slice(1) : null));
 const page = await ctx.newPage();
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
@@ -180,6 +182,14 @@ try {
     await page.goto(BASE);
     await page.screenshot({ path: `${SHOTS}/00-top.png` });
   }
+  // app version and "Get the latest version" in the footer (AGENTS.md): the saved copy's name; the button removes this
+  // app's worker and saved copies and reloads (an old copy planted here goes; another app's copy and saved data stay)
+  await page.goto(BASE); await page.evaluate(() => navigator.serviceWorker.ready); await page.reload(); await page.locator('#appver:not([hidden])').waitFor();
+  assert.match(await page.textContent('#appver'), /^App version \S+/, 'app version shown');
+  await page.evaluate(async () => { await caches.open('hand-babies-old'); await caches.open('other-app-v1'); localStorage.setItem('keep-me', '1'); window.beforeLatest = true; });
+  await Promise.all([page.waitForEvent('load'), page.click('#getlatest')]);
+  const after = await page.evaluate(async () => ({ keys: await caches.keys(), kept: localStorage.getItem('keep-me'), same: !!window.beforeLatest }));
+  assert.ok(!after.same && !after.keys.includes('hand-babies-old') && after.keys.includes('other-app-v1') && after.kept === '1', 'latest version: ' + JSON.stringify(after));
   assert.deepEqual(errors, [], 'no console errors');
   console.log('hand e2e: ok');
 } finally {

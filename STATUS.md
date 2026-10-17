@@ -4,7 +4,7 @@ Site-wide work that belongs to no single app: the homepage, subdomains and hosti
 rules, the roadmap. Each app keeps its own `STATUS.md`. Short and current; lasting rules go in `AGENTS.md`.
 "Recently done" is updated at save-state only.
 
-Last updated: 2026-10-14 by Claude Code, homepage session.
+Last updated: 2026-10-16 (private details moved to the owner's private notes).
 
 ## Now
 
@@ -12,15 +12,12 @@ Each session keeps its own line in `status/<session>.md` (`homepage.md`; a new s
 
 ## Waiting on the owner
 
-- Revoke the two Claude tokens that were shown by mistake while setting up instant page edits (claude.ai settings); the
-  one stored as the GitHub secret is a later one.
-- Decide on the next feedback ideas in `ROADMAP.md` ("Editing and commenting"): a Telegram bot or an "Ask Claude" box (both
-  need a secret in the Worker), a weekly AI proof-reading routine, a private feedback queue for residents, and whether
-  logbook/evals/prewarm's service workers should let `?feedback=1` through (today a bookmark does it; `edit/NOTES.md`).
+- Whether `?feedback=1` should get through logbook/evals/prewarm's service workers (today a bookmark does it;
+  `edit/NOTES.md`). A Telegram bot is still an idea in `ROADMAP.md`.
 - Optional: make **Checks** a required check (GitHub → Settings → Branches → protection rule for `main`).
 - Fill in the domain registrar and renewal date in `OPERATIONS.md` (accounts table).
 - Optional, from the pre-launch checklist in `OPERATIONS.md`: Firestore delete protection on the three databases
-  (free; the home-computer session can do it), and App Check.
+  (free), and App Check.
 
 ## Next
 
@@ -28,6 +25,11 @@ Nothing agreed. Ideas for later are in `ROADMAP.md`; nothing there is a task unt
 
 ## Recently done
 
+- 16 Oct: the **BIS to DSA and OT simulators moved to anantf.com** (`/bis/`, `/ot/`; NTF-Anaesthesia/anantf-site #130,
+  with their own Checks). `anaes.anawj.com/bis/`, `/ot/` and `anawj.com/bis-dsa/`, `/ot-sim/` forward there.
+- #489, #555, #557, #558: **Ask Claude** at `ask.anawj.com` (owner only, behind Cloudflare Access; a request becomes a
+  `Page edits:` issue that the instant workflow drafts); weekly AI proof-read routine; the page-edits workflow says on
+  the issue or PR when it fails. Home computer (14 Oct): an uptime check of every live address, a weekly drift check.
 - #435–#454: feedback follow-ups: Share with a QR code (editor and button), compare a preview with how it is now,
   fixes from a review (live-app privacy, iPhone picking, PR match), app version in problem reports; **Checks** on every
   PR (repo check, unit tests, proof-read, quick browser tests, `.github/workflows/checks.yml`) and **before-and-after
@@ -40,8 +42,8 @@ Nothing agreed. Ideas for later are in `ROADMAP.md`; nothing there is a task unt
 - #398: owner profile in `AGENTS.md` reduced to a plain product version (personal version in the private repo); the
   two-step sign-in note removed from the public repo.
 - #389: allow rules for tests and checks in `.claude/settings.json`.
-- #386, #388, #391: the home-computer session in `OPERATIONS.md` (what to hand it, its daily backup and uptime
-  checks); `AGENTS.md` rule: blocked by the cloud environment, hand it over.
+- #386, #388, #391: the home-computer session in `OPERATIONS.md`; `AGENTS.md` rule: blocked by the cloud
+  environment, hand it over.
 - #378: Firestore backups (daily, 7 days; point-in-time recovery for prewarm), budget alert, all projects on Blaze.
 - #350, #360, #362, #385: subdomain plan and progress; every step done (`SUBDOMAINS.md`).
 - #353, #369, #374–#377: `OPERATIONS.md` and `ROADMAP.md` created.
@@ -50,6 +52,11 @@ Nothing agreed. Ideas for later are in `ROADMAP.md`; nothing there is a task unt
 
 ## Decisions log
 
+- 2026-10-14: instant page edits work end to end: the renewed token drafted PR #561 from an Ask Claude request (merged).
+- 2026-10-14: uptime is one check of every address in `SITES`, run from the home computer (details in the owner's
+  private notes).
+- 2026-10-14: the owner chose Ask Claude, the weekly AI proof-read and a private resident feedback queue; Ask Claude
+  secrets live in the Worker's runtime Variables and Secrets, not the Build settings.
 - 2026-10-14: instant page edits switched on (secret `CLAUDE_CODE_OAUTH_TOKEN` and the Actions setting, done from the
   home computer with the owner); the owner's next real page edit is the test. Checks stays optional: PRs opened by that
   workflow (GitHub's own token) don't trigger Checks, so a required check would block them.
@@ -65,4 +72,4 @@ Nothing agreed. Ideas for later are in `ROADMAP.md`; nothing there is a task unt
 - 2026-10-13: a PR changing any `firestore.rules` waits for the owner's approval.
 - 2026-10-13: apps that save data or sign in get their own subdomain; static pages share one by topic
   (`hand.`, `apmes.`, `nuhroster.`, `prewarmstudy.`); `anawj.com` keeps only the status page (owner).
-- 2026-10-13: no NAS backup of study data and no weekly spend report (owner's choice).
+- 2026-10-13: no extra home backup of study data and no weekly spend report (owner's choice).

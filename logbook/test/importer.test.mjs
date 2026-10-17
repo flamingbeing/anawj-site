@@ -142,5 +142,24 @@ console.log('importer tests passed');
   assert.deepEqual(r.skipped, [{ row: 2, reason: 'Made in the app' }]);
   // the other rows' keys don't depend on the app rows being there
   assert.deepEqual(parseCaseSheet([HEADER, rows[2], rows[3]]).cases.map(c => c.importKey), r.cases.map(c => c.importKey));
+  // the app rows come back apart (rid and categories only), for the count check
+  assert.deepEqual(r.appRows, [{ rid: '202301', cats: ['10'], row: 2 }]);
+  assert.deepEqual(parseCaseSheet([HEADER, rows[2]]).appRows, []);
+  assert.deepEqual(parseCaseSheet([['nothing']]).appRows, []);
+}
+// the count check: the sheet's AY Totals count the app rows too, so they are added in (one Form row + one app row = 2)
+{
+  const mark = (row, v) => { const r = [...row]; while (r.length < 9) r.push(''); r[9] = v; return r; };
+  const LSCS = '16) Lower Segment Caesarean Section (10 | 20)', SAB = '28) Subarachnoid blocks (R2=10 | R3=20 | R4=30 | R5=40)';
+  const r = parseCaseSheet([HEADER,
+    mark([A, '2026-10-15', 'QR 33F LSCS spinal', `${LSCS}, ${SAB}`, null, null, null, null, ''], 'app:k1'),
+    mark([A, '2026-10-02', 'ST 29F LSCS spinal', `${LSCS}, ${SAB}`, null, null, null, null, ''], ''),
+    mark([B, '2026-10-03', 'UV 31F LSCS GA', LSCS, null, null, null, null, ''], 'app:k2')]);
+  const totals = { 202301: { 16: 2, 28: 2 } };
+  assert.equal(r.cases.length, 1, 'only the Form row is imported');
+  assert.deepEqual(countCheck(r.cases, totals).diffs, [{ rid: '202301', code: '16', expected: 2, got: 1 }, { rid: '202301', code: '28', expected: 2, got: 1 }], 'without the app rows: a false "differ"');
+  assert.deepEqual(countCheck([...r.cases, ...r.appRows], totals), { ok: true, diffs: [] });
+  // a real gap still shows
+  assert.deepEqual(countCheck([...r.cases, ...r.appRows], { 202301: { 16: 3, 28: 2 } }).diffs, [{ rid: '202301', code: '16', expected: 3, got: 2 }]);
 }
 console.log('PASS importer app rows');

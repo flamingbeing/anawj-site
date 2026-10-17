@@ -13,6 +13,7 @@
 //   logbooks/{email}/images/{id}      { id, data (base64 JPEG), mime, w, h, createdAt }  reflection figures, owner only
 //   logbooks/{email}/notes/{id}       { id, date, title, body, caseId?, createdAt, updatedAt }  personal notes (notepad.js), owner only
 //   logbooks/{email}/bin/{id}         { id, kind: case | reflection | note, data, deletedAt }  recycle bin (30 days), owner only
+//   logbooks/{email}/formGone/{caseId} { id, deletedAt }  Google Form cases deleted (kept for good, form-inbox.js), owner only
 //   summaries/{rid}                       counts only, readable by everyone signed in
 //   imports/{rid}                         { email, keys: [importKey], updatedAt }  (which old-form rows are in)
 //   formInbox/{responseId}                { id, email, date, dateText, details, labels, submittedAt }  Google Form responses
@@ -174,11 +175,20 @@ export async function emulatorSignIn(email) {
   await A.signInWithCredential(auth, A.GoogleAuthProvider.credential(JSON.stringify({ sub: lc(email).replace(/\W/g, ''), email: lc(email), email_verified: true })));
 }
 
+// Sign in by redirect straight away in the installed app (display-mode standalone, or iOS's navigator.standalone)
+// and on Firefox for Android: there a popup opens as a separate tab without its opener, so Google's handler signs
+// in but can't hand back or close itself, leaving a blank tab (owner, 15 Oct 2026). authDomain is our own
+// apmes.anawj.com, so the redirect keeps its storage; getRedirectResult on start finishes it. Elsewhere, the popup.
+export const redirectFirst = ({ standalone = false, ua = '' } = {}) => standalone || (/Android/i.test(ua) && /Firefox\//i.test(ua));
+const installedApp = () => {
+  try { return !!(globalThis.matchMedia?.('(display-mode: standalone)').matches || globalThis.matchMedia?.('(display-mode: fullscreen)').matches || globalThis.navigator?.standalone); } catch { return false; }
+};
 export async function signIn() {
   if (demo) return D.signIn();
   const { auth, A } = await sdk();
   const provider = new A.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
+  if (redirectFirst({ standalone: installedApp(), ua: globalThis.navigator?.userAgent || '' })) return A.signInWithRedirect(auth, provider);
   try {
     await A.signInWithPopup(auth, provider);
   } catch (e) {
@@ -244,6 +254,9 @@ export async function deleteAccount(email, onStep = () => {}) {
   };
   // stop the listeners first, so the deletions below don't each cost a check (the store goes at sign-out)
   await hub.stopAll();
+  // first, so that if its rules aren't live yet (or are refused) this stops before anything else is gone
+  onStep('Deleting deleted Form cases…');
+  await wipe(['logbooks', email, 'formGone']);
   try {
     for (const [sub, label] of [['cases', 'cases'], ['reflections', 'reflections'], ['images', 'photos'], ['notes', 'notes'], ['meta', 'notes index'], ['bin', 'recycle bin']]) {
       onStep(`Deleting ${label}…`);
@@ -563,6 +576,40 @@ export async function saveCases(email, cases) {
   return docs;
 }
 
+// Restore from a backup (kind 'case' or 'reflection'): writes only the records the server doesn't have. One already
+// there is never written, even when it differs: it may have been changed since the backup was made (a restore used to
+// write the backup's older copy over it), and a restore only adds what is missing. The ids are looked up on the server
+// first, 30 at a time and four lookups at once (a read for each one found, at least one per lookup; about 13 rounds for
+// 1,500 cases), then the missing ones go in batches. Needs signal. -> the docs written
+export async function addMissing(email, kind, records) {
+  const coll = COLLECTION[kind];
+  const docs = [...new Map(records.map(r => CLEAN[kind](r)).map(d => [d.id, d])).values()];
+  if (demo) {
+    const have = new Set((kind === 'case' ? await D.listCases(email) : D.reflectionsOf(lc(email))).map(x => x.id));
+    const out = docs.filter(d => !have.has(d.id));
+    if (kind === 'case') return out.length ? D.saveCases(email, out) : [];
+    const saved = [];
+    for (const d of out) saved.push(await D.saveReflection(email, d));
+    return saved;
+  }
+  email = lc(email);
+  const { db, F } = await sdk();
+  const have = new Set();
+  const lookup = async ids => {
+    const snap = await F.getDocsFromServer(F.query(F.collection(db, 'logbooks', email, coll), F.where(F.documentId(), 'in', ids)));
+    if (reads) count(coll, 'billed', Math.max(1, snap.size));
+    for (const d of snap.docs) have.add(d.id);
+  };
+  try {
+    for (let i = 0; i < docs.length; i += 30 * 4)
+      await Promise.all([0, 1, 2, 3].map(k => docs.slice(i + 30 * k, i + 30 * (k + 1)).map(d => d.id)).filter(ids => ids.length).map(lookup));
+  } catch (e) { throw e && e.code === 'unavailable' ? new Error('no signal (a restore first checks what your logbook already has). Try again with signal.') : e; }
+  const out = docs.filter(d => !have.has(d.id));
+  await inBatches(out, (b, d, F, db) => b.set(F.doc(db, 'logbooks', email, coll, d.id), d),
+    (b, part) => queued(b.commit(), late(email, coll, part.map(d => d.id))));
+  return out;
+}
+
 // for good (no bin entry): Undo of a plan's "done" or of a pasted list, and after the bin copy
 export async function deleteCases(email, ids) {
   await hub.drop(lc(email), 'cases', ids.map(String));
@@ -651,7 +698,8 @@ export async function listFormEntries(email) {
 }
 // One entry at a time, its case (if any) and the entry's delete in one batch, waiting for the server: they land
 // together or not at all, so a case is never lost with its entry, and an entry already picked up on another device
-// (its delete refused) holds up only itself. items: [{ id: inbox id, case: case to save or null }]. -> ids done
+// (its delete refused) holds up only itself. items: [{ id: inbox id, case: case to save or null, mark: { id, importKey,
+// updatedAt } or null (a case kept as the app has it: only its key changes) }]. -> ids done
 export async function commitFormPickup(email, items) {
   if (demo) return D.commitFormPickup ? D.commitFormPickup(email, items) : [];
   email = lc(email);
@@ -659,7 +707,13 @@ export async function commitFormPickup(email, items) {
   const done = [];
   for (const it of items) {
     const b = F.writeBatch(db);
-    if (it.case) { const d = cleanCase(it.case); b.set(F.doc(db, 'logbooks', email, 'cases', d.id), d); }
+    if (it.case) {
+      const d = cleanCase(it.case);
+      // the key's '@<ms>' (form-inbox.js keyOf) is the updatedAt written now: each entry waits for the server, so a
+      // later one stamped with the pick-up's start would look edited in the app and lose the response's next edit
+      if (d.source === 'form' && d.importKey) d.importKey = String(d.importKey).replace(/@\d+$/, '@' + d.updatedAt);
+      b.set(F.doc(db, 'logbooks', email, 'cases', d.id), d);
+    } else if (it.mark) b.update(F.doc(db, 'logbooks', email, 'cases', String(it.mark.id)), { importKey: String(it.mark.importKey), updatedAt: Math.max(Date.now(), Number(it.mark.updatedAt) || 0) });
     b.delete(F.doc(db, 'formInbox', String(it.id)));
     try { await b.commit(); done.push(String(it.id)); }
     catch (err) { console.warn('Google Form entry not picked up', it.id, err.message); }
@@ -670,13 +724,16 @@ export async function commitFormPickup(email, items) {
 // New app cases for the response sheet (sheet-outbox.js). Each entry is its own small write; offline they wait in
 // Firestore's queue with the rest. An entry already there (a retried save) is refused by the rules: fine.
 export async function queueSheetRows(email, entries) {
-  if (demo || !entries.length) return;
+  if (!entries.length) return;
+  if (demo) return D.queueSheetRows(entries);
   const { db, F } = await sdk();
   await Promise.allSettled(entries.map(e => queued(F.setDoc(F.doc(db, 'sheetOutbox', String(e.id)), plain(e)))));
 }
-// A case deleted before the script has picked it up. Best effort: an entry already gone has nothing to delete.
+// A case deleted before the script has picked it up. Best effort: an entry already gone has nothing to delete (the rules
+// allow that, so a delete sent late, offline, raises no sync error).
 export async function dropSheetRows(email, ids) {
-  if (demo || !ids.length) return;
+  if (!ids.length) return;
+  if (demo) return D.dropSheetRows(ids);
   const { db, F } = await sdk();
   await Promise.allSettled(ids.map(id => queued(F.deleteDoc(F.doc(db, 'sheetOutbox', String(id))))));
 }
@@ -702,9 +759,12 @@ export async function fixCaseInitials(email, fixes, onProgress) {
 // after new form responses costs only the new rows (the free tier allows 20k writes a day).
 // Each batch also updates imports/{rid}, so an interrupted import resumes where it stopped.
 // Case doc ids are derived from the importKey, so even a lost imports doc cannot duplicate cases.
+// have: ids of the cases already in the logbook (listCases). A row whose case is already there is never written
+// again, even when the record lacks its key (a case written by another route, or a lost record): writing it would
+// overwrite the resident's own edits, links and tags with the sheet's text. Its key is added to the record.
 // onProgress(done, total) after each batch. Returns { written, skipped }.
-export async function importCases(email, rid, cases, onProgress) {
-  if (demo) return D.importCases(email, rid, cases, onProgress);
+export async function importCases(email, rid, cases, onProgress, { have = [] } = {}) {
+  if (demo) return D.importCases(email, rid, cases, onProgress, { have });
   email = lc(email);
   rid = String(rid);
   const { db, F } = await sdk();
@@ -712,14 +772,17 @@ export async function importCases(email, rid, cases, onProgress) {
   const snap = await F.getDoc(impRef);
   // the record belongs to the address the cases went to: after an email fix, import again in full
   const prev = snap.exists() && (!snap.data().email || snap.data().email === email) ? snap.data().keys || [] : [];
-  const known = new Set(prev);
+  const known = new Set(prev), there = new Set(have), found = [];
   const fresh = [];
   for (const c of cases) {
     if (!c.importKey || known.has(c.importKey)) continue;
     known.add(c.importKey);   // also drops repeats within this upload
-    fresh.push(cleanCase({ ...c, id: importDocId(c.importKey), source: 'import', createdAt: c.createdAt || c.timestamp }));
+    const id = importDocId(c.importKey);
+    if (there.has(id)) { found.push(c.importKey); continue; }
+    fresh.push(cleanCase({ ...c, id, source: 'import', createdAt: c.createdAt || c.timestamp }));
   }
-  const done = new Set(prev);
+  const done = new Set([...prev, ...found]);
+  if (found.length && !fresh.length) await F.setDoc(impRef, { email, keys: [...done], updatedAt: Date.now() });
   if (onProgress) onProgress(0, fresh.length);
   await inBatches(fresh, (b, d) => b.set(F.doc(db, 'logbooks', email, 'cases', d.id), d), async (b, part, n) => {
     for (const d of part) done.add(d.importKey);
@@ -868,10 +931,11 @@ export function watchBin(email, cb) {
   });
   return () => { stopped = true; if (stop) stop(); };
 }
-export async function listBin(email) {
+// server: true reads the server's copy, never a possibly stale offline cache (and fails offline)
+export async function listBin(email, { server = false } = {}) {
   if (demo) return D.listBin(email);
   const { db, F } = await sdk();
-  const snap = await F.getDocs(F.collection(db, 'logbooks', lc(email), 'bin'));
+  const snap = await (server ? F.getDocsFromServer : F.getDocs)(F.collection(db, 'logbooks', lc(email), 'bin'));
   return snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
 }
 export async function saveBinEntry(email, entry) {
@@ -885,5 +949,23 @@ export async function deleteBinEntry(email, id) {
   if (demo) return D.deleteBinEntry(email, id);
   const { db, F } = await sdk();
   await queued(F.deleteDoc(F.doc(db, 'logbooks', lc(email), 'bin', String(id))));
+}
+// Google Form cases deleted (form-inbox.js): logbooks/{email}/formGone/{caseId} = { id, deletedAt }, owner only, kept
+// after the bin entry goes, so an edited or re-sent response never brings the case back. ids: any case ids; only Form
+// cases' (formCaseId) are kept. Written again when a bin entry goes for good (covers deletes made by older versions).
+const FORM_CASE_ID = /^imp_form~003a[A-Za-z0-9_-]{1,120}$/;
+export async function addFormGone(email, ids) {
+  const list = [...new Set((ids || []).map(String).filter(id => FORM_CASE_ID.test(id)))];
+  if (!list.length) return;
+  if (demo) return D.addFormGone ? D.addFormGone(email, list) : undefined;
+  const { db, F } = await sdk();
+  const now = Date.now();
+  await Promise.all(list.map(id => queued(F.setDoc(F.doc(db, 'logbooks', lc(email), 'formGone', id), { id, deletedAt: now }))));
+}
+// the ids, from the server (a pick-up needs the real list; fails offline)
+export async function listFormGone(email) {
+  if (demo) return D.listFormGone ? D.listFormGone(email) : [];
+  const { db, F } = await sdk();
+  return (await F.getDocsFromServer(F.collection(db, 'logbooks', lc(email), 'formGone'))).docs.map(d => d.id);
 }
 // ---- end recycle bin ----

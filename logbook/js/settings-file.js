@@ -10,6 +10,8 @@ import { cleanExportOpts } from './export-opts.js';
 import { cleanDestinations } from './destinations.js';
 import { SWITCH_KEYS } from './profiles.js';
 import { cleanSync } from './sync-md.js';
+import { cleanMine } from './my-themes.js';
+import { cleanLayout } from './analytics.js';
 import { cleanLabels, cleanCaseTemplate } from './parts.js';
 
 export const SETTINGS_KIND = 'apmes-logbook-settings';
@@ -29,23 +31,40 @@ const OBJECTS = {
   partLabels: v => (v == null ? null : cleanLabels(v)),
   caseTpl: v => (v == null ? null : cleanCaseTemplate(v)),
   catOrder: strs,
+  myThemes: v => { const l = cleanMine(v); return l.length ? l : null; },   // your themes (Themes; this device)
+  // the Grid's column widths (px, this device; log2 10)
+  gridCols: v => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([k, x]) => ['date', 'ini', 'details', 'cats'].includes(k) && Number.isFinite(x)).map(([k, x]) => [k, Math.max(40, Math.min(1200, Math.round(x)))])) : null),
+  anLayout: v => cleanLayout(v),   // Analytics Edit mode: the cards' order and the hidden ones
   caseHide: v => strs(v).slice(0, 20),
   basicOn: v => strs(v).slice(0, 30),
   // the profile switches (profiles.js): known keys, true or false
   show: v => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([k, x]) => SWITCH_KEYS.includes(k) || /^case:[a-z]{1,20}$/.test(k)).filter(([, x]) => typeof x === 'boolean')) : null),
   tabOrder: v => strs(v).slice(0, 10),
+  moreOrder: v => strs(v).slice(0, 20),
   tabHidden: v => strs(v).slice(0, 10),
   subcats: v => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).slice(0, 100).map(([k, x]) => [String(k).slice(0, 10), strs(x)])) : {}),
   savedSearches: v => (Array.isArray(v) ? v : []).filter(x => x && typeof x === 'object' && !Array.isArray(x) && typeof x.name === 'string').slice(0, 20)
-    .map(x => ({ id: str(x.id, 20) || Math.random().toString(36).slice(2, 8), name: str(x.name, 40), q: str(x.q), has: strs(x.has), not: strs(x.not), from: str(x.from, 10), to: str(x.to, 10), flag: str(x.flag, 20), scope: str(x.scope, 20) || 'all' })),
+    .map(x => ({ id: str(x.id, 20) || Math.random().toString(36).slice(2, 8), name: str(x.name, 40), q: str(x.q), has: strs(x.has), not: strs(x.not), from: str(x.from, 10), to: str(x.to, 10), flag: str(x.flag, 20), scope: str(x.scope, 20) || 'all', ...(x.global === true ? { global: true } : {}) })),   // global: saved on Search
 };
 const PLAIN = new Set(['dayNoteOnCase', 'pasteClean', 'shareAsk', 'noteToolbar', 'accent', 'boxLines', 'catView', 'compact', 'compactTags', 'defaultDate', 'detectAgeSex', 'firstField', 'enterMode', 'enterSaves', 'hideTips', 'lbCase', 'lbFuzzy', 'lbScope', 'logbookView',
   'reflExport', 'reflNotes', 'searchOps', 'startTab', 'suggestions', 'tagEditorView', 'textSize', 'zoom', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'autoFocus', 'appTitle', 'weeklyDigest',
   'basic', 'mode', 'weekStart', 'afterSave', 'undoSecs', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'borders', 'reflPoints', 'round', 'shadows', 'bigTaps', 'swipeTabs', 'rowMenu', 'reflToolbar', 'autoTick', 'recentCount',
   // device keys added later (they were dropped on import until 13 Oct 2026; settings-file.test.mjs checks DISPLAY_KEYS)
   'rowCopy', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy', 'hideTabsTyping',
-  'labelParts', 'caseTplOn']);
+  'labelParts', 'caseTplOn', 'listHeight', 'pageSize', 'lbGroup', 'lbSort', 'gridLines', 'boxHeight', 'boxGrow', 'totalsCompact', 'totalsTargets', 'calRefl', 'detectInitials', 'oneLetterInitials', 'skipStarts', 'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band']);
 const MAX_JSON = 400 * 1024;
+
+// Reset all settings (Settings, at the bottom; owner, 15 Oct 2026): the account's settings back to their defaults (null),
+// except what is yours rather than a preference: your year and the app's bookkeeping, your profile (its own page has a
+// reset), saved searches, places to send and sync to, and your tags and shorthand unless asked (tags: true).
+// -> the patch for patchLogbook({ settings }); never cases, reflections, notes or drafts (they aren't settings)
+const KEEP_ON_RESET = new Set([...SKIP, 'mode', 'basic', 'show', 'basicOn', 'caseHide', 'savedSearches', 'destinations', 'sync']);
+const TAG_KEYS = ['tagSet', 'subcats', 'catOrder'];
+export function resetAccountPatch(settings, { tags = false } = {}) {
+  const out = {};
+  for (const k of Object.keys(settings || {})) if (!KEEP_ON_RESET.has(k) && (tags || !TAG_KEYS.includes(k)) && settings[k] != null) out[k] = null;
+  return out;
+}
 
 export function settingsFile(logbook, { theme } = {}) {
   const lb = logbook || {};

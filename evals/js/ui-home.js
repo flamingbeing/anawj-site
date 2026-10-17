@@ -34,11 +34,11 @@ export function renderHome() {
   const year = myYear();
 
   return h('div', { class: 'e-stack e-home' },
-    h('section', { class: 'e-card e-card--accent' },
-      h('p', { class: 'e-small e-muted', style: 'margin:0 0 10px' }, first ? `Hi ${first}` : 'Welcome', ` · R${year}`),
-      h('button', { type: 'button', class: 'n-btn e-go e-rq-big', onclick: () => go('new') }, icon('plus'), 'Request evaluation'),
-      last ? h('button', { type: 'button', class: 'n-btn n-btn--outline e-btn-quiet e-btn-big', style: 'margin-top:8px', onclick: repeatLast },
-        'Repeat last: ', toolLabel(last.tool), ' · ', last.assessorName || last.assessorEmail) : null),
+    h('p', { class: 'a-subtitle e-home__hi' }, first ? `Hi ${first}` : 'Welcome', ` · R${year}`),
+    h('section', { class: 'a-actions e-home__actions' },
+      h('button', { type: 'button', class: 'a-btn a-btn--block e-go e-rq-big', onclick: () => go('new') }, icon('plus'), 'Request evaluation'),
+      last ? h('button', { type: 'button', class: 'a-btn a-btn--tinted a-btn--block e-btn-quiet e-btn-big', onclick: repeatLast },
+        h('span', { class: 'e-ellipsis' }, 'Repeat last: ', toolLabel(last.tool), ' · ', last.assessorName || last.assessorEmail)) : null),
 
     action.length ? [
       h('h2', { class: 'e-listhead' }, `Needs action (${action.length})`, h('a', { href: '#requests' }, 'All requests')),
@@ -52,8 +52,8 @@ export function renderHome() {
     !S.loaded.mine ? h('p', { class: 'e-loading' }, 'Loading…')
       : recent.length ? h('div', { class: 'e-list' }, recent.map(ev => requestRow(ev, now)))
       : action.length ? h('p', { class: 'e-small' }, 'Nothing else yet.')
-      : h('div', { class: 'e-card' }, empty('No requests yet', 'Pick an item, choose your assessor and show them the QR code.',
+      : h('div', { class: 'a-card' }, empty('No requests yet', 'Pick an item, choose your assessor and show them the QR code.',
           h('div', { class: 'e-actions' },
-            h('button', { type: 'button', class: 'n-btn e-go', onclick: () => go('new') }, icon('plus'), 'Request your first evaluation'),
-            h('a', { class: 'n-btn n-btn--outline e-btn-quiet', href: '#how' }, 'How evals work')))));
+            h('button', { type: 'button', class: 'a-btn a-btn--tinted e-go', onclick: () => go('new') }, icon('plus'), 'Request your first evaluation'),
+            h('a', { class: 'a-btn a-btn--plain e-btn-quiet', href: '#how' }, 'How evals work')))));
 }

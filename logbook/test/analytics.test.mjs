@@ -73,4 +73,68 @@ const cases = list => list.map(([date, ...cats], i) => ({ id: 'c' + i, date, cat
   assert.deepEqual(t.stale.map(r => r.id), ['r4', 'r2'], 'drafts untouched 30+ days, oldest first; complete ones never');
 }
 
+// Analytics Edit mode: the account's layout of the cards
+{
+  const { arrangeCards, moveCard, hideCard, cleanLayout } = await import('../js/analytics.js');
+  const ids = ['urgent', 'quiet', 'targets', 'refl', 'trends'];
+  assert.deepEqual(arrangeCards(ids, null), { shown: ids, hidden: [] });
+  assert.deepEqual(arrangeCards(ids, { order: ['trends', 'urgent'], hidden: ['quiet'] }), { shown: ['trends', 'urgent', 'targets', 'refl'], hidden: ['quiet'] });
+  assert.deepEqual(arrangeCards(['urgent', 'targets'], { order: ['trends', 'targets', 'urgent'] }).shown, ['targets', 'urgent'], 'cards a profile lacks are left out');
+  let l = moveCard(ids, null, 'trends', -10);
+  assert.deepEqual(arrangeCards(ids, l).shown, ['trends', 'urgent', 'quiet', 'targets', 'refl']);
+  l = hideCard(ids, l, 'quiet', true);
+  assert.deepEqual(arrangeCards(ids, l), { shown: ['trends', 'urgent', 'targets', 'refl'], hidden: ['quiet'] });
+  l = moveCard(ids, l, 'urgent', 1);
+  assert.deepEqual(arrangeCards(ids, l).shown, ['trends', 'targets', 'urgent', 'refl']);
+  assert.deepEqual(arrangeCards(ids, hideCard(ids, l, 'quiet', false)).shown, ['trends', 'targets', 'urgent', 'refl', 'quiet']);
+  assert.deepEqual(cleanLayout({ order: ['a', 'a', 'B!', 3], hidden: 'x' }), { order: ['a'], hidden: [], show: [] });
+  // cards hidden until shown (off), shown with Show, hidden again with Hide
+  const off = ['habits'];
+  const ids2 = ['urgent', 'trends', 'habits'];
+  assert.deepEqual(arrangeCards(ids2, null, off), { shown: ['urgent', 'trends'], hidden: ['habits'] });
+  let l2 = hideCard(ids2, null, 'habits', false, off);
+  assert.deepEqual(arrangeCards(ids2, l2, off).shown, ['urgent', 'trends', 'habits']);
+  l2 = moveCard(ids2, l2, 'habits', -2, off);
+  assert.deepEqual(arrangeCards(ids2, l2, off).shown, ['habits', 'urgent', 'trends']);
+  assert.deepEqual(arrangeCards(ids2, hideCard(ids2, l2, 'habits', true, off), off).hidden, ['habits']);
+}
+
+// 5b: the new cards (fake cases)
+{
+  const A = await import('../js/analytics.js');
+  const fl = A.finishLine({ '01': { monthsToGo: 2, deadline: '2027-06-30' }, '02': { monthsToGo: Infinity, deadline: '2027-06-30' }, '03': { monthsToGo: 30, deadline: '2027-06-30' } }, '2026-10-15');
+  assert.deepEqual(fl.map(x => [x.code, x.late]), [['02', true], ['03', true], ['01', false]]);
+  assert.equal(fl[2].eta, '2026-12-15');
+  const cases = [
+    { date: '2026-09-01', cats: ['13'], createdAt: new Date(2026, 8, 1, 20).getTime(), details: 'ZZ 45F fake hernia GA ETT ASA 2 elective' },
+    { date: '2026-10-02', cats: ['13', '16'], createdAt: new Date(2026, 9, 4).getTime(), details: 'ZY 30F fake LSCS spinal ASA 2E emergency' },
+    { date: '2026-10-03', cats: ['16'], createdAt: new Date(2026, 9, 3, 9).getTime(), details: 'ZX 5yo fake circumcision caudal GA LMA' },
+    { date: '2026-10-04', cats: ['16'], createdAt: new Date(2026, 9, 4, 9).getTime(), details: 'fake TKR' },
+  ];
+  const target = code => ({ '16': 3, '13': 5 }[code] ?? null);
+  const m = A.monthSummary(cases, '2026-10-15', target);
+  assert.deepEqual(m, { month: '2026-10', n: 3, top: [['16', 3], ['13', 1]], first: ['16'], met: ['16'] });
+  const ms = A.milestones(cases, target, [2]);
+  assert.deepEqual(ms.map(x => [x.kind, x.date, x.code || x.n]), [['target', '2026-10-04', '16'], ['cases', '2026-10-02', 2], ['first', '2026-09-01', 1]]);
+  const ages = A.ageMix(cases, t => ({ ZZ: 45, ZY: 30, ZX: 5 }[t.slice(0, 2)] ?? null));
+  assert.deepEqual(ages.bands.filter(([, n]) => n), [['1–12', 1], ['17–64', 2]]);
+  assert.equal(ages.known, 3); assert.equal(ages.total, 4);
+  const mix = A.caseMix(cases);
+  assert.deepEqual(mix.asa.filter(([, n]) => n), [[2, 2]]);
+  assert.deepEqual([mix.emergency, mix.elective, mix.ga, mix.regional], [1, 1, 2, 2]);
+  assert.deepEqual(mix.known, { asa: 2, urgency: 2, technique: 3 });
+  const hb = A.loggingHabits(cases, '2026-10-04');
+  assert.deepEqual(hb, { median: 0, sameDay: 0.75, logged: 4, best: 3, now: 3 });
+  assert.equal(A.loggingHabits(cases, '2026-10-10').now, 0);
+}
+
+// Totals compact: initials, a clash adds letters of the surname
+{
+  const { shortNames } = await import('../js/analytics.js');
+  assert.deepEqual(shortNames(['Ann Jones', 'Ben Lee', 'Amy Jacobs', 'Cara']), ['AJo', 'BL', 'AJa', 'C']);
+  assert.deepEqual(shortNames(['Fake Resident A', 'Fake Resident B']), ['FRA', 'FRB']);
+  assert.deepEqual(shortNames(['Al Jo', 'Al Jo']).length, 2);
+  assert.deepEqual(shortNames(['']), ['?']);
+}
+
 console.log('analytics tests passed');

@@ -25,8 +25,8 @@ try { for (const width of [390, 1280]) {
 
   // the Settings menu, in groups; every page still there
   await goHash('settings');
-  assert.deepEqual(await p.locator('.settings-menu h3').allInnerTexts().then(x => x.map(t => t.toLowerCase())), ['profile', 'look', 'logging', 'reflections', 'notes and sharing', 'data', 'advanced']);
-  for (const id of ['showhide', 'display', 'access', 'logging', 'tags', 'reflset', 'sharefmt', 'sendto', 'bin', 'displayadv', 'loggingadv']) assert.equal(await p.locator(`.settings-menu a[data-go=${id}]`).count(), 1, id);
+  assert.deepEqual(await p.locator('.settings-menu h3').allInnerTexts().then(x => x.map(t => t.toLowerCase())), ['profile', 'look', 'logging', 'reflections', 'notes and sharing', 'advanced']);
+  for (const id of ['showhide', 'themes', 'display', 'access', 'logging', 'tags', 'reflset', 'sharefmt', 'sendto', 'displayadv', 'loggingadv']) assert.equal(await p.locator(`.settings-menu a[data-go=${id}]`).count(), 1, id);
   // search finds the profile page's switches and the tag editor now
   await p.getByLabel('Search settings').fill('residency year');
   await p.locator('.settings-search li', { hasText: 'Residency year' }).filter({ hasText: 'Profile' }).waitFor();
@@ -69,10 +69,10 @@ try { for (const width of [390, 1280]) {
   await dlg.getByRole('button', { name: 'Apply' }).click();
   await p.locator('.profile-now', { hasText: 'Now: Personal' }).waitFor();
   assert.equal((await st()).mode, 'personal');
-  assert.deepEqual(await tabs(), [...tabsAdvanced.filter(t => t !== 'more'), 'notes', 'more']);
+  assert.deepEqual(await tabs(), [...tabsAdvanced.filter(t => t !== 'more' && t !== 'totals'), 'notes', 'more'], 'Notes on the bar; no Totals (totals off)');
   assert.equal(await p.title(), 'Logbook');
   for (const el of await group('apmes').locator('input[role=switch]').all()) assert.equal(await el.isChecked(), false);
-  for (const el of await group('extras').locator('input[role=switch]').all()) assert.equal(await el.isChecked(), true);
+  for (const el of await p.locator('.showhide input[data-extra]').all()) assert.equal(await el.isChecked(), true);
 
   // Personal on screen: counts without targets, no Still needed, a save toast without "now 4/10"
   await p.locator('[role=tab][data-tab=log]').click(); await p.waitForSelector('textarea.details');
@@ -84,9 +84,9 @@ try { for (const width of [390, 1280]) {
   await p.locator('textarea.details').press('Control+Enter');
   await p.locator('#toast', { hasText: /^Saved/ }).waitFor();
   assert.doesNotMatch(await p.locator('#toast').innerText(), /now \d+\/\d+/);
-  // Analytics: cases per tag (your own tags too), no year, no Compare with your intake
-  await p.locator('[role=tab][data-tab=progress]').click();
-  await p.locator('.an-sec summary', { hasText: 'Tags' }).click();
+  // Analytics (in More): cases per tag (your own tags too), no year
+  await goHash('progress');
+  await p.locator('.an-sec summary', { has: p.locator('.an-t', { hasText: /^Tags$/ }) }).click();
   await p.locator('.an-list li', { hasText: 'Lower Segment Caesarean Section' }).first().waitFor();
   assert.equal(await p.locator('.legend.tally').count(), 0);
   assert.equal(await p.getByText('Compare with your intake').count(), 0);
@@ -127,9 +127,9 @@ try { for (const width of [390, 1280]) {
   await p.locator('.profile-now', { hasText: 'Now: Personal' }).waitFor();
   assert.ok(!(await st()).show);
   // a group's reset puts it back to the profile's defaults
-  await group('extras').getByRole('switch', { name: 'The Logbook grid view' }).uncheck();
+  await group('logbook').getByRole('switch', { name: 'The Logbook grid view' }).uncheck();
   await p.locator('.profile-now', { hasText: 'Custom' }).waitFor();
-  await group('extras').getByRole('button', { name: 'Reset this group' }).click();
+  await group('logbook').getByRole('button', { name: 'Reset this group' }).click();
   await dlg.getByRole('button', { name: 'Reset' }).click();
   await p.locator('.profile-now', { hasText: 'Now: Personal' }).waitFor();
   // a Case tab switch, then another group's reset: the Case tab change stays (the reset reads the settings as they are)
@@ -152,10 +152,10 @@ try { for (const width of [390, 1280]) {
   await p.locator('.profile-card input[value=basic]').check();
   const toBasic = await dlg.locator('.profile-changes li').allInnerTexts();
   assert.ok(toBasic.some(l => /^Turns on: Counts against the APMES targets/.test(l)) && toBasic.some(l => /^Turns off: The Logbook grid view/.test(l)), toBasic.join(' | '));
-  assert.ok(toBasic.some(l => /^Into More \(this device\): Analytics, Notes$/.test(l)), toBasic.join(' | '));
+  assert.ok(toBasic.some(l => /^Into More \(this device\): Notes, Analytics$/.test(l)), toBasic.join(' | '));
   await dlg.getByRole('button', { name: 'Apply' }).click();
   await p.locator('.profile-now', { hasText: 'Now: Basic' }).waitFor();
-  assert.deepEqual(await tabs(), tabsAdvanced.filter(t => t !== 'progress'));
+  assert.deepEqual(await tabs(), tabsAdvanced.filter(t => t !== 'progress'), 'Basic keeps Analytics in More');
   assert.equal(await p.title(), 'APMES Logbook');
   // Notes put on the bar by hand: still plain Basic (tabs no profile moves aren't counted), and it stays on the bar
   // going to Advanced
@@ -168,7 +168,7 @@ try { for (const width of [390, 1280]) {
   await dlg.getByRole('button', { name: 'Apply' }).click();
   await p.locator('.profile-now', { hasText: 'Now: Advanced' }).waitFor();
   const advTabs = await tabs();
-  assert.ok(advTabs.includes('notes') && advTabs.includes('progress'), advTabs.join());
+  assert.ok(advTabs.includes('notes') && advTabs.includes('totals'), advTabs.join());
   // Settings search: a profile reads as its name
   await goHash('settings');
   await p.getByLabel('Search settings').fill('personal');
@@ -178,8 +178,9 @@ try { for (const width of [390, 1280]) {
   await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { mode: 'basic', show: null, basicOn: ['grid', 'case:quick'], caseHide: ['plan'] } }); });
   await goHash('log'); await goHash('showhide');
   await p.locator('.profile-now', { hasText: 'Now: Custom (based on Basic)' }).waitFor();
-  assert.equal(await group('extras').getByRole('switch', { name: 'The Logbook grid view' }).isChecked(), true);
-  assert.equal(await group('extras').getByRole('switch', { name: /^Analytics trends/ }).isChecked(), false);
+  assert.equal(await group('logbook').getByRole('switch', { name: 'The Logbook grid view' }).isChecked(), true);
+  assert.equal(await group('analytics').getByRole('switch', { name: /^Analytics trends/ }).isChecked(), true, 'full Analytics in every profile');
+  assert.equal(await group('reflections').getByRole('switch', { name: 'Figures and references in reflections' }).isChecked(), false);
   assert.equal(await group('case').getByRole('switch', { name: /^Quick picks/ }).isChecked(), true);
   assert.equal(await group('case').getByRole('switch', { name: 'Suggested tags as you type' }).isChecked(), true, 'an older quick turns both halves on');
   assert.equal(await group('case').getByRole('switch', { name: 'Plan for later' }).isChecked(), false);

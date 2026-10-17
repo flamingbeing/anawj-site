@@ -17,7 +17,7 @@ The other direction already exists: Form → logbook (`form-script/`, `js/form-i
 - Only **new** cases: edits and deletions in the app don't reach the sheet (it can drift; it's a backup, not a mirror).
 - Rows made by the app carry `app` in **column J** (the sheet's script reads only A–H, so nothing changes for it;
   the workbook import uses J to skip them). Assumed yes; confirm.
-- The response sheet stays "anyone with the link can view" for now; reminder set for 14 Nov 2026 to restrict it.
+- The response sheet's link sharing: see the owner's private notes.
 
 ## What exists today (read-only check, 14 Oct)
 
@@ -107,9 +107,9 @@ delete the trigger.
 ## Two-way drift (owner, 14 Oct 2026)
 
 Owner: the app is the source of truth AND the Google Form / response sheet is trusted too, so a change in either place
-should reach the other. Built so far: the drift check (`/drift-check`, Firetop's read-only script: counts per resident and
-category, row-level gaps by cause, "changes to old cases", weekly on Mondays 08:30 SGT with a phone message), the re-import
-of missing sheet rows (72 written 14 Oct), and the sheet-side nightly Totals check (`Outbox.gs`, report-only until
+should reach the other. Built so far: the drift check (a read-only script on the home computer: counts per resident and
+category, row-level gaps by cause, "changes to old cases", weekly with a phone message; drift check: ask the owner), the
+re-import of missing sheet rows (14 Oct), and the sheet-side nightly Totals check (`Outbox.gs`, report-only until
 `LOGBOOK_TOTALS_FIX` is on). Not built yet: app edits and deletes reaching the sheet, sheet edits and deletes reaching the
 app (the sheet has no row ids; the Form inbox only sees new or edited responses), the drift dashboard with fix buttons.
 Findings: the sheet's Database is append-only (a hand edit of a Case row leaves the old text; a double append adds rows;

@@ -28,22 +28,56 @@ const SCREENS = [
     await p.locator('textarea.details').fill('AB 30F\nLSCS spinal\n\nCD 40M\nlap chole GA');
     await p.getByRole('button', { name: 'Review', exact: true }).click();
     await p.waitForSelector('table.bulk');
+    // reviewed from the bottom, as a list is (above it, the last rows sit under the Save all bar)
+    await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   }, false],
   ['Logbook list', async p => { await hash('logbook')(p); await p.locator('main .seg button', { hasText: /^List$/ }).first().click(); }, false],
+  ['Logbook grid', async p => {
+    await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { show: { grid: true }, logbookView: 'grid' } }); });
+    await hash('logbook')(p); await p.locator('table.grid.sheet tbody tr').first().waitFor();
+  }, true],
+  ['Logbook selecting', async p => {
+    await hash('logbook')(p); await p.locator('main .seg button', { hasText: /^List$/ }).first().click();
+    await p.locator('button.lb-selbtn').click();
+    await p.locator('ul.cases li:not(.monthhead)').nth(1).click();
+    await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  }, true],
+  ['Bulk edit', async p => {
+    await hash('logbook')(p); await p.locator('main .seg button', { hasText: /^List$/ }).first().click();
+    await p.locator('button.lb-selbtn').click();
+    await p.locator('ul.cases li:not(.monthhead)').nth(1).click();
+    await p.locator('.sel-bar').getByRole('button', { name: 'Bulk edit…' }).click();
+    await p.locator('dialog[open]').getByLabel('Case summary').selectOption('find');
+    await p.locator('dialog[open]').getByLabel('Tags', { exact: true }).selectOption('replace');
+  }, true],
   ['Reflections', hash('reflect'), true],
+  ['Reflections selecting', async p => {
+    await hash('reflect')(p); await p.locator('li.refl-row').first().waitFor();
+    await p.locator('main button', { hasText: /^Select$/ }).first().click();
+    await p.locator('li.refl-row').first().click();
+    await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  }, true],
+  ['Reflections bulk edit', async p => {
+    await hash('reflect')(p); await p.locator('li.refl-row').first().waitFor();
+    await p.locator('main button', { hasText: /^Select$/ }).first().click();
+    await p.locator('li.refl-row').first().click();
+    await p.locator('.sel-bar').getByRole('button', { name: 'Bulk edit…' }).click();
+    await p.locator('dialog[open]').getByLabel('Heading', { exact: true }).selectOption('move');
+  }, false],
   ['Analytics', hash('progress'), true],
   ['Totals', hash('totals'), false],
   ['More', hash('more'), true],
   ['Account', hash('account'), false],
   ['Settings', hash('settings'), false],
-  ['Display', hash('display'), true],
+  ['Themes', hash('themes'), true],
+  ['Display', hash('display'), false],
   ['Advanced display', hash('displayadv'), false],
   ['Accessibility', hash('access'), false],
   ['Logging', hash('logging'), false],
   ['Profile', hash('showhide'), false],
   ['Profile dialog', async p => { await hash('showhide')(p); await p.locator('.profile-card input[value=personal]').check(); await p.waitForSelector('dialog[open]'); }, false],
   // the targets switched off (in memory only: the demo store is shared by the next screens)
-  ['Analytics without targets', async p => { await hash('progress')(p); await p.evaluate(async () => { const { S, hooks } = await import('./js/ui-core.js'); S.logbook.settings = { ...S.logbook.settings, show: { targets: false, totals: false, year: false } }; hooks.render(); }); await p.locator('.an-sec summary', { hasText: 'Tags' }).waitFor(); }, false],
+  ['Analytics without targets', async p => { await hash('progress')(p); await p.evaluate(async () => { const { S, hooks } = await import('./js/ui-core.js'); S.logbook.settings = { ...S.logbook.settings, show: { targets: false, totals: false, year: false } }; hooks.render(); }); await p.locator('.an-sec summary', { has: p.locator('.an-t', { hasText: /^Tags$/ }) }).waitFor(); }, false],
   ['Advanced logging', hash('loggingadv'), false],
   ['Tag editor', hash('tags'), false],
   ['Reflection settings', hash('reflset'), false],
@@ -84,7 +118,7 @@ const SCREENS = [
     await p.getByText(/^Synced \d+ of/).waitFor();
   }, true],
   ['Export / Import', hash('data'), false],
-  ['Recover drafts', hash('recovery'), false],
+  ['Recover', hash('recovery'), false],
   ['Admin portal', hash('admin'), false],
   ['Send feedback', async p => { await hash('feedback')(p); await p.getByLabel('Your feedback').waitFor(); }, true],
   ['Feedback (owner)', async p => {
@@ -101,7 +135,31 @@ const SCREENS = [
     await p.evaluate(async () => { const { S } = await import('./js/ui-core.js'); const { editCaseDialog } = await import('./js/ui-log.js'); editCaseDialog(S.cases[0]); });
     await p.waitForSelector('dialog[open]');
   }, true],
+  ['Search', async p => {
+    await hash('search')(p); await p.getByLabel('Search everything').fill('lap');
+    await p.locator('.gs-group').first().waitFor();
+    await p.getByRole('button', { name: 'Search operators' }).click();
+  }, true],
+  ['Search selecting', async p => {
+    await hash('search')(p); await p.getByLabel('Search everything').fill('lap');
+    await p.locator('.gs-group').first().waitFor();
+    await p.locator('.gs-selbtn').click(); await p.locator('.gs-item').first().click();
+    await p.locator('.gs-chips button', { hasText: /^Dates$/ }).click();
+  }, false],
   ['Notes', hash('notes'), true],
+  ['Notes selecting', async p => {
+    await p.evaluate(async () => { const D = await import('./js/demo-backend.js'), t = Date.now(); for (const i of [1, 2]) D.saveNote('demo@example.com', { id: 'fake-a11y-' + i, date: '2020-03-0' + i, title: 'Fake a11y note ' + i, body: 'Fake', createdAt: t + i, updatedAt: t + i }); });
+    await hash('notes')(p); await p.locator('ul.notes-rows > li').first().waitFor();
+    await p.locator('button.notes-selbtn').click(); await p.locator('ul.notes-rows > li').first().click();
+    await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  }, true],
+  ['Notes bulk edit', async p => {
+    await p.evaluate(async () => { const D = await import('./js/demo-backend.js'), t = Date.now(); for (const i of [1, 2]) D.saveNote('demo@example.com', { id: 'fake-a11y-' + i, date: '2020-03-0' + i, title: 'Fake a11y note ' + i, body: 'Fake', createdAt: t + i, updatedAt: t + i }); });
+    await hash('notes')(p); await p.locator('ul.notes-rows > li').first().waitFor();
+    await p.locator('button.notes-selbtn').click(); await p.locator('ul.notes-rows > li').first().click();
+    await p.locator('.sel-bar').getByRole('button', { name: 'Bulk edit…' }).click();
+    await p.locator('dialog[open]').getByLabel('Title', { exact: true }).selectOption('find');
+  }, false],
   ['Note editor', async p => {
     await hash('notes')(p);
     await p.getByRole('button', { name: '+ New note' }).click();

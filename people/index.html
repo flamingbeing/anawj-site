@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>APMES People</title>
 <meta name="description" content="The APMES people lists (residents, faculty, programme directors) that the logbook and evals share.">
-<meta name="theme-color" content="#002f6c">
+<meta name="theme-color" content="#f9f9fb">
 <link rel="icon" type="image/png" sizes="32x32" href="../evals/icons/favicon-32.png">
 <link rel="apple-touch-icon" href="../evals/icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -19,30 +19,81 @@
   try { var t = localStorage.getItem('evals-theme'); if (t === 'auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light'; } catch (e) {}
 </script>
 <link rel="stylesheet" href="../nuhsdesign/tokens.css">
+<link rel="stylesheet" href="../nuhsdesign/app.css">
 <link rel="stylesheet" href="../evals/style.css">
+<script src="../nuhsdesign/app.js" defer></script>
 <style>
-  .p-years { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
-  .p-years li { padding: 2px 10px; border: 1px solid var(--n-line); border-radius: 999px; font-size: var(--n-text-sm); }
-  .p-apps { margin: 4px 0 0; font-size: var(--n-text-sm); color: var(--n-muted); }
-  .p-issue { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; border-top: 1px solid var(--n-line); background: var(--e-surface); }
+  .p-years { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+  .p-years li { padding: 3px 10px; border-radius: 6px; background: var(--a-surface-2); color: var(--a-ink-2); font-size: var(--a-text-xs); font-weight: 600; }
+  .p-apps { margin: 4px 0 0; font-size: var(--a-text-sm); color: var(--a-ink-2); }
+  .p-issue { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; border-top: .5px solid var(--a-sep); background: var(--a-surface); }
   .p-issue:first-child { border-top: 0; }
   .p-issue > div { flex: 1 1 200px; min-width: 0; }
   .p-issue .e-row__meta { white-space: normal; }
+  /* Import from the monthly roster: groups of tickable changes */
+  .p-group-h { padding: 14px 16px 10px; }
+  .p-group-h .e-h3 { margin: 0; }
+  .p-group-h .e-hint { margin-top: 2px; }
+  .p-group .e-checks { background: var(--a-surface); border-radius: 0; box-shadow: inset 0 .5px 0 var(--a-sep); }
+  .p-pick, .p-pick:has(input:disabled) { cursor: default; opacity: 1; }
+  .p-pick > input:disabled { opacity: .45; cursor: not-allowed; }
+  .p-pick__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .p-pick__body > label { cursor: pointer; }
+  .p-pick__body .e-row__meta { white-space: normal; }
+  .p-pick__what { font-size: var(--a-text-sm); font-weight: 600; }
+  .p-pick__fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 12px; margin-top: 8px; }
+  .p-pick__fields[hidden] { display: none; }
+  .p-more summary { cursor: pointer; font-weight: 600; }
+  .p-plain { margin: 8px 0 0; padding-left: 20px; font-size: var(--a-text-sm); }
+  .p-month { max-width: 240px; margin-top: 12px; }
+  #p-roster { max-height: 10.5em; }
+  /* Rotations: the block rotation grid, read-only */
+  .rt-bar { display: flex; flex-wrap: wrap; gap: 8px; }
+  .rt-bar .e-select, .rt-bar .e-input { flex: 1 1 11rem; min-width: 0; width: auto; }
+  .rt-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; list-style: none; margin: 10px 0 0; padding: 0; font-size: var(--a-text-xs); color: var(--a-ink-2); }
+  .rt-legend li { display: flex; align-items: center; gap: 6px; }
+  .rt-legend .rt-c { display: inline-block; width: 14px; height: 14px; padding: 0; border-radius: 3px; }
+  .rt-scroll { overflow: auto; max-height: 72vh; border: .5px solid var(--a-sep); border-radius: 10px; background: var(--a-surface); }
+  .rt-table { border-collapse: separate; border-spacing: 0; font-size: 11px; line-height: 1.2; }
+  .rt-table th, .rt-table td { padding: 0; height: 26px; border-bottom: .5px solid var(--a-sep); border-right: .5px solid var(--a-sep); }
+  .rt-table thead th { position: sticky; top: 0; z-index: 2; background: var(--a-surface); font-weight: 600; color: var(--a-ink-2); height: 24px; padding: 0 4px; }
+  .rt-table thead tr:nth-child(2) th { top: 24px; font-weight: 400; }
+  .rt-wk { min-width: 3.4rem; text-align: center; }
+  .rt-hol { color: var(--a-danger); }
+  .rt-mon { text-align: left; }
+  .rt-table .rt-name { position: sticky; left: 0; z-index: 1; background: var(--a-surface); text-align: left; min-width: 9.5rem; max-width: 13rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; font-weight: 500; }
+  .rt-table thead .rt-name { z-index: 3; }
+  .rt-sec th { position: sticky; left: 0; text-align: left; background: var(--a-surface-2); color: var(--a-ink-2); font-size: 11px; text-transform: uppercase; letter-spacing: .03em; padding: 0 8px; height: 24px; }
+  .rt-who { background: none; border: 0; padding: 4px 0; font: inherit; color: var(--a-tint); cursor: pointer; text-align: left; min-height: 24px; }
+  .rt-who:hover { text-decoration: underline; }
+  .rt-origin { margin-left: 6px; padding: 1px 6px; border-radius: 99px; background: var(--a-surface-2); color: var(--a-ink-2); font-size: 10px; font-weight: 600; }
+  .rt-c { --rt-h: #7d8b99; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 4.6rem; padding: 0 3px; color: var(--a-ink); background: color-mix(in srgb, var(--rt-h) 26%, var(--a-surface)); }
+  .rt-i-NUH { --rt-h: #178fd7; } .rt-i-NTF { --rt-h: #1d9a8a; } .rt-i-KKH { --rt-h: #8a5cc4; } .rt-i-TTSH { --rt-h: #e57200; } .rt-i-other { --rt-h: #a1824a; } .rt-i-none { --rt-h: #7d8b99; }
+  .rt-t-exam { --rt-h: #d4a017; }
+  .rt-unk { background: var(--a-surface); outline: 1px solid var(--a-danger); outline-offset: -2px; }
+  .rt-prov { font-style: italic; outline: 1px dashed var(--a-ink-3); outline-offset: -2px; }
+  .rt-el { font-style: italic; }
+  .rt-dim { opacity: .18; } .rt-hit { outline: 2px solid var(--a-ink); outline-offset: -2px; }
+  .rt-n { text-align: center; min-width: 3.4rem; font-variant-numeric: tabular-nums; } .rt-z { color: var(--a-ink-3); }
+  .rt-man summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
+  .rt-hist th, .rt-hist td { height: 28px; padding: 0 8px; }
+  .rt-file { display: none; }
 </style>
 </head>
-<body>
-<header class="e-appbar">
-  <div class="e-appbar__bar">
-    <button type="button" id="back" class="e-appbar__back" aria-label="Back" hidden><svg viewBox="0 0 24 24" class="e-ico" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+<body class="a-app">
+<header class="a-bar e-appbar">
+  <div class="a-band"><i></i><i></i><i></i><i></i></div>
+  <div class="a-bar-row">
+    <button type="button" id="back" class="a-bar-btn e-appbar__back" aria-label="Back" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span aria-hidden="true">Back</span></button>
     <div class="e-appbar__titles">
-      <h1 id="title" class="e-appbar__title">APMES People</h1>
+      <h1 id="title" class="a-bar-title e-appbar__title">APMES People</h1>
       <p id="sub" class="e-appbar__sub" hidden></p>
     </div>
     <div id="me" class="e-appbar__right"></div>
   </div>
 </header>
-<main id="app"><p class="e-loading">Loading…</p></main>
-<div id="toast" role="status" aria-live="polite"></div>
+<main id="app" class="a-main"><p class="e-loading">Loading…</p></main>
+<div id="toast" class="a-toast" role="status" aria-live="polite"></div>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

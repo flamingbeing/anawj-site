@@ -6,8 +6,8 @@ move an item to its app's `STATUS.md` "Next" once the owner says to build it. St
 
 ## Direction
 
-- **Find diverse use cases for AI-built apps** (owner's main goal, Oct 2026). Exploring is the point: most apps are
-  experiments, so speed beats polish, except for the vital ones (`AGENTS.md`, Working with the owner).
+- **Find diverse use cases for AI-built apps** (Oct 2026). Most apps are experiments, so speed beats polish, except
+  for the vital ones (`AGENTS.md`, Working with the owner).
 - **Resident education** is the thread through most of it: the APMES logbook and evals, the hand surgery pages.
 
 ## Vital apps
@@ -52,11 +52,3 @@ weekly proof-read; instant page edits and PR revisions by the Claude GitHub Acti
   workflow posting before-and-after 390 px pictures on each PR would make it automatic.
 - Not worth it for now: a form-based CMS (Decap, Tina), commercial feedback tools, an Obsidian outbox, live-editable text
   in Firestore (except perhaps an announcement banner).
-
-## Ways of working to try
-
-- **The always-on home computer** (13 Oct 2026): runs `claude remote-control` (command-line Claude Code) from the
-  owner's projects folder, which holds every Claude project, so the phone can drive a session there (first run 13 Oct;
-  the desktop app's Remote Control is sandboxed, so the command line is used instead). Started hidden by a small
-  PowerShell script, at sign-in through Task Scheduler, logging to a file in the user folder. For jobs the cloud can't
-  do: the owner's signed-in browser, files on that computer, long jobs. Ordinary repo work stays in the cloud.

@@ -23,8 +23,10 @@ try { for (const width of [390, 1280]) {
   await group('logbook').getByLabel('Copy and Reflect buttons on each case').uncheck();
   await group('bar').getByLabel('Notes on the tab bar').check();
   await p.locator('[role=tab][data-tab=notes]').waitFor();
-  await group('bar').getByLabel('Analytics on the tab bar').uncheck();
-  await p.waitForFunction(() => !document.querySelector('[role=tab][data-tab=progress]'));
+  // Advanced puts Analytics on the bar (Case, Logbook, Totals, Reflections, Analytics, More; owner, 15 Oct 2026)
+  assert.equal(await p.locator('[role=tab][data-tab=progress]').count(), 1);
+  await group('bar').getByLabel('Analytics on the tab bar').check();
+  await p.locator('[role=tab][data-tab=progress]').waitFor();
   assert.equal((await st()).d.rowMenu, true);
 
   // resetting one group leaves the others alone
@@ -38,8 +40,8 @@ try { for (const width of [390, 1280]) {
   assert.equal(now.s.hideTips, true); assert.equal(now.d.rowMenu, true);
   await group('bar').getByRole('button', { name: 'Reset this group' }).click();
   await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click();
-  await p.locator('[role=tab][data-tab=progress]').waitFor();
   await p.waitForFunction(() => !document.querySelector('[role=tab][data-tab=notes]'));
+  assert.deepEqual((await p.locator('[role=tab]').evaluateAll(t => t.map(x => x.dataset.tab))), ['log', 'logbook', 'totals', 'reflect', 'progress', 'more'], 'Advanced: Case, Logbook, Totals, Reflections, Analytics, More');
   now = await st();
   assert.equal(now.s.hideTips, true); assert.equal(now.d.rowMenu, true);
   await group('tips').getByRole('button', { name: 'Reset this group' }).click();
@@ -60,7 +62,7 @@ try { for (const width of [390, 1280]) {
   const tabsAdvanced = await tabsNow();
   await pickProfile('basic');
   await p.waitForFunction(() => document.body.classList.contains('basic'));
-  assert.deepEqual(await tabsNow(), tabsAdvanced.filter(t => t !== 'progress'), 'Analytics moves into More');
+  assert.deepEqual(await tabsNow(), tabsAdvanced.filter(t => t !== 'progress'), 'Basic: Analytics goes into More');
   await p.locator('[role=tab][data-tab=more]').click();
   await p.locator('.more-list a[data-go=progress]').waitFor();
   // settings stay: the advanced settings links and cards are all there
@@ -76,21 +78,20 @@ try { for (const width of [390, 1280]) {
   assert.equal(await p.locator('main .seg button').filter({ hasText: /^Grid$/ }).count(), 0);
   await p.evaluate(() => { location.hash = '#progress'; });
   await p.locator('.an-sec').first().waitFor();
-  assert.equal(await p.locator('.an-sec summary').filter({ hasText: /Trends|Gone quiet|Reflection to-dos/ }).count(), 0);
-  assert.equal(await p.locator('a.an-link').count(), 0);
-  assert.ok(!/at your pace/.test(await p.locator('main').innerText()));
+  // full Analytics in every profile, Basic too (owner, 15 Oct 2026)
+  await p.locator('.an-sec summary').filter({ hasText: 'Trends' }).waitFor();
   await p.evaluate(async () => { const { reflectOnCase } = await import('./js/ui-reflect.js'); await reflectOnCase({ id: 'fake-basic', date: '2026-10-10', initials: 'ZZ', details: 'Fake basic case', cats: ['13'] }); });
   await p.waitForSelector('.refl-editor');
   assert.equal(await p.locator('.refl-editor summary').filter({ hasText: /Figures|References/ }).count(), 0);
   await p.goBack(); await p.waitForFunction(() => !document.querySelector('.refl-editor'));
   // ...and back on, one by one
   await p.evaluate(() => { location.hash = '#showhide'; });
-  assert.equal(await group('extras').getByRole('switch', { name: /^Reflect buttons/ }).isChecked(), true, 'Basic keeps the reflections');
+  assert.equal(await group('reflections').getByRole('switch', { name: /^Reflect buttons/ }).isChecked(), true, 'Basic keeps the reflections');
   await p.locator('.profile-now', { hasText: 'Now: Basic' }).waitFor();
-  await group('extras').getByRole('switch', { name: 'The Logbook grid view' }).check();
+  await group('logbook').getByRole('switch', { name: 'The Logbook grid view' }).check();
   await p.locator('.profile-now', { hasText: 'Custom (based on Basic)' }).waitFor();
-  await group('extras').getByRole('switch', { name: /^Analytics trends/ }).check();
-  await group('extras').getByRole('switch', { name: 'Figures and references in reflections' }).check();
+  await group('analytics').getByRole('switch', { name: /^Analytics trends/ }).check();
+  await group('reflections').getByRole('switch', { name: 'Figures and references in reflections' }).check();
   await group('case').getByLabel(/Quick picks/).check();
   await group('case').getByLabel('Suggested tags as you type').check();
   await group('bar').getByLabel('Analytics on the tab bar').check();
@@ -108,7 +109,7 @@ try { for (const width of [390, 1280]) {
   await pickProfile('logbook');
   await p.waitForFunction(() => document.body.classList.contains('logbook-only'));
   assert.ok(!(await st()).s.show, 'picking a profile starts from its defaults');
-  assert.deepEqual(await tabsNow(), tabsAdvanced.filter(t => t !== 'progress' && t !== 'reflect'));
+  assert.deepEqual(await tabsNow(), tabsAdvanced.filter(t => t !== 'reflect' && t !== 'progress'), 'Case, Logbook, Totals, More');
   await p.locator('[role=tab][data-tab=logbook]').click();
   await p.locator('main .seg button').filter({ hasText: /^List$/ }).click();
   await p.locator('ul.cases li').first().waitFor();
@@ -120,7 +121,7 @@ try { for (const width of [390, 1280]) {
   await p.locator('main h2').filter({ hasText: 'Reflections' }).first().waitFor();
   // everything back on, one by one, is Advanced again
   await p.evaluate(() => { location.hash = '#showhide'; });
-  for (const el of await group('extras').locator('input[role=switch]').all()) await el.check();
+  for (const el of await p.locator('.showhide input[data-extra]').all()) await el.check();
   await group('apmes').getByLabel('Still needed (on the Case tab)').check();
   for (const el of await group('case').locator('input[role=switch]').all()) await el.check();
   await group('bar').getByLabel('Reflections on the tab bar').check();
@@ -137,14 +138,30 @@ try { for (const width of [390, 1280]) {
   assert.deepEqual(new Set(await tabsNow()), new Set(tabsAdvanced));
   await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { caseHide: null } }); });
 
-  // Faculty / PCs (faculty, PDs and admins; the demo user is an admin): Case logs, Analytics (the programme's), More
+  // Faculty / PCs (faculty, PDs and admins; the demo user is an admin): Totals, Admin, More (Case logs, Analytics first in it)
   await pickProfile('faculty');
   await p.waitForFunction(() => document.body.classList.contains('faculty-profile'));
-  assert.deepEqual(await tabsNow(), ['caselogs', 'progress', 'admin', 'more'], 'admins get the Admin portal left of More');
+  assert.deepEqual(await tabsNow(), ['totals', 'admin', 'more'], 'admins get the Admin portal left of More');
+  await p.locator('[role=tab][data-tab=totals]').click();
+  await p.getByRole('heading', { name: 'Programme totals' }).waitFor();
+  await p.locator('table.totals td.n').first().waitFor();
+  // Totals: Category column, names row frozen, no tap-and-hold tooltips, the count switch below the table, every year as a zip
+  assert.equal(await p.locator('table.totals thead th').first().innerText(), 'Category');
+  assert.equal(await p.locator('table.totals thead th').nth(1).evaluate(e => getComputedStyle(e).position), 'sticky');
+  assert.equal(await p.locator('table.totals td.n[title]').count(), 0);
+  // a long category: wraps in Compact (on by default: no sideways scroll nobody can reach by keyboard, #663), scrolls
+  // sideways without it
+  assert.deepEqual(await p.locator('table.totals td.cat .cat-in').first().evaluate(e => [getComputedStyle(e).overflowX, getComputedStyle(e).overflowWrap]), ['visible', 'anywhere'], 'Compact: a long category wraps');
+  assert.equal(await p.locator('table.totals td[title]').count(), 0, 'no tooltips');
+  assert.ok(await p.evaluate(() => { const t = document.querySelector('table.totals'), sw = [...document.querySelectorAll('main .seg button')].find(b => /All tags/.test(b.textContent)); return !!sw && !!(t.compareDocumentPosition(sw) & Node.DOCUMENT_POSITION_FOLLOWING); }), 'All tags / Towards minimums below the table');
+  const zipDl = p.waitForEvent('download'); await p.getByRole('button', { name: 'Download all years (zip)' }).click();
+  assert.match((await zipDl).suggestedFilename(), /^totals-all-years-\d{4}-\d{2}-\d{2}\.zip$/);
   await p.locator('[role=tab][data-tab=admin]').click();
   await p.locator('a[data-go=adminresidents]').click();
   assert.equal(await p.locator('[role=tab][data-tab=admin]').getAttribute('aria-selected'), 'true', 'Admin portal pages sit under its tab');
-  await p.locator('[role=tab][data-tab=caselogs]').click();
+  await p.locator('[role=tab][data-tab=more]').click();
+  assert.equal(await p.locator('.more-list li a').first().getAttribute('data-go'), 'caselogs', 'Case logs first in More');
+  await p.locator('.more-list a[data-go=caselogs]').click();
   await p.locator('.caselog-list li').filter({ hasText: 'Resident A' }).waitFor();
   assert.match(await p.locator('.caselog-list li').filter({ hasText: 'Resident A' }).innerText(), /\d+ cases/);
   await p.getByLabel('Find a resident').fill('resident b');
@@ -153,15 +170,20 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('heading', { name: 'Resident B' }).waitFor();
   await p.locator('table.totals td.n').first().waitFor();
   await p.getByRole('heading', { name: /^Reflections · \d+ of \d+ headings met$/ }).waitFor();
-  assert.equal(await p.locator('[role=tab][data-tab=caselogs]').getAttribute('aria-selected'), 'true', 'a case log sits under Case logs');
+  assert.equal(await p.locator('[role=tab][data-tab=more]').getAttribute('aria-selected'), 'true', 'a case log sits under Case logs, in More');
   const logDl = p.waitForEvent('download'); await p.getByRole('button', { name: 'Download Excel' }).click();
   assert.match((await logDl).suggestedFilename(), /^case-log-Resident-B-\d{4}-\d{2}-\d{2}\.xlsx$/);
-  await p.locator('[role=tab][data-tab=progress]').click();
-  await p.getByRole('heading', { name: 'Programme analytics' }).waitFor();
-  await p.getByRole('heading', { name: 'Programme totals' }).waitFor();
-  // their own Case, Logbook and Reflections are first in More
+  // then Analytics (the programme's: who's behind, no totals) and their own Case, Logbook and Reflections in More
   await p.locator('[role=tab][data-tab=more]').click();
-  assert.deepEqual((await p.locator('.more-list li a').evaluateAll(as => as.map(a => a.dataset.go))).slice(0, 3), ['log', 'logbook', 'reflect']);
+  const moreIds = await p.locator('.more-list li a').evaluateAll(as => as.map(a => a.dataset.go));
+  assert.deepEqual(moreIds.slice(0, 4), ['caselogs', 'progress', 'log', 'logbook']);
+  assert.ok(moreIds.slice(4, 6).includes('reflect'), 'their Reflections too (after Notes, in the tab bar’s order): ' + moreIds);
+  await p.locator('.more-list a[data-go=progress]').click();
+  await p.getByRole('heading', { name: 'Programme analytics' }).waitFor();
+  // the Year comparison: each target tag's median in the year (log2 5b)
+  await p.getByRole('heading', { name: 'Year comparison' }).waitFor();
+  assert.ok(await p.locator('.yc-table tbody tr').count() > 10, 'a row per target tag');
+  assert.equal(await p.getByRole('heading', { name: 'Programme totals' }).count(), 0, 'no totals in Analytics');
   await pickProfile('advanced');
   await p.waitForFunction(() => !document.body.classList.contains('faculty-profile'));
   assert.deepEqual(new Set(await tabsNow()), new Set(tabsAdvanced));

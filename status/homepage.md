@@ -1,5 +1,4 @@
 # Now: Claude Code, homepage session
 
-Branch `claude/modest-ptolemy-ge34bv`, no open PR, nothing half-done (13 Oct 2026). The editing-and-commenting work is
-merged (#410–#454; `STATUS.md`, `edit/NOTES.md`); what's left needs the owner's decisions ("Waiting on the owner").
-Delete this file when the session ends for good.
+Branch `claude/modest-ptolemy-ge34bv` (14 Oct 2026). Ask Claude and instant page edits work end to end (#561 merged).
+The seven old uptime monitors are paused (home computer). Delete this file when the session ends for good.

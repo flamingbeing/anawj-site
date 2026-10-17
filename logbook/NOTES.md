@@ -28,7 +28,12 @@ portfolio content.
 - Logbook **Case summary** (the case box). Reflection **Case details** (prefilled from the case summary).
 - **☆ Interesting** = the star on a case (`reflectTag`; was "Possible reflection"): a bookmark for interesting cases.
   Logbook rows show "☆ interesting", Filter → Show has "Interesting", the Reflections tab offers them first.
-- **Analytics** = the old Progress tab (`#progress`). Totals is under it ("Compare with your intake").
+- **Analytics** = the old Progress tab (`#progress`), in More. **Totals** (`#totals`, Programme totals) is its own tab
+  (owner, 15 Oct 2026): the bar starts Case, Logbook, Totals, Reflections, More (Analytics, Case logs, Notes in More);
+  Totals shows to programme residents, faculty, PDs and admins with the totals switch on. Its table scrolls inside the
+  card so the names row and the Category column (at most a third of the width) stay frozen; no tooltips on the
+  counts (tap and hold clashed with selecting text); All tags / Towards minimums sit below the table; Download all
+  years (zip) saves one Excel file per residency year.
   Reflection progress credits at most one complete JR reflection per heading (two for Paediatrics).
   Extra JR reflections remain saved, with a note explaining why they do not count. Heading bars,
   overall progress and shared summary counts use this same cap. Required JR cases and sub-types remain reminders.
@@ -41,6 +46,18 @@ portfolio content.
 - More → **Export / Import** (`#data`): **Export** = the Word portfolio only (it holds everything APMES needs);
   **Import** = reflections from Word (`#reflimport`) and the logbook from Excel/CSV; **Backup** = backup file and
   restore, Excel spreadsheet. Keep that wording. The Logbook and Reflections tabs have no More tools cards.
+- **Backup file and restore** (`backup.js`; unit `test/backup.test.mjs`, e2e `bugfixes.mjs`; audit, 14 Oct 2026): both
+  wait for the server's copy first (`S.casesSynced && S.reflectionsSynced`, then `notesFromServer`). A new phone, or
+  one signed in again (sign-out wipes the device copy), shows an empty list until it comes, and a restore then counted
+  every case and reflection as missing and wrote the backup's older copies over newer ones with blind sets. Restore
+  waits up to 30 s ("Your logbook is still loading (no signal?), try again"), works out what's missing again when
+  Restore is tapped (`restorePlan`; toast "Restoring…"), and writes cases and reflections only where the server has no
+  document with that id (`cloud.addMissing`: ids looked up on the server 30 at a time with `documentId() in`, four
+  lookups at once, a read per one found, then batches; it needs signal); notes go through the write queue with base
+  null. Save to Google Drive / Dropbox takes
+  everything as the server has it (`makeBackup({ fromServer: true })`, "Not saved" after 30 s; the notes zip then
+  reads the same notes). Download backup and the spreadsheet wait 10 s, then save this device's copy and say so in
+  the toast (a backup made offline still helps), or stop if the device has nothing yet.
 - **Excel backup** (`export-opts.js`, tested; dialog in `ui-logbook.js` `downloadExcel`): logbook + reflections
   (or one), date range, columns ticked and ordered, tag/date style, Summary sheet; saved as
   `settings.excelExport`. The Cases sheet keeps a hidden id column and a veryHidden "Export info" sheet
@@ -166,7 +183,8 @@ portfolio content.
   sticky line you tap anywhere to jump to a date. Reflection rows: initials with a small JR, the date on one line
   ("11 Sep", or "11 Sep 25" in an earlier year); a heading's counts never split over two lines. Analytics cards show
   the summary and one bar folded; "You and your year" (the spread strips) is inside the opened card.
-- **Case box marks** (polish 4): the initials and the age/sex are highlighted inside the case box (a see-through copy
+- **Case box marks** (polish 4): the initials, the age/sex, labelled parts and (log2 2) the BMI the suggestions read
+  (`suggest.js` `bmiAt`, purple) are highlighted inside the case box (a see-through copy
   of its text on top, `.box-marks`, styled from the box's own computed font and padding so the wrapping matches).
   The line under the box says only what the age was read as ("6m = 6 years · male"): kept on purpose, as the check
   that 6m means years and 6mo months. The initials and procedure are no longer repeated there.
@@ -280,7 +298,7 @@ portfolio content.
   keys, after a confirm; custom CSS is switched off but kept, own font files stay stored.
 - **Look options, Oct 2026** (device keys): **Corners** (Display, `round` 0 Square / 1 / 2 Normal / 3 Very round): every
   border-radius in style.css (and the reflection editor's inline ones) is `calc(Npx * var(--round, 1))`; tag tick
-  boxes cap at 1.2 so they never look like radio buttons. **Soft shadows instead of lines** (`shadows`, cards only; **on by default**, owner 12 Oct 2026: `shadows: false` = lines).
+  boxes cap at 1.2 so they never look like radio buttons. **Card style** (Themes; owner, 16 Oct 2026; `cardStyle` / `cardPatch` in display.js): Raised = soft shadows (default; owner 12 Oct 2026), Outlined = lines (`shadows: false`), Flat = no lines and no page cards (`flat`). It replaced the Soft shadows switch and the Flat end of the Borders slider; the line strength (`borders`, Borderless … Normal) moved to Advanced display → Look as **Line strength**, kept while Flat is on.
   **Bigger tap targets on the Case tab** (Advanced display, `bigTaps`). **Tab bar order and hidden tabs** (Advanced
   display, `tabOrder` / `tabHidden`, `arrangeTabs` in ui-settings.js): ↑ ↓ and a switch per tab; More can't be
   hidden, at least two and at most seven (`MAX_BAR`, More included; owner, Oct 2026) stay. Every page in the More list
@@ -322,7 +340,19 @@ portfolio content.
   fill-ins are all empty goes; a value is never read again as a template. Options: date format, categories as
   names / codes / #tags, wiki or Markdown links, case notes per month or day, reflection folders (month, heading,
   flat), file name pattern, front matter fields, the reflection templates (title, summary, each point, figure,
-  references). Default day: `[[YYYY-MM-DD]]`, then `1. AB` / case, a blank line between cases; no tags. An older
+  references). Default day: `YYYY-MM-DD` (plain since log2 15; it was `[[YYYY-MM-DD]]`), then `1. AB` / case, a blank
+  line between cases; no tags. **Day heading** (`dayHeadStyle`): Plain / Heading (`# date`) / Link (`{{dateLink}}`,
+  `[[file date|date]]` or a Markdown link) / Custom (the `dayHead` box; a heading typed before the styles existed is
+  Custom); one case follows the style unless its box was typed. **Dates** (`dateFormat`): 2026-10-10, 20261010,
+  10 Oct 2026, Sat 10 Oct 2026, 10/10/2026 or Custom (`datePattern`: YYYY YY MMMM MMM MM M DD D dddd ddd, [text]
+  literal; `fmtPattern`). **File names and link targets** (`fileDate`): As the dates (slashes become spaces) or their
+  own; they name the export's day notes, reflection files' {{date}} and what Link points to. Sync's own file name
+  pattern (Settings → Sync) is separate. Changing the heading makes Sync rewrite each synced day once (3-way merge
+  keeps the user's edits). **Under each case** (`reflInDay`: None (default) / Link / Embed `![[…]]` / Full text;
+  `notesInDay`: None / Full text): a case's reflections and linked notes after it in a day and in one case, their
+  headings two levels down. Link and Embed need the reflection's own note (`ctx.reflPath`): the export, and Sync places
+  with **Also sync reflection notes**; Copy, Share, Send to and other Sync places give the full text (Markdown links can't embed: a link). A linked note under its case
+  leaves the day's Notes. e2e: `md-format.mjs`. An older
   `settings.shareFormat` (the Copy & share format) carries over until the Markdown page is saved; `share-format.js`
   is kept for that and its tests. Previews use the user's own latest day and reflection.
 - **Sync** (Settings → Sync, `#sync`; `ui-sync.js` page + run, `sync-remote.js` calls, `sync-md.js` pure and tested;
@@ -348,6 +378,13 @@ portfolio content.
   (`forgetSync`). Drive/Dropbox reuse the backup sign-in (`signInFor`, pending `action: 'sync'`, `back` page);
   tokens stay memory-only, so a run resumed after one sign-in never leaves for a second (the other place waits for
   the next tap). ID check once per run. e2e: `test/e2e/sync.mjs` fakes all three APIs.
+- **Sync reflection notes** (log2 15; owner said build it, 16 Oct 2026; off unless chosen, per place: `target.reflections`):
+  one note per reflection in `Reflections/…` beside the day files, named and foldered as the Markdown export names
+  them (`reflectionFiles` in sync-md.js, in a stable order: date, created, id), inside the usual marked block, so no
+  front matter and no figures. Ledger keys `r:<id>` with the file's `path`; a reflection whose name changes (title,
+  date, heading) gets a new file and the old one is left (Sync never deletes a file; the run says how many); a
+  deleted reflection's file stays. Only on those places do a day's Link and Embed point at the notes (the day text
+  differs per place). Tested in `sync-md.test.mjs` and `e2e/sync.mjs`.
 - **Save to Google Drive / Dropbox** (Backup card; `cloud-save.js`, ids and pure helpers in `backup-targets.js`,
   tested): sign-in leaves the page and comes back, no popups (Oct 2026: on the owner's phone popups lost their
   opener, so Drive stayed on a blank page and Dropbox did nothing). Drive = OAuth implicit grant (token in the
@@ -421,12 +458,14 @@ portfolio content.
   - **Advanced**: hides nothing.
   - **Faculty / PCs** (`facultyMode()`; offered only to `facultyRole()`: admins, PDs and active faculty; their
     default when nothing is saved, outside the demo; owner, 12 Oct 2026: PCs are added as admins, no PC role; no
-    Generic profile): tab bar **Case logs** (`#caselogs`, `ui-caselogs.js`: residents by year with total cases, tags
-    behind / due, reflections; tap → `#caselog`, that resident's counts per tag against the targets (`totalsTable`
-    with one column), reflection headings met, Excel download), then **Analytics** as programme analytics
-    (`renderProgramme`: who's behind, the tags most residents are behind on, then Programme totals), then the Admin
-    portal for admins (left of More; owner), then More (their own
-    Case, Logbook, Reflections first). All from the counts summaries, never case details. The rules let active
+    Generic profile): tab bar **Totals** (Programme totals), the Admin portal for admins (left of More; owner), then More
+    (owner, 15 Oct 2026): **Case logs** first (`#caselogs`, `ui-caselogs.js`: residents by year with total cases, tags
+    behind / due, reflections; tap → `#caselog`, that resident's counts per tag against the targets (`totalsTable` with
+    one column), reflection headings met, Excel download), then **Analytics** as programme analytics (`renderProgramme`:
+    who's behind, the tags most residents are behind on, and the **Year comparison**: each target tag's median in the
+    year picked, the target due next, residents with half the median or less from a median of 4 (`year-compare.js`,
+    unit-tested); no totals), then their own Case, Logbook, Reflections. All from the counts
+    summaries, never case details. The rules let active
     faculty read `summaries/` (counts are no secret, owner); they still can't read the residents list, cases,
     reflections or notes. Case logs is listed in More for them in other profiles.
   - Display preview (`displayPreview`): dashed accent edge, faint stripes and a "Preview only: not a real case" pill,
@@ -459,7 +498,8 @@ portfolio content.
   Enter in the title moves to the note text): # headings, **bold**, - / 1. lists, - [ ] to-dos that tick in
   Preview, http(s)/mailto links only. No images. Delete → recycle bin (kind `note`, 30 days; restore refuses past 100).
   Firebase cost: notes are not read at sign-in; `ensureNotes()` starts the listener on first need (the page, a day
-  with notes in the Logbook, the Markdown export, a backup) and keeps it for the visit. Typing saves after 3 s of
+  with notes in the Logbook, the Markdown export, a backup) and keeps it for the visit. Sync, the backups and a
+  restore wait for the server's list (`notesFromServer`): this device's copy may be weeks old. Typing saves after 3 s of
   quiet, on blur, on leaving (Back, another tab) and on pagehide / hidden, through `writes.save('note')` →
   `cloud.commitRecord` (offline queue, conflict check). The note index { days, cases, n } (`logbooks/{email}/meta/
   noteIndex`, owner only; updated only from the server's copy of the notes) lets the Logbook show a bar on days with
@@ -556,6 +596,108 @@ portfolio content.
   line break or space, `splitOverflow`) and puts the rest in a note linked to it ("Rest of the case · AB", Notes'
   100-note limit checked first). "Plan for later" refuses a long row (planned cases can't carry a note).
 
+### Themes (Settings → Themes; `themes.js`; owner, 15 Oct 2026)
+
+- A theme is a bundle of this device's look settings (`THEME_KEYS`); picking one sets them all (Undo in the toast),
+  and changing any afterwards shows "Custom (based on …)". Classic themes are cards; Inspired ones ("Obsidian-style",
+  colours, corners and type only, never logos, paid fonts or brand names beyond "-style") are a searchable list.
+  No celebrity or brand palettes (owner). New ideas come in through "Suggest a theme" (private feedback).
+- Display keeps layout (compact, start tab, header and tab bar, rows); Themes holds looks: light or dark, colour
+  swatches (NUH, muted, pastel, Custom), Colourful, background tint, Top band, card style, corners, spacing, tab
+  bar style, heading font, fonts, line spacing. Advanced display keeps the fine controls (line strength, button style).
+- **Your themes** (owner, 16 Oct 2026; `my-themes.js`, unit-tested; e2e `my-themes.mjs`): once the look is Custom, the
+  "Your themes" card says so and offers Save this look under a name (`display().myThemes`, this device, up to 12, a
+  name already there is replaced; light or dark is kept with it). Saved looks are picked like any theme ("Now: Night
+  shift (yours)"), × deletes with Undo. **Export…** writes `my-logbook-themes.json` (`kind: apmes-logbook-themes`);
+  **Import…** adds a file's themes, only known look keys with checked values. The Themes reset leaves them alone; the
+  settings file carries them.
+- **Top band: only the NUHS theme keeps the NUH stripe; other themes bring their own four colours** (owner, 15 Oct
+  2026; an exception to AGENTS.md's four-quarter band, for the logbook only). The Top band setting overrides it: the
+  theme's colours (default), shades of my colour, the NUH stripe, or none.
+- The CSS for the settings that aren't classes comes from `lookCss` into `<style id="look-css">`, cached as
+  `apmes-logbook-look-css` for the first paint. A new look key goes in `THEME_KEYS`, `DISPLAY_KEYS` and settings-file
+  `PLAIN`; `themes.test.mjs` round-trips every theme.
+
+- **Reset all settings** (Settings, last card; owner, 15 Oct 2026): this device only, or the account too
+  (`settings-file.js` `resetAccountPatch`: your year, profile, saved searches, send and sync places and the app's
+  bookkeeping stay; tags and shorthand only when ticked). Saves a settings file first by default; Undo in the toast.
+
+- **Analytics Edit mode** (owner, 15 Oct 2026): Edit above the cards; drag by ⠿ or the arrows, Hide / Show, Reset
+  layout, Done. Saved for the account as `settings.anLayout { order, hidden }` (`analytics.js` arrangeCards: cards a
+  profile lacks are left out; new cards land in their default place). A new card needs an id in `CARD_NAMES`.
+
+- **Default tab bars** (owner, 15 Oct 2026; `profiles.js` PROFILE_ON / PROFILE_OFF): logbook only Case · Logbook ·
+  Totals · More; Basic + Reflections; Advanced + Reflections · Analytics; Personal Case · Logbook · Notes · Reflections ·
+  Analytics · More; Faculty / PCs Totals · Admin · More. Devices arranged by hand keep their arrangement.
+- **More page:** two groups (More's pages with Settings last; Account and help), privacy and credits as fine print. Its
+  Edit mode (per device) drags the tab bar and More's own list (`display().moreOrder`), Pin / Take off (a full bar asks
+  which tab it replaces). The drag code is shared: `drag-list.js`.
+
+- **Recover** (More; owner, 15 Oct 2026): one page for Needs attention (unsynced or clashing changes: Retry, Keep mine
+  / Keep theirs), Recently deleted (the recycle bin, all devices), Unfinished drafts and Earlier versions (this device),
+  each folded with a count. The bin is no longer in Settings; search "recycle" finds it here.
+- **Case box height** (this device): the grab bar under the box sets a kept height (`display().boxHeight`; the List
+  box, paste a list, has its own bar and `listHeight`, owner 16 Oct 2026; double-tap
+  resets); Grow as I type (`boxGrow`, on by default) grows it to two thirds of the screen.
+- **Totals Compact** (this device, on by default): initials across the top (`analytics.js` shortNames; a tap names the
+  person), short category names, a key under the table; Show targets at the bottom. Excel keeps full names.
+- **Select and Bulk edit** (Logbook List and the calendar's day list; log2 9 / 9d): press and hold a row (with
+  Accessibility → Press and hold on, the hold opens the row menu, which has Select), or the Select button. A tap then
+  ticks a row; the bar at the bottom has Select all (the whole search, not only the rows drawn), Select none, Bulk edit…
+  and Done. Bulk edit… (`ui-bulk.js`, the rules in `bulk-change.js`): Change has a row per field, each "Unchanged"
+  until chosen (date, initials, case summary replace / add to the end / find and replace with exact capitals, tags
+  add / remove / replace, Interesting); Actions has Copy, Share, Send to and Move to the bin for just these. Review
+  changes lists the changes, warns when something is replaced, shows up to three before → after; from 20 cases an
+  overwriting change's button says how many. Save goes through `updateMany` (a case changed elsewhere keeps that
+  version); Undo in the toast puts back only cases nobody has changed since. The old "Tag N cases…" is now "Edit N
+  cases…" (Filter → More): every case in the search, selected, into Bulk edit. Not in the grid (it has its own editing).
+- **Notes: a bin on each note while selecting** (owner, 16 Oct 2026): press and hold (or Select), then the red bin at a
+  note's right moves just that note to the recycle bin (`moveToBin`, Undo in the message); the selection stays. The
+  bin icon is `trash` in ui-core.js. e2e: `notes-select.mjs`.
+- **Notes: Select and Bulk edit** (log2 9b): the same bar and popup (`ui-bulk.js` bulkDialog; the notes' fields in
+  `ui-bulk-notes.js`, the rules in `note-bulk.js`). Change: date (set or clear; a daily note keeps its day, its id is the
+  date), title (replace / add in front / find and replace), text (add to the end / find and replace), unlink from the
+  case. Actions: Merge into one (a new note, each selected one under its title in date order, the earliest date, the
+  case if they all share it; the originals go to the bin, Undo brings them back), Copy, Share, Send to, Download (zip),
+  Move to the bin.
+- **Reflections: Select and Bulk edit** (log2 9c): the header's Edit is now **Select** (press and hold a row starts it
+  too); dragging between headings stays in it. The old Select all / Clear / Mark complete / Delete selected toolbar is
+  the shared bar and popup (`ui-bulk-refl.js`, rules in `refl-bulk.js`). Change: heading (a sub-type stays where the
+  new heading has it), status (complete only when nothing is missing, as one at a time: the review says what the
+  others still need), portfolio export in / out, JR, date. Actions: Copy, Share, Send to (Markdown, as Settings →
+  Markdown makes it), Move to the bin. Word export of just these is not built: the portfolio export takes the ticked
+  ones (use Portfolio export: in / out).
+- **Grid as a spreadsheet** (log2 10): thin cell lines, inputs without boxes; drag a heading's right edge to resize a
+  column (`display().gridCols`, this device; ← → on the focused edge too; a double-tap resets it, "Reset column
+  widths" resets all); Lines per row 1 / 2 / 3 / Fit to text (`display().gridLines`; the summary is a textarea that
+  grows to its text with Fit).
+- **Send to presets** (log2 12): Apple Notes through a Shortcut named “Logbook to Notes” (`shortcuts://run-shortcut?
+  name=…&input=text&text=…`; setup steps folded on the Send to page), Email (mailto), Telegram (`tg://msg`), Drafts,
+  Bear, Things, Day One, besides Obsidian, WhatsApp, UpNote and Other app. Keep, Notion and OneNote take no text from
+  a link: the page says to use Share. Each link follows the app's documented format; check them on a real iPhone.
+- **Pages** (log2 11; owner's call, 15 Oct): the Logbook List and Grid show 100 cases a page (25 / 50 / 100 / 300 /
+  All, this device: `display().pageSize`, unset = 100); "‹ Page 2 of 14 ›" with a list of the pages and each page's
+  dates to jump to (`paging.js`, unit-tested); a new search, filter or view goes back to page 1; the Calendar stays
+  monthly. Replaces "Show more".
+- **Group by and Sort** (log2 14): in the Filter panel while the List shows (so the List looks as before), Group by Month (default) / Day / Week / Residency year / APMES tag
+  (a case under each of its tags; the heading has "12 of 20 for the target") / Your tags / Flags (No tag yet,
+  ☆ Interesting, Plan for later) / None, and Sort Newest (default) / Oldest / Initials A–Z / Most tags; this device
+  (`display().lbGroup` / `lbSort`, unset = the defaults). The default looks exactly as before (Jump on each month);
+  any other choice draws headings that fold (tap) and say how many cases, "(continued)" across a page, and "Select
+  these N" while selecting. Pure grouping in `lb-group.js` (unit-tested); pages count the rows shown.
+- **Search** (log2 9e, first part): a line magnifier (`ic('search')`, never an emoji: it follows the theme; owner,
+  16 Oct 2026) in the header on every tab, or / on a computer (not while typing), opens
+  `#search` (`ui-search.js`; the engine `global-search.js`, unit-tested). One box over cases (planned ones too),
+  reflections and notes (loaded the first time Search opens; offline works on what is on the device). The Logbook's
+  search language plus in:, status:, is:interesting / is:planned, has:reflection / has:note, no:tag, linked:yes / no,
+  heading:, tag:, diagnosis:; ⓘ lists them and a tap adds one. Results grouped by kind with counts, Best match or
+  Newest, the words marked; a tap opens the case (edit page), the reflection (editor) or the note (Done comes back to
+  Search); a case found links its reflection and notes. Chips (Cases / Reflections / Notes, Dates, Tag…, Drafts,
+  Interesting) add or take out their operator in the box (after: / before: for dates) and light up from what is typed:
+  the box is the one source. Saved searches are the Logbook's list (`settings.savedSearches`); one saved on Search has
+  `global: true` and the magnifier icon, and runs in Search when tapped on the Logbook. Select ticks results into bulk edit: one
+  kind opens its own popup; several kinds share the date (`ui-bulk-mixed.js`), with Copy and Move to the bin.
+
 ## Data, roles and photos (`firestore.rules`)
 
 - **App owner:** `owners/{email}`, set by hand in the Firebase console. May read logbooks and cases and import
@@ -578,6 +720,12 @@ portfolio content.
   and its setup: `form-script/` (never turn off Firebase Auth "Enable create (sign-up)": it would block new Google sign-ins).
   Owner, 14 Oct 2026: no "Google sign-ins only" rule (`sign_in_provider`) for now: a small single-hospital Form with no
   patient identifiers. Password accounts already get nothing (every rule needs a verified email or `formBots`).
+  15 Oct 2026 (audit): a response can come back at any time (edits stay on; the backfill), so a deleted Form case is
+  kept for good in `formGone/{caseId}` (the bin lasts only 30 days), the pick-up stops if the bin or that list can't be
+  read from the server, and the key notes the response's newest submit (a re-import knows an edited row). FormApp
+  gives no first-submit time, so an old imported response edited in the Form is matched by day, initials and
+  categories (not added, with a toast); a match like that against a case in the bin is added (with a toast), never
+  dropped quietly. A `Code.gs` change reaches the Form only when the owner pastes it: list it in `form-script/CHANGES-PENDING.md`.
 - **Test data paths against the real rules (14 Oct 2026 lesson):** the e2e tests run in demo mode, which skips the
   server-side checks (`commitRecord`'s base comparison, the rules), so a delete that never reached the server passed every
   test for a day (#519). Any change to saving, deleting, sync or the bin also needs the emulator tests:
@@ -589,8 +737,17 @@ portfolio content.
 - **App → response sheet (14 Oct 2026, `PLAN-app-to-sheet.md`):** new app cases (source `app` or `paste`) of programme
   residents also go to `sheetOutbox/{caseId}` (`js/sheet-outbox.js`, switched by `SHEET_OUTBOX_ON`); a script on the
   sheet turns each into a Case-tab row with `app:<caseId>` in column J and deletes the entry. New cases only (edits
-  and deletions don't reach the sheet; a case deleted before pick-up is taken out of the outbox). The Admin
-  workbook import skips rows with `app:` in column J. The sheet side is `form-script/Outbox.gs` (setup: `form-script/OUTBOX-README.md`). Lessons (14 Oct): the sheet's own script rebuilds a resident's report and the AY totals in 10–40 s under the document lock while its `onFormSubmit` waits only 10 s (now 60 s), so Outbox.gs holds the lock in small pieces and keeps owed rebuilds in a Script property; a copy of the sheet keeps the REAL residents' report spreadsheet ids (Residents column G), so any test on a copy must repoint them first (`logbookOutboxTryOne` refuses otherwise); Apps Script loads files in list order (keep the original order, put new files last); a script that adds rows doesn't fire `onFormSubmit`, so it runs the same chain itself. Tests: `test/sheet-outbox.test.mjs`, the sheetOutbox rules in
+  and deletions don't reach the sheet; a case deleted before pick-up is taken out of the outbox, and put back when it is
+  restored with its id: Undo, the bin, a delete that failed or lost to an edit; only cases made since `SHEET_OUTBOX_SINCE`,
+  the go-live instant, 22:15 Singapore time on 14 Oct 2026; deleting an entry already gone is allowed, so a late offline
+  delete shows no false sync error). The Admin workbook import skips rows with `app:` in column J (its count check still adds them: the AY
+  Totals count them). Outbox.gs reads one page of 12 per run from a cursor (`LOGBOOK_OUTBOX_CURSOR`), so entries it must
+  skip (resident not on the Residents tab) never block the rest (Oct 2026: they used to, as every run read the same first
+  page); the nightly Totals check reports skipped entries and fails after a day. One run at a time (the script lock), and
+  each piece looks in column J again under the lock, so overlapping runs never add a case twice. An entry keeps the rid it
+  was queued with, so a wrong id fixed in People leaves the old entries stuck: `logbookOutboxDropRid` lists, then deletes
+  them. New cases go only once the logbook names the resident's rid (`toSheet`); `app.js keepRid` sets it the moment the
+  resident is known, also mid-session (someone put on the list after this device last asked). The sheet side is `form-script/Outbox.gs` (setup: `form-script/OUTBOX-README.md`). Lessons (14 Oct): the sheet's own script rebuilds a resident's report and the AY totals in 10–40 s under the document lock while its `onFormSubmit` waits only 10 s (now 60 s), so Outbox.gs holds the lock in small pieces and keeps owed rebuilds in a Script property; a copy of the sheet keeps the REAL residents' report spreadsheet ids (Residents column G), so any test on a copy must repoint them first (`logbookOutboxTryOne` refuses otherwise); Apps Script loads files in list order (keep the original order, put new files last); a script that adds rows doesn't fire `onFormSubmit`, so it runs the same chain itself. Tests: `test/sheet-outbox.test.mjs`, the sheetOutbox rules in
   `test/rules.emulator.mjs`, and `TEST=conflicts` (scenario `sheetOutbox`).
 - **Privacy policy:** `privacy/index.html` (anawj.com/privacy/) shows who sees what. Keep it in step when roles change.
 - **Private feedback (14 Oct 2026):** More → Send feedback (`ui-feedback.js`, pure parts in `feedback.js`) saves
@@ -605,6 +762,12 @@ portfolio content.
   stores it in the demo store (the demo admin plays the owner). Tests: `test/e2e/feedback.mjs`, rules suite.
 
 ## Tags and suggestions (`tags.js`, `suggest.js`)
+
+- **Detection** (Settings → Logging → Detection; owner, 15 Oct 2026): account settings `detectInitials` (false: never
+  read initials from the text), `skipStarts` ("===, Pt:", dropped before initials, only when initials follow) and
+  `oneLetterInitials` (a lone capital is initials; I and A still need an age, "/" or "("). `ui-core.settings()` passes
+  them into engine.js (`setDetection`), so the box, pastes and spreadsheets read initials alike. The line under the
+  Case box shows what was read; a tap keeps it as text for that case only (`draft.noIni`, `draft.noAge`).
 
 - Tag numbers ("16", "20iii") come from the APMES portfolio's Section 4 table and the old Google Form; they stay as
   internal IDs (Section 4 fill, old-form import, CSV IDs) but are never shown: Still needed, Totals, the Excel backup
@@ -635,7 +798,11 @@ portfolio content.
 - Deletions: the recycle bin is a feed of tombstones (`deletedAt > syncAt - 10 min`): a binned record goes only if it
   is still the version that was binned (the entry's `data.updatedAt`; restored or edited elsewhere since, it stays, so
   a bin entry whose delete was refused as a conflict removes nothing). Deletes on this device (`commitRecord`
-  `_deleted`, `deleteCases`, `deleteReflection`) drop the record from the local copy and remember its id (`gone`,
+  `_deleted`: every move to the bin, cases, reflections and notes alike, checked against the version being deleted;
+  a restore from the bin goes through the write queue too, base null, so it waits behind a delete still waiting for
+  signal and lands after it, and `watchDeletes` follows each delete's own job (`writes.jobKey` / `stateOf`), not the
+  record's latest, so a refused delete is still rolled back with a restore queued behind it; `deleteCases`,
+  `deleteReflection`) drop the record from the local copy and remember its id (`gone`,
   8 days), so a stale copy arriving later is ignored. A removal the server confirms goes at once; one seen only in the
   cache, or after this device's own pending write (a refused write), is checked with one read. Delete account stops
   the listeners first.
@@ -643,7 +810,7 @@ portfolio content.
   case, plan "done" / pasted-list Undo, Recent changes restoring a deletion) while another device was closed stays on
   that device until then, as does a write stamped by a clock more than 10 minutes slow. A bin-entry tombstone for
   these was considered and not used: older app versions would show it in the recycle bin as an empty case to restore.
-- Late writes: direct writes (pasted lists, bulk tag, reflections saved outside the editor, bin entries) that reach the
+- Late writes: direct writes (pasted lists, reflections saved outside the editor, bin entries) that reach the
   server more than 5 minutes after they were made (offline) are stamped again once the server has them
   (`restampIfLate` in `cloud.js`, one small write per record so one deleted since doesn't block the rest; ids listed in
   `apmes-logbook-late:<email>` from the moment they're queued until the server has them, so a page closed first
@@ -786,6 +953,12 @@ portfolio content.
 - Programme tag groups are adopted only from the server logbook, never a cached copy (it overwrote groups
   changed on another device). Delete account re-authenticates before deleting anything.
 - Totals: your own column is live (summaryOf), not the copy loaded when Analytics opened.
+- **App version (owner, 14 Oct 2026, as in the prewarming app):** the bottom of More (owner, 15 Oct 2026; it was
+  Settings) shows "App version
+  2026-10-14 (3f9a2c1d)" (the service worker's cache name, stamped at deploy by
+  `tools/stamp-versions.mjs`; the date is the day that version went live) and "Get the latest version": it unregisters this app's service worker and deletes the
+  `logbook-` caches, then reloads (`js/app-version.js`). Never data, drafts, settings or other apps' caches; refused
+  offline (the saved copy is what opens the app) and while changes are still sending. e2e: `test/e2e/app-version.mjs`.
 - Totals counts (owner, 14 Oct 2026): by default every tag on every case, all years (cumulative), plus a **Total tags**
   row like the old Google Sheet's Grand Total (one per tag per case; "Total cases" counts cases, so it is smaller). A
   per-device switch (`display().totalsCount = 'min'`) shows only what counts towards the minimums (each tag up to its
@@ -794,6 +967,26 @@ portfolio content.
 ### Device recovery (Codex robustness review)
 
 Case creation, individual edits/Undo and reflection editor saves first commit immutable recovery records on the device (IndexedDB, with localStorage fallback). Server transactions compare the editor’s base version before replacing a record. Offline saves stay usable; rejected saves keep the editor/input. More → Recent changes / Recover drafts shows pending/failed sync, explicit retries, both sides of a concurrent edit, and the last 100 saved versions. Pending/failed/conflicting changes never expire automatically. History is private to the browser/account and is cleared on sign-out; it is not a backup. Existing batch imports and reflection metadata operations keep their existing cloud APIs.
+
+After a conflict (14 Oct 2026 audit) nothing more for that record is sent until the resident chooses in Recent changes;
+a later save used to wait behind it for good, say "Saved locally", and be set aside by either conflict button. Now
+(`writes.js`): a save made on the version shown (the other copy) replaces the stopped chain (this device's earlier
+versions are set aside, kept in the history past the last 100, and a toast says so); saving it unchanged changes
+nothing; one made on this device's own version is kept as one more conflict and fails, so the editor keeps its input
+(each next one replaces that held copy). "Keep version from elsewhere" sets aside that save, older ones and the held
+copies, never a newer pending one. The Restore buttons go through `writes.restore()`: after a conflict it saves over
+the other copy, and behind a failed save it saves from that save's base (what the server holds; it used to queue
+behind the failed save for good and say "Version restored"); the chain is set aside only once that save is stored.
+Retry on a save waiting behind a failed one sends the failed one again first. While a conflict is open the list shows
+the server's copy (from the sync engine), so an edit or delete made elsewhere since shows and is counted (it showed
+the copy found at the conflict: parked seed 285932884); the copy found at the conflict shows only while the list still
+holds this device's own version, or the very version it started from (same `updatedAt`: a stale cached list; a
+restore elsewhere is a newer one), or its delete took the record off. Windows that share the store (two tabs, the
+home-screen app and a browser tab) read a save's stored state again just before sending it, on Retry and when a
+failed save is reused, so one another window already sent or set aside is not sent again (nor one it has since
+dropped from the history: gone, with 100 newer finished saves in the store).
+
+Changes to many logged cases at once (Tag N cases, Settings → tag Merge, a spreadsheet's Changed rows) also go through the queue, case by case with the version each change was made from (`updateMany` in `ui-core.js`; audit, 14 Oct 2026): a blind batch overwrote a case changed on another device meanwhile, with no conflict and no copy. Now that case keeps the other device's version, both are in Recent changes, and the toast says how many were kept (with a Recent changes button). A case whose saves already met such a change (an unresolved conflict) is left alone and counted as kept: a save queued behind it never synced, and either choice in Recent changes then set it aside. The safe way on for a kept case is **Keep version from elsewhere**, then the same tag change or merge again (the toast says so); "Restore my version" puts this device's older copy back over the other device's edit. Ten at a time, each batch waiting (10 s at most) until its saves are done, so the counts say what happened: on a connection slower than the 180 ms `save()` waits, a conflict was found only after the case had counted as saved, and a merge took the old tag off the list. A merge takes the old tag off the list only when every case saved; offline saves, and any still on their way after a batch's 10 s (a connection that only looks online; the batches after it then don't wait), count as saved, and one that meets a change later shows as "Save needs attention", as for one edit. The list repaints once a batch, not on each save's state change (that sorted, overlaid and counted every case about three times a case: 300 cases took over half a minute on a 1,500-case logbook; now about 9 s online in the demo, under a second offline), with "Saving N cases… n done" meanwhile; it stops if the account changes. Each case costs a read and a write, and a big change pushes older entries out of the 100-version history. Only brand-new cases (pasted lists, plans, a backup's missing cases) still go in one batch (`saveMany`). Lesson: anything that saves many records through the queue should hold the per-save repaint (`holding` in `ui-core.js`; multi-delete in `bin.js` doesn't yet), and code run on every queue change uses `writes.attention()` / `conflicted()` / `status()` rather than `writes.entries()` (a deep copy of every entry).
 
 Case and reflection drafts use separate document slots, including when session storage is cloned into a duplicated tab. Case input writes synchronously and flushes on pagehide/hidden; draft status reports storage failures. Recovering a draft preserves the currently open draft in its previous slot.
 
@@ -814,3 +1007,19 @@ Run `logbook/test/e2e/usability.mjs` beside recovery and the full E2E suite. Bot
 The first tap selects a tag in List or Pills and opens a small read-only details card. Edit is explicit; Add after uses the selection as an insertion anchor. Close / Escape / browser Back dismiss the card and retain selection. New tags and section headers offer separate Sits under and Place after controls, a searchable sibling list, Beginning / End and a placement preview. Insertion preserves child subtrees and existing APMES parent restrictions. Changing parent resets placement to its end. A changed layout or account refuses a stale dialog save. Selection clears with the account caches.
 
 Notes v1 followed in its own PR (Claude, after the handover): see **Notes** under "Where things are".
+
+- **Drift check lesson (15 Oct 2026):** an edit or delete in a resident's account found by the drift check is the resident's own
+  work until they say otherwise (a resident's deliberate duplicate clean-up was first undone as "accidental"). Ask the owner to
+  ask the resident before restoring, and keep a before-snapshot of anything written back.
+
+Reliability-hour lessons (15 Oct 2026): a cloud container with 4 CPUs runs only 2 agents per workflow, so run one workflow per area
+side by side. In the multidevice harness, `SLOW=1` used to leave the page "offline" while Firestore's open connection still reached the
+server (fixed in #571): a failure that needs a state no real phone can be in is the harness's, so check that first. `writes.entries()`
+lists the newest job first. The conflict path's blind spots (a save after a conflict, an overlay frozen at the conflict) explained
+every remaining soak failure.
+
+Merging parallel fix branches (15 Oct 2026): after one is squash-merged, merging main into the next branch brings back the same
+conflicts; when that branch already holds the combined code, take its side (`git checkout --ours`), then check `git diff
+origin/main` shows only its own change. Never let emulator leftovers (`firebase-debug.log`, `firestore-debug.log`,
+`node_modules`) into a commit. GitHub's slow `browser` job can be run locally (`.github/workflows/checks.yml` lists the steps);
+`feedback/test/e2e.mjs` needs the real Worker and may time out from a cloud container.

@@ -38,6 +38,7 @@
   try { var t = localStorage.getItem('apmes-logbook-theme'); document.documentElement.dataset.theme = t === 'dark' || t === 'oled' ? 'dark' : t === 'auto' ? 'auto' : 'light'; if (t === 'oled') document.documentElement.dataset.oled = ''; } catch (e) {}
   // and its colour (Settings → Display → Colour; navy unless chosen): the palettes colors.js worked out last time
   try { var css = localStorage.getItem('apmes-logbook-accent-css'); if (css && css.length < 8000) { var st = document.createElement('style'); st.id = 'accent-css'; st.textContent = css; document.head.appendChild(st); } } catch (e) {}
+  try { var lc = localStorage.getItem('apmes-logbook-look-css'); if (lc && lc.length < 8000) { var ls = document.createElement('style'); ls.id = 'look-css'; ls.textContent = lc; document.head.appendChild(ls); } } catch (e) {}
 </script>
 <link rel="stylesheet" href="style.css">
 <!-- fetch the Case tab's modules at once instead of one import at a time (the other pages load on first use, app.js);

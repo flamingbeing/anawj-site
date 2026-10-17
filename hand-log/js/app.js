@@ -264,7 +264,7 @@ function renderEntry(id) {
   dl.replaceChildren(...rows.flatMap(([k, v]) => [el('dt', { textContent: k }), el('dd', { textContent: v || '—' })]));
   let again = $('log-again');
   if (!again) {
-    again = el('button', { type: 'button', id: 'log-again', class: 'btn', textContent: 'Log another like this' });
+    again = el('button', { type: 'button', id: 'log-again', class: 'btn a-btn a-btn--block', textContent: 'Log another like this' });
     $('export-one').before(again);
     again.addEventListener('click', () => {
       if (!current) return;
@@ -288,8 +288,9 @@ function renderSummary() {
     const t = TYPE_LABEL[e.type] || e.type; byType[t] = (byType[t] || 0) + 1;
     const k = `${t}: ${itemName(e)}`; byItem[k] = (byItem[k] || 0) + 1;
   }
-  const li = (obj) => Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([k, n]) => el('li', { textContent: `${k} — ${n}` }));
-  $('sum-type').replaceChildren(...(list.length ? li(byType) : [el('li', { textContent: 'No entries yet.' })]));
+  const li = (obj) => Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([k, n]) => el('li', { class: 'a-row' },
+    el('span', { class: 'a-row-text', textContent: k }), el('span', { class: 'a-row-value', textContent: String(n) })));
+  $('sum-type').replaceChildren(...(list.length ? li(byType) : [el('li', { class: 'a-row a-muted', textContent: 'No entries yet.' })]));
   $('sum-item').replaceChildren(...li(byItem));
 }
 
@@ -327,6 +328,7 @@ $('import-json').addEventListener('change', async (ev) => {
 });
 
 // ---------- routing ----------
+let shown = null, routes = 0;   // the view on screen; a count so a slower screen change never overrides a newer one
 function route() {
   const h = location.hash || '#list';
   let view = 'list';
@@ -334,15 +336,60 @@ function route() {
   else if (h.startsWith('#entry/')) { view = 'entry'; renderEntry(decodeURIComponent(h.slice(7))); }
   else if (h === '#summary') { view = 'summary'; renderSummary(); }
   else renderList();
-  for (const s of document.querySelectorAll('.view')) s.hidden = s.id !== 'view-' + view;
-  for (const a of document.querySelectorAll('.bar nav a')) {
-    const on = a.getAttribute('href') === (view === 'entry' ? '#list' : h);
-    a.classList.toggle('on', on);
-    if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
-  }
-  window.scrollTo(0, 0);
+  const n = ++routes;
+  const show = () => {
+    if (n !== routes) return;
+    for (const s of document.querySelectorAll('.view')) {
+      s.hidden = s.id !== 'view-' + view;
+      const t = s.querySelector('.a-title');
+      if (t) t.hidden = s.hidden;   // the app bar's small title follows the large title on screen (app kit)
+      if (t && !s.hidden) $('bar-title').textContent = t.textContent;
+    }
+    for (const a of document.querySelectorAll('.a-tabbar a')) {
+      const on = a.getAttribute('href') === (view === 'entry' ? '#list' : h);
+      a.classList.toggle('on', on);
+      if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    }
+    window.scrollTo(0, 0);
+    // a new screen starts with its large title, so the bar's small title goes at once instead of fading out
+    const bar = document.querySelector('.a-bar');
+    if (bar) {
+      bar.classList.add('no-fade'); bar.classList.remove('is-scrolled');
+      requestAnimationFrame(() => requestAnimationFrame(() => bar.classList.remove('no-fade')));
+    }
+    window.aRefreshBar?.();
+  };
+  // opening an entry slides in and going back slides out, like a native app (app kit aGo); other changes are instant
+  const from = shown; shown = view;
+  if (window.aGo && from && from !== view && (from === 'entry' || view === 'entry')) window.aGo(show, { back: from === 'entry' });
+  else show();
 }
 window.addEventListener('hashchange', route);
 route();
 
 try { if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {}); } catch { /* no SW */ }
+
+// App version and "Get the latest version" (AGENTS.md): the version is the name of the service worker's saved copy;
+// the button checks there is signal, then removes only this app's worker and copy and reloads (saved data stays)
+function appVersion(prefix) {
+  const line = document.getElementById('appver'), btn = document.getElementById('getlatest'), msg = document.getElementById('getlatest-msg');
+  if (!line || !btn) return;
+  if (window.caches) caches.keys().then(ks => {
+    const k = ks.find(x => x.startsWith(prefix)); if (!k) return;
+    const v = k.slice(prefix.length), d = /^(\d{4}-\d{2}-\d{2})-([0-9a-f]+)$/.exec(v);
+    line.textContent = 'App version ' + (d ? `${d[1]} (${d[2]})` : v); line.hidden = false;
+  }).catch(() => {});
+  btn.onclick = async () => {
+    btn.disabled = true; msg.textContent = '';
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      const url = new URL(reg?.active?.scriptURL || 'sw.js', location.href);
+      url.searchParams.set('fresh', Date.now());
+      if (!(await fetch(url, { cache: 'no-store' })).ok) throw new Error('offline');
+      await reg?.unregister();
+      if (window.caches) for (const k of await caches.keys()) if (k.startsWith(prefix)) await caches.delete(k);
+      location.reload();
+    } catch { msg.textContent = 'No signal: nothing was changed. Try again with signal.'; btn.disabled = false; }
+  };
+}
+appVersion('hand-log-');

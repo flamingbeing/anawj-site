@@ -5,14 +5,13 @@
 
 import { S, h, toast, fill, cloud, okNoIds, confirmBox, emptyState, hooks } from './ui-core.js';
 import { copyText } from './share.js';
+import { appVersion } from './app-version.js';
 import { feedbackRecord, sendProblem, taskText, byNewestFeedback, screenOf, TEXT_MAX, DOING_MAX } from './feedback.js';
 
-// the service worker's cache name is the app version ('logbook-v41-3f9a2c1d', stamped at deploy)
-async function appVersion() {
-  try { return (await caches.keys()).filter(k => k.startsWith('logbook-')).sort().pop() || 'no-sw'; } catch { return 'no-sw'; }
-}
 
 let sentNote = false;   // after a send, the page says so until it is left
+let draft = '';   // text to start the box with (Themes → Suggest a theme), used once
+export const setFeedbackDraft = t => { draft = String(t || ''); sentNote = false; };
 const rerender = () => hooks.render();
 
 export function renderFeedbackSend() {
@@ -23,7 +22,8 @@ export function renderFeedbackSend() {
       h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: () => { sentNote = false; rerender(); } }, 'Send more feedback'))));
   }
   const text = h('textarea', { id: 'fb-text', rows: '6', maxlength: String(TEXT_MAX), 'aria-describedby': 'fb-count' });
-  const count = h('span', { id: 'fb-count', class: 'hint' }, `0 / ${TEXT_MAX}`);
+  if (draft) { text.value = draft; draft = ''; }
+  const count = h('span', { id: 'fb-count', class: 'hint' }, `${text.value.length} / ${TEXT_MAX}`);
   const doing = h('input', { id: 'fb-doing', type: 'text', maxlength: String(DOING_MAX), autocomplete: 'off' });
   const tick = h('input', { id: 'fb-tick', type: 'checkbox' });
   const note = h('p', { class: 'hint fb-problem', role: 'alert', hidden: true });

@@ -181,7 +181,7 @@ function residentsCard() {
   const card = h('section', { class: 'card' },
     h('div', { class: 'bar' }, h('h2', { style: 'margin:0' }, 'Residents'), h('span', { class: 'grow' }),
       A.residents ? h('button', { class: A.editRes ? 'small primary' : 'small', onclick: () => { A.editRes = !A.editRes; if (!A.editRes) A.pasted = null; hooks.render(); } }, A.editRes ? 'Done' : 'Edit') : null),
-    h('p', { class: 'hint' }, 'Programme residents share their case counts on Totals (Analytics → Compare with your intake). Years move up every 1 July from the intake. Tap Edit to change one (leave, repeats; it keeps moving up from there) or to mark someone as an SMO, which stays put: cases done as an SMO count as R3 in the portfolio. Attrited residents are left off Totals (their logbook is kept); set them back to Active to show them again.'));
+    h('p', { class: 'hint' }, 'Programme residents share their case counts on the Totals tab. Years move up every 1 July from the intake. Tap Edit to change one (leave, repeats; it keeps moving up from there) or to mark someone as an SMO, which stays put: cases done as an SMO count as R3 in the portfolio. Attrited residents are left off Totals (their logbook is kept); set them back to Active to show them again.'));
   if (!A.residents) { add(card, h('p', { class: 'empty' }, 'Loading…')); return card; }
   const ed = A.editRes;
   // apply a change and save it; a refused save puts the old values back
@@ -351,7 +351,7 @@ function importCard() {
           h('td', {}, g.rid || '—'),
           h('td', {}, r ? r.name : g.label),
           h('td', {}, r && r.email ? r.email : h('span', { class: 'flag err' }, 'no email — add to residents first')),
-          h('td', { class: 'num' }, String(g.cases.length)),
+          h('td', { class: 'num' }, String(g.cases.length), g.app && g.app.length ? h('span', { class: 'muted', title: 'Rows made in the app: already in the logbook, not imported, but counted in the check' }, ` + ${g.app.length} in the app`) : null),
           h('td', {}, g.check.checked ? (g.check.ok ? h('span', { class: 'flag', style: 'background:var(--ok-bg);color:var(--ok)' }, '✓ matches') :
             h('span', { class: 'flag err', title: g.check.diffs.map(d => `${d.code}: expected ${d.expected}, got ${d.got}`).join('\n') }, `${g.check.diffs.length} differ`)) : h('span', { class: 'muted' }, 'no totals')));
       })))),
@@ -381,10 +381,15 @@ async function readWorkbook(file) {
       if (!groups.has(k)) groups.set(k, { rid: c.rid, label: c.residentLabel, cases: [] });
       groups.get(k).cases.push(c);
     }
+    // rows the sheet script added for cases logged in the app: not imported (already in the logbook), but the Totals tabs
+    // count them, so the check does too
+    const appByRid = new Map();
+    for (const a of parsed.appRows || []) if (a.rid) appByRid.set(a.rid, [...(appByRid.get(a.rid) || []), a]);
     const list = [...groups.values()].sort((a, b) => String(a.rid).localeCompare(String(b.rid)));
     for (const g of list) {
       const t = g.rid && totals[g.rid] ? { [g.rid]: totals[g.rid] } : null;
-      g.check = t ? { checked: true, ...countCheck(g.cases, t) } : { checked: false, ok: false, diffs: [] };
+      g.app = (g.rid && appByRid.get(g.rid)) || [];
+      g.check = t ? { checked: true, ...countCheck([...g.cases, ...g.app], t) } : { checked: false, ok: false, diffs: [] };
     }
     A.imp = { groups: list, total: parsed.cases.length, skipped: parsed.skipped.length, warnings: parsed.warnings.length, warningList: parsed.warnings };
   } catch (err) { toast('Could not read the workbook: ' + err.message); }
@@ -411,8 +416,10 @@ async function runImport() {
     try {
       // responses the Google Form inbox already brought into this logbook aren't imported again (form-inbox.js)
       const { withoutFormCases } = await import('./form-inbox.js');
-      const { rows, dropped } = withoutFormCases(cases, await cloud.listCases(r.email));
-      const res = await cloud.importCases(r.email, g.rid, rows, n => { A.prog = (done + Math.min(n, cases.length)) / total; paintProgress(); });
+      const before = await cloud.listCases(r.email);
+      const { rows, dropped } = withoutFormCases(cases, before);
+      // a case already in the logbook is never overwritten (the resident may have edited it since)
+      const res = await cloud.importCases(r.email, g.rid, rows, n => { A.prog = (done + Math.min(n, cases.length)) / total; paintProgress(); }, { have: before.map(c => c.id) });
       if (dropped) res.skipped += dropped;
       // counts for the Totals tab, from everything in the logbook (cases logged in the app included)
       const all = await cloud.listCases(r.email);

@@ -1,87 +1,115 @@
-/* Hand assessment: one long page, readable on a phone, prints cleanly. */
+/* Hand assessment: one long page, readable on a phone, prints cleanly. The NUHS app kit (../nuhsdesign/app.css)
+   gives the app look; this file adds the reading styles. */
 :root {
-  --ink: var(--n-ink, #333); --navy: var(--n-navy, #002f6c); --muted: #5d636b; --line: #d9d9d9;
-  --red: #b3001f; --red-bg: #fff0f1; --blue-bg: #eaf3fb; --green: #146c2e; --green-bg: #ecf7ef; --amber-bg: #fff6e0;
+  --red: #b3001f; --amber: #8a5a00; --green: #146c2e;
+  --card-2: #f6f6f9;   /* a block inside a white section */
+  scroll-padding-top: calc(var(--a-safe-t) + var(--a-band) + var(--a-bar-h) + 56px);
 }
-* { box-sizing: border-box; }
-html { scroll-padding-top: 92px; -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: #fff; color: var(--ink); font: 400 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-main { max-width: 860px; margin: 0 auto; padding: 0 16px 48px; }
 
-.bar { position: sticky; top: 0; z-index: 10; background: var(--navy); color: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
-.bar .title { max-width: 860px; margin: 0 auto; padding: 8px 16px 2px; font-size: 1rem; }
-.bar .title span { opacity: .8; font-size: .85rem; }
-.bar nav { max-width: 860px; margin: 0 auto; display: flex; gap: 6px; overflow-x: auto; padding: 6px 16px 8px; scrollbar-width: none; }
-.bar nav::-webkit-scrollbar { display: none; }
-.bar nav a { flex: none; color: #fff; text-decoration: none; font-size: .9rem; font-weight: 600; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.14); }
-.bar nav a:hover, .bar nav a.on { background: #fff; color: var(--navy); }
-.bar :focus-visible { outline: 3px solid #00a9e0; outline-offset: 2px; }
-:focus-visible { outline: 3px solid var(--navy); outline-offset: 2px; }
+/* section chips under the bar; app.js marks the one in view with .on */
+.sec-nav { max-width: 720px; margin: 0 auto; padding: 0 var(--a-gutter) 10px; scroll-padding-inline: var(--a-gutter); }
+.sec-nav .a-chip { display: inline-flex; align-items: center; min-height: 36px; color: var(--a-ink); text-decoration: none !important; }
+.sec-nav .a-chip.on { background: var(--a-tint); color: var(--a-tint-ink); box-shadow: none; }
 
-
-section { padding-top: 20px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
-h2 { color: var(--navy); font-size: 1.5rem; margin: 8px 0 8px; line-height: 1.2; }
-h3 { color: var(--navy); font-size: 1.15rem; margin: 22px 0 6px; }
-h4 { font-size: 1rem; margin: 10px 0 4px; }
+/* each section reads as a white rounded card on the grey background */
+main > section {
+  margin: 16px 0 0; padding: 18px 16px 10px; border-radius: var(--a-r); background: var(--a-surface);
+  font-size: 16px; line-height: 1.5; letter-spacing: 0;
+}
+h2 { font-size: 26px; font-weight: 700; line-height: 1.15; margin: 0 0 10px; }
+h3 { font-size: 19px; font-weight: 650; line-height: 1.25; margin: 24px 0 6px; letter-spacing: -.01em; }
+h4 { font-size: 16px; font-weight: 650; margin: 12px 0 4px; letter-spacing: 0; }
 h4.red { color: var(--red); }
 p { margin: 6px 0 10px; }
 ul, ol { margin: 4px 0 10px; padding-left: 22px; }
-li { margin: 3px 0; }
-a { color: #1a5fa0; }
-.lead { font-size: 1.02rem; }
-.small { font-size: .88rem; color: var(--muted); }
+li { margin: 4px 0; }
+.lead { font-size: 17px; color: var(--a-ink-2); }
+.small { font-size: var(--a-text-sm); color: var(--a-ink-2); }
+/* links inside the text stay underlined so they don't rely on colour alone */
+main > section a { text-decoration: underline; text-underline-offset: 2px; }
 
-ol.flow li { margin: 5px 0; }
-
-.callout { padding: 10px 12px; border-radius: 4px; margin: 12px 0; border-left: 4px solid; }
-.callout.tip { background: var(--blue-bg); border-color: #1a5fa0; }
-.callout.warn { background: var(--amber-bg); border-color: #c77700; }
-.callout.must { background: var(--green-bg); border-color: var(--green); font-size: 1.05rem; }
+.callout { padding: 12px 14px; border-radius: var(--a-r); margin: 12px 0; }
+.callout.tip { background: var(--a-tint-soft); }
+.callout.warn { background: var(--a-warn-bg); }
+.callout.must { background: var(--a-ok-bg); font-size: 17px; }
 .callout ol { margin-bottom: 0; }
-.miss { background: var(--amber-bg); padding: 8px 10px; border-radius: 4px; font-size: .95rem; }
-.example { background: #f5f5f5; border-left: 4px solid var(--green); padding: 8px 12px; border-radius: 4px; font-size: .95rem; }
-.example.bad { border-color: var(--red); background: var(--red-bg); }
+.miss { background: var(--a-warn-bg); padding: 10px 12px; border-radius: 10px; font-size: 15px; }
+.example { background: var(--card-2); border-left: 3px solid var(--green); padding: 10px 12px; border-radius: 10px; font-size: 15px; }
+.example.bad { border-color: var(--red); background: var(--a-danger-bg); }
 
-details.pic { border: 1px solid var(--line); border-radius: 6px; margin: 8px 0; background: #fff; }
-details.pic > summary { cursor: pointer; padding: 12px; font-weight: 700; font-size: 1.05rem; color: var(--navy); list-style: none; display: flex; align-items: center; gap: 10px; }
+/* "By case": scenarios are rows in the section's group; tap one to open it (chevron turns down) */
+details.pic { margin: 0 -16px; border-top: .5px solid var(--a-sep); }
+#picture > .lead { margin-bottom: 12px; }
+details.pic:last-child { margin-bottom: -10px; }
+details.pic > summary {
+  display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 12px 16px; cursor: pointer;
+  font-size: 17px; font-weight: 600; line-height: 1.3; color: var(--a-ink); list-style: none;
+  -webkit-user-select: none; user-select: none; touch-action: manipulation; transition: background .25s;
+}
 details.pic > summary::-webkit-details-marker { display: none; }
-details.pic > summary::after { content: "+"; margin-left: auto; font-size: 1.4rem; line-height: 1; }
-details.pic[open] > summary::after { content: "−"; }
-details.pic[open] > summary { border-bottom: 1px solid var(--line); background: var(--blue-bg); }
-details.pic > .cols { padding: 4px 12px 8px; }
+details.pic > summary:active { background: var(--a-surface-2); transition: none; }
+details.pic > summary::after {
+  content: ""; flex: none; margin-left: auto; width: 8px; height: 8px; border: solid var(--a-ink-3);
+  border-width: 2px 2px 0 0; transform: rotate(45deg); opacity: .8; transition: transform .2s var(--a-ease);
+}
+details.pic[open] > summary::after { transform: rotate(135deg); }
+details.pic[open] > summary { color: var(--a-tint); }
+details.pic > .cols { padding: 0 16px 12px; }
 ul.cross { list-style: none; padding-left: 0; }
 ul.cross li::before { content: "✗ "; color: var(--red); font-weight: 700; }
 ul.checklist li { margin: 6px 0; }
 
 .cols { display: grid; gap: 4px 20px; }
 @media (min-width: 700px) { .cols { grid-template-columns: 1fr 1fr; } }
-.card { border: 1px solid var(--line); border-radius: 6px; padding: 4px 12px 8px; margin: 10px 0; }
-.kanavel { border: 2px solid var(--red); background: var(--red-bg); }
+.card { border-radius: var(--a-r); padding: 6px 14px 10px; margin: 10px 0; background: var(--card-2); min-width: 0; }
+.kanavel { background: var(--a-danger-bg); box-shadow: inset 0 0 0 1.5px var(--red); }
 .kanavel h3 { margin-top: 8px; color: var(--red); }
 
-table.t { width: 100%; border-collapse: collapse; margin: 10px 0 14px; font-size: .93rem; }
+table.t { width: 100%; border-collapse: collapse; margin: 10px 0 14px; font-size: 15px; }
 table.t caption { text-align: left; font-weight: 700; padding-bottom: 4px; }
-table.t th { background: var(--navy); color: #fff; text-align: left; padding: 6px 8px; }
-table.t td { border-bottom: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
-table.t tr:nth-child(even) td { background: #fafafa; }
+table.t th {
+  text-align: left; padding: 6px 8px; color: var(--a-ink-2); font-size: var(--a-text-xs); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .02em; border-bottom: .5px solid var(--a-sep);
+}
+table.t td { border-bottom: .5px solid var(--a-sep); padding: 8px; vertical-align: top; }
+table.t tr:last-child td { border-bottom: 0; }
 
+/* figures: picture, then Play/Pause and Share GIF as plain tint buttons */
 .fig { margin: 10px auto 12px; text-align: center; position: relative; max-width: 560px; }
-.fig-art { cursor: pointer; }
+.fig-art { cursor: pointer; border-radius: 10px; overflow: hidden; }
 .fig-art > svg { display: block; width: 100%; height: auto; }
-.fig-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
-.fig-btn { font: 600 .78rem/1 system-ui, sans-serif; color: var(--navy); background: #fff; border: 1px solid #b9c3d0; border-radius: 999px; padding: 6px 10px; cursor: pointer; opacity: .9; }
-.fig-btn:hover { background: var(--blue-bg); }
-.fig-gif { font-size: .8rem; padding: 6px 0; }
+.fig-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
+.fig-btn, .fig-gif {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; border: 0; background: none;
+  color: var(--a-tint); font-size: var(--a-text-sm); font-weight: 500; cursor: pointer; text-decoration: none !important;
+}
+.fig-btn:active, .fig-gif:active { opacity: .45; }
 .fig svg text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+.fig3d { display: block; width: 100%; height: auto; touch-action: pan-y; cursor: grab; background: #fff; }
 
-
-
-footer { padding: 16px 0; color: var(--muted); font-size: .85rem; }
+/* footer: note, edit link, then the two small muted lines (app version, get the latest version) */
+footer { padding: 8px 0 16px; }
+footer > .a-footnote:first-child { margin: 18px 16px 12px; }
+footer .edit-link .a-row { color: var(--a-tint); }
+footer > p#appver, footer > p:last-child { margin: 0 16px; color: var(--a-ink-2); font-size: var(--a-text-xs); line-height: 1.4; }
+footer > p#appver { margin-top: 18px; }
+footer .linkbtn {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none;
+  color: inherit; font: inherit; text-decoration: underline; cursor: pointer;
+}
 
 @media print {
-  .bar, .fig-bar { display: none; }
+  .a-bar, .fig-bar { display: none; }
+  .a-app, html { background: #fff; }
+  main > section { padding: 0; margin-top: 16px; }
   details.pic { break-inside: avoid; }
   details > *:not(summary) { display: block; }
   section { break-inside: auto; }
 }
-.fig3d { display: block; width: 100%; height: auto; touch-action: pan-y; cursor: grab; background: #fff; }
+
+/* computers: the section chips line up with the kit's wider content column; rows react to the mouse */
+@media (min-width: 1000px) { .sec-nav { max-width: 880px; padding-left: 32px; padding-right: 32px; scroll-padding-inline: 32px; } }
+@media (hover: hover) and (pointer: fine) {
+  details.pic > summary:hover { background: var(--a-surface-2); }
+  .fig-btn:hover, .fig-gif:hover { text-decoration: underline !important; }
+}

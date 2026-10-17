@@ -68,11 +68,13 @@ export function parseAge(text) {
 }
 
 // "BMI 42", "bmi42", "BMI: 41.5", "BMI of 40" -> number | null
-export function parseBMI(text) {
+export function parseBMI(text) { const m = bmiAt(text); return m ? m.value : null; }
+// where it is in the text, for the case box's highlight: { from, to, value } | null
+export function bmiAt(text) {
   const m = String(text || '').match(/\bbmi\s*(?:of|is|was|[:=~-])?\s*(\d{2}(?:\.\d+)?)(?![\d/])/i);
   if (!m) return null;
   const v = parseFloat(m[1]);
-  return v >= 10 && v <= 100 ? v : null;
+  return v >= 10 && v <= 100 ? { from: m.index, to: m.index + m[0].length, value: v } : null;
 }
 
 // Same tokenisation as tools/build_logbook_keywords.py: drop leading patient initials, lowercase,
@@ -110,9 +112,8 @@ const SECOND = 0.35;
 // a keyword chip reaches 0.5 only when ~57% of such chips were ticked in the old log.
 const TILT = 1.25;
 // Ages and BMI are facts, so their rules beat keywords.
-// In the old log only about half of 13-16 year olds were logged as paeds (and 1 in 3 of 17s),
-// so a teen gets a weak '20' chip that the bulk paste (score >= 0.5) won't auto-tick.
-const AGE_SCORE = { '20': 0.95, band: 0.9, '21': 0.9, teen: 0.45 };
+// An age of 16 or under is Paeds (EPA 9: to 16 years; owner, 15 Oct 2026); over 16 is not.
+const AGE_SCORE = { '20': 0.95, band: 0.9, '21': 0.9 };
 const BMI_SCORE = 0.9;
 // A shorthand word you (or the built-in list) linked to a tag: a strong chip.
 const SHORTHAND_SCORE = 0.8;
@@ -175,13 +176,14 @@ export function suggest(text, { limit = 6, keywords = KEYWORDS, calibration = CA
       // an age says which band it is, so keyword guesses at the other bands step aside
       for (const b of ['20i', '20ii', '20iii']) if (out.get(b)?.why === 'keyword') out.delete(b);
     } else if (y <= 16) {
-      put('20', AGE_SCORE.teen, 'age');
-      for (const b of ['20i', '20ii', '20iii']) if (out.get(b)?.why === 'keyword') out.delete(b);
-      if (out.get('20')?.why === 'keyword') out.get('20').score = Math.min(out.get('20').score, AGE_SCORE.teen);
+      // EPA 9 counts paediatric cases to 16 years (owner, 15 Oct 2026): a 13 to 16 year old is Paeds, no band
+      put('20', AGE_SCORE['20'], 'age');
+      for (const b of ['20i', '20ii', '20iii']) if (out.get(b)?.why !== 'age') out.delete(b);
       if (out.get('21')?.why === 'keyword') out.delete('21');
     } else {
-      // a known adult is not paediatric and not geriatric before 65
-      for (const b of ['20', '20i', '20ii', '20iii']) if (out.get(b)?.why === 'keyword') out.delete(b);
+      // a known adult is not paediatric (whatever suggested it: a keyword or a shorthand word such as
+      // "circumcision", which ticked Paeds on an 18/M; 15 Oct 2026) and not geriatric before 65
+      for (const b of ['20', '20i', '20ii', '20iii']) out.delete(b);
       if (y < 65 && out.get('21')?.why === 'keyword') out.delete('21');
     }
   }

@@ -336,6 +336,8 @@ function download(name, blob) {
 // ---------- render ----------
 
 const app = document.getElementById('app');
+// banners (Practice, update, moved, backup, storage) sit under the app bar, above the screen
+const barHost = () => document.getElementById('bars') || document.body;
 // Fields in table cells have no visible label of their own: name each from its column heading and row,
 // so a screen reader says "Session, MOR 4" rather than "combo box".
 function labelTableFields(root) {
@@ -355,6 +357,7 @@ function labelTableFields(root) {
     if (f && /^(INPUT|SELECT|TEXTAREA)$/.test(f.tagName) && !f.labels?.length && !f.getAttribute('aria-label') && !l.contains(f)) f.setAttribute('aria-label', l.textContent.trim().slice(0, 80));
   }
 }
+const SCREEN_TITLES = { monthly: 'Monthly', cases: 'Cases', roster: 'Roster', premed: 'Premeds', staff: 'Staff', settings: 'Settings', myday: 'My day' };
 function render() {
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === state.tab)));
   const y = window.scrollY;
@@ -372,6 +375,8 @@ function render() {
     const key = JSON.stringify([state.roster.rows, state.day, state.staff, state.settings, state.rotations]);
     if (key !== checkKey || !state.roster.checks) { checkKey = key; state.roster.checks = check({ rows: state.roster.rows, staff: dayStaff(), day: state.day, settings: state.settings }); }
   }
+  const title = document.getElementById('screen-title'); // the large title on phones
+  if (title) { title.textContent = SCREEN_TITLES[state.tab] || ''; title.hidden = !title.textContent; }
   app.replaceChildren(({ monthly: renderMonthly, roster: renderRoster, premed: renderPremed, cases: () => renderDay('cases'), staff: renderStaffTab, settings: renderSettings, myday: renderMyDay })[state.tab]());
   renderCloudBar();
   renderDateBar();
@@ -413,7 +418,7 @@ function renderMovedBar() {
   const to = window.ROSTER_MOVED_TO;
   if (!to || document.getElementById('moved-bar')) return;
   const go = () => { try { localStorage.setItem('nuh-roster-moved', '1'); } catch { /* no storage */ } location.replace(to); };
-  document.body.prepend(h('div', { id: 'moved-bar', class: 'demo-bar moved-bar' },
+  barHost().prepend(h('div', { id: 'moved-bar', class: 'demo-bar moved-bar' },
     h('b', {}, 'The roster has moved'), h('span', {}, ' to nuhroster.anawj.com. What this browser saved here stays at this old address: download it, then use Import JSON at the bottom of the new page.'),
     h('span', { class: 'grow' }),
     h('button', { class: 'small primary', onclick: downloadEverything }, 'Download everything'),
@@ -425,7 +430,7 @@ addEventListener('storage', e => {
   if (e.key !== KEY || clearedForGood || otherTab) return;
   otherTab = true; clearTimeout(saveTimer);
   document.getElementById('tab-bar')?.remove();
-  document.body.prepend(h('div', { id: 'tab-bar', class: 'demo-bar moved-bar', role: 'alert' },
+  barHost().prepend(h('div', { id: 'tab-bar', class: 'demo-bar moved-bar', role: 'alert' },
     h('b', {}, 'The roster was changed in another tab.'), h('span', {}, ' This tab has stopped saving so it doesn\'t undo that. Reload to carry on here with the latest, or close this tab.'),
     h('span', { class: 'grow' }), h('button', { class: 'small primary', onclick: () => location.reload() }, 'Reload')));
 });
@@ -440,7 +445,7 @@ function renderBackupBar() {
   if (!last) { try { localStorage.setItem(BACKUP_KEY, String(Date.now())); } catch { /* no storage */ } return; } // first week: quiet
   if (Date.now() - last < 7 * 864e5) return;
   const later = () => { try { localStorage.setItem(BACKUP_KEY, String(Date.now())); } catch { /* no storage */ } renderBackupBar(); };
-  document.body.prepend(h('div', { id: 'backup-bar', class: 'demo-bar' },
+  barHost().prepend(h('div', { id: 'backup-bar', class: 'demo-bar' },
     h('b', {}, 'A backup?'), h('span', {}, ' The roster is kept only in this browser. Download everything once a week, or sign in to save it for the team.'),
     h('span', { class: 'grow' }),
     h('button', { class: 'small primary', onclick: () => { downloadEverything(); renderBackupBar(); } }, 'Download everything'),
@@ -467,7 +472,7 @@ function renderStoreBar() {
       h('button', { class: 'small primary', onclick: copy }, 'Download the damaged data'),
       h('button', { class: 'small', onclick: () => { storeProblem = null; renderStoreBar(); save(); } }, 'Hide'));
   }
-  document.body.prepend(bar);
+  barHost().prepend(bar);
 }
 // Stored dates more than n days before today (the open date is never in state.days).
 function oldDays(n) {
@@ -496,7 +501,7 @@ function renderDemoBar() {
     return;
   }
   if (document.getElementById('demo-bar')) return;
-  document.body.prepend(h('div', { id: 'demo-bar', class: 'demo-bar' },
+  barHost().prepend(h('div', { id: 'demo-bar', class: 'demo-bar' },
     h('b', {}, 'Practice'), h('span', { class: 'demo-text' }, ' · made-up staff and rosters, saved only in this browser. Try anything: nothing here touches the real roster.'),
     h('span', { class: 'grow' }),
     // on a phone the tools fold away, so the bar doesn't take a third of the screen
@@ -1492,12 +1497,14 @@ function redo() {
 const SHORTCUTS = [['Ctrl+Z', 'Undo'], ['Ctrl+Y or Ctrl+Shift+Z', 'Redo'], ['Ctrl+S', 'Save the roster for the team (or download it)'],
   ['Alt+1 … Alt+4', 'Monthly, Cases, Roster, Premeds'], ['[ and ]', 'Previous and next day'], ['/', 'Filter names'], ['Esc', 'Close a box, or cancel Move or swap'], ['?', 'This list']];
 const WHATS_NEW_KEY = 'nuh-roster-whats-new';
+// a bottom sheet on phones, a centred card on wide screens (the app kit's aSheet: drag down or tap outside to close)
+const openSheet = dlg => (window.aSheet ? window.aSheet.open(dlg) : dlg.showModal());
 function showWhatsNew() {
-  const dlg = h('dialog', { class: 'changes key' }, h('h2', {}, 'What\'s new'),
+  const dlg = h('dialog', { class: 'a-sheet changes key' }, h('h2', {}, 'What\'s new'),
     WHATS_NEW.map(([when, items]) => [h('h3', {}, when), h('ul', {}, items.map(t => h('li', {}, t)))]),
     h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: () => dlg.close() }, 'Close'), h('button', { onclick: () => { dlg.close(); showKey(); } }, 'Key and help')));
   dlg.addEventListener('close', () => dlg.remove());
-  document.body.append(dlg); dlg.showModal();
+  document.body.append(dlg); openSheet(dlg);
   try { localStorage.setItem(WHATS_NEW_KEY, WHATS_NEW[0][0]); } catch { /* no storage */ }
 }
 // once per device, for people who have used it before (not on a first visit, Practice or for the tour)
@@ -1511,7 +1518,7 @@ function maybeWhatsNew() {
   try { localStorage.setItem(WHATS_NEW_KEY, WHATS_NEW[0][0]); } catch { /* no storage */ }
 }
 function showKey() {
-  const dlg = h('dialog', { class: 'changes key' }, h('h2', {}, 'Key and help'),
+  const dlg = h('dialog', { class: 'a-sheet changes key' }, h('h2', {}, 'Key and help'),
     h('table', { class: 'key-table' }, h('tbody', {}, SYMBOLS.map(([k, what]) => h('tr', {}, h('th', { scope: 'row' }, k), h('td', {}, what))))),
     h('h3', {}, 'How do I…'),
     h('div', { class: 'how' }, HOW.map(([q, a]) => h('details', { ontoggle: e => { if (e.target.open) dlg.querySelectorAll('.how details[open]').forEach(d => { if (d !== e.target) d.open = false; }); } },
@@ -1520,14 +1527,14 @@ function showKey() {
       h('a', { class: 'btn', href: 'guide.html', target: '_blank', rel: 'noopener' }, 'One-page guide to print'),
       h('button', { onclick: () => { dlg.close(); showWhatsNew(); } }, 'What\'s new')));
   dlg.addEventListener('close', () => dlg.remove());
-  document.body.append(dlg); dlg.showModal();
+  document.body.append(dlg); openSheet(dlg);
 }
 function showShortcuts() {
-  const dlg = h('dialog', { class: 'changes' }, h('h2', {}, 'Keyboard shortcuts'),
+  const dlg = h('dialog', { class: 'a-sheet changes' }, h('h2', {}, 'Keyboard shortcuts'),
     h('table', {}, h('tbody', {}, SHORTCUTS.map(([k, what]) => h('tr', {}, h('td', {}, h('kbd', {}, k)), h('td', {}, what))))),
     h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: () => { dlg.close(); dlg.remove(); } }, 'Close')));
   dlg.addEventListener('close', () => dlg.remove()); // Esc too
-  document.body.append(dlg); dlg.showModal();
+  document.body.append(dlg); openSheet(dlg);
 }
 document.addEventListener('keydown', e => {
   if (e.target.closest?.('input, textarea, select, [contenteditable]') || document.querySelector('dialog[open]')) return;
@@ -3945,7 +3952,34 @@ function renderSettings() {
         h('button', { onclick: () => { if (confirm('Reset rules and subspecialties to the defaults? Staff are kept.')) { state.settings = clone(DEFAULT_SETTINGS); render(); } } }, 'Reset rules'),
         h('button', { onclick: () => { if (confirm('Delete everything stored in this browser (staff, day, roster)?')) { state = blankState(); syncRooms(); render(); } } }, 'Delete all data in this browser')),
     )),
+    appVersion(),
   );
+}
+
+// App version and "Get the latest version" (owner, 14 Oct 2026; prewarm's pattern): which saved copy this phone runs,
+// and a way out for a phone stuck on an old one. It only clears the app's own saved copy, never the roster data or sign-in.
+function appVersion() {
+  const ver = h('div', { id: 'appver' }), msg = h('span', { role: 'status' });
+  if (window.caches) caches.keys().then(ks => {
+    const k = ks.find(x => x.startsWith('nuh-roster-')); if (!k) return;
+    const v = k.slice('nuh-roster-'.length), d = /^(\d{4}-\d{2}-\d{2})-([0-9a-f]+)$/.exec(v);
+    ver.textContent = 'App version ' + (d ? `${d[1]} (${d[2]})` : v);
+  }).catch(() => {});
+  const getLatest = async btn => {
+    btn.disabled = true; msg.textContent = '';
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      const url = new URL(reg?.active?.scriptURL || new URL('sw.js', location.href));
+      url.searchParams.set('fresh', Date.now());
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      await reg?.unregister();
+      if (window.caches) for (const k of await caches.keys()) if (k.startsWith('nuh-roster-')) await caches.delete(k);
+      location.reload();
+    } catch { msg.textContent = 'No signal: nothing was changed. Try again with signal.'; btn.disabled = false; }
+  };
+  return h('div', { class: 'appver hint' }, ver,
+    h('div', {}, h('button', { type: 'button', class: 'link', onclick: e => getLatest(e.currentTarget) }, 'Not updating? Get the latest version'), ' ', msg));
 }
 
 // ---------- team file ----------
@@ -4373,7 +4407,7 @@ addEventListener('unhandledrejection', e => crashed(e.reason));
   navigator.serviceWorker.register('sw.js').then(reg => {
     const offer = w => {
       if (document.getElementById('update-bar')) return;
-      document.body.prepend(h('div', { id: 'update-bar', class: 'demo-bar', role: 'status' }, h('b', {}, 'Update available'), h('span', { class: 'grow' }),
+      barHost().prepend(h('div', { id: 'update-bar', class: 'demo-bar', role: 'status' }, h('b', {}, 'Update available'), h('span', { class: 'grow' }),
         h('button', { class: 'small primary', onclick: () => { document.getElementById('update-bar')?.remove(); wantReload = true; w.postMessage('skipWaiting'); } }, 'Reload')));
     };
     if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);

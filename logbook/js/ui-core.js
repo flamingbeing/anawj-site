@@ -2,7 +2,7 @@
 
 import { BY_CODE, CATEGORIES, DEFAULT_NAMES, yearName, appYear } from './categories.js';
 import { tagSetOf, tagTree, flatTree, userCatNames, tagName as tagNameIn, tagLinks as tagLinksIn } from './tags.js';
-import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicYear, splitInitials, cleanInitials, ID_RE } from './engine.js';
+import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicYear, splitInitials, cleanInitials, ID_RE, setDetection, detectionFrom } from './engine.js';
 import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
 import { writes } from './writes.js';
@@ -36,7 +36,14 @@ export const S = {
 // Set by app.js: re-render the current screen, or tell it the case list changed.
 export const hooks = { render() {}, casesChanged() {} };
 
-export const settings = () => ({ suggestions: true, rYear: 1, ...(S.logbook && S.logbook.settings) });
+// (the account's detection settings follow along into engine.js, which reads initials everywhere: the box, pastes,
+// spreadsheets; redone only when the settings object changes)
+let detectFor;
+export const settings = () => {
+  const st = S.logbook && S.logbook.settings;
+  if (st !== detectFor) { detectFor = st; setDetection(detectionFrom(st)); }
+  return { suggestions: true, rYear: 1, ...st };
+};
 // Profiles (settings.mode, the whole account; at the top of Settings → Profile). Each is a preset of switches
 // (profiles.js): picking one shows what it turns on and off, then sets them; any switch can be changed after, and the
 // profile then reads "Custom (based on …)". Basic is the default for everyone (owner, 12 Oct 2026): a simpler app, the
@@ -46,15 +53,15 @@ export const settings = () => ({ suggestions: true, rYear: 1, ...(S.logbook && S
 // written; no Reflect buttons or ☆ Interesting). Advanced hides nothing. Personal is for logging outside APMES: the
 // APMES parts (targets, Still needed, totals, portfolio, residency year, reflection headings) off, the extras on and
 // Notes on the tab bar. Faculty / PCs (faculty, PDs and admins, who include the programme coordinators; their
-// default, outside the demo): residents' case logs first (Case logs: counts per tag from the summaries, never case
-// details), then programme analytics, then More; their own Case, Logbook, Reflections and Notes tabs start in More.
+// default, outside the demo): Totals (counts per tag from the summaries, never case details), then More, with
+// residents' Case logs and programme analytics first in it; their own Case, Logbook, Reflections and Notes tabs start in More.
 export const PROFILES = [
   // simplest first: logbook only hides the most
   ['logbook', 'Basic: logbook only', 'Basic without reflections, if you submit your reflections separately. Reflections you already wrote stay in More.'],
   ['basic', 'Basic', 'A simpler app (the default): the same tabs and buttons without the extras. Analytics is in More.'],
   ['advanced', 'Advanced', 'Everything: quick picks, the Logbook grid, Analytics trends and forecasts, reflection figures and references.'],
   ['personal', 'Personal', 'For logging outside APMES: no targets, totals or portfolio; the Advanced extras, your own tags and Notes on the tab bar.'],
-  ['faculty', 'Faculty / PCs', 'For faculty, PDs and programme coordinators: residents’ case logs first, then programme analytics, then More.'],
+  ['faculty', 'Faculty / PCs', 'For faculty, PDs and programme coordinators: Programme totals first; residents’ case logs and programme analytics in More.'],
 ];
 // may use Faculty / PCs: admins (PCs), PDs and active faculty (the rules let them read the counts summaries)
 export const facultyRole = () => !!(S.admin || S.pd || S.faculty);
@@ -128,13 +135,19 @@ export function setCases(cases) {
   return true;
 }
 let rawCases = [];
-writes.configure({ backend: cloud.commitRecord, normalize: cloud.cleanWrite, getOwner: () => S.user?.email || null });
-writes.onChange(() => {
+writes.configure({ backend: cloud.commitRecord, normalize: cloud.cleanWrite, getOwner: () => S.user?.email || null, notice: msg => { toast(msg); toast.notice = { msg, at: Date.now() }; } });
+// a change to many cases (updateMany) holds these and repaints once a batch: one each time a save's state changed (three
+// a case) sorted, overlaid and counted the whole list again (300 cases: half a minute, 14 Oct 2026)
+let holding = 0, held = false;
+function queueChanged() {
   if (!S.user) return;
+  if (holding) { held = true; return; }
+  held = false;
   // a save's sync state changing (pending, accepted, done) seldom changes the list: repaint only when it does
   if (S.casesLoaded && setCases(rawCases)) hooks.casesChanged?.();
   hooks.writesChanged?.();
-});
+}
+writes.onChange(queueChanged);
 export const byNewest = (a, b) => (b.date || '0').localeCompare(a.date || '0') || (b.createdAt || 0) - (a.createdAt || 0);
 
 // ---------- tiny DOM helper (as in nuh-roster) ----------
@@ -184,6 +197,7 @@ const ICON_PATHS = {
   search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4',
   share: 'M12 3v12M8 7l4-4 4 4M5 11v9h14v-9',   // a box with an arrow out of it
   filter: 'M4 6h16M7 12h10M10 18h4',
+  trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6',   // a bin
 };
 const svgIcon = (k, cls) => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -221,6 +235,9 @@ export const emptyState = (icon, title, hint, action) => h('div', { class: 'empt
 export const UNDO_SECS = [[5, '5 seconds (default)'], [10, '10 seconds'], [20, '20 seconds'], [30, '30 seconds']];
 const undoMs = () => (UNDO_SECS.some(([n]) => n === Number(settings().undoSecs)) ? Number(settings().undoSecs) * 1000 : 4500);
 export function toast(msg, { action, onaction, ms } = {}) {
+  // the write queue's notice rides along with the toast the save itself shows next ('Case updated'), or it is lost
+  const n = toast.notice; toast.notice = null;
+  if (n && typeof msg === 'string' && msg !== n.msg && Date.now() - n.at < 3000) msg += ' · ' + n.msg;
   ms = action ? Math.max(ms || 0, undoMs()) : ms || 4500;
   const t = document.getElementById('toast');
   fill(t, h('span', {}, msg), action ? h('button', { onclick: () => { t.classList.remove('show'); onaction(); } }, action) : null);
@@ -449,17 +466,19 @@ export async function createCase({ id, createdAt, date, details, initials, cats,
 }
 
 // New app cases also go to the response sheet's outbox (sheet-outbox.js): programme residents only, never waited for
-// and never a reason for a save to fail.
-function toSheet(cases) {
+// and never a reason for a save to fail. Also used when a deleted case comes back with its id (bin.js): its entry went
+// with the delete. The rules refuse an entry that is still there (harmless), and the sheet script skips a case its
+// "app:<id>" marker shows is in the sheet already.
+export function toSheet(cases) {
   const who = outboxOn() && S.resident && S.logbook?.rid === S.resident.rid ? { email: mine(), rid: S.resident.rid } : null;
   const entries = who ? outboxEntries(cases, who) : [];
   if (entries.length) cloud.queueSheetRows(who.email, entries).catch(err => console.warn('Sheet outbox not queued', err));
 }
 const offSheet = ids => { if (outboxOn() && S.resident) cloud.dropSheetRows(mine(), ids).catch(() => {}); };
 
+const forSave = c => { const next = { ...c, cats: sortCodes(c.cats), updatedAt: Date.now() }; if (next.date) delete next.dateText; return next; };
 export async function updateCase(c, { base = S.cases.find(x => x.id === c.id) || null } = {}) {
-  const next = { ...c, cats: sortCodes(c.cats), updatedAt: Date.now() };
-  if (next.date) delete next.dateText;
+  const next = forSave(c);
   const owner = mine();
   const saved = await writes.save('case', owner, next, base);
   if (S.user?.email !== owner) throw new Error('Account changed; this save belongs to the previous account');
@@ -485,7 +504,65 @@ export async function restoreCase(c, base = S.cases.find(x => x.id === c.id) || 
   applyLocal(list => [saved, ...list.filter(x => x.id !== c.id)]);
 }
 
-// opts.sheet: cases made now by pasting (also queued for the response sheet); restores and edits are not
+// Restore from a backup: only the cases the server doesn't have (cloud.addMissing: one already there is never
+// replaced by the backup's older copy). -> the cases added
+export async function addMissingCases(cases) {
+  const owner = mine();
+  const added = await cloud.addMissing(owner, 'case', cases);
+  if (added.length && S.user?.email === owner) applyLocal(list => { const have = new Set(list.map(c => c.id)); return [...list, ...added.filter(c => !have.has(c.id))]; });
+  return added;
+}
+
+// Many logged cases changed at once (bulk tag, tag merge, a spreadsheet's changed rows): each through the write queue
+// with the version the change was made from, as a single edit is, so a case changed on another device meanwhile keeps
+// that version (both are in Recent changes); a blind batch overwrote it (audit, 14 Oct 2026). A case already stopped by
+// such a change is left alone (kept): a save queued behind that conflict never synced, and either choice in Recent
+// changes then set it aside. Ten at a time, each batch waiting (10 s at most) until its saves are done, so the count
+// says what happened, not only what save()'s 180 ms showed (on a slow connection a merge took the old tag off the list
+// while a case still had it), and no more than ten are in flight; past that (a connection that only looks online) the
+// rest go as offline saves do, counted as saved. One repaint a batch; it stops if the account changes.
+// pairs: [{ base, next }]; onprogress(done, of) before each batch of a long run (the dialog has closed by then)
+// -> { saved, kept (changed elsewhere), failed, error, stopped (signed out or switched) }
+const savingToast = (done, of) => toast(`Saving ${of} cases… ${done} done`, { ms: 60000 });
+export async function updateMany(pairs, { onprogress = savingToast } = {}) {
+  const owner = S.user?.email, out = { saved: 0, kept: 0, failed: 0, error: null }, gone = () => !owner || S.user?.email !== owner;
+  let patient = true;
+  holding++;
+  try {
+    for (let i = 0; i < pairs.length && !gone(); i += 10) {
+      if (pairs.length > 10) onprogress(i, pairs.length);
+      const batch = pairs.slice(i, i + 10).filter(p => writes.conflicted('case', String(p.next.id)) ? (out.kept++, false) : true);
+      const r = await Promise.allSettled(batch.map(p => writes.save('case', owner, forSave(p.next), p.base)));
+      if (patient) patient = await writes.settle('case', batch.map(p => String(p.next.id)), 10000);
+      if (gone()) break;
+      const saved = new Map();
+      batch.forEach((p, j) => {
+        const id = String(p.next.id);
+        if (writes.conflicted('case', id)) out.kept++;
+        else if (r[j].status === 'rejected' || writes.status('case', id) === 'failed') {
+          out.failed++;
+          out.error = out.error || r[j].reason || new Error(writes.entries().find(x => x.kind === 'case' && x.record.id === id)?.error || 'Could not save');
+        } else { out.saved++; saved.set(id, r[j].value); }
+      });
+      applyLocal(list => list.map(x => saved.get(String(x.id)) || x));
+      hooks.writesChanged?.();
+    }
+    return gone() ? { ...out, stopped: true } : out;
+  } finally { if (!--holding && held) queueChanged(); }
+}
+// its toast: what didn't save says so, with a way to Recent changes
+// again: what to do once the other version is kept ('tag them again'): "Restore my version" there would put this
+// device's older copy back over the other device's change
+export function updatedToast(text, r, again = '') {
+  if (!r.kept && !r.failed) return toast(text);
+  const not = [r.kept ? `${r.kept} kept as ${r.kept === 1 ? 'it was' : 'they were'} changed on another device${again ? ` (keep that version in Recover, then ${again})` : ''}` : '',
+    r.failed ? `${r.failed} not saved (${r.error?.message || 'error'})` : ''].filter(Boolean).join('; ');
+  toast(`${text}. ${not}`, { action: 'Recover', onaction: () => { location.hash = '#recovery'; }, ms: 12000 });
+}
+
+// New cases only (pasted lists, plans, a backup's missing cases): one blind batch, with no base to check against; a
+// change to a logged case goes through updateMany. opts.sheet: cases made now by pasting (also queued for the response
+// sheet); restores are not
 export async function saveMany(cases, { sheet = false } = {}) {
   applyLocal(list => {
     const byId = new Map(list.map(c => [c.id, c]));

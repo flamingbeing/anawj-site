@@ -11,26 +11,39 @@
 if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname))
   location.replace('https://hand.anawj.com/babies/' + location.pathname.replace(/^\/hand-babies\/?/, '') + location.search + location.hash);
 </script>
-<meta name="theme-color" content="#002f6c">
+<meta name="theme-color" content="#f9f9fb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Hand assessment</title>
 <meta name="description" content="Crash course for new hand surgery MOs: accurate sensation, 2-point discrimination, individual tendon testing, Kanavel's signs and photos for remote review.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23002f6c'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EH%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="../nuhsdesign/tokens.css">
+<link rel="stylesheet" href="../nuhsdesign/app.css">
 <link rel="stylesheet" href="style.css">
+<script src="../nuhsdesign/app.js" defer></script>
 </head>
-<body>
-<header class="bar">
-  <div class="title"><b>Hand assessment</b> <span>for new hand MOs</span></div>
-  <nav aria-label="Sections">
-    <a href="#picture">By case</a>
-    <a href="#sensation">Sensation</a>
-    <a href="#tendons">Tendons</a>
-    <a href="#infection">Infection</a>
-    <a href="#photos">Photos</a>
-    <a href="#call">Handover</a>
+<body class="a-app">
+<header class="a-bar bar">
+  <div class="a-band" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <div class="a-bar-row">
+    <span></span>
+    <span class="a-bar-title" aria-hidden="true">Hand assessment</span>
+    <span></span>
+  </div>
+  <nav class="a-chips sec-nav" aria-label="Sections">
+    <a class="a-chip" href="#picture">By case</a>
+    <a class="a-chip" href="#sensation">Sensation</a>
+    <a class="a-chip" href="#tendons">Tendons</a>
+    <a class="a-chip" href="#infection">Infection</a>
+    <a class="a-chip" href="#photos">Photos</a>
+    <a class="a-chip" href="#call">Handover</a>
   </nav>
 </header>
 
-<main>
+<main class="a-main">
+<h1 class="a-title">Hand assessment</h1>
+<div class="a-subtitle">for new hand MOs</div>
 
 <section id="picture">
   <h2>By case</h2>
@@ -330,8 +343,10 @@ if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname))
 </section>
 
 <footer>
-  <p>Teaching aid for new hand MOs. Follow your department's protocols and your senior. Works offline once opened.</p>
-  <p><a href="https://anawj.com/edit/?page=%2Fhand-babies%2F">Spotted something wrong? Suggest an edit</a></p>
+  <p class="a-footnote">Teaching aid for new hand MOs. Follow your department's protocols and your senior. Works offline once opened.</p>
+  <ul class="a-list edit-link"><li><a class="a-row" href="https://anawj.com/edit/?page=%2Fhand-babies%2F"><span class="a-row-text">Spotted something wrong? Suggest an edit</span><span class="a-chev" aria-hidden="true"></span></a></li></ul>
+  <p id="appver" hidden></p>
+  <p><button type="button" id="getlatest" class="linkbtn">Not updating? Get the latest version</button> <span id="getlatest-msg" role="status"></span></p>
 </footer>
 </main>
 <script src="app.js"></script>

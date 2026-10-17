@@ -3,12 +3,12 @@
 
 import { BY_CODE, TIPS } from './categories.js';
 import { withParents, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, humanAge, nth, weekLead } from './engine.js';
-import { suggest as suggestCodes } from './suggest.js';
+import { suggest as suggestCodes, bmiAt } from './suggest.js';
 import { apmesShorthand, shorthandTags } from './tags.js';
 import {
   S, h, ic, toast, debounce, modal, confirmBox, cat, catName, catShort, catFull, catChip, countText, logTags, tagLinks, tagName, tagChip, tagSet, keepTags, PROGRESS_BY_CODE,
   createCase, updateCase, removeCase, restoreCase, saveMany, deleteMany, subcatChips, subcatsOf, settings, todayISO, hooks, fill, add, cloud, writes, okNoIds, patchLogbook, catPills, basicHides, basicMode, caseShown, shows } from './ui-core.js';
-import { display } from './display.js';
+import { display, setDisplay } from './display.js';
 import { moveToBin } from './bin.js';
 import { caseHasNotes, openNotes, dayNoteBox, addNotes, notesRoom } from './ui-notepad.js';
 import { createDraftSlot, listDrafts } from './drafts.js';
@@ -39,8 +39,14 @@ const draftParts = (box = draft.details) => {
   const text = box.trim(), hint = draft.initialsHint;
   if (hint && text.slice(0, hint.length).toUpperCase() === hint && (!text.slice(hint.length) || /^\s/.test(text.slice(hint.length))))
     return { initials: hint, details: text.slice(hint.length).trim() };
-  return splitInitials(text);
+  settings();   // (brings the account's detection settings into engine.js first)
+  const p = splitInitials(text);
+  // tapped on the line under the box: these letters stay in the case text (Todoist-style undo; 15 Oct 2026)
+  return p.initials && draft.noIni === p.initials ? { initials: '', details: text } : p;
 };
+// the age read from the box, unless tapped off on the line under it
+const boxAge = details => { const { age } = settings().detectAgeSex !== false ? splitAge(details) : { age: '' }; return age && draft.noAge === age ? '' : age; };
+const ageOff = () => !!draft.noAge && splitAge(draftParts().details).age === draft.noAge;
 // Settings → Advanced logging → Separate initials box (device firstField 'initials'; an older 'date' counts as off)
 const firstField = () => (display().firstField === 'initials' ? 'initials' : 'details');
 // The Case tab opening the keyboard by itself (Logging → Advanced: "Open the keyboard when the Case tab opens"). On a
@@ -72,7 +78,7 @@ export const focusLog = () => {
   el?.focus({ preventScroll: true });
   if (el && document.activeElement === el) launchedAt = 0;
 };
-const suggestionKey = () => JSON.stringify([draftText(), curDate(), settings().detectAgeSex !== false]);
+const suggestionKey = () => JSON.stringify([draftText(), curDate(), settings().detectAgeSex !== false, draft.noIni || '', draft.noAge || '']);
 const draftKey = () => `${DRAFT_KEY}:${cloud.demo ? 'demo:' : ''}${(S.user && S.user.email) || ''}`;
 function loadDraft() {
   if (draftOwner === draftKey()) return;
@@ -236,6 +242,44 @@ function keepPlace(anchor, fn) {
 // On phones, focusing the details box pops the keyboard and scrolls back up: only do it with a mouse.
 // how tall the case box starts (Settings → Logging: 2 to 20 lines)
 const boxLines = () => Math.min(20, Math.max(2, Math.round(Number(settings().boxLines) || 3)));
+// The case box's height (owner, 15 Oct 2026; per device): a dragged height is kept (display().boxHeight, px), and
+// "Grow as I type" (on unless display().boxGrow is false) grows it from there up to two thirds of the screen
+const boxHeight = () => { const v = Math.round(Number(display().boxHeight)); return v >= 60 && v <= 2000 ? v : null; };
+const boxGrows = () => display().boxGrow !== false;
+function fitBox(ta) {
+  if (!ta || !ta.isConnected) return;
+  const base = boxHeight();
+  ta.style.height = base ? base + 'px' : '';
+  if (!boxGrows()) return;
+  const want = Math.min(Math.round(innerHeight * 0.66), ta.scrollHeight + 2);
+  if (want > ta.offsetHeight) ta.style.height = want + 'px';
+}
+// the grab bar under the box: drag (finger or mouse) to set the height; double-tap resets; ↑ ↓ on a keyboard.
+// The List box (paste a list) has its own (owner, 16 Oct 2026): its height is kept apart (display().listHeight)
+const listHeight = () => { const v = Math.round(Number(display().listHeight)); return v >= 60 && v <= 2000 ? v : null; };
+function boxGrab(ta, list = false) {
+  const set = px => { const v = Math.max(60, Math.min(Math.round(innerHeight * 0.85), Math.round(px))); ta.style.height = v + 'px'; grab.setAttribute('aria-valuenow', v); return v; };
+  const save = v => { if (list) setDisplay({ listHeight: v }); else { setDisplay({ boxHeight: v }); fitBox(ta); } };
+  const reset = () => { if (list) { setDisplay({ listHeight: null }); ta.style.height = ''; } else { setDisplay({ boxHeight: null }); fitBox(ta); } };
+  let lastTap = 0;
+  // a focusable separator is a slider to screen readers: it needs a value (the height in pixels)
+  const grab = h('div', { class: 'box-grab', role: 'separator', tabindex: '0', 'aria-orientation': 'horizontal', 'aria-label': `${list ? 'List box' : 'Case box'} height: drag to change, double-tap to reset`,
+    'aria-valuemin': '60', 'aria-valuemax': String(Math.round(innerHeight * 0.85)), 'aria-valuenow': String((list ? listHeight() : boxHeight()) || (list ? 180 : 96)),
+    onpointerdown: e => {
+      const now = Date.now();
+      if (now - lastTap < 350) { lastTap = 0; reset(); return; }
+      lastTap = now;
+      e.preventDefault();
+      const y0 = e.clientY, h0 = ta.offsetHeight;
+      grab.setPointerCapture?.(e.pointerId); grab.classList.add('dragging');
+      let v = h0;
+      const move = ev => { v = set(h0 + ev.clientY - y0); };
+      const up = () => { grab.classList.remove('dragging'); for (const [k, f] of [['pointermove', move], ['pointerup', up], ['pointercancel', up]]) grab.removeEventListener(k, f); if (v !== h0) save(v); };
+      grab.addEventListener('pointermove', move); grab.addEventListener('pointerup', up); grab.addEventListener('pointercancel', up);
+    },
+    onkeydown: e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); save(set(ta.offsetHeight + (e.key === 'ArrowDown' ? 24 : -24))); } } });
+  return grab;
+}
 // Paste: the clipboard into a box (filled when empty, else on a new line). Browsers that can't read
 // the clipboard (or a refused permission) get a hint to long-press and paste instead.
 async function pasteInto(ta, after) {
@@ -564,7 +608,10 @@ function renderOne(card) {
     autocapitalize: htmlHas('box-caps-off') ? 'off' : 'sentences', autocorrect: htmlHas('box-correct') ? 'on' : 'off', spellcheck: htmlHas('box-spell-off') ? 'false' : 'true',
     placeholder: placeholderRows().map(([a, b]) => `${a}  ← ${b}`).join('\n'),
     value: draft.details,
-    oninput: e => { suggestedSave = null; draft.details = e.target.value; saveDraftSoon(); suggestSoon(); paintParsed(true); },
+    oninput: e => { suggestedSave = null; draft.details = e.target.value; saveDraftSoon(); suggestSoon(); paintParsed(true); fitBox(e.target); },
+    // the browser's own corner handle (a mouse): the height it leaves is kept, as the grab bar's is
+    onmousedown: e => { e.target._h0 = e.target.offsetHeight; },
+    onmouseup: e => { const ta = e.target; if (ta._h0 && Math.abs(ta.offsetHeight - ta._h0) > 4) setDisplay({ boxHeight: ta.offsetHeight }); ta._h0 = 0; },
     // Settings → Advanced logging → Case template (off by default)
     onfocus: e => putTemplate(e.target), onblur: e => dropTemplate(e.target),
     // Settings → Logging → Enter key: 'newline' (default; Ctrl/Cmd+Enter saves), 'double' (Enter on an empty
@@ -631,8 +678,8 @@ function renderOne(card) {
   const draftNote = h('span', { class: 'draft-note', 'aria-live': 'polite' });
   // one quiet line under the box: the star on the left, the draft and sync state on the right, then a short
   // link to Recent changes / Recover drafts (its words say what needs doing when a save needs attention)
-  const syncNote = h('a', { href: '#recovery', class: 'draft-note sync-note', title: 'Recent changes / Recover drafts', 'aria-live': 'polite' });
-  const paintSync = () => { const jobs = writes.entries(); syncNote.textContent = writes.error() || (jobs.some(x => x.state === 'failed' || x.state === 'conflict') ? 'Save needs attention' : writes.pending() ? 'Pending sync' : jobs.length ? 'Synced' : 'Recover'); };
+  const syncNote = h('a', { href: '#recovery', class: 'draft-note sync-note', title: 'Recover: drafts, deleted items and earlier versions', 'aria-live': 'polite' });
+  const paintSync = () => { syncNote.textContent = writes.error() || (writes.attention() ? 'Save needs attention' : writes.pending() ? 'Pending sync' : writes.entries().length ? 'Synced' : 'Recover'); };
   const offSync = writes.onChange(() => { if (syncNote.isConnected) paintSync(); else offSync(); });
   paintSync();
   const tagRow = h('div', { class: 'tag-row' }, tagBox, draftNote, syncNote);
@@ -662,7 +709,7 @@ function renderOne(card) {
   add(card,
     h('div', { class: 'lp-left' },
       initialsInput ? h('label', { class: 'field log-initials' }, 'Initials', initialsInput) : null,
-      h('div', { class: 'box-wrap' }, boxMarks, textarea, pasteBtn(textarea), clearBtn), tooLong, parsed, tagRow,
+      h('div', { class: 'box-wrap' }, boxMarks, textarea, pasteBtn(textarea), clearBtn), boxGrab(textarea), tooLong, parsed, tagRow,
       // suggestions first, then the last case and your own templates
       h('div', { class: 'chiplabel quick-label' }, 'Quick picks'), sugg, templates,
       // Settings → Notes → Show the daily note on the Case tab (off by default)
@@ -686,6 +733,7 @@ function renderOne(card) {
     if (t.closest('.chip, .picker li, label.check, [role=button], button, a.btn')) e.preventDefault();
   });
   Object.assign(ui, { initials: initialsInput, draftNote, textarea, parsed, tooLong, boxMarks, sugg, selected, selExtra, groupSave, tip, enterHint, templates, picker, paintCommon });
+  requestAnimationFrame(() => fitBox(textarea));   // the kept height, grown to the draft's text
   paintSuggest(); paintSel(); paintQuick(); paintParsed(false);
   watchMarks(textarea);
   requestAnimationFrame(() => alignPlaceholder(textarea));
@@ -707,14 +755,25 @@ function paintParsed(typed) {
   setText(ui.draftNote, draftError || (text ? 'Draft saved' : ''));
   if (!text) { if (ui.parsed.firstChild) fill(ui.parsed); ui.parsed.dataset.age = ''; ui.parsed.dataset.key = ''; if (ui.tooLong) ui.tooLong.hidden = true; marksSoon([]); return; }
   const { initials, details } = draftParts();
-  const { age } = settings().detectAgeSex !== false ? splitAge(details) : { age: '' };
+  const age = boxAge(details);
   // Labelled parts on: which parts the box has ("Parts Learning point · Plan"), so you see a label was read
   const lab = labels();
   const names = lab ? [...new Set(parseParts(details, lab).parts.filter(p => p.text.trim()).map(p => p.name.replace(/ \d+$/, '')))] : [];
-  const key = age + '|' + names.join('|');
+  // the initials as they'll be saved, only when read from the box (not typed in their own field); in the colour of
+  // their highlight in the box, as the age is (owner, 15 Oct 2026)
+  const ini = initials && !draft.initials ? initials : '';
+  const key = ini + '|' + age + '|' + (draft.noIni || '') + '|' + (draft.noAge || '') + '|' + names.join('|');
   if (ui.parsed.dataset.key !== key) {
     ui.parsed.dataset.key = key; ui.parsed.dataset.age = age;
-    fill(ui.parsed, age ? h('span', { class: 'pi' }, h('b', {}, age), ` = ${humanAge(age)}`) : null,
+    // each is a button: a tap keeps that text in the case instead (a tap on the struck line reads it again)
+    const undo = (cls, what, label, flag, on) => h('button', { type: 'button', class: `pi ${cls}${on ? '' : ' undone'}`, 'aria-pressed': String(!on),
+      title: on ? `Not ${label}: keep ${what} in the case text` : `Read ${what} as ${label} again`,
+      onclick: () => { draft[flag] = on ? what : ''; saveDraft(); paintParsed(true); suggestSoon(); } },
+      h('b', {}, what), on ? ` = ${label === 'the age' ? humanAge(what) : label}` : ` · not ${label} (tap to undo)`);
+    const offIni = !ini && !draft.initials && draft.noIni && splitInitials(text).initials === draft.noIni ? draft.noIni : '';
+    const rawAge = settings().detectAgeSex !== false ? splitAge(details).age : '', offAge = !age && rawAge && rawAge === draft.noAge ? rawAge : '';
+    fill(ui.parsed, ini ? undo('pi-ini', ini, 'initials', 'noIni', true) : offIni ? undo('pi-ini', offIni, 'initials', 'noIni', false) : null,
+      age ? undo('pi-age', age, 'the age', 'noAge', true) : offAge ? undo('pi-age', offAge, 'the age', 'noAge', false) : null,
       names.length ? h('span', { class: 'pi parts-read' }, h('small', {}, 'Parts '), names.join(' · ')) : null);
   }
   if (ui.tooLong) {
@@ -743,6 +802,9 @@ function paintParsed(typed) {
       i += line.length + 1;
     }
   }
+  // the BMI the suggestions read ("BMI 42": Bariatric from 40), wherever it is (log2 2); in order, none overlapping
+  const bmi = settings().suggestions !== false ? bmiAt(v) : null;
+  if (bmi && !marks.some(([, a, b]) => bmi.from < b && bmi.to > a)) { marks.push(['bmi', bmi.from, bmi.to]); marks.sort((x, y) => x[1] - y[1]); }
   marksSoon(marks);
 }
 // The marks are drawn just before the next frame: one paint for a burst of keys, and the box never shows
@@ -792,7 +854,7 @@ function paintMarks(marks) {
 
 // Suggestions, with your own shorthand for APMES tags (Tag editor) mixed in
 // (learning points left out: forTags)
-const suggest = (text, opts = {}) => suggestCodes(forTags(text), { ...opts, detectAgeSex: settings().detectAgeSex !== false, extra: apmesShorthand(tagSet()) });
+const suggest = (text, opts = {}) => suggestCodes(forTags(text), { detectAgeSex: settings().detectAgeSex !== false, ...opts, extra: apmesShorthand(tagSet()) });
 
 function paintSuggest() {
   if (!ui || !ui.sugg) return;
@@ -800,7 +862,7 @@ function paintSuggest() {
   ui.sugg.hidden = !on;
   if (!on) return;
   const text = draft.details.trim();
-  const found = text ? suggest(text, { limit: 8 }) : [];
+  const found = text ? suggest(text, { limit: 8, ...(ageOff() ? { detectAgeSex: false } : {}) }) : [];
   if (settings().autoTick && applyAutoTick(found, text)) return paintSel();   // paintSel paints these again
   const list = found.filter(s => !draft.cats.includes(s.code));
   // your own tags whose shorthand you typed (choosing one ticks what it counts towards)
@@ -962,7 +1024,7 @@ async function saveCase({ another, tap }) {
     paintSuggest();
     const tags = settings().suggestions !== false && details ? shorthandTags(tagSet(), forTags(details)).filter(k => !(draft.tags || []).includes(k)) : [];
     // confident suggestions only (as "+ All" and a pasted list): a weak guess is never counted without a look
-    const codes = settings().suggestions !== false && details ? confident(suggest(box.trim(), { limit: 8 })) : [];
+    const codes = settings().suggestions !== false && details ? confident(suggest(box.trim(), { limit: 8, ...(ageOff() ? { detectAgeSex: false } : {}) })) : [];
     const cats = sortCodes(withParents([...codes, ...tags.flatMap(tagLinks)]));
     suggestedSave = cats.length ? { key: suggestionKey(), cats, tags, at: tap ? Date.now() : 0 } : null;
     paintEnterHint();
@@ -983,7 +1045,7 @@ async function saveCase({ another, tap }) {
   const norm = t => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
   const twin = (S.cases || []).find(x => x.date === curDate() && norm(caseText(x)) === norm(details));
   if (twin && !(await confirmBox('Possible duplicate', `You already logged “${caseText(twin).slice(0, 60)}” on ${fmtDate(twin.date)}. Save another one?`, 'Save anyway'))) return;
-  const parts = firstField() === 'initials' || draft.initialsHint ? draftParts(box) : splitInitials(details);
+  const parts = firstField() === 'initials' || draft.initialsHint || draft.noIni ? draftParts(box) : splitInitials(details);
   // over the 2000 characters a case holds: the rest into a linked note (asked first), never cut off silently
   if (!(await splitLong([parts]))) return;
   const owner = S.user?.email, inputAtSave = JSON.stringify(draft);
@@ -1000,7 +1062,7 @@ async function saveCase({ another, tap }) {
   const keepTags = next === 'keepTags' ? { cats: draft.cats, tags: draft.tags || [] } : { cats: [], tags: [] };
   // Undo puts the case back with the ticks the user took off still off (auto-tick)
   const ticksAtSave = { auto: [...(draft.auto || [])], rejected: [...(draft.rejected || [])] };
-  draft = { ...draft, details: '', initials: '', initialsHint: '', caseId: null, caseCreatedAt: null, ...keepTags, ...FRESH_TICKS(), date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false };
+  draft = { ...draft, details: '', initials: '', initialsHint: '', noIni: '', noAge: '', caseId: null, caseCreatedAt: null, ...keepTags, ...FRESH_TICKS(), date: keep, keepDate: sticky, keptAt: Date.now(), dateAt: Date.now(), reflectTag: false };
   if (ui.tagBox) ui.tagBox.querySelector('input').checked = false;
   saveDraft();
   if (ui.textarea) ui.textarea.value = '';
@@ -1055,10 +1117,11 @@ function renderBulk(card) {
     },
   });
   ui.textarea = ta;
+  if (listHeight()) ta.style.height = listHeight() + 'px';
   const out = h('div');
   add(card, 
     h('p', { class: 'hint help' }, 'Paste your notes or OT list with an empty line between cases (a case can take several lines; a bold first line, **like this**, starts a case too). Tags are guessed for each case. Cases without a date at the start get ', h('b', {}, fmtDate(curDate())), ' (change it above).'),
-    ta,
+    ta, boxGrab(ta, true),
     h('div', { class: 'bar', style: 'margin-top:8px' },
       h('button', { class: 'primary', onclick: () => { bulkRows = reviewRows(ta.value); bulkText = ta.value; paintBulk(out); } }, 'Review'),
       pasteBtn(ta, 'Paste from clipboard'),
@@ -1067,11 +1130,12 @@ function renderBulk(card) {
   if (bulkRows) paintBulk(out);
 }
 
-// A pasted list read into rows: the confident suggestions ticked, and your own tags whose shorthand a row uses
-// (Tag editor) with what they count towards, as a single case would offer them.
+// A pasted list read into rows: the confident suggestions ticked only with Settings → Logging → "Tick confident
+// suggestions automatically" (as a single case; owner, 15 Oct 2026), else offered as chips with "Tick all
+// suggestions"; and your own tags whose shorthand a row uses (Tag editor) with what they count towards.
 function reviewRows(text) {
   const on = settings().suggestions !== false;
-  return parseBulk(text, on ? t => suggest(t) : null, undefined, { labels: labels() }).map(r => {
+  return parseBulk(text, on && settings().autoTick ? t => suggest(t) : null, undefined, { labels: labels() }).map(r => {
     const tags = on && r.details ? shorthandTags(tagSet(), forTags(r.details)) : [];
     return { ...r, tags, cats: tags.length ? sortCodes(withParents([...r.cats, ...tags.flatMap(tagLinks)])) : r.cats };
   });
@@ -1108,8 +1172,16 @@ function paintBulk(out) {
           sugg.map(s => catChip(s.code, { cls: `sugg ${s.score >= STRONG ? 'strong' : ''}`, title: 'Suggested: ' + catFull(s.code), onclick: () => { r.cats = addCat(r.cats, s.code); paintBulk(out); } }))) : null),
       h('td', {}, h('button', { class: 'small danger icon-btn', title: 'Drop this case', 'aria-label': 'Drop this case', onclick: () => { bulkRows.splice(i, 1); paintBulk(out); } }, '×')));
   }));
+  // the confident suggestions of every row, ticked in one tap (the bold chips)
+  const strong = r => (on && r.details.trim() ? suggest(r.details).filter(s => s.score >= STRONG && !r.cats.includes(s.code)).map(s => s.code) : []);
+  const anyStrong = bulkRows.some(r => strong(r).length);
+  // the count and Tick all on one line, so the rows start high on a phone
   fill(out, 
-    h('h3', {}, `${bulkRows.length} case${bulkRows.length === 1 ? '' : 's'}`),
+    h('div', { class: 'bar', style: 'margin:0 0 6px;align-items:center' }, h('h3', { style: 'margin:0' }, `${bulkRows.length} case${bulkRows.length === 1 ? '' : 's'}`), h('span', { style: 'flex:1' }),
+      anyStrong ? h('button', { class: 'small', title: 'The confident suggestions (in bold) on every case', onclick: () => {
+        for (const r of bulkRows) { const add = strong(r); if (add.length) r.cats = sortCodes(withParents([...r.cats, ...add])); }
+        paintBulk(out);
+      } }, 'Tick all suggestions') : null),
     missing ? h('p', { class: 'tip' }, `${missing} case${missing === 1 ? ' has' : 's have'} no tag yet.`) : null,
     h('div', { class: 'scroll' }, h('table', { class: 'bulk' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Details'), h('th', {}, 'Tags'), h('th', {}))), tbody)),
     h('div', { class: 'actions' }, h('button', { class: 'primary big', onclick: saveBulk }, `Save all ${bulkRows.length}`),
@@ -1244,7 +1316,7 @@ export function editCaseDialog(c, opts = {}) {
   const saveEditDraft = () => {
     if ((cloud.demo ? 'demo:' : '') + (S.user?.email || '') !== ownerKey) return;
     if (JSON.stringify(e) === initial) return;
-    try { editDraft.save({ record: e, base, isNew, savedAt: Date.now() }); draftStatus.textContent = 'Edit draft saved on this device · Recover drafts'; }
+    try { editDraft.save({ record: e, base, isNew, savedAt: Date.now() }); draftStatus.textContent = 'Edit draft saved on this device · in Recover'; }
     catch { draftStatus.textContent = 'Edit draft not saved · storage unavailable'; }
   };
   const sel = h('div', { class: 'chips selected' });

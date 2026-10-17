@@ -250,3 +250,36 @@ const { START, END, wrapBlock, extractBlock, replaceBlock, merge3, planDay, dayF
   assert.deepEqual(reconcileSyncState(first.state, [t]).drop, []);
 }
 console.log('sync-md tests passed');
+
+// reflection notes (log2 15): one per reflection, named as the export names them, keyed r:<id>; renamed ones flagged
+{
+  const { reflectionFiles, changedRefls, placePath, REFL_KEY, cleanTarget: ct, cleanSyncLedger: cl, markSynced: ms } = await import('../js/sync-md.js');
+  const refls = [
+    { id: 'rb', date: '2026-10-12', initials: 'ZB', title: 'Fake b', headingId: 'lscs', points: [{ heading: 'P', text: 'fake' }], createdAt: 2 },
+    { id: 'ra', date: '2026-10-11', initials: 'ZA', title: 'Fake a', points: [], createdAt: 1 },
+    { id: 'gone', date: '2026-10-10', deleted: true, title: 'x' },
+  ];
+  const files = reflectionFiles(refls, null);
+  assert.deepEqual(files.map(x => x.key), ['r:ra', 'r:rb'], 'oldest first, deleted ones left out');
+  assert.match(files[0].path, /^Reflections\/2026-10\/.+\.md$/);
+  assert.ok(!files[1].text.startsWith('---') && files[1].text.includes('# Fake b'), 'no front matter: ' + files[1].text.slice(0, 40));
+  assert.ok(REFL_KEY.test('r:ra') && !REFL_KEY.test('2026-10-10'));
+  assert.equal(placePath({ kind: 'github', folder: 'Vault/Daily' }, files[0].path), 'Vault/Daily/' + files[0].path);
+  assert.equal(placePath({ kind: 'dropbox' }, 'Reflections/x.md'), '/Daily/Reflections/x.md');
+  // what to write: new, changed, renamed
+  const fps = { 'r:ra': 'f1', 'r:rb': 'f2' };
+  let ledger = ms({}, 't1', 'r:ra', 'f1', 'rev1', files[0].path);
+  ledger = ms(ledger, 't1', 'r:rb', 'f2', 'rev2', 'Reflections/2026-10/old name.md');
+  ledger = ms(ledger, 't1', '2026-10-11', 'fd');
+  const ch = changedRefls(ledger, 't1', files, fps);
+  assert.deepEqual(ch.map(x => [x.key, x.renamed]), [['r:rb', true]], 'unchanged skipped; a new name is written');
+  assert.deepEqual(changedRefls(ledger, 't1', files, { ...fps, 'r:ra': 'f9' }).map(x => x.key), ['r:ra', 'r:rb']);
+  // the ledger keeps reflection entries (with their path) beside the days
+  const back = cl(ledger);
+  assert.equal(back.t1['r:ra'].path, files[0].path); assert.equal(back.t1['2026-10-11'].fp, 'fd');
+  assert.equal(cl({ t1: { 'r:bad key': { fp: 'x' }, 'x:1': { fp: 'y' } } }).t1['r:bad key'], undefined);
+  // the place's switch: only true is kept
+  assert.equal(ct({ kind: 'dropbox', reflections: true }).reflections, true);
+  assert.equal('reflections' in ct({ kind: 'dropbox', reflections: 'yes' }), false);
+  console.log('sync reflection notes: ok');
+}

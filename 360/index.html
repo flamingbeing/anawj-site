@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>APMES CCC 360</title>
+<meta name="description" content="What the programme coordinators collect before a CCC: scholarly projects and multisource feedback nominees.">
+<meta name="theme-color" content="#f9f9fb">
+<link rel="icon" type="image/png" sizes="32x32" href="../evals/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="../evals/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap" media="print" onload="this.media='all'">
+<script>
+  // CCC 360 lives at apmes.anawj.com/360/ (one sign-in with the logbook, evals and People). Send visitors on from anawj.com.
+  // A no-op on apmes.anawj.com, previews and localhost.
+  if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname)) location.replace('https://apmes.anawj.com/360/' + location.search + location.hash);
+  // evals' theme choice applies here too
+  try { var t = localStorage.getItem('evals-theme'); if (t === 'auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light'; } catch (e) {}
+</script>
+<link rel="stylesheet" href="../nuhsdesign/tokens.css">
+<link rel="stylesheet" href="../nuhsdesign/app.css">
+<link rel="stylesheet" href="../evals/style.css">
+<script src="../nuhsdesign/app.js" defer></script>
+<style>
+  .cc-col { max-width: 720px; margin: 0 auto; }
+  .cc-col .a-btn { max-width: 100%; white-space: normal; text-align: center; }
+  .cc-intro p { margin: 0 0 8px; }
+  .cc-card { display: grid; gap: 12px; }
+  .cc-card + .cc-card { margin-top: 12px; }
+  .cc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .cc-head h3 { margin: 0; font-size: var(--a-text-md, 1rem); }
+  .cc-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 420px) { .cc-pair { grid-template-columns: 1fr; } }
+  .cc-sug { list-style: none; margin: 4px 0 0; padding: 0; border: .5px solid var(--a-sep); border-radius: 10px; background: var(--a-surface); overflow: hidden; }
+  .cc-sug button { display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; border: 0; border-top: .5px solid var(--a-sep); background: none; font: inherit; color: var(--a-ink); text-align: left; cursor: pointer; }
+  .cc-sug li:first-child button { border-top: 0; }
+  .cc-sug button:hover, .cc-sug button:focus-visible { background: var(--a-surface-2); }
+  .cc-badge { padding: 1px 8px; border-radius: 99px; background: var(--a-surface-2); color: var(--a-ink-2); font-size: var(--a-text-xs); font-weight: 600; white-space: nowrap; }
+  .cc-sent { margin: 6px 0 0; font-size: var(--a-text-sm); color: var(--a-ink-2); }
+  .cc-list { margin: 8px 0 0; padding-left: 18px; font-size: var(--a-text-sm); }
+  .cc-list li { margin: 0 0 6px; }
+  .cc-list a { text-decoration: underline; font-weight: 600; }
+  .cc-count { font-variant-numeric: tabular-nums; color: var(--a-ink-2); font-size: var(--a-text-sm); }
+  .cc-private { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--a-surface-2); font-size: var(--a-text-sm); color: var(--a-ink-2); }
+</style>
+</head>
+<body class="a-app e-nonav">
+<header class="a-bar e-appbar">
+  <div class="a-band"><i></i><i></i><i></i><i></i></div>
+  <div class="a-bar-row">
+    <button type="button" id="back" class="a-bar-btn e-appbar__back" aria-label="Back" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span aria-hidden="true">Back</span></button>
+    <div class="e-appbar__titles">
+      <h1 id="title" class="a-bar-title e-appbar__title">APMES CCC 360</h1>
+      <p id="sub" class="e-appbar__sub" hidden></p>
+    </div>
+    <div id="me" class="e-appbar__right"></div>
+  </div>
+</header>
+<main id="app" class="a-main"><p class="e-loading">Loading…</p></main>
+<div id="toast" class="a-toast" role="status" aria-live="polite"></div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

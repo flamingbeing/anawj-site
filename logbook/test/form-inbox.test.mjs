@@ -1,6 +1,6 @@
 // Run with: node logbook/test/form-inbox.test.mjs  (fake cases only)
 import assert from 'node:assert/strict';
-import { entryToCase, mergeFormEntries, formCaseId, maskIds, pickupMessage, sameResponse, withoutFormCases, PICKUP_MAX } from '../js/form-inbox.js';
+import { entryToCase, mergeFormEntries, formCaseId, maskIds, pickupMessage, pickUp, sameResponse, withoutFormCases, looksLikeImportOf, PICKUP_MAX } from '../js/form-inbox.js';
 import { cleanCase } from '../js/clean.js';
 
 const NOW = 1_800_000_000_000;
@@ -16,7 +16,7 @@ const entry = (id, extra = {}) => ({ id, email: 'alice@example.com', date: '2026
   assert.deepEqual(r.case.cats, ['16', '17']);
   assert.equal(r.case.date, '2026-03-04');
   assert.equal(r.case.source, 'form');
-  assert.equal(r.case.importKey, `form:2_ABC@${NOW}`);
+  assert.equal(r.case.importKey, `form:2_ABC~${NOW - 5000}@${NOW}`);   // the response's newest submit, then the write time
   assert.equal(r.case.createdAt, NOW - 5000);
   assert.equal(r.masked, false);
   // what the case looks like once cleaned for saving keeps everything (and fits the rules' fields)
@@ -61,7 +61,7 @@ const entry = (id, extra = {}) => ({ id, email: 'alice@example.com', date: '2026
   assert.equal(r2.save[0].createdAt, had.createdAt);
   assert.equal(r2.save[0].reflectionId, 'refl1');
   assert.equal(r2.save[0].reflectTag, true);
-  assert.equal(r2.save[0].importKey, `form:a@${later}`);
+  assert.equal(r2.save[0].importKey, `form:a~${later - 1000}@${later}`);
 
   // ... unless the resident changed it in the app since: theirs stays, the entry still leaves the inbox
   const edited = { ...had, details: 'my own words', updatedAt: NOW + 60000 };
@@ -134,6 +134,124 @@ const entry = (id, extra = {}) => ({ id, email: 'alice@example.com', date: '2026
   assert.equal(r.done.length, PICKUP_MAX);
   assert.equal(r.left, 7);
   assert.match(pickupMessage(r), /7 more next time/);
+}
+
+// a deleted Form case stays deleted once its bin entry has gone (30-day purge, Delete forever): the formGone list
+{
+  const r = mergeFormEntries([entry('g1'), entry('g2')], {}, NOW, { binned: [], gone: [formCaseId('g1')] });
+  assert.deepEqual(r.gone, ['g1']);
+  assert.deepEqual(r.save.map(c => c.id), [formCaseId('g2')]);
+  assert.deepEqual(r.done, ['g1', 'g2']);
+  // bin entries may be passed as the binned cases' data too
+  assert.deepEqual(mergeFormEntries([entry('g3')], {}, NOW, { binned: [{ id: formCaseId('g3'), source: 'form' }] }).gone, ['g3']);
+}
+
+// an imported case the resident deleted (still in the bin) isn't brought back by the same response from the inbox
+{
+  const t = Date.UTC(2026, 9, 5, 3, 0, 0);
+  const imp = { id: 'imp_k1', source: 'import', date: '2026-10-05', initials: 'AB', details: '34F elective LSCS spinal', cats: ['16', '17'], createdAt: t + 8 * 3600e3, updatedAt: 1 };
+  const r = mergeFormEntries([entry('i1', { date: '2026-10-05', submittedAt: t })], {}, NOW, { binned: [imp] });
+  assert.deepEqual(r.save, []);
+  assert.deepEqual(r.gone, ['i1']);
+  assert.equal(pickupMessage(r), '');   // (the same response: quietly)
+  // A response that only has its day, initials and categories (an edit of it, a corrected copy sent after deleting a
+  // wrong one, another patient) is added, as nothing in the logbook has it, and the toast points to the bin
+  const later = mergeFormEntries([entry('i2', { date: '2026-10-05', details: 'AB 34F elective LSCS spinal (corrected)', submittedAt: t + 17 * 864e5 })], {}, NOW, { binned: [imp] });
+  assert.deepEqual([later.save.map(c => c.id), later.gone, later.binLike], [[formCaseId('i2')], [], ['i2']]);
+  assert.equal(pickupMessage(later), '1 case from the Google Form added to your logbook; it has the same day, initials and categories as a case in your recycle bin (if it is the case you deleted, delete it again).');
+  const two = mergeFormEntries([entry('i3', { date: '2026-10-05', submittedAt: t + 864e5 }), entry('i4', { date: '2026-10-06' })], {}, NOW, { binned: [imp] });
+  assert.match(pickupMessage(two), /^2 cases from the Google Form added to your logbook; 1 of them has the same day, initials and categories as a case in your recycle bin \(if it is the case/);
+  // ... deleted again, it is a Form case: listed in formGone, it stays gone
+  assert.deepEqual(mergeFormEntries([entry('i2', { date: '2026-10-05', submittedAt: t + 18 * 864e5 })], {}, NOW, { binned: [imp], gone: [formCaseId('i2')] }).gone, ['i2']);
+}
+
+// An old response (before the inbox, brought in by the workbook import) edited in the Form arrives with the edit's
+// time: the imported case on that day with the same initials and categories is taken to be it, not added again
+{
+  const first = Date.UTC(2026, 9, 3, 2, 30, 15);   // 10:30:15 in Singapore, 3 Oct
+  const imp = { id: 'imp_abc~00230', source: 'import', date: '2026-10-03', initials: 'AB', details: '34F elective LSCS spinal', cats: ['16', '17'], createdAt: first + 8 * 3600e3, updatedAt: 1 };
+  const edited = entry('o1', { date: '2026-10-03', details: 'AB 34F elective LSCS spinal, block top-up', submittedAt: Date.UTC(2026, 9, 20, 5, 0, 0) });
+  const r = mergeFormEntries([edited], { [imp.id]: imp }, NOW);
+  assert.deepEqual(r.save, []);
+  assert.deepEqual(r.dupes, ['o1']);
+  assert.deepEqual(r.similar, ['o1']);
+  assert.deepEqual(r.done, ['o1']);
+  assert.equal(pickupMessage(r), '1 Form response not added: your logbook already has a case with the same day, initials and categories (if it was another patient, log it here in the app: the Form would skip it again).');
+  // an older imported case without the initials field (initials at the front of the details) matches too
+  const oldImp = { ...imp, initials: undefined, details: 'AB 34F elective LSCS spinal' };
+  delete oldImp.initials;
+  assert.equal(mergeFormEntries([edited], { [imp.id]: oldImp }, NOW).similar.length, 1);
+  // anything else is another case: other initials, other categories, another day, no initials, or a response sent
+  // before the imported one
+  const added = e => mergeFormEntries([e], { [imp.id]: imp }, NOW).save.length;
+  assert.equal(added({ ...edited, details: 'CD 34F elective LSCS spinal' }), 1);
+  assert.equal(added({ ...edited, labels: [LSCS] }), 1);
+  assert.equal(added({ ...edited, date: '2026-10-04' }), 1);
+  assert.equal(added({ ...edited, details: '34F elective LSCS spinal' }), 1);
+  assert.equal(added({ ...edited, submittedAt: first - 864e5 }), 1);
+  // only imported cases count (a case logged in the app or another Form response is another case)
+  assert.equal(looksLikeImportOf({ ...imp, source: 'app' }, edited, entryToCase(edited, NOW).case), false);
+  assert.equal(looksLikeImportOf(imp, edited, entryToCase(edited, NOW).case), true);
+  // the same response unedited is still matched by its time, quietly
+  const same = mergeFormEntries([entry('o2', { date: '2026-10-03', submittedAt: first })], { [imp.id]: imp }, NOW);
+  assert.deepEqual([same.dupes, same.similar, pickupMessage(same)], [['o2'], [], '']);
+}
+
+// A Form case's response edited later: the key notes the newest submit, so a re-run of the workbook import (whose sheet
+// row now carries the edit's time) leaves that row out, even when the case is kept as the resident changed it in the app
+{
+  const H8 = 8 * 3600e3, sub = Date.UTC(2026, 9, 16, 1, 0, 0), edit = Date.UTC(2026, 9, 17, 1, 0, 0), later = edit + 60e3;
+  const had = cleanCase(entryToCase(entry('e1', { date: '2026-10-16', submittedAt: sub }), sub + 60e3).case, sub + 60e3);
+  const row = { date: '2026-10-16', createdAt: edit + H8 };
+  assert.equal(withoutFormCases([row], [had]).dropped, 0);   // (before the edit is picked up: not known yet)
+  // the edit replaces the Form case: createdAt stays the first submit, the key notes the edit
+  const r = mergeFormEntries([entry('e1', { date: '2026-10-16', details: 'AB 34F emergency LSCS GA', submittedAt: edit })], { [had.id]: had }, later);
+  assert.equal(r.save.length, 1);
+  assert.equal(r.save[0].createdAt, sub);
+  const now1 = cleanCase(r.save[0], later + 5);
+  assert.deepEqual(withoutFormCases([row, { date: '2026-10-16', createdAt: sub + H8 }], [now1]).dropped, 2);   // edit or first submit
+  // kept as the app has it: nothing replaced, the key's write time kept (still the resident's), the newest submit noted
+  const mine = { ...had, details: 'my own words', updatedAt: sub + 3600e3 };
+  const k = mergeFormEntries([entry('e1', { date: '2026-10-16', details: 'AB changed on the Form', submittedAt: edit })], { [had.id]: mine }, later);
+  assert.deepEqual([k.save, k.kept], [[], ['e1']]);
+  assert.deepEqual(k.mark, [{ id: had.id, importKey: `form:e1~${edit}@${sub + 60e3}`, updatedAt: later }]);
+  const marked = { ...mine, importKey: k.mark[0].importKey, updatedAt: k.mark[0].updatedAt };
+  assert.equal(withoutFormCases([row], [marked]).dropped, 1);
+  // ... and it stays the resident's: the next edit is kept too, and the same edit again needs nothing
+  assert.deepEqual(mergeFormEntries([entry('e1', { submittedAt: edit + 864e5 })], { [had.id]: marked }, later + 864e5).kept, ['e1']);
+  assert.deepEqual(mergeFormEntries([entry('e1', { date: '2026-10-16', details: 'AB changed on the Form', submittedAt: edit })], { [had.id]: marked }, later + 1).mark, []);
+  // the same content sent with a newer submit time (a field the logbook doesn't keep was edited): the key is updated
+  const same = mergeFormEntries([entry('e1', { date: '2026-10-16', submittedAt: edit })], { [had.id]: had }, later);
+  assert.equal(same.save.length, 1);
+  assert.match(same.save[0].importKey, new RegExp(`^form:e1~${edit}@`));
+  // an older copy than the case has (two quick edits sent out of order) changes nothing
+  const old = mergeFormEntries([entry('e1', { date: '2026-10-16', details: 'AB first words', submittedAt: sub })], { [now1.id]: now1 }, later + 2);
+  assert.deepEqual([old.save, old.kept, old.done], [[], [], ['e1']]);
+  // a case written before the key noted the submit ('form:<id>@<ms>'): an edit is still told apart from a re-send
+  const legacy = { ...had, importKey: `form:e1@${sub + 60e3}` };
+  assert.equal(mergeFormEntries([entry('e1', { date: '2026-10-16', submittedAt: sub })], { [had.id]: legacy }, later).save.length, 0);
+  assert.equal(mergeFormEntries([entry('e1', { date: '2026-10-16', submittedAt: edit })], { [had.id]: legacy }, later).save.length, 1);
+}
+
+// The toast tells only what reached the server: a pick-up whose commits are refused (another device took the entries, a
+// lost connection) says nothing, and the entries wait for the next one
+{
+  const sub = Date.UTC(2026, 9, 15, 1, 0, 0);
+  const had = cleanCase(entryToCase(entry('k1', { date: '2026-10-15', submittedAt: sub }), sub + 60e3).case, sub + 60e3);
+  const mine = { ...had, details: 'my own words', updatedAt: sub + 3600e3 };
+  const t = Date.UTC(2026, 9, 5, 3, 0, 0);
+  const imp = { id: 'imp_k2', source: 'import', date: '2026-10-05', initials: 'AB', details: '34F elective LSCS spinal', cats: ['16', '17'], createdAt: t + 8 * 3600e3, updatedAt: 1 };
+  const es = [entry('k1', { date: '2026-10-15', submittedAt: sub + 864e5 }), entry('n1', { details: 'CD 12345678 new' }), entry('s1', { date: '2026-10-05', submittedAt: t + 864e5 })];
+  const io = ok => ({ listBin: async () => [], listFormGone: async () => [], commitFormPickup: async (_, items) => items.map(it => it.id).filter(ok) });
+  const none = await pickUp(io(() => false), 'alice@example.com', es, { cases: () => [mine, imp], now: NOW });
+  assert.deepEqual([none.save, none.done, none.kept, none.similar, none.mark, none.masked], [[], [], [], [], [], 0]);
+  assert.equal(pickupMessage(none), '');
+  const all = await pickUp(io(() => true), 'alice@example.com', es, { cases: () => [mine, imp], now: NOW });
+  assert.deepEqual([all.save.map(c => c.id), all.kept, all.similar, all.mark.map(m => m.id), all.masked], [[formCaseId('n1')], ['k1'], ['s1'], [had.id], 1]);
+  assert.match(pickupMessage(all), /^1 case from the Google Form added to your logbook; 1 edited Form response left as you changed it here; 1 Form response not added: .*; an ID number was removed from 1\.$/);
+  // only some committed: only those are told
+  const some = await pickUp(io(id => id === 'n1'), 'alice@example.com', es, { cases: () => [mine, imp], now: NOW });
+  assert.deepEqual([some.save.length, some.kept, some.similar, some.mark], [1, [], [], []]);
 }
 
 console.log('form-inbox tests passed');

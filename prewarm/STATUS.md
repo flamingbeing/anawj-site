@@ -13,8 +13,8 @@ edit the same lines. Read them all before starting; edit only yours.
 
 - Blank Word form uploaded (12 Oct 2026). Still to do: check one patient's Form view on a phone (Download Word file,
   Save as PDF / Print).
-- Add `admins/kohwenjun@gmail.com` (lower case, any field) in the Firebase console for `prewarm-study` if it isn't there:
-  the app said that email isn't on the admin list. Then tap Refresh now in Settings. Then set a password (Settings →
+- Add the owner's own `admins/<email>` entry (lower case, any field) in the Firebase console for `prewarm-study` if it
+  isn't there: the app said that email isn't on the admin list. Then tap Refresh now in Settings. Then set a password (Settings →
   Password, after one emailed-link sign-in).
 - MOVE MERGED (#364, #382, 13 Oct night) and CHECKED on the owner's phones (old nurse link, admin password sign-in, team phone moving and rejoining, synced reading). Homepage session told. Nothing open.
 - PACU link (13 Oct): the old link's saves were refused ("Not allowed"); cause unknown (live rules = repo rules; record deleted). The NEW link works (owner tested). Practice: fresh link per patient, test once on a phone that isn't on the team. Revisit only if it recurs.
@@ -56,6 +56,8 @@ edit the same lines. Read them all before starting; edit only yours.
 - #285: unsaved readings come back after the phone closes the app; toasts no longer block taps.
 
 ## Decisions
+
+- 15 Oct 2026: prewarm is highly important and must stay up, so **no breaking changes** (owner): only small, tested, reversible changes; the design session's restyle of prewarm (app kit, `index.html`, `style.css`, `sw.js` SHELL, `update.html`) is on hold until the owner says otherwise in that session.
 
 - 14 Oct 2026: export pre-warming readings past the warming as NA (Downloaded columns stay empty); keep records indefinitely and phones need not wipe their copy; build the rest of the review list as recommended, small PRs, no rules changes without approval (owner).
 

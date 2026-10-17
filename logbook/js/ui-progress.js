@@ -2,13 +2,14 @@
 // benchmarking; counts only, never details).
 
 import { R_YEARS, BY_CODE, CATEGORIES, appYear, yearName } from './categories.js';
-import { progress, todayISO, rYearDefault, weekLead, weekdayNames, fmtDate, finalTarget, towardsMinimum, tagTotal, MINIMUM_TOTAL } from './engine.js';
+import { splitAge, splitInitials, progress, todayISO, rYearDefault, weekLead, weekdayNames, fmtDate, finalTarget, towardsMinimum, tagTotal, MINIMUM_TOTAL } from './engine.js';
 import { display, setDisplay } from './display.js';
 import { exportTotals } from './xlsxio.js';
-import { reflectionProgress, HEADING_BY_ID } from './reflections.js';
+import { reflectionProgress, HEADING_BY_ID, suggestHeadings } from './reflections.js';
 import { logbookGlance, reflectionGlance, cohortGlance } from './glance.js';
-import { paceForecast, paceText, goneQuiet, reflectionTodos } from './analytics.js';
+import { paceForecast, paceText, goneQuiet, reflectionTodos, arrangeCards, moveCard, hideCard, finishLine, monthSummary, milestones, ageMix, caseMix, loggingHabits, shortNames } from './analytics.js';
 import { reflectOnCase, openReflection } from './ui-reflect.js';
+import { gripDrag } from './drag-list.js';
 import { S, h, ic, toast, cloud, rYear, myYearName, settings, subcatsOf, patchLogbook, needExcel, download, displayName, hooks, add, resetters, info, catName, catShort, tagName, summaryOf, basicHides } from './ui-core.js';
 
 const STATUS_TEXT = { late: 'Behind', due: 'Due this year', ontrack: 'On track', done: 'Done', none: 'No target' };
@@ -77,12 +78,10 @@ export function renderProgress() {
       strip('Tags done', lg.done, cohort.tags, lg.total), strip('Cases logged', S.cases.length, cohort.cases)) : null,
     h('label', { class: 'check', style: 'margin:0 0 4px' }, h('input', { type: 'checkbox', checked: !!pview.hideDone, onchange: e => { pview.hideDone = e.target.checked; hooks.render(); } }), 'Hide done'),
     progList(shown, fc));
-  // everyone's counts (counts only) for comparison
-  const compare = h('section', { class: 'card more-list an-compare' },
-    h('ul', {}, h('li', {}, h('a', { href: '#totals' },
-      h('span', { class: 'mt' }, h('b', {}, 'Compare with your intake'), h('small', {}, 'Case counts per tag across residents in your year (Totals)')),
-      h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
-  return h('div', {}, head, urgentSec, quietSec, targets, reflectionsOn() ? reflCard() : null, advanced() ? todoCard() : null, advanced() ? trendsCard() : null, totalsOn ? compare : null);
+  // everyone's counts are on their own tab, Totals (owner, 15 Oct 2026), not linked from here
+  return layoutPage(head, { urgent: urgentSec, finish: advanced() ? finishCard(fc) : null, month: monthCard(true), quiet: quietSec, targets,
+    refl: reflectionsOn() ? reflCard() : null, material: reflectionsOn() ? materialCard() : null, todo: advanced() ? todoCard() : null,
+    milestones: milestonesCard(true), trends: advanced() ? trendsCard() : null, ...extraCards() });
 }
 const reflectionsOn = () => !basicHides('reflect') && !basicHides('reflHeadings');
 
@@ -100,8 +99,121 @@ function renderCounts() {
   const counts = section('counts', 'Tags', `${rows.length} tag${rows.length === 1 ? '' : 's'} used · ${S.cases.length} cases`,
     rows.length ? h('ul', { class: 'an-list' }, rows.map(([k, x]) => h('li', {}, casesLink(name(k), { tag: k }), h('small', { class: 'muted' }, ` · ${x} case${x === 1 ? '' : 's'}`))))
       : h('p', { class: 'empty' }, 'No cases yet.'));
-  return h('div', {}, head, counts, reflectionsOn() ? reflCard() : null, advanced() ? todoCard() : null, advanced() ? trendsCard() : null);
+  return layoutPage(head, { counts, month: monthCard(false), refl: reflectionsOn() ? reflCard() : null, material: reflectionsOn() ? materialCard() : null,
+    todo: advanced() ? todoCard() : null, milestones: milestonesCard(false), trends: advanced() ? trendsCard() : null, ...extraCards() });
 }
+
+// ---------- more cards (5b; owner, 15 Oct 2026). Estimates from the case text say so, with how many cases they read ----------
+
+const monthName = iso => new Date(iso + 'T00:00').toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+const tagTarget = targetsOn => (targetsOn ? code => finalTarget(code) : () => null);
+function finishCard(fc) {
+  const rows = finishLine(fc, todayISO());
+  if (!rows.length) return null;
+  const late = rows.filter(r => r.late).length;
+  return section('finish', 'Finish line', late ? `${late} tag${late === 1 ? '' : 's'} won’t reach the next target in time at your pace` : 'Every tag reaches its next target in time at your pace ✓',
+    h('ul', { class: 'an-list' }, rows.map(r => h('li', {}, casesLink(catName(r.code), { tag: 'c:' + r.code }),
+      h('small', { class: r.late ? 'warn' : 'muted' }, ` · ${r.eta ? 'about ' + monthName(r.eta) : 'no recent cases'} · due by ${monthName(r.deadline)}`)))),
+    h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'At the pace of your last 6 months, when each tag reaches its next target, and the end of the year it is due in.'));
+}
+function monthCard(targetsOn) {
+  const m = monthSummary(S.cases, todayISO(), tagTarget(targetsOn));
+  const name = new Date(m.month + '-01T00:00').toLocaleDateString(undefined, { month: 'long' });
+  return section('month', `This month (${name})`, `${m.n} case${m.n === 1 ? '' : 's'}${m.first.length ? ` · ${m.first.length} new tag${m.first.length === 1 ? '' : 's'}` : ''}${m.met.length ? ` · ${m.met.length} target${m.met.length === 1 ? '' : 's'} met` : ''}`,
+    m.n ? h('ul', { class: 'an-list' },
+      m.top.length ? h('li', {}, 'Most logged: ', m.top.map(([code, n], i) => [i ? ', ' : '', casesLink(catName(code), { tag: 'c:' + code }), ` (${n})`])) : null,
+      m.first.length ? h('li', {}, 'First time: ', m.first.map(c => catName(c)).join(', ')) : null,
+      m.met.length ? h('li', {}, 'Final target reached: ', m.met.map(c => catName(c)).join(', '), ' ✓') : null) : h('p', { class: 'empty' }, 'No cases yet this month.'));
+}
+function materialCard() {
+  const short = new Set(reflectionProgress(S.reflections).headings.filter(x => !x.met).map(x => x.id));
+  const linked = new Set((S.reflections || []).map(r => r.caseId).filter(Boolean));
+  const by = new Map();
+  for (const c of S.cases.filter(c => c.reflectTag && !linked.has(c.id))) {
+    const hd = suggestHeadings(c, S.reflections).find(x => short.has(x.headingId));
+    if (hd) (by.get(hd.headingId) || by.set(hd.headingId, []).get(hd.headingId)).push(c);
+  }
+  const n = [...by.values()].reduce((a, l) => a + l.length, 0);
+  return section('material', 'Reflection material', n ? `${n} ☆ case${n === 1 ? '' : 's'} for ${by.size} heading${by.size === 1 ? '' : 's'} still short` : 'No ☆ Interesting cases for the headings still short',
+    by.size ? h('ul', { class: 'an-list' }, [...by].map(([id, list]) => h('li', {}, h('b', {}, HEADING_BY_ID[id].name), ': ',
+      list.slice(0, 5).map((c, i) => [i ? ', ' : '', h('a', { href: '#reflect', class: 'an-link', onclick: e => { e.preventDefault(); reflectOnCase(c); } }, `${c.initials || 'Case'} ${fmtDate(c.date)}`)]),
+      list.length > 5 ? ` and ${list.length - 5} more` : ''))) : h('p', { class: 'empty' }, 'Star cases with ☆ Interesting on the Case tab; the ones that fit a heading you still need show here.'));
+}
+function milestonesCard(targetsOn) {
+  const list = milestones(S.cases, tagTarget(targetsOn));
+  if (!list.length) return null;
+  const say = x => (x.kind === 'first' ? 'Your first case' : x.kind === 'cases' ? `${x.n} cases` : `${catName(x.code)}: final target (${x.n}) reached`);
+  return section('milestones', 'Milestones', `${list.length} so far · latest: ${say(list[0])}`,
+    h('ul', { class: 'an-list' }, list.slice(0, 15).map(x => h('li', {}, say(x), h('small', { class: 'muted' }, ` · ${fmtDate(x.date)}`)))));
+}
+// an age read from the case text as years ("72M", "5yo", "3/12", "2/52", "10 d/o"), or null
+const ageOf = t => {
+  const a = splitAge(splitInitials(t).details).age; if (!a) return null;
+  const m = a.match(/^(\d+)(mo|m\/o|\/12|\/52|d\/o)?/i); if (!m) return null;
+  const n = Number(m[1]), u = (m[2] || '').toLowerCase();
+  return ['mo', 'm/o', '/12'].includes(u) ? n / 12 : u === '/52' ? n / 52 : u === 'd/o' ? n / 365 : n;
+};
+const share = (n, of) => (of ? Math.round(100 * n / of) + '%' : '–');
+const estFrom = (n, of) => h('p', { class: 'hint help', style: 'margin:6px 0 0' }, `Estimated from the words in ${n} of ${of} cases.`);
+function extraCards() {
+  if (!S.cases.length) return {};
+  const ages = ageMix(S.cases, ageOf), mix = caseMix(S.cases), hb = loggingHabits(S.cases, todayISO());
+  const bars = rows => h('ul', { class: 'an-list' }, rows.map(([label, n, of]) => h('li', {}, label, h('small', { class: 'muted' }, ` · ${n} (${share(n, of)})`))));
+  return {
+    ages: section('ages', 'Patient ages (estimated)', `from ${ages.known} of ${ages.total} cases`, bars(ages.bands.map(([l, n]) => [l, n, ages.known])), estFrom(ages.known, ages.total)),
+    mix: section('mix', 'Case mix (estimated)', `${mix.ga} GA · ${mix.regional} regional · ${mix.emergency} emergency`,
+      h('h3', {}, 'ASA'), bars(mix.asa.filter(([, n]) => n).map(([a, n]) => [`ASA ${a}`, n, mix.known.asa])), estFrom(mix.known.asa, mix.total),
+      h('h3', {}, 'Elective or emergency'), bars([['Elective', mix.elective, mix.known.urgency], ['Emergency', mix.emergency, mix.known.urgency]]), estFrom(mix.known.urgency, mix.total),
+      h('h3', {}, 'GA or regional'), bars([['GA', mix.ga, mix.known.technique], ['Regional', mix.regional, mix.known.technique]]), estFrom(mix.known.technique, mix.total)),
+    habits: section('habits', 'Logging habits', hb.median == null ? 'Not enough cases yet' : `${share(Math.round(hb.sameDay * hb.logged), hb.logged)} logged on the day · streak ${hb.now} day${hb.now === 1 ? '' : 's'}`,
+      h('ul', { class: 'an-list' },
+        h('li', {}, `Logged on the day of the case: ${share(Math.round((hb.sameDay || 0) * hb.logged), hb.logged)}`),
+        h('li', {}, `Usually logged: ${hb.median == null ? '–' : hb.median === 0 ? 'the same day' : hb.median + ' day' + (hb.median === 1 ? '' : 's') + ' after'}`),
+        h('li', {}, `Days in a row with a case: ${hb.now} now, ${hb.best} at most`))),
+  };
+}
+
+// ---------- Edit mode (owner, 15 Oct 2026): the cards in your order, some hidden; saved for the account ----------
+
+const CARD_NAMES = { urgent: 'Needs attention', finish: 'Finish line', month: 'This month', quiet: 'Gone quiet', targets: 'Logbook', counts: 'Tags', refl: 'Reflections',
+  material: 'Reflection material', todo: 'Reflection to-dos', milestones: 'Milestones', trends: 'Trends', ages: 'Patient ages', mix: 'Case mix', habits: 'Logging habits' };
+// the less important cards start hidden: Edit → Hidden cards → Show (owner, 15 Oct 2026)
+const OFF_CARDS = ['ages', 'mix', 'habits'];
+// cards: id -> its card, or null when this profile (or the data) has none; the cards a profile can't use aren't listed
+function layoutPage(head, cards) {
+  const ids = Object.keys(cards).filter(k => cards[k]);
+  const layout = settings().anLayout;
+  const { shown, hidden } = arrangeCards(ids, layout, OFF_CARDS);
+  if (pview.edit) return h('div', {}, head, editCard(ids, layout));
+  const edit = () => { pview.edit = true; hooks.render(); };
+  return h('div', {}, head,
+    h('div', { class: 'bar an-editbar' }, hidden.length ? h('span', { class: 'hint' }, `${hidden.length} card${hidden.length === 1 ? '' : 's'} hidden`) : null,
+      h('span', { style: 'flex:1' }), h('button', { type: 'button', class: 'small', onclick: edit }, 'Edit')),
+    ...shown.map(id => cards[id]));
+}
+function editCard(ids, layout) {
+  const { shown, hidden } = arrangeCards(ids, layout, OFF_CARDS);
+  const save = l => { patchLogbook({ settings: { anLayout: l } }); hooks.render(); };
+  const list = h('ul', { class: 'an-edit-list', role: 'list' }, shown.map((id, i) => h('li', { 'data-card': id },
+    h('span', { class: 'an-grip', 'aria-hidden': 'true', title: 'Drag to move', onpointerdown: e => drag(e, id) }, '⠿'),
+    h('span', { class: 'an-edit-name' }, CARD_NAMES[id] || id),
+    h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${CARD_NAMES[id]} up`, disabled: i === 0, onclick: () => save(moveCard(ids, layout, id, -1, OFF_CARDS)) }, '↑'),
+    h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${CARD_NAMES[id]} down`, disabled: i === shown.length - 1, onclick: () => save(moveCard(ids, layout, id, 1, OFF_CARDS)) }, '↓'),
+    h('button', { type: 'button', class: 'small', 'aria-label': `Hide ${CARD_NAMES[id]}`, onclick: () => save(hideCard(ids, layout, id, true, OFF_CARDS)) }, 'Hide'))));
+  const drag = (e, id) => gripDrag(e, list, (from, to) => save(moveCard(ids, layout, id, to - from, OFF_CARDS)));
+  return h('section', { class: 'card an-edit' },
+    h('h2', {}, 'Arrange Analytics'),
+    h('p', { class: 'hint help' }, 'Drag a card by ⠿, or use the arrows. Hidden cards wait below. Saved for your account.'),
+    list,
+    hidden.length ? [h('h3', {}, 'Hidden cards'), h('ul', { class: 'an-edit-list', role: 'list' }, hidden.map(id => h('li', {},
+      h('span', { class: 'an-edit-name' }, CARD_NAMES[id] || id),
+      h('button', { type: 'button', class: 'small', 'aria-label': `Show ${CARD_NAMES[id]}`, onclick: () => save(hideCard(ids, layout, id, false, OFF_CARDS)) }, 'Show'))))] : null,
+    h('div', { class: 'bar', style: 'margin:12px 0 0' },
+      h('button', { type: 'button', class: 'linkish', onclick: () => save(null) }, 'Reset layout'),
+      h('span', { style: 'flex:1' }),
+      h('button', { type: 'button', class: 'primary', onclick: () => { pview.edit = false; hooks.render(); } }, 'Done')));
+}
+resetters.push(() => { pview.edit = false; });
 
 // A folded card: the title and a one-line summary; tap to open the full section (kept open while you stay).
 // glance (optional, a .glance element): shown under the summary whether open or not.
@@ -338,24 +450,35 @@ export function renderTotals() {
   const mine = rYear();
   if (tview.year == null || !years.includes(tview.year)) tview.year = years.includes(mine) ? mine : years[0];
   const people = all.filter(s => (s.rYear || 0) === tview.year).sort((a, b) => String(a.name).localeCompare(String(b.name)));
-  const table = totalsTable(people);
+  // Compact (on by default, this device): initials across the top (a tap names the person), short category names, a
+  // key under the table; Show targets (on by default) at the bottom. The Excel downloads keep the full names.
+  const compact = display().totalsCompact !== false, targets = display().totalsTargets !== false;
+  const nameBar = h('p', { class: 'hint tname', 'aria-live': 'polite', style: 'margin:6px 0 0;min-height:1.2em' });
+  const table = totalsTable(people, { compact, targets, onName: (p, short) => { nameBar.textContent = `${short} = ${p.name} · ${p.smo ? 'SMO' : p.rYear ? yearName(p.rYear) : '?'}`; } });
+  const flip = (k, on) => () => { setDisplay({ [k]: on ? null : false }); hooks.render(); };
 
   add(card, 
     h('div', { class: 'bar' },
       h('h2', { style: 'margin:0' }, 'Programme totals'),
       h('select', { 'aria-label': 'Residency year', onchange: e => { tview.year = Number(e.target.value); hooks.render(); } },
         years.map(y => h('option', { value: String(y), selected: y === tview.year }, groupName(y, all)))),
+      h('button', { type: 'button', class: 'small', 'aria-pressed': String(compact), onclick: flip('totalsCompact', !compact) }, 'Compact'),
       h('span', { class: 'grow' }),
       h('button', { class: 'small', onclick: () => { tview.summaries = null; hooks.render(); } }, 'Refresh'),
-      h('button', { class: 'small', onclick: () => downloadTotals(table.data) }, 'Download Excel')),
-    h('p', { class: 'hint help' }, 'Case counts only, so residents can see how they compare. Under each tag: its targets. Colours use each resident’s own year (tap and hold a red or amber count to see how many short).'),
-    h('div', { class: 'bar' }, countSwitch()),
-    h('p', { class: 'hint help' }, countMode() === 'min'
-      ? 'Towards minimums: each tag counts up to its last target, so extra cases past it don’t add (tags without a target show –).'
-      : 'All tags: every case with that tag, all years added up. A case with 3 tags adds 3 to Total tags.'),
+      h('button', { class: 'small', onclick: () => downloadTotals(table.data) }, 'Download Excel'),
+      h('button', { class: 'small', onclick: () => downloadAllYears(all) }, 'Download all years (zip)')),
     legend(),
-    // scrolls sideways on phones: focusable and named so the keyboard can reach it
-    h('div', { class: 'scroll', style: 'margin-top:8px', tabindex: '0', role: 'region', 'aria-label': 'Totals table' }, table.el));
+    // scrolls both ways inside the card (focusable and named so the keyboard can reach it), so the names row and the
+    // category column stay put (owner, 15 Oct 2026)
+    compact ? nameBar : null,
+    h('div', { class: 'scroll tscroll', style: 'margin-top:8px', tabindex: '0', role: 'region', 'aria-label': 'Totals table' }, table.el),
+    table.key ? h('p', { class: 'hint tkey', style: 'margin:6px 0 0' }, table.key.map(([sh, n]) => `${sh} = ${n}`).join(' · ')) : null,
+    // how the counts add up, below the table (owner, 15 Oct 2026); and the target lines
+    h('div', { class: 'bar', style: 'margin-top:10px;align-items:center' }, countSwitch(),
+      h('label', { class: 'check', style: 'margin:0' }, h('input', { type: 'checkbox', checked: targets, onchange: flip('totalsTargets', !targets) }), 'Show targets')),
+    h('p', { class: 'hint help' }, countMode() === 'min'
+      ? 'Towards minimums: each category counts up to its last target, so extra cases past it don’t add (categories without a target show –).'
+      : 'All tags: every case with that category, all years added up. A case with 3 tags adds 3 to Total tags.'));
   return card;
 }
 
@@ -398,32 +521,29 @@ export function countSwitch() {
     [['all', 'All tags'], ['min', 'Towards minimums']].map(([v, t]) => h('button', { type: 'button', class: 'small', 'aria-pressed': String(countMode() === v), onclick: set(v) }, t)));
 }
 
-export function totalsTable(people) {
+// a Category cell: at most a third of the width; long names wrap, and a word too wide for it scrolls sideways inside
+// the cell (owner, 15 Oct 2026). No tooltips (tap and hold clashed with selecting text).
+const catCell = (...kids) => h('td', { class: 'cat' }, h('div', { class: 'cat-in' }, ...kids));
+export function totalsTable(people, { compact = false, targets = true, onName = null } = {}) {
+  const shorts = compact ? shortNames(people.map(p => p.name)) : null;
   const prog = people.map(p => Object.fromEntries(progress(p.counts || {}, p.rYear || 1).map(x => [x.code, x])));
   const codes = CATEGORIES.filter(c => !c.retired || people.some(p => (p.counts || {})[c.code])).map(c => c.code);
   const meId = S.resident && S.resident.rid;
   const data = { columns: people.map(p => `${p.name} (${p.smo ? 'SMO' : 'R' + (p.rYear || '?')})`), rows: [] };   // the download keeps R4/R5
   const tbody = h('tbody');
-  // How far behind: the earliest target a resident has missed (behind) or must meet this year (due)
-  const short = pr => {
-    if (!pr || (pr.status !== 'late' && pr.status !== 'due')) return 0;
-    const m = pr.milestones.find(x => !x.met && (x.due === 'past' || x.due === 'now'));
-    return m ? m.n - pr.count : 0;
-  };
   const min = countMode() === 'min';
   for (const code of codes) {
     const all = people.map(p => (p.counts || {})[code] || 0);
     // towards the minimums: up to the tag's last target; a tag without one counts towards none (–)
     const vals = min ? all.map(v => (finalTarget(code) == null ? null : towardsMinimum(code, v))) : all;
     const sts = prog.map(pr => (pr[code] ? pr[code].status : 'none'));
-    const gaps = prog.map(pr => short(pr[code]));
     // the targets under the name: "10 by R3 | 15 by R5"
     const t = BY_CODE[code].targets || {};
     const tgt = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${appYear(y)}`).join(' | ');
     const tgtR = R_YEARS.filter(y => t[y] != null).map(y => `${t[y]} by ${y}`).join(' | ');   // the download keeps R4/R5
     data.rows.push({ label: catName(code) + (tgtR ? ` [${tgtR}]` : ''), values: vals, statuses: sts });
-    add(tbody, h('tr', {}, h('td', { class: 'cat', title: BY_CODE[code].full }, catName(code), tgt ? h('small', { class: 'tgt' }, tgt) : null),
-      vals.map((v, i) => h('td', { class: `n ${sts[i]}`, title: gaps[i] ? `${gaps[i]} short of the target` : min && all[i] > (v || 0) ? `${all[i]} logged` : '' }, v == null ? '–' : String(v)))));
+    add(tbody, h('tr', {}, catCell(compact ? catShort(code) : catName(code), tgt && targets ? h('small', { class: 'tgt' }, tgt) : null),
+      vals.map((v, i) => h('td', { class: `n ${sts[i]}` }, v == null ? '–' : String(v)))));   // no tooltips: tap and hold clashed with selecting text (owner)
   }
   const totals = people.map(p => p.total || 0);
   const tags = people.map(p => tagTotal(p.counts, min ? 'min' : 'all'));
@@ -431,16 +551,33 @@ export function totalsTable(people) {
   const tagLabel = min ? `Total towards the minimums (of ${MINIMUM_TOTAL})` : 'Total tags (all cases, every year)';
   data.rows.push({ label: tagLabel, values: tags }, { label: 'Total cases', values: totals }, { label: 'Reflections (towards the 96 needed)', values: refl });
   add(tbody, 
-    h('tr', { class: 'total' }, h('td', { class: 'cat', title: min ? 'Each tag counted up to its last target' : 'Every tag on every case, added up (a case with 3 tags adds 3)' },
+    h('tr', { class: 'total' }, catCell(
       min ? 'Towards minimums' : 'Total tags', h('small', { class: 'tgt' }, min ? `of the ${MINIMUM_TOTAL} needed` : 'every tag on every case')), tags.map(v => h('td', { class: 'n' }, String(v)))),
-    h('tr', { class: 'total' }, h('td', { class: 'cat' }, 'Total cases'), totals.map(v => h('td', { class: 'n' }, String(v)))),
-    h('tr', {}, h('td', { class: 'cat', title: 'Counted towards each heading’s minimum only' }, 'Reflections', h('small', { class: 'tgt' }, 'towards the 96 needed')), refl.map(v => h('td', { class: 'n' }, String(v)))));
-  const thead = h('thead', {}, h('tr', {}, h('th', {}, 'Tag'),
-    people.map(p => h('th', { class: `rot ${p.rid === meId ? 'me' : ''}`, title: p.name }, `${p.name} · ${p.smo ? 'SMO' : p.rYear ? yearName(p.rYear) : '?'}`))));
+    h('tr', { class: 'total' }, catCell('Total cases'), totals.map(v => h('td', { class: 'n' }, String(v)))),
+    h('tr', {}, catCell('Reflections', h('small', { class: 'tgt' }, 'towards the 96 needed')), refl.map(v => h('td', { class: 'n' }, String(v)))));
+  const thead = h('thead', {}, h('tr', {}, h('th', {}, 'Category'),
+    people.map((p, i) => compact
+      ? h('th', { class: `ini-h ${p.rid === meId ? 'me' : ''}` }, h('button', { type: 'button', class: 'linkish ini-btn', 'aria-label': p.name, onclick: () => onName?.(p, shorts[i]) }, shorts[i]))
+      : h('th', { class: `rot ${p.rid === meId ? 'me' : ''}` }, `${p.name} · ${p.smo ? 'SMO' : p.rYear ? yearName(p.rYear) : '?'}`))));
   data.title = `${tview.year ? (tview.year === 3 && people.some(p => p.smo) ? 'R3 / SMO' : 'R' + tview.year) : 'Year unknown'} totals${min ? ' (towards the minimums)' : ''} — ${todayISO()}`;
-  return { el: h('table', { class: 'totals' }, thead, tbody), data };
+  return { el: h('table', { class: `totals${compact ? ' compact' : ''}` }, thead, tbody), data, key: compact ? people.map((p, i) => [shorts[i], p.name]) : null };
 }
 
+// every residency year's table, one Excel file each, in one zip (the count mode as shown)
+async function downloadAllYears(all) {
+  const was = tview.year;
+  try {
+    const [{ needZip }] = await Promise.all([import('./portfolio.js'), needExcel()]);
+    const zip = new (await needZip())();
+    for (const y of [...new Set(all.map(s => s.rYear || 0))].sort((a, b) => (a || 9) - (b || 9))) {
+      tview.year = y;   // totalsTable names the year from it
+      const people = all.filter(s => (s.rYear || 0) === y).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+      zip.file(`totals-${y ? groupName(y, all).replace(/[^A-Za-z0-9]+/g, '-') : 'year-unknown'}-${todayISO()}.xlsx`, await exportTotals(totalsTable(people).data));
+    }
+    download(`totals-all-years-${todayISO()}.zip`, await zip.generateAsync({ type: 'blob' }));
+  } catch (err) { toast('Could not export: ' + err.message); }
+  finally { tview.year = was; }
+}
 export async function downloadTotals(data, name = `totals-${tview.year ? 'R' + tview.year : 'year-unknown'}-${todayISO()}.xlsx`) {
   try {
     await needExcel();

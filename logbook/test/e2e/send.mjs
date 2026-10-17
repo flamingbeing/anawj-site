@@ -15,7 +15,7 @@ try { for (const width of [390, 1280]) {
   // every link the app opens is caught here, not followed
   await p.addInitScript(() => {
     window.__opened = [];
-    document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (a && /^(obsidian|upnote|myapp|https:\/\/wa\.me)/.test(a.getAttribute('href'))) { e.preventDefault(); window.__opened.push(a.getAttribute('href')); } }, true);
+    document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[href]'); if (a && /^(obsidian|upnote|myapp|shortcuts|https:\/\/wa\.me)/.test(a.getAttribute('href'))) { e.preventDefault(); window.__opened.push(a.getAttribute('href')); } }, true);
   });
   const opened = () => p.evaluate(() => window.__opened);
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
@@ -49,6 +49,14 @@ try { for (const width of [390, 1280]) {
   // "Try it" opens the link with a test text
   await p.getByRole('button', { name: 'Try it' }).click();
   assert.match((await opened())[0], /^obsidian:\/\/new\?vault=FakeVault&file=Logbook%2Ftest&content=Test%20from%20the%20Logbook$/);
+  // the iPhone presets (log2 12): Apple Notes runs the "Logbook to Notes" Shortcut with the text; its setup steps are here
+  await p.getByLabel('Add a place to send to').selectOption('applenotes');
+  await p.getByRole('button', { name: 'Try it' }).nth(1).click();
+  assert.equal((await opened())[1], 'shortcuts://run-shortcut?name=Logbook%20to%20Notes&input=text&text=Test%20from%20the%20Logbook');
+  await p.locator('summary', { hasText: 'Apple Notes on an iPhone' }).click();
+  await p.getByText('Name the shortcut exactly “Logbook to Notes”.').waitFor();
+  await p.getByRole('button', { name: 'Remove' }).nth(1).click();
+  await p.evaluate(() => { window.__opened.length = 1; });
 
   // the Send button now shows; sending opens the link with the day's Markdown, encoded
   await p.goto(base + '?demo#logbook');

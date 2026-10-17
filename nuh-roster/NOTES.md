@@ -172,6 +172,9 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
   logbook's pattern: shell cache-first, Firebase SDK cached, big vendor files cached on first use, "Update available:
   Reload" bar). Its VERSION base is `nuh-roster-v1`; the deploy stamps it, so PRs leave it alone. Not registered at the
   old anawj.com address. Offline, the app opens and My day shows the last roster this phone loaded.
+- App version (14 Oct): the bottom of Settings shows "App version <date> (<hash>)" from the `nuh-roster-` cache name and
+  "Not updating? Get the latest version": with signal it unregisters the service worker, deletes only `nuh-roster-` caches
+  and reloads (data in this browser and sign-in are kept); with no signal it changes nothing. Prewarm's pattern.
 - Opening the app on a past date (not today) moves the roster to tomorrow, with a toast to go back.
 - My day also has: Add to calendar (an .ics file made in the browser, `js/ics.js`; no feed URL, nothing sent), My
   week (the next 7 days: saved rosters, else leave and calls from the monthly rosters; viewers load the team's copies
@@ -188,11 +191,13 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - **Undo instead of "are you sure?"** for Generate new, Clear cases, Clear manpower, Reset to monthly rosters and restoring a saved version on the same date: the toast has an Undo button. Confirms stay only for what can't be undone.
 - **Person chip and box:** the same chip and box on Today, Cases, Roster, Premeds and Calls/clinics. On Calls/clinics a dashed chip comes from the monthly rosters (or the MOT call team for EOT 8 and 9); × on the only one stores `-` (nobody), and "↺ monthly" goes back to the monthly roster. The name and grade are read-only there; Edit opens the Staff tab on that person.
 - **Touch screens:** no dragging, no C / & / × icons. Tapping opens the box.
-- **Design:** "Kent Ridge Clinical" (NUHS website style):
-  - navy and white, Open Sans
-  - the four-colour band along the top of the header, as on the logbook: equal quarters of orange `#e57200`, red
-    `#e4002b`, blue `#178fd7` (not cyan) and navy `#002f6c`
-  - square panels, with only controls rounded
+- **Design:** the NUHS app kit (`../nuhsdesign/app.css` + `app.js`, linked after `tokens.css`; 15 Oct 2026): on a phone
+  it looks like a native app (translucent bar with the kit's four-quarter band, tab bar at the bottom, a large title
+  per tab, rounded cards on the grey ground, segmented controls, sheets, the kit's toast); on a computer the tabs are a
+  sidebar and the screen keeps the full width (`.a-main--wide`) for the tables. Phone font (system UI), navy tint,
+  light only. `style.css` keeps the roster's own names (`--navy`, `--chip`…) as aliases of the kit's colours; the band
+  is four equal quarters of orange `#e57200`, red `#e4002b`, blue `#178fd7` (not cyan) and navy `#002f6c`. Banners go in
+  `#bars` under the bar; Key and help, Keyboard shortcuts and What's new open as kit sheets (`aSheet.open`).
 - **Demo mode** (`?demo`): an invented department about the real size (39 seniors, 50 juniors); on the start day 5 are on leave and 2 seniors on an admin day (every weekday gets 2 senior admins); every monthly roster filled for the chosen month and the months either side (more are made as the date moves on), and made-up case notes for each new day (fewer at weekends). It uses separate storage and never signs in. Bump `DEMO_VERSION` in `js/app.js` when the demo data changes, so open demos start again.
 
 ## Working with the owner
@@ -262,8 +267,8 @@ HMS (the hospital's system) exports monthly rosters as PDFs. Each has a title "A
 - Download › "Image in 2 parts": the calls and lists, then the OT rooms (each with the title and date), so neither is
   shrunk past reading when WhatsApp compresses a tall photo (`buildRosterCanvas(layout, width, spans)`, `layout.otFrom`).
 - The draft's date (C5) is read by `dateFromText` (ISO, day-first d/m/y, "14 Oct 2026"), not `new Date()`, which reads
-  these differently in Safari. `test/design.test.mjs` checks every `/* n-… */` copy in style.css still matches
-  `nuhsdesign/tokens.css`; highlight yellows are `--hl-bg` / `--hl-line`.
+  these differently in Safari. `test/design.test.mjs` checks the kit is linked (and cached by `sw.js`), the band, and any `/* n-… */` copy in
+  style.css still matches `nuhsdesign/tokens.css`; highlight yellows are `--hl-bg` / `--hl-line`.
 - Fix names (13 Oct): names an import couldn't match (draft, rotation file, red names on a monthly roster) get a card
   with a picker per name (closest names first, by `sameNameScore`); saving keeps the spelling as that person's short
   name (in the staff log) and reads the draft or rotation file again (`lastDraft`, `lastRotFile`).

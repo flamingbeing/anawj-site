@@ -51,6 +51,14 @@ export const recoveryStore = {
     if (!succeeded) throw new Error('Local recovery storage is unavailable; keep your text in the editor');
     return [...new Map(records.filter(x => x.realm === realm).map(x => [x.key, x])).values()];
   },
+  // one change by key: the write queue reads it again before sending (another tab may have sent it). A fallback copy
+  // is the newer one (a successful IndexedDB write removes it); an unreadable database throws, never reads as gone.
+  async get(key) {
+    let record = null;
+    try { record = JSON.parse(localStorage.getItem(PREFIX + key)); } catch { /* storage blocked */ }
+    record ||= await transaction('readonly', store => store.get(key));
+    return record && record.realm === realm ? record : null;
+  },
   async remove(key) {
     try { await transaction('readwrite', store => store.delete(key)); } catch { /* fallback may be in use */ }
     try { localStorage.removeItem(PREFIX + key); } catch { /* blocked */ }
@@ -81,7 +89,7 @@ export function recordSignature(record) {
 export function checkWrite(current, desired, base) {
   if (recordSignature(current) === recordSignature(desired)) return false;
   if (recordSignature(current) !== recordSignature(base)) {
-    const error = new Error('This record changed elsewhere. Both versions are kept in Recent changes');
+    const error = new Error('This record changed elsewhere. Both versions are kept in Recover');
     error.code = 'write-conflict'; error.remote = current || null; throw error;
   }
   return true;

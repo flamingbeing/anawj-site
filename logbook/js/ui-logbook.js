@@ -1,7 +1,7 @@
 // Logbook screen: every case, newest first (list) or by day (calendar). Search, filter, flags, edit; a grid view for bulk edits
 // and pasting rows from Excel; Excel download and upload (round trip with a preview of the changes).
 
-import { duplicates, fmtDate, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow, nth, cleanInitials, procedureText, textHas, guessMapping, rowsFromGrid, IMPORT_FIELDS, caseFromRow, weekLead, weekdayNames } from './engine.js';
+import { duplicates, fmtDate, diffRows, sortCodes, withParents, caseParts, caseText, dateWindow, nth, cleanInitials, procedureText, textHas, guessMapping, rowsFromGrid, IMPORT_FIELDS, caseFromRow, weekLead, weekdayNames, finalTarget } from './engine.js';
 import { flagCase } from './importer.js';
 import { exportWorkbook, readSheetGrid } from './xlsxio.js';
 import { cleanExportOpts, exportTables, rangeText, CASE_COLS, REFL_COLS } from './export-opts.js';
@@ -10,35 +10,45 @@ import { parseQuery, matchQuery, OPERATOR_HELP, insertOperator, FIELDS, FIELDS_N
 import { parseCsv } from './tags.js';
 import {
   S, h, toast, debounce, modal, cat, categoryNamesRevision, catName, catShort, tagName, catFull, catChip, PICKER_ORDER, settings, patchLogbook, needExcel, download, fileButton, catPills,
-  updateCase, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, tagLinks, confirmBox, keepTags, hooks, rowIcon, ic, ib, emptyState, reveal, basicHides } from './ui-core.js';
+  updateCase, updateMany, updatedToast, saveMany, deleteMany, displayName, rYear, todayISO, fill, add, resetters, tagSet, confirmBox, hooks, rowIcon, ic, ib, emptyState, reveal, basicHides, effectiveIntake, residentSmo } from './ui-core.js';
 import { dayHasNotes, caseHasNotes, openNotes, ensureNotes, dayNoteCard } from './ui-notepad.js';
 import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
-import { reflectOnCase } from './ui-reflect.js';
+import { reflectOnCase, openReflection } from './ui-reflect.js';
 import { moveToBin } from './bin.js';
+import { display, setDisplay } from './display.js';
 import { destinations, openSend } from './ui-send.js';
 import { syncButton } from './ui-sync.js';
 import { shareText, copyText, caseText as shareCaseText, dayTextWithNotes } from './share.js';
 import { labelsOn, parseParts, rowSegments, findLabel, takeHas } from './parts.js';
 import { cloud, shows } from './ui-core.js';
 import { evalRequestUrl, evalsBase } from './eval-link.js';
+import { bulkEditDialog } from './ui-bulk.js';
+import { pagesOf, pageSize, clampPage, PAGE_SIZES } from './paging.js';
+import { GROUPS, SORTS, groupBy, sortBy, sortCases, groupCases, entriesOf } from './lb-group.js';
+import { caseRYear } from './portfolio.js';
+import { yearName } from './categories.js';
 
 // has: tags a case must all have; not: tags it must have none of ('c:16' or a personal tag key); from/to: dates
-const FRESH = () => ({ q: '', has: [], not: [], from: '', to: '', flag: '', mode: null, limit: 150, month: null, day: null });
+const FRESH = () => ({ q: '', has: [], not: [], from: '', to: '', flag: '', mode: null, page: 0, month: null, day: null, fold: new Set() });
 const view = FRESH();
 resetters.push(() => Object.assign(view, FRESH()));   // next user starts unfiltered
+// Select (List and the calendar's day list): press and hold a row, or the Select button; the bar at the bottom says
+// how many, Select all (the whole search, not only the rows shown), Select none, Bulk edit… and Done
+const sel = { on: false, ids: new Set(), paint: null };
+resetters.push(() => { sel.on = false; sel.ids.clear(); });
 // open the Logbook on a day (Settings → Logging → After Save: "Go to the Logbook"); ui-log.js calls it through hooks
 hooks.showDay = iso => { view.month = iso.slice(0, 7); view.day = iso; };
 // open the Logbook (List) on the cases behind a number in Analytics: a tag ('c:16' or a personal tag key) and/or a
 // date range. Other filters are cleared so the list matches the number tapped.
 hooks.showCases = ({ tag = null, from = '', to = '' } = {}) => {
-  Object.assign(view, { q: '', has: tag ? [tag] : [], not: [], from, to, flag: '', limit: 150, mode: 'list' });
+  Object.assign(view, { q: '', has: tag ? [tag] : [], not: [], from, to, flag: '', page: 0, mode: 'list' });
 };
 const hasTag = (c, k) => (k.startsWith('c:') ? (c.cats || []).includes(k.slice(2)) : (c.tags || []).includes(k));
-const keyName = k => (k.startsWith('c:') ? catShort(k.slice(2)) : tagName(k));
+export const keyName = k => (k.startsWith('c:') ? catShort(k.slice(2)) : tagName(k));
 // Every tag to filter or bulk-tag by: the tag list, then tags taken off it that cases still carry
 // (so they can be found and removed). -> [{ k, depth, label }]
-function tagChoices() {
+export function tagChoices() {
   const set = tagSet();
   const out = flatTree(tagTree(set)).filter(n => n.kind !== 'head').map(n => ({ k: n.e.k, depth: n.depth, label: keyName(n.e.k) }));
   const known = new Set(set.map(e => e.k)), gone = new Map();
@@ -85,7 +95,7 @@ function catTags(cats) {
 }
 
 export function renderLogbook() {
-  const wrap = h('div');
+  const wrap = h('div', { class: 'lb-wrap' });
   const list = h('div');
   const dupIds = new Set(duplicates(S.cases).flatMap(g => g.slice(1))); // the later copies
   const flagsOf = c => [...flagCase(c), ...(dupIds.has(c.id) ? ['duplicate'] : [])];
@@ -142,9 +152,34 @@ export function renderLogbook() {
     const rows = filtered();
     fill(list, view.mode === 'grid' ? gridView(rows, paint) : view.mode === 'calendar' ? calendarView(rows, flagsOf, paint) : listView(rows, flagsOf, paint));
     counter.textContent = rows.length === S.cases.length ? `${S.cases.length} cases` : `${rows.length} of ${S.cases.length} cases`;
-    bulkBtn.textContent = `Tag ${rows.length === S.cases.length ? 'all ' : ''}${rows.length} case${rows.length === 1 ? '' : 's'}…`; bulkBtn.disabled = !rows.length;
+    bulkBtn.textContent = `Edit ${rows.length === S.cases.length ? 'all ' : ''}${rows.length} case${rows.length === 1 ? '' : 's'}…`; bulkBtn.disabled = !rows.length;
+    selectBtn.hidden = view.mode === 'grid' || !S.cases.length;
+    groupRow.hidden = view.mode !== 'list';
+    paintSel();
   };
-  const paintSoon = debounce(() => { view.limit = 150; paint(); }, 150);
+  // the selection: cases since deleted drop out; the grid has its own editing, so selecting stops there
+  const startSel = (ids = []) => { sel.on = true; for (const id of ids) sel.ids.add(id); paint(); };
+  const endSel = () => { sel.on = false; sel.ids.clear(); paint(); };
+  const selBar = h('div', { class: 'sel-bar', role: 'region', 'aria-label': 'Selected cases', hidden: true });
+  const paintSel = () => {
+    if (view.mode === 'grid') { sel.on = false; sel.ids.clear(); }
+    const have = new Set(S.cases.map(c => c.id));
+    for (const id of sel.ids) if (!have.has(id)) sel.ids.delete(id);
+    wrap.classList.toggle('selecting', sel.on);
+    selBar.hidden = !sel.on;
+    if (!sel.on) return fill(selBar);
+    const rows = filtered(), n = sel.ids.size;
+    fill(selBar,
+      h('span', { class: 'sel-n', 'aria-live': 'polite' }, `${n} selected`),
+      h('button', { class: 'small', disabled: rows.length && rows.every(c => sel.ids.has(c.id)), onclick: () => { for (const c of rows) sel.ids.add(c.id); paint(); } }, rows.length === S.cases.length ? `Select all ${rows.length}` : `Select all ${rows.length} found`),
+      h('button', { class: 'small', disabled: !n, onclick: () => { sel.ids.clear(); paint(); } }, 'Select none'),
+      h('span', { class: 'grow' }),
+      h('button', { class: 'small primary', disabled: !n, onclick: () => openBulk() }, 'Bulk edit…'),
+      h('button', { class: 'small', onclick: endSel }, 'Done'));
+  };
+  sel.paint = paintSel;
+  const openBulk = () => bulkEditDialog(S.cases.filter(c => sel.ids.has(c.id)), { tags: tagChoices(), name: keyName, onDone: () => endSel() });
+  const paintSoon = debounce(() => { view.page = 0; paint(); }, 150);   // (a new search starts at page 1)
 
   const nFlag = f => S.cases.filter(c => flagsOf(c).includes(f)).length;
   // with Labelled parts on, one more for each label: "Has learning point (12)"
@@ -167,7 +202,9 @@ export function renderLogbook() {
   const hasRow = h('div', { class: 'chips lb-tagrow' });
   const notRow = h('div', { class: 'chips lb-tagrow' });
   const dateIn = k => h('input', { type: 'date', value: view[k], 'aria-label': k === 'from' ? 'From' : 'To', onchange: e => { view[k] = e.target.value; refresh(); } });
-  const bulkBtn = h('button', { class: 'small', onclick: () => bulkTag(filtered()) });
+  // Edit N cases…: every case in the search, selected, into Bulk edit
+  const bulkBtn = h('button', { class: 'small', onclick: () => { const rows = filtered(); if (!rows.length) return; if (view.mode === 'grid') setMode('list'); startSel(rows.map(c => c.id)); openBulk(); } });
+  const selectBtn = h('button', { class: 'small lb-selbtn', title: 'Select cases to edit, copy or move to the bin together', onclick: () => (sel.on ? endSel() : startSel()) }, 'Select');
   const flagSel = h('select', { 'aria-label': 'Filter by flag', onchange: e => { view.flag = e.target.value; refresh(); } },
     flagOpts.map(([v, l]) => h('option', { value: v, selected: view.flag === v }, l)));
   // compact: two columns on a phone, so the panel doesn't fill the screen
@@ -200,8 +237,11 @@ export function renderLogbook() {
     // a fold in use opens (a saved search with tags or dates); closing is left to the toggle
     for (const [b, body, on] of [[dateBtn, datePanel, view.from || view.to], [tagBtn, tagPanel, n]]) if (on && body.hidden) { body.hidden = false; b.setAttribute('aria-expanded', 'true'); }
   };
+  const [groupSel, sortSel] = groupSelects(() => paint());
+  const groupRow = h('div', { class: 'lb-grid lb-grouprow', hidden: view.mode !== 'list' }, cell('Group by', groupSel), cell('Sort', sortSel));
   const filters = h('div', { class: 'lb-filters', hidden: !(view.showFilters || active()) },
     h('div', { class: 'lb-grid' }, cell('Show', flagSel), cell('Search in', searchIn)),
+    groupRow,
     h('div', { class: 'bar lb-folds' }, dateBtn, tagBtn, moreBtn, resetBtn),
     datePanel, tagPanel, morePanel,
     labelList.length ? h('p', { class: 'lb-points' }, h('a', { href: '#points' }, 'All learning points ›')) : null);
@@ -229,13 +269,15 @@ export function renderLogbook() {
   const savedRow = h('div', { class: 'chips lb-saved' });
   const paintSaved = () => {
     const list = settings().savedSearches || [];
-    fill(savedRow, ...list.map(x => h('span', { class: 'chip tmpl', role: 'button', tabindex: '0', title: 'Run this search' + (x.q ? `: “${x.q}”` : ''), onclick: () => {
+    fill(savedRow, ...list.map(x => h('span', { class: 'chip tmpl', role: 'button', tabindex: '0', title: (x.global ? 'Run this search in Search' : 'Run this search') + (x.q ? `: “${x.q}”` : ''), onclick: async () => {
+      // saved on the Search page (cases, reflections and notes): it runs there
+      if (x.global) { const { searchFor } = await import('./ui-search.js'); return searchFor(x.q); }
       Object.assign(view, { q: x.q || '', has: [...(x.has || [])], not: [...(x.not || [])], from: x.from || '', to: x.to || '', flag: x.flag || '' });
       setBox(view.q);
       if (x.scope) setOpts(x.scope, !!settings().lbFuzzy);
       const [f, t] = filters.querySelectorAll('input[type=date]'); if (f) f.value = view.from; if (t) t.value = view.to;
       filters.hidden = false; refresh();
-    } }, ic('star'), x.name, h('span', { class: 'x', role: 'button', tabindex: '0', 'aria-label': 'Delete saved search', onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); e.target.click(); } }, onclick: async e => {
+    } }, x.global ? ic('search') : ic('star'), x.name, h('span', { class: 'x', role: 'button', tabindex: '0', 'aria-label': 'Delete saved search', onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); e.target.click(); } }, onclick: async e => {
       e.stopPropagation();
       if (!(await confirmBox('Delete saved search', `Delete “${x.name}”?`, 'Delete', true))) return;
       await patchLogbook({ settings: { savedSearches: (settings().savedSearches || []).filter(y => y.id !== x.id) } }); paintSaved();
@@ -250,7 +292,7 @@ export function renderLogbook() {
     await patchLogbook({ settings: { savedSearches: [...list, x].slice(-20) } });
     paintSaved(); toast(`Saved “${name}”`);
   }
-  function refresh() { flagSel.value = view.flag; paintFilterBtn(); repaintFilters(); view.limit = 150; paint(); }
+  function refresh() { flagSel.value = view.flag; paintFilterBtn(); repaintFilters(); view.page = 0; paint(); }
   function active() { return !!(view.has.length || view.not.length || view.from || view.to || view.flag || (settings().lbScope || 'all') !== 'all' || settings().lbFuzzy || settings().lbCase); }
   const filterBtn = h('button', { class: 'small ib', title: 'Filter', 'aria-expanded': String(!filters.hidden), onclick: () => {
     const open = filters.hidden; view.showFilters = open; reveal(filters, open); filterBtn.setAttribute('aria-expanded', String(open));
@@ -286,54 +328,22 @@ export function renderLogbook() {
     h('div', { class: 'bar', style: 'margin-bottom:0' },
       // Sync (Settings → Sync): only once a place to sync to is set up; it says how many days wait (and then the
       // gap may shrink, so the view switch stays on this row on a phone)
-      ...(sb => [counter, h('span', { class: 'grow', style: sb ? 'min-width:0' : null }), sb])(syncButton()),
+      ...(sb => [counter, h('span', { class: 'grow', style: sb ? 'min-width:0' : null }), sb])(syncButton()), selectBtn,
       h('div', { class: 'seg' }, modes().map(([m, l]) =>
         h('button', { 'aria-pressed': String(view.mode === m), onclick: () => setMode(m) }, l)))));
   // pinned (Settings → Display): the month headings in List stick just under it
   if ('ResizeObserver' in window) new ResizeObserver(() => wrap.style.setProperty('--lb-top-h', top.offsetHeight + 'px')).observe(top);
-  add(wrap, top, h('section', { class: 'card' }, list));
+  add(wrap, top, h('section', { class: 'card' }, list), selBar);
+  // a press and hold (or the row menu's Select) starts selecting from that row
+  hooks.selectCase = c => { if (view.mode === 'grid') return; startSel([c.id]); };
   paint();
   return wrap;
 
   function setMode(m) {
-    view.mode = m; view.limit = 150; paint();
+    view.mode = m; view.page = 0; paint();
     wrap.querySelectorAll('.seg button').forEach((b, i) => b.setAttribute('aria-pressed', String(modes()[i][0] === m)));
     if (settings().logbookView !== m) patchLogbook({ settings: { logbookView: m } });  // remembered per user
   }
-}
-
-// Add a tag to, or take one off, every case in the search results.
-function bulkTag(rows) {
-  if (!rows.length) return;
-  const tags = tagChoices();
-  const act = h('select', {}, h('option', { value: 'add' }, 'Add'), h('option', { value: 'remove' }, 'Remove'));
-  const sel = h('select', {}, h('option', { value: '' }, 'Choose a tag…'), tags.map(n => h('option', { value: n.k }, `${'  '.repeat(Math.min(n.depth, 3))}${n.label}`)));
-  const m = modal(`Tag ${rows.length} case${rows.length === 1 ? '' : 's'}`, [
-    h('p', { class: 'hint help' }, 'Applies to every case in the current search results.'),
-    h('div', { class: 'bar', style: 'gap:8px' }, act, sel),
-    h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }),
-      h('button', { onclick: () => m.close() }, 'Cancel'),
-      h('button', { class: 'primary', onclick: async () => {
-        const k = sel.value; if (!k) return toast('Choose a tag');
-        const add = act.value === 'add', code = k.startsWith('c:') ? k.slice(2) : null;
-        const next = rows.filter(c => hasTag(c, k) !== add).map(c => {
-          const out = { ...c, updatedAt: Date.now() };
-          if (code) {
-            out.cats = add ? sortCodes(withParents([...(c.cats || []), code])) : (c.cats || []).filter(x => x !== code && cat(x).parent !== code);
-            // your tags that sit under a removed APMES tag go with it (as in the edit dialog)
-            if (!add) { out.tags = keepTags(c.tags, out.cats); if (!out.tags.length) delete out.tags; }
-          } else {
-            out.tags = add ? [...new Set([...(c.tags || []), k])] : (c.tags || []).filter(x => x !== k);
-            if (add) out.cats = sortCodes(withParents([...(c.cats || []), ...tagLinks(k)]));   // a tag that counts towards APMES ticks them
-            if (!out.tags.length) delete out.tags;
-          }
-          return out;
-        });
-        await m.close();
-        if (!next.length) return toast(add ? 'They all have it already' : 'None of them have it');
-        if (!(await confirmBox('Change cases?', `${add ? 'Add' : 'Remove'} “${keyName(k)}” ${add ? 'to' : 'from'} ${next.length} case${next.length === 1 ? '' : 's'}?`, add ? 'Add' : 'Remove', !add))) return;
-        try { await saveMany(next); toast(`${next.length} case${next.length === 1 ? '' : 's'} updated`); } catch (err) { toast('Could not save: ' + err.message); }
-      } }, 'Apply'))]);
 }
 
 // ---------- list ----------
@@ -352,17 +362,90 @@ function monthHead(label, ul) {
 function listView(rows, flagsOf, repaint) {
   if (!S.cases.length) return emptyState('logbook', 'No cases yet', 'Cases you log show here, newest first.', h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
   if (!rows.length) return emptyState('search', 'No cases match', 'Try fewer words, or clear the filters.');
+  const by = groupBy(display().lbGroup), sort = sortBy(display().lbSort);
   const ul = h('ul', { class: 'cases' });
-  let month = '';
-  for (const c of rows.slice(0, view.limit)) {
-    const m = c.date ? fmtDate(c.date).replace(/^\d+ /, '') : 'No date';
-    if (m !== month) { month = m; add(ul, monthHead(m, ul)); }
-    add(ul, caseRow(c, flagsOf));
+  // the default (Month, Newest): as it always was, with Jump to a date on each month
+  if (by === 'month' && sort === 'newest') {
+    const pg = pager(rows, repaint);
+    let month = '';
+    for (const c of pg.rows) {
+      const m = c.date ? fmtDate(c.date).replace(/^\d+ /, '') : 'No date';
+      if (m !== month) { month = m; add(ul, monthHead(m, ul)); }
+      add(ul, caseRow(c, flagsOf));
+    }
+    return h('div', {}, pg.bar(), ul, pg.bar(true));
   }
-  const more = rows.length > view.limit
-    ? h('div', { class: 'bar', style: 'justify-content:center;margin-top:12px' }, h('button', { onclick: () => { view.limit += 300; repaint(); } }, `Show more (${rows.length - view.limit} left)`))
-    : null;
-  return h('div', {}, ul, more);
+  const groups = groupCases(sortCases(rows, sort, groupCtx()), by, sort, groupCtx());
+  // a folded group is one heading on its page; the pages count the cases shown (a case under two tags counts twice)
+  const folded = g => view.fold.has(`${by}:${g.key}`);
+  const all = groups.flatMap(g => (folded(g) ? [{ g, c: null, first: true, fold: true }] : entriesOf([g])));
+  const pg = pager(all.map(e => ({ ...e, date: e.c ? e.c.date : '' })), repaint);
+  let cur = null;
+  for (const e of pg.rows) {
+    if (e.g !== cur) { cur = e.g; add(ul, groupHead(e.g, by, !e.first, folded(e.g), repaint)); }
+    if (e.fold) continue;
+    if (e.g.planned) { add(ul, ...e.g.planned.map(p => h('li', { class: 'lb-planned' }, h('a', { href: '#log' }, `${p.date ? fmtDate(p.date) + ' · ' : ''}${caseText(p).slice(0, 80) || 'Planned case'}`)))); continue; }
+    add(ul, caseRow(e.c, flagsOf));
+  }
+  return h('div', {}, pg.bar(), ul, pg.bar(true));
+}
+
+// Group by and Sort (log2 14; this device), in the Filter panel while the List shows: Month (the default) / Day / Week /
+// Residency year / APMES tag / Your tags / Flags / None; Newest / Oldest / Initials A–Z / Most tags. Groups fold.
+function groupSelects(repaint) {
+  const pick = (label, key, opts, val) => h('select', { 'aria-label': label, onchange: e => { const v = e.target.value; setDisplay({ [key]: v === opts[0][0] ? null : v }); view.page = 0; repaint(); } },
+    opts.map(([v, t]) => h('option', { value: v, selected: v === val }, t)));
+  const groups = GROUPS.filter(([k]) => !(k === 'year' && basicHides('year')));
+  return [pick('Group by', 'lbGroup', groups, groupBy(display().lbGroup)), pick('Sort', 'lbSort', SORTS, sortBy(display().lbSort))];
+}
+
+// what the grouping needs from the app: names, residency years, targets and counts, the planned cases
+function groupCtx() {
+  const intake = effectiveIntake(), smo = residentSmo(S.resident);
+  const order = new Map(PICKER_ORDER.map((c, i) => [c.code, i]));
+  const targets = !basicHides('targets');
+  return {
+    initials: c => caseParts(c).initials || '', tagCount: c => (c.cats || []).length + (c.tags || []).length,
+    weekStart: settings().weekStart == null || settings().weekStart === '' ? 1 : Number(settings().weekStart),
+    year: d => (intake ? caseRYear(d, intake, smo) : null), yearName,
+    day: iso => fmtDate(iso), catName, order: k => (order.has(k) ? order.get(k) : 999),
+    target: k => (targets ? finalTarget(k) : null), count: k => (S.counts || {})[k] || 0, tagName,
+    plan: S.logbook && Array.isArray(S.logbook.plan) ? S.logbook.plan : [],
+  };
+}
+
+// A group's heading: tap to fold or unfold it; while selecting, "Select these" ticks the whole group
+function groupHead(g, by, cont, isFolded, repaint) {
+  const id = `${by}:${g.key}`, n = g.planned ? g.planned.length : g.items.length;
+  const toggle = h('button', { type: 'button', class: 'lb-gfold', 'aria-expanded': String(!isFolded), onclick: () => { if (view.fold.has(id)) view.fold.delete(id); else view.fold.add(id); repaint(); } },
+    h('span', { class: 'lb-gfold-i', 'aria-hidden': 'true' }, isFolded ? '▸' : '▾'), ' ',
+    h('span', { class: 'mh-name' }, g.label + (cont ? ' (continued)' : '')), ' ',
+    h('span', { class: 'muted' }, [`${n} ${g.planned ? 'planned' : n === 1 ? 'case' : 'cases'}`, g.note].filter(Boolean).join(' · ')));
+  const pickAll = sel.on && !g.planned && n ? h('button', { type: 'button', class: 'small', onclick: () => { for (const c of g.items) sel.ids.add(c.id); repaint(); } }, `Select these ${n}`) : null;
+  return h('li', { class: 'monthhead lb-ghead' }, toggle, pickAll);
+}
+
+// Pages (log2 11; owner, 15 Oct 2026): 100 cases a page by default (25 / 50 / 100 / 300 / All, this device);
+// "‹ Page 2 of 14 ›" with a list of the pages and their dates to jump to. A new search or filter starts at page 1.
+// -> { rows (this page's), bar(bottom) }
+function pager(rows, repaint) {
+  const size = pageSize(display().pageSize), pages = pagesOf(rows, size);
+  view.page = clampPage(view.page, pages.length);
+  const cur = pages[view.page];
+  const go = i => { view.page = clampPage(i, pages.length); repaint(); window.scrollTo({ top: 0 }); };
+  const span = pg => (pg.from && pg.to ? (pg.from === pg.to ? fmtDate(pg.from) : `${fmtDate(pg.from)} – ${fmtDate(pg.to)}`) : 'No date');
+  const bar = (bottom = false) => {
+    if (pages.length <= 1 && (bottom || rows.length <= PAGE_SIZES[0])) return null;
+    return h('div', { class: 'bar lb-pager' + (bottom ? ' bottom' : '') },
+      pages.length > 1 ? h('button', { class: 'small icon-btn', 'aria-label': 'Previous page', disabled: view.page === 0, onclick: () => go(view.page - 1) }, '‹') : null,
+      pages.length > 1 ? h('select', { class: 'lb-pagesel', 'aria-label': 'Page', onchange: e => go(Number(e.target.value)) },
+        pages.map((pg, i) => h('option', { value: String(i), selected: i === view.page }, `Page ${i + 1} of ${pages.length} · ${span(pg)}`))) : null,
+      pages.length > 1 ? h('button', { class: 'small icon-btn', 'aria-label': 'Next page', disabled: view.page >= pages.length - 1, onclick: () => go(view.page + 1) }, '›') : null,
+      bottom ? null : h('span', { class: 'grow' }),
+      bottom ? null : h('select', { class: 'lb-pagesize', 'aria-label': 'Cases per page', onchange: e => { setDisplay({ pageSize: Number(e.target.value) === 100 ? null : Number(e.target.value) }); view.page = 0; repaint(); } },
+        PAGE_SIZES.map(n => h('option', { value: String(n), selected: n === size }, n ? `${n} per page` : 'All on one page'))));
+  };
+  return { rows: rows.slice(cur.start, cur.end), bar };
 }
 
 // One case: date, details, procedure tags, flags. Tap to edit. Shared by the list and the calendar.
@@ -377,6 +460,7 @@ function openRowMenu(c) {
     // APMES → Request an evaluation (off by default): the evaluations app, with this case's date and initials
     shows('evalRequest') ? h('a', { class: 'btn eval-req', href: evalRequestUrl({ date: c.date, initials: caseParts(c).initials }, { today: todayISO(), demo: cloud.demo, base: evalsBase(location.href) }), target: '_blank', rel: 'noopener', onclick: () => m.close() }, rowIcon('reflect'), ' Request an evaluation') : null,
     h('button', { onclick: () => { m.close(); editCaseDialog(c); } }, ' Edit the case'),
+    hooks.selectCase && S.tab === 'logbook' ? h('button', { onclick: () => { m.close(); hooks.selectCase(c); } }, ' Select (to edit several)') : null,
     h('button', { class: 'linkish', onclick: () => m.close() }, 'Cancel')));
 }
 function rowMenu(c) {
@@ -406,24 +490,46 @@ function swallowNextClick() {
   window.addEventListener('pointerup', off, { capture: true, once: true });
   window.addEventListener('pointercancel', off, { capture: true, once: true });
 }
-function holdToMenu(li, c) {
-  let t = 0, x = 0, y = 0;
+// With Press and hold off (the default), holding a row starts selecting from it (owner, 15 Oct 2026); with it on, the
+// hold opens the menu, which has Select. While selecting, a hold does nothing more (a tap ticks).
+function holdToMenu(li, c, menu = true) {
+  let t = 0, x = 0, y = 0, held = 0;
   const stop = () => { clearTimeout(t); t = 0; };
+  const act = () => (menu ? openRowMenu(c) : hooks.selectCase?.(c));
   li.addEventListener('pointerdown', e => {
-    if (e.button !== 0 || e.target.closest('button, a, input')) return;
+    if (e.button !== 0 || e.target.closest('button, a, input') || (!menu && sel.on)) return;
     x = e.clientX; y = e.clientY; stop();
-    t = setTimeout(() => { t = 0; swallowNextClick(); try { navigator.vibrate?.(10); } catch { /* not allowed */ } openRowMenu(c); }, HOLD_MS);
+    t = setTimeout(() => { t = 0; held = Date.now(); swallowNextClick(); try { navigator.vibrate?.(10); } catch { /* not allowed */ } act(); }, HOLD_MS);
   });
   li.addEventListener('pointermove', e => { if (t && Math.hypot(e.clientX - x, e.clientY - y) > 10) stop(); });
   for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) li.addEventListener(ev, stop);
-  // Android's long press and a right-click: the same menu instead of the browser's (unless the hold already opened it)
-  li.addEventListener('contextmenu', e => { e.preventDefault(); if (document.querySelector('dialog[open] .row-menu-list')) return; stop(); openRowMenu(c); });
+  // Android's long press and a right-click: the same menu instead of the browser's (unless the hold already opened it);
+  // for Select, only the touch long press that just selected (a right-click keeps the browser's menu)
+  li.addEventListener('contextmenu', e => {
+    // (Android may send it a moment before the half second: then it starts selecting there and then)
+    if (!menu) { if (t) { e.preventDefault(); stop(); held = Date.now(); swallowNextClick(); act(); } else if (Date.now() - held < 1000) e.preventDefault(); return; }
+    e.preventDefault(); if (document.querySelector('dialog[open] .row-menu-list')) return; stop(); openRowMenu(c);
+  });
+}
+// tick or untick a row while selecting (no repaint: the bar's count and the row change in place)
+function toggleSel(c, li, setBox = true) {
+  const on = !sel.ids.has(c.id);
+  if (on) sel.ids.add(c.id); else sel.ids.delete(c.id);
+  li.classList.toggle('sel', on);
+  const box = li.querySelector('.sel-box'); if (box && setBox) box.checked = on;
+  sel.paint?.();
 }
 
 function caseRow(c, flagsOf) {
   const flags = flagsOf(c);
   const p = caseParts(c);
-  const li = h('li', { 'data-date': c.date || '', onclick: () => editCaseDialog(c), tabindex: '0', onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) editCaseDialog(c); } },
+  const picking = sel.on && S.tab === 'logbook', picked = picking && sel.ids.has(c.id);
+  const open = () => (picking ? toggleSel(c, li) : editCaseDialog(c));
+  // while selecting, the row's checkbox takes the keyboard (one stop a row) and says which case it is
+  const li = h('li', { 'data-date': c.date || '', class: picked ? 'sel' : null, onclick: open, tabindex: picking ? '-1' : '0',
+      onkeydown: e => { if ((e.key === 'Enter' || (picking && e.key === ' ')) && e.target === e.currentTarget) { e.preventDefault(); open(); } } },
+      picking ? h('input', { type: 'checkbox', class: 'sel-box', checked: picked, 'aria-label': `Select ${[p.initials, c.date ? fmtDate(c.date) : '', String(p.details || '').slice(0, 40)].filter(Boolean).join(', ') || 'this case'}`,
+        onclick: e => { e.stopPropagation(); toggleSel(c, li, false); } }) : null,
       // the left column: the initials on top, the date on one line under them (like Reflections; owner, 13 Oct 2026)
       h('span', { class: 'd' }, p.initials ? h('b', { class: 'ini' }, p.initials) : null,
         h('span', { class: 'dt' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '')] : (c.dateText || '—'))),
@@ -445,7 +551,7 @@ function caseRow(c, flagsOf) {
           basicHides('reflect') ? null : (S.reflections || []).some(r => r.caseId === c.id)
             ? h('button', { class: 'small row-btn has-refl', title: 'Open the reflection on this case', 'aria-label': 'Open the reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } }, rowIcon('done'), h('span', { class: 'lbl' }, 'Reflect'))
             : h('button', { class: 'small row-btn', title: 'Write a reflection on this case', 'aria-label': 'Write a reflection on this case', onclick: e => { e.stopPropagation(); reflectOnCase(c); } }, rowIcon('reflect'), h('span', { class: 'lbl' }, 'Reflect')))));
-  if (document.documentElement.classList.contains('row-hold')) holdToMenu(li, c);
+  holdToMenu(li, c, document.documentElement.classList.contains('row-hold'));
   return li;
 }
 
@@ -478,6 +584,11 @@ function calendarView(rows, flagsOf, repaint) {
   // decoration, each day's button says its own date
   const grid = h('div', { class: 'lb-cal', role: 'group', 'aria-label': `Days of ${MONTHS[m - 1]} ${y}` }, weekdayNames(ws).map(d => h('div', { class: 'lb-dow', 'aria-hidden': 'true' }, d)));
   for (let i = 0; i < lead; i++) add(grid, h('div', { class: 'lb-day blank' }));
+  // Show reflections (owner, 15 Oct 2026; this device, off by default): a mark on days with a reflection, and each
+  // reflection in the day's list under its case (or on its own when it isn't linked to one)
+  const reflOn = !!display().calRefl && !basicHides('reflect');
+  const reflByDay = new Map();
+  if (reflOn) for (const r of S.reflections || []) if (r.date) (reflByDay.get(r.date) || reflByDay.set(r.date, []).get(r.date)).push(r);
   let monthN = 0;
   for (let d = 1; d <= days; d++) {
     const iso = `${y}-${pad(m)}-${pad(d)}`;
@@ -487,11 +598,15 @@ function calendarView(rows, flagsOf, repaint) {
     const tint = cs.length ? Math.min(4, cs.length) : 0;
     add(grid, h('button', {
       class: `lb-day t${tint} ${iso === today ? 'today' : ''} ${iso === view.day ? 'sel' : ''}`,
-      'aria-label': `${d} ${MONTHS[m - 1]}: ${cs.length} case${cs.length === 1 ? '' : 's'}${dayHasNotes(iso) ? ', has notes' : ''}`, 'aria-pressed': String(iso === view.day),
+      'aria-label': `${d} ${MONTHS[m - 1]}: ${cs.length} case${cs.length === 1 ? '' : 's'}${dayHasNotes(iso) ? ', has notes' : ''}${reflByDay.has(iso) ? ', has a reflection' : ''}`, 'aria-pressed': String(iso === view.day),
       onclick: () => { view.day = view.day === iso ? null : iso; repaint(); if (view.day) showDay(); },
     }, h('span', { class: 'n' }, d), h('span', { class: 'lb-count' + (cs.length ? '' : ' none'), 'aria-hidden': cs.length ? null : 'true' }, cs.length || ''), flagged ? h('i', { class: 'lb-dot', title: 'Has a flagged case' }) : null,
-      dayHasNotes(iso) ? h('i', { class: 'lb-note', title: 'Has notes' }) : null));
+      dayHasNotes(iso) ? h('i', { class: 'lb-note', title: 'Has notes' }) : null,
+      reflByDay.has(iso) ? h('i', { class: 'lb-refl', title: 'Has a reflection' }) : null));
   }
+  const dayRefl = view.day ? reflByDay.get(view.day) || [] : [];
+  const reflRow = r => h('li', { class: 'refl-under' }, h('button', { type: 'button', class: 'linkish', onclick: () => { location.hash = '#reflect'; openReflection(r); } },
+    rowIcon('reflect'), ` ${r.title || r.diagnosis || 'Reflection'}`, h('small', { class: 'muted' }, ` · ${r.status === 'complete' ? 'complete' : 'draft'}`)));
   const dayCases = view.day ? (byDay.get(view.day) || []) : [];
   const dayNotes = dayHasNotes(view.day);
   // the day's Copy includes its notes, and its daily note shows under the heading: have them ready (drawn again once
@@ -506,7 +621,8 @@ function calendarView(rows, flagsOf, repaint) {
         !MONTH_INPUT ? null : h('input', { type: 'month', 'aria-label': 'Pick a month', value: view.month, onclick: e => { try { e.target.showPicker(); } catch { /* the native tap opens it */ } },
           onchange: e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { view.month = e.target.value; view.day = null; repaint(); } } })),
       h('button', { class: 'small icon-btn', 'aria-label': 'Next month', onclick: () => shift(1) }, '›'),
-      h('button', { class: 'small', onclick: () => { view.month = today.slice(0, 7); view.day = today; repaint(); } }, 'Today')),
+      h('button', { class: 'small', onclick: () => { view.month = today.slice(0, 7); view.day = today; repaint(); } }, 'Today'),
+      basicHides('reflect') ? null : h('label', { class: 'check lb-reflsw', style: 'margin:0' }, h('input', { type: 'checkbox', checked: reflOn, onchange: e => { setDisplay({ calRefl: e.target.checked || null }); repaint(); } }), 'Show reflections')),
     grid,
     view.day ? h('div', { class: 'lb-daydetail', style: 'margin-top:12px' },
       // the day, then its buttons together on one row (none left alone on a line of its own)
@@ -522,7 +638,9 @@ function calendarView(rows, flagsOf, repaint) {
           // log on this day (the Log page opens with the date already picked): last, at the right like a main action
           h('button', { class: 'small primary', title: 'Log a case on this day', 'aria-label': 'Log a case on this day', onclick: () => logOnDate(view.day) }, '+ Add'))),
       dayNoteCard(view.day),
-      dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => caseRow(c, flagsOf))) : emptyState('calendar', view.day === today ? 'No cases yet today' : 'No cases on this day'))
+      dayCases.length ? h('ul', { class: 'cases' }, dayCases.map(c => [caseRow(c, flagsOf), ...dayRefl.filter(r => r.caseId === c.id).map(reflRow)]),
+        dayRefl.filter(r => !dayCases.some(c => c.id === r.caseId)).map(reflRow)) : emptyState('calendar', view.day === today ? 'No cases yet today' : 'No cases on this day'),
+      !dayCases.length && dayRefl.length ? h('ul', { class: 'cases' }, dayRefl.map(reflRow)) : null)
       : h('p', { class: 'hint help', style: 'margin-top:10px' }, 'Tap a day to see its cases.'),
     undated.length ? h('details', { style: 'margin-top:12px' },
       h('summary', {}, `No date (${undated.length})`),
@@ -567,9 +685,19 @@ function showDay() {
 
 const catText = cats => sortCodes(cats || []).join(', ');
 
+// The Grid (log2 10): a spreadsheet look (thin lines, no boxed inputs). Column widths drag from each heading's right
+// edge (this device; a double-tap on the edge resets that column); lines per row 1 / 2 / 3 / Fit (the summary grows to
+// its text). Edits save when a cell is left, as before.
+const GRID_COLS = [['date', 'Date', 150], ['ini', 'Initials', 72], ['details', 'Case summary', 0], ['cats', 'Tags', 220]];
+const LINE_OPTS = [['1', '1 line'], ['2', '2 lines'], ['3', '3 lines'], ['fit', 'Fit to text']];
 function gridView(rows, repaint) {
+  const lines = String(display().gridLines || '1');
+  const widths = { ...(display().gridCols || {}) };
+  const fitAll = () => tbody.querySelectorAll('textarea.g-details').forEach(fitCell);
+  const fitCell = ta => { if (lines !== 'fit') return; ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
   const tbody = h('tbody');
-  for (const c of rows.slice(0, view.limit)) {
+  const pg = pager(rows, repaint);
+  for (const c of pg.rows) {
     const p = caseParts(c);
     // dates come from a date picker and categories from the case's edit dialog: nothing free-text gets in
     const row = { date: c.date || '', initials: p.initials, details: p.details };
@@ -584,20 +712,56 @@ function gridView(rows, repaint) {
       Object.assign(c, await updateCase(next));
       Object.assign(p, { initials, details });
     };
-    const cell = (key, attrs = {}) => h('input', { ...attrs, value: row[key], oninput: e => { row[key] = e.target.value; tr.classList.add('dirty'); }, onchange: commit });
-    add(tr, 
+    const cell = (key, attrs = {}, tag = 'input') => h(tag, { ...attrs, value: row[key], oninput: e => { row[key] = e.target.value; tr.classList.add('dirty'); if (tag === 'textarea') fitCell(e.target); }, onchange: commit });
+    const details = cell('details', { 'aria-label': 'Details', class: 'g-details', rows: lines === 'fit' ? '1' : lines }, 'textarea');
+    details.value = row.details;
+    add(tr,
       h('td', { class: 'date' }, cell('date', { type: 'date', 'aria-label': 'Date', title: c.dateText && !c.date ? `Was written as “${c.dateText}”: pick the date` : '' })),
       h('td', { class: 'ini' }, cell('initials', { 'aria-label': 'Initials', placeholder: 'AB', autocapitalize: 'characters', size: '5' })),
-      h('td', {}, cell('details', { 'aria-label': 'Details' })),
+      h('td', { class: 'details' }, details),
       h('td', { class: 'cats' }, h('button', { type: 'button', class: 'grid-cats', 'aria-label': 'Tags: change', onclick: () => editCaseDialog(c) },
         (c.cats || []).length ? catPills(c.cats) : h('span', { class: 'flag err' }, 'no tag'))));
     add(tbody, tr);
   }
-  const more = rows.length > view.limit ? h('button', { onclick: () => { view.limit += 300; repaint(); } }, `Show more (${rows.length - view.limit} left)`) : null;
+  // a column's width: drag the heading's right edge (pointer events: a finger or a mouse); double-tap resets it
+  const cols = GRID_COLS.map(([k, , w]) => h('col', { 'data-col': k, style: widths[k] ? `width:${widths[k]}px` : w ? `width:${w}px` : '' }));
+  const table = h('table', { class: 'grid sheet' + (lines === 'fit' ? ' fit' : '') + (Object.keys(widths).length ? ' sized' : '') }, h('colgroup', {}, cols));
+  const head = h('tr', {}, GRID_COLS.map(([k, label], i) => {
+    let lastTap = 0;
+    const grip = h('span', { class: 'col-grip', role: 'separator', 'aria-orientation': 'vertical', 'aria-label': `${label} column width: drag to change, double-tap to reset`, tabindex: '0',
+      'aria-valuemin': '40', 'aria-valuemax': '1200', 'aria-valuenow': String(Math.round(widths[k] || GRID_COLS[i][2] || 300)),
+      onpointerdown: e => {
+        e.preventDefault(); e.stopPropagation();
+        const now = Date.now();
+        if (now - lastTap < 350) { lastTap = 0; delete widths[k]; setDisplay({ gridCols: Object.keys(widths).length ? { ...widths } : null }); repaint(); return; }
+        lastTap = now;
+        const th = e.currentTarget.closest('th'), x0 = e.clientX, w0 = th.getBoundingClientRect().width;
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        table.classList.add('sized');
+        const move = ev => { const w = Math.max(40, Math.round(w0 + ev.clientX - x0)); cols[i].style.width = w + 'px'; widths[k] = w; grip.setAttribute('aria-valuenow', String(w)); };
+        const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); if (widths[k]) setDisplay({ gridCols: { ...widths } }); };
+        addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+      },
+      onkeydown: e => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        const w = Math.max(40, Math.round((widths[k] || e.currentTarget.closest('th').getBoundingClientRect().width) + (e.key === 'ArrowRight' ? 16 : -16)));
+        widths[k] = w; cols[i].style.width = w + 'px'; grip.setAttribute('aria-valuenow', String(w)); table.classList.add('sized');
+        setDisplay({ gridCols: { ...widths } });
+      } });
+    return h('th', {}, h('span', { class: 'th-l' }, label), grip);
+  }));
+  add(table, h('thead', {}, head), tbody);
+  const linesSel = h('select', { 'aria-label': 'Lines per row', onchange: e => { setDisplay({ gridLines: e.target.value === '1' ? null : e.target.value }); repaint(); } },
+    LINE_OPTS.map(([v, t]) => h('option', { value: v, selected: lines === v }, t)));
+  requestAnimationFrame(fitAll);
   return h('div', {},
-    h('p', { class: 'hint help' }, 'Edit the date, initials and details directly; changes save when you leave a cell. Tap the tags to change them.'),
-    h('div', { class: 'scroll' }, h('table', { class: 'grid' }, h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Initials'), h('th', {}, 'Case summary'), h('th', {}, 'Tags'))), tbody)),
-    more,
+    h('p', { class: 'hint help' }, 'Edit the date, initials and details directly; changes save when you leave a cell. Tap the tags to change them. Drag a heading’s edge to resize a column (double-tap it to reset).'),
+    h('div', { class: 'bar grid-opts' }, h('label', { class: 'refl-view' }, h('span', { class: 'hint' }, 'Lines per row '), linesSel),
+      Object.keys(widths).length ? h('button', { class: 'small linkish', onclick: () => { setDisplay({ gridCols: null }); repaint(); } }, 'Reset column widths') : null),
+    pg.bar(),
+    h('div', { class: 'scroll' }, table),
+    pg.bar(true),
     pasteRows());
 }
 
@@ -833,10 +997,13 @@ function previewDiff(d, after) {
       nothing ? null : h('button', { class: 'primary', onclick: async () => {
         m.close();
         try {
-          const writes = [...changed.map(x => x.after), ...added];
-          if (writes.length) await saveMany(writes);
+          // changed rows: each through the write queue with the case as it was here (a case changed on another device
+          // since is kept, not overwritten); new ones in one batch
+          const r = await updateMany(changed.map(x => ({ base: x.before, next: x.after })));
+          if (r.stopped) return;   // (signed out or switched meanwhile)
+          if (added.length) await saveMany(added);
           if (deleted.length) await moveToBin('case', deleted);   // recycle bin (bin agent): restorable for 30 days
-          toast(`Applied: ${changed.length} changed, ${added.length} new, ${deleted.length} deleted${deleted.length ? ' (in the recycle bin for 30 days)' : ''}`);
+          updatedToast(`Applied: ${r.saved} changed, ${added.length} new, ${deleted.length} deleted${deleted.length ? ' (in the recycle bin for 30 days)' : ''}`, r);
           after && after();
         } catch (err) { toast('Could not apply: ' + err.message); }
       } }, 'Apply')),

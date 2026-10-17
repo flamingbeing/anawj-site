@@ -7,19 +7,24 @@
 
 // host -> { prefixes: { '/cmcj/': 'cmcj/' } }  (several apps share the host, one path each)
 //      or { root: 'prewarm/' }                 (one app at the root; its own folder name works too)
+//      or { moved: { '/bis/': 'https://anantf.com/bis/' } }  (apps now on another site: each path forwards there)
 export const SITES = {
-  // anaesthesia teaching pages (static, no data)
-  'anaes.anawj.com': { prefixes: { '/bis/': 'bis-dsa/', '/ot/': 'ot-sim/' } },
+  // the anaesthesia teaching pages moved to anantf.com on 16 Oct 2026 (the BIS and OT simulators): old links forward
+  'anaes.anawj.com': { moved: { '/bis/': 'https://anantf.com/bis/', '/ot/': 'https://anantf.com/ot/' } },
   'hand.anawj.com': { prefixes: { '/cmcj/': 'cmcj/', '/babies/': 'hand-babies/', '/handlog/': 'hand-log/' } },
   'prewarmstudy.anawj.com': { root: 'prewarm/' },
   'nuhroster.anawj.com': { root: 'nuh-roster/' },
+  // NTF anaesthesia monthly duty roster (its own data, so its own host)
+  'ntfroster.anawj.com': { root: 'ntf-roster/' },
+  // NUH junior monthly roster helper (cardiac and ICU calls into the department's Google Sheet; its own data)
+  'nuhjuniormonthly.anawj.com': { root: 'nuh-junior-monthly/' },
   // /people/ is the shared people lists (residents, faculty, PDs) the logbook and evals both use.
   // /apmes/guidebook/ is the programme guidebook text the evals app reads (just that folder of apmes/).
   // /__/auth/ and /__/firebase/ are Firebase's sign-in helper pages (the auth domain of logbook and evals). The helper
   // scripts are the same files anawj.com serves; init.json is this host's own copy (authDomain apmes.anawj.com).
   // Ask Claude, the owner's page (behind Cloudflare Access; its API is worker/ask.js)
   'ask.anawj.com': { root: 'ask/' },
-  'apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/people/': 'people/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth/firebase/' } },
+  'apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/people/': 'people/', '/applicants/': 'applicants/', '/360/': '360/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth/firebase/' } },
 };
 
 // The one folder every host serves as it is: the shared design files (styles only, no data), so a subdomain's apps can
@@ -43,8 +48,8 @@ export function feedback(host, search, cookie) {
 // PR preview before the real addresses exist: <preview>/_sites/hand.anawj.com/babies/
 const TRY = '/_sites/';
 
-// -> { file } (a path inside the repo, or a folder ending in "/"), { redirect } (a public path to send the browser
-//    to), or { notFound: true }
+// -> { file } (a path inside the repo, or a folder ending in "/"), { redirect } (a public path, or a full address
+//    on another site, to send the browser to), or { notFound: true }
 export function resolve(host, pathname) {
   const out = route(host, pathname);
   // an encoded slash, dot or backslash, or a leftover ".." could point the asset lookup out of the folder: refuse
@@ -62,13 +67,19 @@ function route(host, pathname) {
       site = SITES[h]; p = rest.slice(slash);
       const base = `${TRY}${h}`;
       const out = route(h, p);
-      return out.redirect ? { redirect: base + out.redirect } : out;
+      return out.redirect ? { redirect: /^https?:/.test(out.redirect) ? out.redirect : base + out.redirect } : out;
     }
   }
   if (!site) return { file: p.replace(/^\//, '') };   // every other host: the repo as it is
   for (const dir of SHARED) {
     if (p === dir.slice(0, -1)) return { redirect: dir };
     if (p.startsWith(dir)) return { file: p.slice(1) };
+  }
+  if (site.moved) {
+    for (const [prefix, to] of Object.entries(site.moved)) {
+      if (p === prefix.slice(0, -1) || p.startsWith(prefix)) return { redirect: to + p.slice(prefix.length) };
+    }
+    return { notFound: true };
   }
   if (site.root) {
     const own = '/' + site.root;

@@ -41,6 +41,8 @@ const shaped = readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: 
 assert.deepEqual(shaped.settings.savedSearches, []);
 assert.equal(typeof shaped.settings.shareFormat.dayHead, 'string');
 assert.ok(Array.isArray(shaped.settings.excelExport.caseCols));
+// a search saved on the Search page keeps its global flag (it runs in Search from the Logbook)
+assert.equal(readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: { savedSearches: [{ name: 'Everywhere', q: 'lap in:notes', global: true }, { name: 'Logbook', q: 'x', global: 'yes' }] } })).settings.savedSearches.map(x => x.global).join(), 'true,');
 const ss = readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: { savedSearches: [null, 3, { name: 'Blocks', has: ['c:26', 5], q: 'block' }] } })).settings.savedSearches;
 assert.equal(ss.length, 1); assert.deepEqual(ss[0].has, ['c:26']); assert.equal(ss[0].q, 'block');
 assert.equal('rYear' in settingsFile({ settings: { rYear: 4, compact: true } }).settings, false);
@@ -107,4 +109,14 @@ console.log('settings-file display keys and profile switches tests passed');
   const got = readSettingsFile(JSON.stringify(f2)).settings;
   assert.equal(got.hideTabsTyping, true);
   assert.equal(got.show.evalRequest, true);
+}
+
+// Reset all settings: preferences go back to their defaults; your year, profile, places, searches and (unless asked) tags stay
+{
+  const { resetAccountPatch } = await import('../js/settings-file.js');
+  const st = { rYear: 2, mode: 'basic', show: { analytics: true }, savedSearches: [{ name: 'x' }], destinations: [{ id: 'a' }], sync: { on: true },
+    tagSet: [{ k: 'u:x' }], subcats: {}, autoTick: true, enterMode: 'single', markdown: { day: 'x' }, detectInitials: false, borders: 2, gone: null };
+  assert.deepEqual(resetAccountPatch(st), { autoTick: null, enterMode: null, markdown: null, detectInitials: null, borders: null });
+  assert.deepEqual(resetAccountPatch(st, { tags: true }), { tagSet: null, subcats: null, autoTick: null, enterMode: null, markdown: null, detectInitials: null, borders: null });
+  assert.deepEqual(resetAccountPatch(null), {});
 }

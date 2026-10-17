@@ -93,4 +93,8 @@ assert.match(entryFrom('r 3', 'a@example.com', 1, answers).skip, /response id/);
   assert.doesNotMatch(src, /function onFormSubmit\b|function onOpen\b/);
 }
 
+// the backfill starts when the inbox went live (14 Oct 2026): responses before it came in with the workbook import, and
+// sending them again could bring back an imported case the resident deleted once it has left the recycle bin
+assert.match(src, /var SINCE = new Date\('2026-10-14T00:00:00\+08:00'\);/);
+
 console.log('form-script tests passed');
