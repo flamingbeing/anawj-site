@@ -7,12 +7,14 @@
 
 import { S, h, fill, toast, cloud, modal, confirmBox, download, empty, applyTheme, errText, avatar, initials, debounce, row, segment } from '../../evals/js/ui-core.js';
 import {
-  INTRO, SCORES, parseNames, cleanRound, encodeRound, readRoundText, cleanAnswers, blank, statusOf, progress, warnings,
-  formBody, formUrl, answersText, summary, resultsCSV, demoRound,
+  INTRO, SCALE, DEFAULT_QUESTIONS, MAX_QUESTIONS, parseNames, cleanRound, cleanQuestions, encodeRound, readRoundText, cleanAnswers, blank, statusOf,
+  progress, nextUnanswered, warnings, formBody, formUrl, answersText, summary, resultsCSV, demoRound, matchPhotoFile, photoSrc, scaleQuestions, hasAnswer,
 } from './model.js';
 import * as store from './store.js';
+import { passportJpeg } from './photo.js';
 
 applyTheme();
+if (cloud.demo && /[?&]demo=reset/.test(location.search)) store.resetDemo();   // the demo goes back to its made-up start
 
 const app = document.getElementById('app');
 const titleEl = document.getElementById('title');
@@ -32,6 +34,7 @@ let round = null;      // the open round, or null
 let answers = {};      // this respondent's answers, by applicant id
 let sent = null;       // { at, via } once this respondent sent
 let isCom = false;     // on the selection committee (may read the responses)
+let photos = {};       // applicant id -> picture (published rounds only)
 
 // A round link: the round travels after #r= . Read it before anything else so it survives sign-in.
 (function takeLink() {
@@ -49,6 +52,8 @@ async function loadRound() {
   let shared = null;
   if (S.user && mayAnswer()) { try { const all = await store.listRounds(); shared = all.find(r => r.status === 'open') || all[0] || null; } catch (e) { console.warn('Shared rounds unavailable', e); } }
   round = shared || cleanRound(get(K.round, null)) || (cloud.demo ? demoRound() : null);
+  photos = {};
+  if (round?.shared) { try { photos = await store.listPhotos(round.cycle); } catch (e) { console.warn('Photos unavailable', e); } }
 }
 async function loadMine() {
   answers = {}; sent = null;
@@ -114,33 +119,39 @@ function account() {
 
 // ---------- screens ----------
 
-const chipFor = a => {
-  const s = statusOf(a);
-  return s === 'scored' ? h('span', { class: 'e-chip e-chip--submitted' }, 'Score ' + a.score)
-    : s === 'partial' ? h('span', { class: 'e-chip e-chip--in-progress' }, a.score ? 'Score ' + a.score + ', no comment' : 'Comment, no score')
-      : s === 'skipped' ? h('span', { class: 'e-chip e-chip--draft' }, 'Didn’t interact') : h('span', { class: 'e-chip e-chip--draft' }, 'Not yet');
-};
+const first = name => String(name).split(/[\s,]+/)[0];
+const faceOf = (a, cls = '') => (photos[a.id]
+  ? h('img', { class: `sl-photo ${cls}`, src: photos[a.id], alt: '', width: 210, height: 270, loading: 'lazy' })
+  : h('span', { class: `sl-photo sl-photo--none ${cls}`, 'aria-hidden': 'true' }, initials(a.name)));
+const STATUS_TEXT = { done: 'Done', skipped: 'Skipped', partial: 'Started', todo: '' };
 
 function homeScreen() {
   if (!round) {
-    return empty(isStaff() ? 'No round yet' : 'No round open on this device',
-      isStaff() ? 'Set up the round: paste the applicants’ names, then share the private link with residents and faculty.' : 'Open the link you were sent for this round. If you can’t find it, ask the programme office.',
+    return empty(isStaff() ? 'No round yet' : 'No round open',
+      isStaff() ? 'Set up the round: add the applicants, then publish it so residents and faculty can answer.' : 'There is no round open for you yet. If you were expecting one, ask the programme office.',
       isStaff() ? h('button', { class: 'a-btn', type: 'button', onclick: () => go('#setup') }, 'Set up the round') : null);
   }
   const p = progress(round, answers);
-  const pct = Math.round((p.done / p.total) * 100);
-  return h('div', { class: 'e-stack' },
-    !isOpen() ? h('div', { class: 'e-warn-note' }, 'This round is closed. You can still look at your answers, but they can’t be sent any more.') : null,
+  const pct = Math.round((p.finished / p.total) * 100);
+  const nxt = nextUnanswered(round, answers, -1);
+  const go1 = () => go(nxt ? '#a/' + nxt.id : '#review');
+  const open = isOpen();
+  return h('div', { class: 'e-stack sl-col' },
+    !open ? h('div', { class: 'e-warn-note' }, 'This round is closed. You can still look at your answers, but they can’t be sent any more.') : null,
     h('section', { class: 'e-card sl-intro' },
       h('h2', { class: 'e-h2', style: 'margin-top:0' }, round.title),
-      INTRO.map(t => h('p', {}, t)),
-      h('div', { class: 'sl-conf' }, h('span', { 'aria-hidden': 'true' }, '🔒'), h('span', {}, 'Confidential. Only the selection committee sees who said what. Please don’t share your answers or discuss them with the applicants.')),
-      h('div', { class: 'sl-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': p.total, 'aria-valuenow': p.done, 'aria-label': 'Applicants answered' }, h('i', { style: `width:${pct}%` })),
-      h('p', { class: 'e-small' }, `${p.done} of ${p.total} answered${sent ? ' · sent' : ''}`)),
-    h('div', { class: 'e-card e-card--flush' }, h('div', { class: 'e-list' }, round.applicants.map(a =>
-      row({ name: a.name, title: a.name, chip: chipFor(answers[a.id]), onclick: () => go('#a/' + a.id) })))),
-    h('div', { class: 'e-actions' },
-      h('button', { class: 'a-btn e-go', type: 'button', onclick: () => go('#review') }, sent ? 'Review what you sent' : 'Review and send')));
+      h('p', {}, INTRO[1]),
+      h('details', { class: 'sl-more' }, h('summary', {}, 'About this exercise'), INTRO.filter((_, i) => i !== 1).map(t => h('p', {}, t))),
+      h('div', { class: 'sl-conf' }, h('span', { 'aria-hidden': 'true' }, '🔒'), h('span', {}, 'Confidential: only the selection committee and programme directors see who said what.')),
+      h('div', { class: 'sl-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': p.total, 'aria-valuenow': p.finished, 'aria-label': 'Applicants answered' }, h('i', { style: `width:${pct}%` })),
+      h('p', { class: 'e-small' }, `${p.finished} of ${p.total} answered${sent ? ' · sent' : ''}`),
+      h('div', { class: 'e-actions' }, h('button', { class: 'a-btn e-go', type: 'button', onclick: go1 },
+        p.finished === 0 && !sent ? 'Start' : nxt ? `Continue (${p.total - p.finished} left)` : sent ? 'Review what you sent' : 'Review and send'))),
+    h('ul', { class: 'sl-grid', 'aria-label': 'Applicants' }, round.applicants.map(a => {
+      const st = statusOf(round, answers[a.id]);
+      return h('li', {}, h('button', { type: 'button', class: `sl-tile sl-tile--${st}`, onclick: () => go('#a/' + a.id), 'aria-label': `${a.name}${STATUS_TEXT[st] ? ', ' + STATUS_TEXT[st] : ''}` },
+        faceOf(a), h('span', { class: 'sl-tile__name' }, a.name), STATUS_TEXT[st] ? h('span', { class: 'sl-tile__st' }, STATUS_TEXT[st]) : null));
+    })));
 }
 
 function applicantScreen(id) {
@@ -148,33 +159,54 @@ function applicantScreen(id) {
   const a = round.applicants[idx];
   const r = answers[id] || blank();
   answers[id] = r;
-  header(a.name, { back: true });
-  const saved = h('p', { class: 'sl-saved', 'aria-live': 'polite' });
-  const save = () => { r.na = r.na && r.score == null && !r.comment.trim(); saveMine(); saved.textContent = 'Saved on this device'; };
-  const scores = h('fieldset', { class: 'sl-scores' }, h('legend', { class: 'e-label' }, 'Overall suitability for residency, 1 (unsuitable) to 5 (best fit)'),
-    SCORES.map(([v, label]) => h('label', {}, h('input', { type: 'radio', name: 'score', value: v, checked: r.score === v, disabled: r.na, onchange: () => { r.score = v; r.na = false; save(); naBox.checked = false; } }), h('b', {}, String(v)), h('span', {}, label))));
-  // legend sits inside the grid: put it above instead
-  const legend = scores.querySelector('legend'); legend.style.gridColumn = '1 / -1';
-  const text = h('textarea', { class: 'e-textarea', id: 'sl-comment', rows: 5, maxlength: 5000, disabled: r.na, placeholder: 'e.g. observed strengths, weaknesses or concerns, with a specific example', 'aria-describedby': 'sl-hint',
-    oninput: debounce(() => { r.comment = text.value; if (r.comment.trim()) r.na = false; naBox.checked = r.na; save(); }, 300) });
-  text.value = r.comment;
-  const naBox = h('input', { type: 'checkbox', checked: r.na, onchange: () => {
-    if ((r.score || r.comment.trim()) && naBox.checked) { naBox.checked = false; toast('Clear the score and comment first.'); return; }
-    r.na = naBox.checked; scores.querySelectorAll('input').forEach(i => { i.disabled = r.na; }); text.disabled = r.na; save();
-  } });
+  header(a.name, { back: false });
+  backEl.hidden = true;
+  const saved = h('span', { class: 'sl-saved', 'aria-live': 'polite' });
+  const save = () => { saveMine(); saved.textContent = 'Saved'; updateStatus(); };
   const prev = round.applicants[idx - 1], next = round.applicants[idx + 1];
-  fill(app, h('div', { class: 'e-stack sl-col' },
-    h('p', { class: 'sl-pos' }, `Applicant ${idx + 1} of ${round.applicants.length}`),
-    h('section', { class: 'e-card' },
-      scores,
-      h('label', { class: 'e-label', for: 'sl-comment', style: 'margin-top:16px;display:block' }, 'Comments'),
-      text,
-      h('p', { class: 'e-hint', id: 'sl-hint' }, 'Specific examples help most: what you saw, when, and what it told you.'),
-      h('label', { class: 'e-check', style: 'margin-top:12px' }, naBox, h('span', {}, 'I haven’t worked with this applicant')),
-      saved),
-    h('div', { class: 'sl-nav' },
-      prev ? h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => go('#a/' + prev.id) }, '‹ ' + prev.name.split(' ')[0]) : h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => go('#') }, 'All applicants'),
-      next ? h('button', { class: 'a-btn', type: 'button', onclick: () => go('#a/' + next.id) }, next.name.split(' ')[0] + ' ›') : h('button', { class: 'a-btn e-go', type: 'button', onclick: () => go('#review') }, 'Review'))));
+  const goNext = () => go(next ? '#a/' + next.id : '#review');
+  const p = progress(round, answers);
+  const open = isOpen();
+
+  const stat = h('span', { class: 'sl-apstat' });
+  const updateStatus = () => { stat.textContent = STATUS_TEXT[statusOf(round, r)] || ''; };
+  updateStatus();
+
+  const naBtn = h('button', { type: 'button', class: 'sl-na', 'aria-pressed': String(!!r.na), disabled: !open, onclick: async () => {
+    if (!r.na) {
+      if (hasAnswer(round, r) && !await confirmBox('Skip ' + a.name + '?', 'This clears what you entered for them.', 'Skip them', true)) return;
+      for (const q of round.questions) delete r[q.id];
+      r.na = true; saveMine(); goNext();
+    } else { r.na = false; saveMine(); render(); }
+  } }, r.na ? 'Haven’t worked with them ✓ (tap to undo)' : 'I haven’t worked with them');
+
+  const blocks = round.questions.map(q => {
+    if (q.type === 'scale') {
+      const name = 'q-' + q.id;
+      return h('fieldset', { class: 'sl-q', disabled: !open },
+        h('legend', { class: 'sl-q__label' }, q.label, q.required ? h('span', { class: 'sl-req' }, ' required') : null),
+        h('div', { class: 'sl-scores' }, SCALE.map(v => h('label', {}, h('input', { type: 'radio', name, value: v, checked: r[q.id] === v, onchange: () => { r[q.id] = v; r.na = false; save(); } }), h('b', {}, String(v))))),
+        q.low || q.high ? h('div', { class: 'sl-ends', 'aria-hidden': 'true' }, h('span', {}, '1 ' + (q.low || '')), h('span', {}, (q.high || '') + ' 5')) : null);
+    }
+    const ta = h('textarea', { class: 'e-textarea sl-ta', id: 'q-' + q.id, rows: 3, maxlength: 5000, disabled: !open, placeholder: q.hint || '',
+      oninput: debounce(() => { if (ta.value.trim()) { r[q.id] = ta.value; r.na = false; } else delete r[q.id]; save(); }, 300) });
+    ta.value = typeof r[q.id] === 'string' ? r[q.id] : '';
+    return h('div', { class: 'sl-q' }, h('label', { class: 'sl-q__label', for: 'q-' + q.id }, q.label, q.required ? h('span', { class: 'sl-req' }, ' required') : h('span', { class: 'sl-opt' }, ' optional')), ta);
+  });
+
+  fill(app, h('div', { class: 'sl-col sl-apply' },
+    h('div', { class: 'sl-toprow' },
+      h('span', { class: 'sl-pos' }, `${idx + 1} of ${round.applicants.length} · ${p.total - p.finished} left`),
+      h('button', { type: 'button', class: 'a-btn a-btn--plain a-btn--sm', onclick: () => go('#') }, 'All applicants')),
+    h('div', { class: 'sl-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': p.total, 'aria-valuenow': p.finished, 'aria-label': 'Applicants answered' }, h('i', { style: `width:${Math.round((p.finished / p.total) * 100)}%` })),
+    h('section', { class: 'e-card sl-card' },
+      h('div', { class: 'sl-who-row' }, faceOf(a, 'sl-photo--lg'),
+        h('div', { class: 'sl-who-text' }, h('h2', { class: 'sl-name' }, a.name), stat, naBtn)),
+      r.na ? h('p', { class: 'e-small sl-skipped' }, 'Skipped: nothing more to answer for this applicant.') : h('div', { class: 'sl-qs' }, blocks)),
+    h('div', { class: 'sl-fixed' }, h('div', { class: 'sl-fixed__in' },
+      prev ? h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => go('#a/' + prev.id), 'aria-label': 'Previous applicant' }, '‹ Back') : h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => go('#') }, 'All'),
+      saved,
+      h('button', { class: 'a-btn e-go', type: 'button', onclick: goNext }, next ? 'Next ›' : 'Review')))));
   window.scrollTo(0, 0);
 }
 
@@ -182,13 +214,14 @@ function reviewScreen() {
   header('Review and send', { back: true });
   const p = progress(round, answers);
   const w = warnings(round, answers);
+  const open = isOpen();
   const nameIn = h('input', { class: 'e-input', id: 'sl-name', autocomplete: 'name', value: S.user.name || '', maxlength: 120 });
   const status = h('p', { class: 'e-small', 'aria-live': 'polite' });
-  const send = h('button', { class: 'a-btn e-go', type: 'button', disabled: !isOpen() }, sent ? 'Send again' : 'Send');
+  const send = h('button', { class: 'a-btn e-go', type: 'button', disabled: !open }, sent ? 'Send again' : 'Send');
   send.onclick = async () => {
     const who = nameIn.value.trim() || S.user.email;
     if (sent && !await confirmBox('Send again?', round.shared ? 'This replaces what you sent before.' : 'You already sent these. The committee will get a second copy.', 'Send again')) return;
-    if (p.scored + p.partial === 0 && !await confirmBox('Nothing to send', 'You haven’t scored or commented on anyone. Send anyway?', 'Send anyway')) return;
+    if (p.done + p.partial === 0 && !await confirmBox('Nothing to send', 'You haven’t answered about anyone. Send anyway?', 'Send anyway')) return;
     send.disabled = true; status.textContent = 'Sending…';
     try {
       const via = await deliver(who);
@@ -198,27 +231,32 @@ function reviewScreen() {
         put(K.subs(round.cycle), list);
       }
       go('#done');
-    } catch (e) { status.textContent = 'Couldn’t send: ' + errText(e) + ' Your answers are safe on this device; try again, or copy them below.'; send.disabled = false; }
+    } catch (e) { status.textContent = 'Couldn’t send: ' + errText(e) + ' Your answers are safe on this device; try again, or copy them under “Other ways”.'; send.disabled = false; }
   };
-  fill(app, h('div', { class: 'e-stack sl-col' },
+  const text = () => answersText(round, nameIn.value.trim() || S.user.name, answers);
+  fill(app, h('div', { class: 'sl-col sl-apply' },
     h('section', { class: 'e-card' },
-      h('h2', { class: 'e-h2', style: 'margin-top:0' }, `${p.scored} scored with a comment`),
-      h('p', { class: 'e-small' }, `${p.partial} partly answered · ${p.skipped} didn’t interact · ${p.todo} not answered`),
-      w.length ? h('div', { class: 'e-warn-note' }, h('p', { style: 'margin:0 0 6px;font-weight:600' }, 'Worth a second look (you can still send):'),
+      h('h2', { class: 'e-h2', style: 'margin-top:0' }, `${p.finished} of ${p.total} answered`),
+      h('p', { class: 'e-small' }, `${p.done} with answers · ${p.skipped} skipped (haven’t worked with them)${p.partial ? ` · ${p.partial} started` : ''}${p.todo ? ` · ${p.todo} not answered` : ''}`),
+      w.length ? h('div', { class: 'e-warn-note' }, h('p', { style: 'margin:0 0 6px;font-weight:600' }, 'Worth a look (you can still send):'),
         h('ul', { class: 'sl-comments' }, w.map(x => h('li', {}, h('a', { href: '#a/' + x.id }, x.name), ' ' + x.text)))) : h('p', { class: 'e-ok-note' }, 'Everyone is answered.')),
     h('section', { class: 'e-card' },
       h('label', { class: 'e-label', for: 'sl-name' }, 'Your name, as the committee will see it'),
       nameIn,
-      !isOpen() ? h('p', { class: 'e-warn-note' }, 'This round is closed, so answers can’t be sent any more.') : null,
-      h('p', { class: 'e-hint' }, round.shared ? 'Your answers go to the selection committee and the programme directors, who see who said what. Nobody else can read them.' : round.form ? 'Your answers go to the selection committee’s form. Nothing else is kept online.' : 'This round isn’t connected to a form yet, so “Send” keeps your answers on this device and shows them to the committee here. Use Copy to send them another way.'),
-      h('div', { class: 'e-actions' }, send,
-        h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(answersText(round, nameIn.value.trim() || S.user.name, answers)); toast('Copied'); } catch { toast('Couldn’t copy. Use Download.'); } } }, 'Copy'),
-        h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => download(`feedback-${round.cycle}.txt`, new Blob([answersText(round, nameIn.value.trim() || S.user.name, answers)], { type: 'text/plain' })) }, 'Download')),
-      status)));
+      !open ? h('p', { class: 'e-warn-note' }, 'This round is closed, so answers can’t be sent any more.') : null,
+      h('p', { class: 'e-hint' }, round.shared ? 'Your answers go to the selection committee and the programme directors, who see who said what. Nobody else can read them.' : round.form ? 'Your answers go to the selection committee’s form. Nothing else is kept online.' : 'This round isn’t published, so “Send” keeps your answers on this device and shows them to the committee here.'),
+      status,
+      h('details', { class: 'sl-more' }, h('summary', {}, 'Other ways to keep your answers'),
+        h('div', { class: 'e-actions' },
+          h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(text()); toast('Copied'); } catch { toast('Couldn’t copy. Use Download.'); } } }, 'Copy'),
+          h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => download(`feedback-${round.cycle}.txt`, new Blob([text()], { type: 'text/plain' })) }, 'Download')))),
+    h('div', { class: 'sl-fixed' }, h('div', { class: 'sl-fixed__in' },
+      h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => { const x = nextUnanswered(round, answers, -1); go(x ? '#a/' + x.id : '#'); } }, w.length ? 'Fix' : 'All'), send))));
+  window.scrollTo(0, 0);
 }
 
-// Stage 1 delivery: post to the Google Form when the round is wired to one (the reply can't be read from another site, so
-// "sent" means the browser handed it over; the committee checks the response sheet). Otherwise it stays on this device.
+// Delivery: a published round goes to the shared store. A link round posts to the Google Form when it is wired to one (the reply
+// can't be read from another site, so "sent" means the browser handed it over); otherwise it stays on this device.
 async function deliver(who) {
   if (round.shared) { await store.sendResponse(round, S.user, who, answers); return 'store'; }
   if (cloud.demo || !round.form) return 'device';
@@ -244,14 +282,15 @@ function setupScreen() {
   names.value = round ? round.applicants.map(a => a.name).join('\n') : '';
   const wired = round?.shared ? `Published (${round.status}): residents and faculty see it as soon as they open the app.` : round?.form ? 'Connected to a Google Form.' : 'Not published: answers stay on each person’s device, or go to the Google Form if the round is connected to one.';
   const out = h('div', {});
+  let qs = cleanQuestions(round?.questions).map(q => ({ ...q }));   // the questions as edited on this screen
   const build = () => {
     const apps = parseNames(names.value);
     if (!apps.length) { toast('Add at least one name.'); return null; }
-    // keep ids, and any form wiring, for names that were already there
+    // keep ids, photos and any form wiring for names that were already there
     const old = new Map((round?.applicants || []).map(a => [a.name.toLowerCase(), a]));
     const merged = apps.map(a => old.get(a.name.toLowerCase()) || a);
     const used = new Set(); merged.forEach((a, i) => { if (used.has(a.id)) a.id = 'n' + (i + 1); used.add(a.id); });
-    const next = cleanRound({ title: titleIn.value, cycle: cycleIn.value || 'round', applicants: merged, form: round?.form });
+    const next = cleanRound({ title: titleIn.value, cycle: cycleIn.value || 'round', applicants: merged, questions: qs, form: round?.form });
     if (!next) { toast('That round isn’t valid.'); return null; }
     return next;
   };
@@ -261,23 +300,88 @@ function setupScreen() {
     const next = build(); if (!next) return;
     if (next.cycle === 'round') { toast('Give the round an intake (for example 2027) first.'); return; }
     if (!round?.shared && !await confirmBox('Publish the round?', 'The applicants’ names go to the shared store, and every resident and faculty member in APMES can see them and answer.', 'Publish')) return;
-    try { round = await store.saveRound(next, status); await loadMine(); toast(status === 'open' ? 'Published' : 'Closed'); render(); } catch (e) { toast('Couldn’t save. ' + errText(e)); }
+    try { round = await store.saveRound(next, status); await loadMine(); toast(status === 'open' ? 'Saved and published' : 'Closed'); render(); } catch (e) { toast('Couldn’t save. ' + errText(e)); }
   };
   const link = () => {
     const r = round?.shared ? build() : save(); if (!r) return;
     const url = `${location.origin}${location.pathname}#r=${encodeRound(r)}`;
-    fill(out, h('p', { class: 'e-small' }, 'Send this link privately (WhatsApp or email) to residents and faculty. It carries the applicants’ names, so don’t post it anywhere public:'),
+    fill(out, h('p', { class: 'e-small' }, 'Only for a round that isn’t published. Send this link privately (WhatsApp or email). It carries the applicants’ names, so don’t post it anywhere public:'),
       h('textarea', { class: 'e-textarea sl-code', readonly: true, 'aria-label': 'Private link', onfocus: e => e.target.select() }, url),
       h('div', { class: 'e-actions' }, h('button', { class: 'a-btn', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(url); toast('Link copied'); } catch { toast('Select the link and copy it.'); } } }, 'Copy link')));
   };
   const imp = h('textarea', { class: 'e-textarea sl-code', id: 'su-import', 'aria-label': 'Round link or JSON', placeholder: 'Paste a round link or round JSON' });
+
+  // the questions
+  const qBox = h('div', { class: 'sl-qedit' });
+  const drawQs = () => {
+    fill(qBox, qs.map((q, i) => h('div', { class: 'sl-qrow' },
+      h('input', { class: 'e-input', 'aria-label': `Question ${i + 1} text`, value: q.label, maxlength: 200, oninput: e => { q.label = e.target.value; } }),
+      h('div', { class: 'sl-qrow__line' },
+        h('select', { class: 'e-select', 'aria-label': `Question ${i + 1} type`, onchange: e => { q.type = e.target.value; drawQs(); } },
+          h('option', { value: 'scale', selected: q.type === 'scale' }, 'Score 1 to 5'), h('option', { value: 'text', selected: q.type === 'text' }, 'Text box')),
+        h('label', { class: 'sl-chk' }, h('input', { type: 'checkbox', checked: !!q.required, onchange: e => { q.required = e.target.checked; } }), ' Required')),
+      q.type === 'scale'
+        ? h('div', { class: 'sl-qrow__line' },
+          h('input', { class: 'e-input', 'aria-label': `Question ${i + 1}: words for 1`, placeholder: 'Words for 1 (e.g. Unsuitable)', value: q.low || '', maxlength: 30, oninput: e => { q.low = e.target.value; } }),
+          h('input', { class: 'e-input', 'aria-label': `Question ${i + 1}: words for 5`, placeholder: 'Words for 5 (e.g. Best fit)', value: q.high || '', maxlength: 30, oninput: e => { q.high = e.target.value; } }))
+        : h('input', { class: 'e-input', 'aria-label': `Question ${i + 1}: hint shown in the box`, placeholder: 'Hint shown in the box', value: q.hint || '', maxlength: 200, oninput: e => { q.hint = e.target.value; } }),
+      h('div', { class: 'sl-qrow__line sl-qrow__btns' },
+        h('button', { type: 'button', class: 'a-btn a-btn--tinted a-btn--sm', disabled: i === 0, 'aria-label': `Move question ${i + 1} up`, onclick: () => { [qs[i - 1], qs[i]] = [qs[i], qs[i - 1]]; drawQs(); } }, 'Up'),
+        h('button', { type: 'button', class: 'a-btn a-btn--tinted a-btn--sm', disabled: i === qs.length - 1, 'aria-label': `Move question ${i + 1} down`, onclick: () => { [qs[i + 1], qs[i]] = [qs[i], qs[i + 1]]; drawQs(); } }, 'Down'),
+        h('button', { type: 'button', class: 'a-btn a-btn--tinted a-btn--sm', disabled: qs.length === 1, 'aria-label': `Remove question ${i + 1}`, onclick: () => { qs.splice(i, 1); drawQs(); } }, 'Remove')))));
+  };
+  drawQs();
+
+  // the photos (published rounds)
+  const photoBox = h('div', {});
+  const drawPhotos = () => {
+    if (!round?.shared) { fill(photoBox, h('p', { class: 'e-small' }, 'Publish the round first: photos are kept with the published round, where residents and faculty can see them next to each name.')); return; }
+    const pick = h('input', { type: 'file', accept: 'image/*', class: 'sl-file', id: 'ph-one', 'aria-label': 'Choose a photo' });
+    let target = null;
+    pick.addEventListener('change', async () => { if (pick.files[0] && target) await addPhotos([[target, pick.files[0]]]); pick.value = ''; });
+    const many = h('input', { type: 'file', accept: 'image/*', multiple: true, class: 'sl-file', id: 'ph-many', 'aria-label': 'Choose photos named after the applicants' });
+    many.addEventListener('change', async () => {
+      const pairs = [], miss = [];
+      for (const f of many.files) { const a = matchPhotoFile(round, f.name); if (a) pairs.push([a, f]); else miss.push(f.name); }
+      many.value = '';
+      await addPhotos(pairs, miss);
+    });
+    fill(photoBox,
+      h('p', { class: 'e-small' }, 'Passport-style: the app crops each picture to a small 7:9 portrait, so any photo works. Photos are shown to everyone who answers.'),
+      h('div', { class: 'e-actions' }, h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => many.click() }, 'Add many (file name = applicant name)'), many),
+      h('div', { class: 'e-list' }, round.applicants.map(a => h('div', { class: 'e-row e-row--static' },
+        faceOf(a, 'sl-photo--sm'),
+        h('span', { class: 'e-row__body' }, h('span', { class: 'e-row__title' }, a.name)),
+        h('button', { type: 'button', class: 'a-btn a-btn--tinted a-btn--sm', 'aria-label': `${photos[a.id] ? 'Change' : 'Add'} photo for ${a.name}`, onclick: () => { target = a; pick.click(); } }, photos[a.id] ? 'Change' : 'Add photo'),
+        photos[a.id] ? h('button', { type: 'button', class: 'a-btn a-btn--tinted a-btn--sm', 'aria-label': `Remove photo of ${a.name}`, onclick: async () => {
+          try { await store.removePhoto(round.cycle, a.id); delete photos[a.id]; drawPhotos(); } catch (e) { toast('Couldn’t remove. ' + errText(e)); }
+        } }, 'Remove') : null))),
+      pick);
+  };
+  async function addPhotos(pairs, missed = []) {
+    let ok = 0; const bad = [...missed];
+    for (const [a, f] of pairs) {
+      try { const b64 = await passportJpeg(f); await store.savePhoto(round.cycle, a.id, b64); photos[a.id] = photoSrc(b64); ok++; }
+      catch (e) { bad.push(f.name + ' (' + errText(e) + ')'); }
+    }
+    drawPhotos();
+    toast(`${ok} photo${ok === 1 ? '' : 's'} added${bad.length ? '. Not used: ' + bad.slice(0, 3).join(', ') + (bad.length > 3 ? '…' : '') : ''}`);
+  }
+  drawPhotos();
+
   fill(app, h('div', { class: 'e-stack sl-col' },
     h('section', { class: 'e-card' },
       h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'The round'),
       h('label', { class: 'e-label', for: 'su-title' }, 'Title'), titleIn,
       h('label', { class: 'e-label', for: 'su-cycle', style: 'margin-top:12px;display:block' }, 'Intake'), cycleIn,
       h('label', { class: 'e-label', for: 'su-names', style: 'margin-top:12px;display:block' }, 'Applicants'), names,
-      h('p', { class: 'e-hint' }, wired + ' Names are never in the app’s code.'),
+      h('p', { class: 'e-hint' }, wired + ' Names are never in the app’s code. Don’t rename people once answers are coming in: a changed name counts as a new applicant.'),
+      h('h3', { class: 'e-h3', style: 'margin:16px 0 4px' }, 'Questions asked about each applicant'),
+      h('p', { class: 'e-hint', style: 'margin-top:0' }, 'Up to ' + MAX_QUESTIONS + '. Changing the wording is safe any time; removing a question hides its earlier answers.'),
+      qBox,
+      h('div', { class: 'e-actions' },
+        h('button', { class: 'a-btn a-btn--tinted a-btn--sm', type: 'button', disabled: qs.length >= MAX_QUESTIONS, onclick: () => { qs.push({ id: 'q' + (Date.now() % 100000), type: 'text', label: 'New question', required: false }); drawQs(); } }, 'Add a question'),
+        h('button', { class: 'a-btn a-btn--tinted a-btn--sm', type: 'button', onclick: () => { qs = DEFAULT_QUESTIONS.map(q => ({ ...q })); drawQs(); } }, 'Back to the standard two')),
       h('div', { class: 'e-actions' },
         round?.shared
           ? [h('button', { class: 'a-btn', type: 'button', onclick: () => publish(round.status) }, 'Save changes'),
@@ -285,6 +389,7 @@ function setupScreen() {
           : [h('button', { class: 'a-btn', type: 'button', onclick: () => publish('open') }, 'Publish to everyone'),
             h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => { if (save()) toast('Saved on this device'); } }, 'Save on this device only')],
         h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: link }, 'Make a private link')), out),
+    h('section', { class: 'e-card' }, h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'Photos'), photoBox),
     committeeCard(),
     h('section', { class: 'e-card' },
       h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'Already have a round?'),
@@ -293,7 +398,7 @@ function setupScreen() {
       h('div', { class: 'e-actions' }, h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => {
         const r = readRoundText(imp.value);
         if (!r) { toast('That didn’t look like a round.'); return; }
-        put(K.round, r); round = r; loadMine().then(() => { toast('Round loaded'); render(); });
+        put(K.round, r); round = r; photos = {}; loadMine().then(() => { toast('Round loaded'); render(); });
       } }, 'Load it'))),
     round && !round.shared ? h('section', { class: 'e-card' },
       h('button', { class: 'a-btn a-btn--danger a-btn--tinted', type: 'button', onclick: async () => {
@@ -339,17 +444,22 @@ async function resultsScreen() {
     if (n !== seq) return;
   } else list = subs();
   const sum = summary(round, list);
+  const sq = scaleQuestions(round);
   const staffBar = tabs('results');
+  const many = round.questions.filter(q => q.type === 'text').length > 1;
+  const ap = id => round.applicants.find(a => a.id === id);
   fill(app, h('div', { class: 'e-stack e-wide' },
     staffBar,
     h('div', { class: 'e-note' }, round.shared
       ? `${round.title} (${round.status}): ${list.length} ${list.length === 1 ? 'response' : 'responses'}. Only PDs and the committee see this screen.`
       : `${list.length} ${list.length === 1 ? 'response was' : 'responses were'} sent from this device. Answers sent to the Google Form are in its response sheet; publish the round to see everyone’s here.`),
     h('div', { class: 'e-table-wrap', tabindex: '0', role: 'region', 'aria-label': 'Scores by applicant' }, h('table', { class: 'e-table' },
-      h('thead', {}, h('tr', {}, ['Applicant', 'Mean', 'Scores', 'Didn’t interact'].map(x => h('th', { scope: 'col' }, x)))),
-      h('tbody', {}, sum.map(s => h('tr', {}, h('th', { scope: 'row' }, s.name), h('td', { class: 'sl-mean' }, s.mean == null ? '–' : s.mean.toFixed(1)), h('td', {}, String(s.n)), h('td', {}, String(s.skipped))))))),
+      h('thead', {}, h('tr', {}, [h('th', { scope: 'col' }, 'Applicant'), ...sq.map(q => h('th', { scope: 'col' }, sq.length === 1 ? 'Mean (n)' : q.label + ' (mean, n)')), h('th', { scope: 'col' }, 'Answered'), h('th', { scope: 'col' }, 'Skipped')])),
+      h('tbody', {}, sum.map(s => h('tr', {}, h('th', { scope: 'row' }, h('span', { class: 'sl-rowname' }, faceOf(ap(s.id), 'sl-photo--sm'), s.name)),
+        ...s.scales.map(sc => h('td', { class: 'sl-mean' }, sc.mean == null ? '–' : `${sc.mean.toFixed(1)} (${sc.n})`)),
+        h('td', {}, String(s.answered)), h('td', {}, String(s.skipped))))))),
     sum.filter(s => s.comments.length).map(s => h('section', { class: 'e-card' }, h('h2', { class: 'e-h3', style: 'margin-top:0' }, s.name),
-      h('ul', { class: 'sl-comments' }, s.comments.map(c => h('li', {}, c.text, ' ', h('span', { class: 'sl-who' }, '· ' + c.by)))))),
+      h('ul', { class: 'sl-comments' }, s.comments.map(c => h('li', {}, many ? h('em', {}, c.q + ': ') : null, c.text, ' ', h('span', { class: 'sl-who' }, '· ' + c.by)))))),
     list.length ? h('section', { class: 'e-card' }, h('h2', { class: 'e-h3', style: 'margin-top:0' }, 'Who has answered'),
       h('p', { class: 'e-small' }, list.map(s => s.name).sort((a, b) => a.localeCompare(b)).join(', '))) : null,
     h('div', { class: 'e-actions' }, h('button', { class: 'a-btn', type: 'button', disabled: !list.length, onclick: () => download(`results-${round.cycle}.csv`, new Blob([resultsCSV(round, list)], { type: 'text/csv' })) }, 'Download CSV'))));

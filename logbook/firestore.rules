@@ -740,6 +740,12 @@ service cloud.firestore {
       allow read: if selMayAnswer();
       allow create, update: if (isAdmin() || isPD()) && cycle.size() <= 20 && validSelRound(cycle, request.resource.data);
       allow delete: if isAdmin() || isPD();
+      // applicants' passport photos (a few KB of base64 JPEG each): everyone who may answer reads; admins and PDs keep them
+      match /photos/{aid} {
+        allow read: if selMayAnswer();
+        allow create, update: if (isAdmin() || isPD()) && aid.size() <= 20 && validSelPhoto(request.resource.data);
+        allow delete: if isAdmin() || isPD();
+      }
       match /responses/{email} {
         allow get: if isOwner(email);
         allow read: if isPD() || selCommittee();
@@ -750,11 +756,17 @@ service cloud.firestore {
       }
     }
     function validSelRound(cycle, d) {
-      return d.keys().hasOnly(['cycle', 'title', 'status', 'applicants', 'updatedAt'])
+      return d.keys().hasOnly(['cycle', 'title', 'status', 'applicants', 'questions', 'updatedAt'])
         && d.cycle == cycle
         && d.title is string && d.title.size() > 0 && d.title.size() <= 200
         && d.status in ['open', 'closed']
         && d.applicants is list && d.applicants.size() >= 1 && d.applicants.size() <= 200
+        && (!('questions' in d) || (d.questions is list && d.questions.size() >= 1 && d.questions.size() <= 10))
+        && optNumber(d, 'updatedAt');
+    }
+    function validSelPhoto(d) {
+      return d.keys().hasOnly(['jpeg', 'updatedAt'])
+        && d.jpeg is string && d.jpeg.size() > 0 && d.jpeg.size() <= 80000
         && optNumber(d, 'updatedAt');
     }
     function validSelResponse(email, d) {
