@@ -52,7 +52,8 @@ like the older lists (`owners/`, `admins/`, `pds/`), which still work; retiring 
 - `accessLog/{id}` `{ by, to, change, at }` is append-only (the app writes it in the same batch as the grant); readable by Admin staff,
   PCs and owners.
 - Faculty records also take optional `core`, `ccc` (booleans) and `workEmail`.
-- Not built yet: the Access pane in People (a table of people by role) and the paste boxes that tick core/CCC and add PCs by name or email.
+- `js/access.js` (roles, `mayChange` mirroring these rules, `changeText`, `parseAccessPaste`; `test/access.test.mjs`) is built.
+- Not built yet: the Access tab in People (a table of people by role), its cloud and demo calls, and the paste boxes that tick core/CCC and add PCs by name or email (plan: `360/STATUS.md`, "Handover").
 
 ## Rotations (read-only; owner, 16 Oct 2026)
 
