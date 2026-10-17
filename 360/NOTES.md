@@ -12,7 +12,7 @@ made-up residents). Same people and sign-in as logbook, evals and People. Not th
   offer last round's list** (owner).
 - The form's lists, kept: scholarly projects (title, supervisor, status, start, end, note; "nothing to report" tick),
   committee / admin work, teaching / presentations, conference presentations (free-text lines).
-- Nominees: name, group (senior, peer, allied health, other), email (required for allied health, optional for doctors), note.
+- Nominees: name, group (senior, peer, allied health, other), email (required for allied health, optional for doctors). No note field.
   Limits as on the form: 6 seniors (Associate Consultant or above), 2 peers (registrars, residents, MOPEX), 4 allied health.
 - PCs review nominees (mark ok or swap) and send the emails **outside the app** (CSV export, or one `mailto:` per nominee).
   Nominees do not reply in the app.
@@ -47,3 +47,21 @@ after any change to them: a first version broke the evals decline and reassign c
 - Real PCs, Admin staff, PDs, APDs and the core faculty list: the owner's private notes (`data/ccc-360/`).
 - Sign-in is Google; the `access`, `faculty` and `pds` ids are the Google email. A person's NUHS work email may differ: faculty
   records gain an optional `workEmail`, which the nominee picker uses for the PCs' emails.
+
+## How it's built (resident half, 17 Oct 2026)
+
+- `js/model.js`: all logic, no page code (`test/model.test.mjs`): cleaning of projects, lists and nominees, the limits (6 senior
+  doctors, 2 peers, 4 allied health, 2 others; 20 in all, 30 per list), what blocks Send (a project with no title, a nominee with
+  no name or a bad email, an allied-health nominee with no email) and what only warns, carrying projects over, the faculty
+  picker (`suggestFaculty`: active faculty whose name starts with each word typed, core faculty first; `contactEmail`: work email
+  if set, else the sign-in email) and the document shapes the rules check.
+- `js/store.js`: rounds, a resident's own entry and nominees, and Send (both documents in one batch, a plain await so "sent" means the
+  server has it). `?demo` uses a localStorage twin (`ccc-demo-store`).
+- `js/app.js`: home, Scholarly projects, Feedback nominees, Review and send. Typing is autosaved on the device (`ccc-draft-…`) and
+  wins over the server copy until Send; the device copy is cleared on Send. A closed round is read-only. Everything typed is shown
+  with `textContent`, never as HTML.
+- **Peers are typed in, not picked.** Residents can read the faculty list but not the residents' list (rules), so only senior doctors
+  (and others) are suggested from faculty. Opening the residents' list to residents would expose emails, so it is not done.
+- Staff (PD, Admin staff, PC) who are not residents see a placeholder until the coordinators' view is built.
+- Tests: `node 360/test/model.test.mjs`, `node 360/test/e2e.mjs` (demo at 390 px, axe on each screen, a send and a change, carry-over,
+  a closed round, nothing outside the site reached).

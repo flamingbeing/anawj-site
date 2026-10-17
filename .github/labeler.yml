@@ -27,6 +27,9 @@ people:
 applicants:
   - changed-files:
       - any-glob-to-any-file: 'applicants/**'
+ccc-360:
+  - changed-files:
+      - any-glob-to-any-file: '360/**'
 hand-log:
   - changed-files:
       - any-glob-to-any-file: 'hand-log/**'

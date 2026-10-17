@@ -4,7 +4,7 @@ Last updated: 2026-10-17 by Claude Code (360).
 
 ## Now
 
-Each session edits only its own file in `status/`. This session (`status/360.md`) built the rules and handed the People changes to the People session (below); the resident app is not started.
+Each session edits only its own file in `status/`. The resident app is built and tested (not yet in a PR; see below). This session (`status/360.md`) built the rules and handed the People changes to the People session (below); the resident app is not started.
 
 ## Waiting on the owner
 
@@ -17,7 +17,7 @@ Each session edits only its own file in `status/`. This session (`status/360.md`
 
 1. **People › Access pane** (handed to the People session; plan in `people/NOTES.md`, "Roles", and the handover below).
 2. **People › faculty ticks and paste boxes:** `core`, `ccc`, `workEmail` on faculty records (rules already allow them); paste boxes that tick core/CCC by name or email and add PCs, matching on sign-in email, work email, then exactly one name (`parseAccessPaste` in `people/js/access.js` does the matching).
-3. **360 resident app** (`360/`): store with a demo twin, `model.js` with unit tests, e2e with axe at 390 px. Screens: round list, projects (title, supervisor, status, start, end, note; "nothing to report"; committee/admin, teaching, conferences as lines), nominees (senior doctors up to 6 from the faculty list, peers up to 2 from residents, allied health up to 4 typed in with email, other), review and submit. Nominee picker: core faculty first, "CCC" badge; fills `workEmail` if set, else the sign-in email. Active faculty and residents only. Nominees start empty each round (no copy from last round). Show only to active residents.
+3. **360 resident app** (`360/`; **built, 17 Oct 2026**, see `NOTES.md` "How it's built"; waits for its PR): store with a demo twin, `model.js` with unit tests, e2e with axe at 390 px. Screens: round list, projects (title, supervisor, status, start, end, note; "nothing to report"; committee/admin, teaching, conferences as lines), nominees (senior doctors up to 6 from the faculty list, peers up to 2 from residents, allied health up to 4 typed in with email, other), review and submit. Nominee picker: core faculty first, "CCC" badge; fills `workEmail` if set, else the sign-in email. Active faculty and residents only. Nominees start empty each round (no copy from last round). Show only to active residents.
 4. **PC view:** all entries and nominees, mark ok or swap (`review/`), CSV (formula-safe) and one `mailto:` per nominee, close round, delete nominees 60 days after a round closes (and delete a round's nominees before deleting the round). Render user text with `textContent` only.
 5. Retire `owners/`, `admins/`, `pds/` after a quiet week (a planned job; the rules read both for now).
 
