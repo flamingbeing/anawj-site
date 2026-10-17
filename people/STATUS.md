@@ -6,7 +6,7 @@ list, filtered by the `people` label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-17 by Claude Code, People app (people).
+Last updated: 2026-10-17 by Claude Code, People app (people) (save-state).
 
 ## Now
 
@@ -16,9 +16,8 @@ check `evals/` work in progress too.
 
 ## Waiting on the owner
 
-- **Approve the People › Access PR** (17 Oct; handover from the CCC 360 session, so it waits for the owner's say before merge). Then:
-  the older `owners/`, `admins/`, `pds/` lists still work but are not shown on the Access screen until they are copied into `access/`
-  (the home-computer copy already done by firetop covers that; check the list looks right on the live app).
+- **Check People › Access on the live app** (17 Oct; merged as #754): the older `owners/`, `admins/`, `pds/` lists still work but show on the
+  Access screen only once copied into `access/` (firetop's copy should cover it); see that your own roles appear and the log works.
 
 - **Try Import from roster with the real lists** (16 Oct): People › Residents › Import from roster › Get the list from NUH
   Junior Monthly (import the newest month's sheet there first, so grades are current; use the browser that has the roster app's data, or sign in to its team sharing; otherwise copy it from
@@ -28,8 +27,8 @@ check `evals/` work in progress too.
 ## Next (agreed queue)
 
 0. **Permissions and manpower for the APMES apps** (owner, 17 Oct 2026): this session is the orchestrator and takes requests from other
-   sessions on its own (`people/NOTES.md`, "Who runs permissions"). Access pane built; open: retire the older role lists once `access/` is
-   confirmed on the live app, and tell the CCC 360 session when the pane and faculty ticks are live.
+   sessions on its own (`people/NOTES.md`, "Who runs permissions"). Access pane built and merged (#754; CCC 360 told). Open: retire the older role lists once `access/` is
+   confirmed on the live app. #757 (CCC 360, open, rules): any resident reads ACTIVE residents; no change for People.
 
 1. **Rotations, stage 1 is built** (owner's go 16 Oct 2026): part 1, the read-only grid, people per posting and a person's
    history, in the browser; part 2, linking sheet names to roster names by hand once (kept in this browser) and the pull by
