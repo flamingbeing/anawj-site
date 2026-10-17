@@ -21,7 +21,12 @@ Each session keeps its own line in `status/<session>.md` (`homepage.md`; a new s
 
 ## Next
 
-Nothing agreed. Ideas for later are in `ROADMAP.md`; nothing there is a task until the owner asks.
+Token plan (owner, 17 Oct 2026; plan in the private repo). Done here: quick-save unsubscribe step (#773), deny-read
+rules (#774), brainstorm file moved to `logbook/archive/`, save-tokens rule in AGENTS.md and lower context-nudge
+thresholds (#775). Later, after the weekly reset on Thu 22 Oct 10am SGT: `logbook/NOTES.md` diet (pilot), then eeg,
+pantry, prewarm, nuh-junior-monthly; lazy startup hook; split `nuh-roster/js/app.js`.
+
+Otherwise nothing agreed. Ideas for later are in `ROADMAP.md`; nothing there is a task until the owner asks.
 
 ## Recently done
 
