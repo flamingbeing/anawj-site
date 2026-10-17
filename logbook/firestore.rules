@@ -667,5 +667,57 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if isAdmin();
     }
+
+    // Selection 360 (selection/): confidential feedback on residency applicants, by residents and faculty.
+    // A round is selection/{cycle} (title, applicants, open or closed): admins and PDs write it; anyone who may answer
+    // (an admin, a PD, listed faculty, a resident) reads it. Each respondent writes only their own response,
+    // selection/{cycle}/responses/{email}, while the round is open, and reads only that. PDs and the committee
+    // (selectionCommittee/{email}, kept by admins and PDs) read every response. Admins do not read responses unless
+    // they are PDs or on the committee (owner, 17 Oct 2026: "committee and PDs").
+    function selMayAnswer() {
+      return isAdmin() || isPD()
+        || (signedIn() && exists(/databases/$(database)/documents/faculty/$(me())))
+        || (signedIn() && exists(/databases/$(database)/documents/members/$(me()))
+            && isResident(get(/databases/$(database)/documents/members/$(me())).data.rid));
+    }
+    function selCommittee() {
+      return signedIn() && exists(/databases/$(database)/documents/selectionCommittee/$(me()));
+    }
+    match /selectionCommittee/{email} {
+      allow get: if isOwner(email);
+      allow list: if isAdmin() || isPD();
+      allow create, update: if (isAdmin() || isPD()) && email == email.lower()
+        && request.resource.data.keys().hasOnly(['name'])
+        && optString(request.resource.data, 'name', 200);
+      allow delete: if isAdmin() || isPD();
+    }
+    match /selection/{cycle} {
+      allow read: if selMayAnswer();
+      allow create, update: if (isAdmin() || isPD()) && cycle.size() <= 20 && validSelRound(cycle, request.resource.data);
+      allow delete: if isAdmin() || isPD();
+      match /responses/{email} {
+        allow get: if isOwner(email);
+        allow read: if isPD() || selCommittee();
+        allow create, update: if isOwner(email) && email == email.lower() && selMayAnswer()
+          && get(/databases/$(database)/documents/selection/$(cycle)).data.status == 'open'
+          && validSelResponse(email, request.resource.data);
+        allow delete: if isPD();
+      }
+    }
+    function validSelRound(cycle, d) {
+      return d.keys().hasOnly(['cycle', 'title', 'status', 'applicants', 'updatedAt'])
+        && d.cycle == cycle
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 200
+        && d.status in ['open', 'closed']
+        && d.applicants is list && d.applicants.size() >= 1 && d.applicants.size() <= 200
+        && optNumber(d, 'updatedAt');
+    }
+    function validSelResponse(email, d) {
+      return d.keys().hasOnly(['email', 'name', 'answers', 'updatedAt'])
+        && d.email == email
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 120
+        && d.answers is map && d.answers.size() <= 200
+        && d.updatedAt == request.time;
+    }
   }
 }

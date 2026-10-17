@@ -70,6 +70,12 @@ function queued(p) {
   p.catch(e => { if (late) { console.error('Sync failed', e); for (const cb of syncErrorListeners) cb(e); } });
   return Promise.race([p, new Promise(r => setTimeout(() => { late = true; r(); }, ACK_WAIT))]);
 }
+// For apps built on evals' sign-in that keep their own collections (selection/): the Firestore handle and the same
+// offline-friendly write. Never used in the demo.
+export async function firestore() {
+  const { db, F } = await sdk();
+  return { db, F, queued };
+}
 // a read that answers null instead of failing when access is denied or the device is offline
 const soft = p => p.catch(e => {
   if (!['permission-denied', 'unavailable'].includes(e?.code)) console.warn('Read failed', e);

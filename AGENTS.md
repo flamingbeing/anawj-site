@@ -113,7 +113,7 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
   Checks workflow), `node ntf-roster/test/perf.e2e.mjs` (speed budgets on a slowed phone; also in the Checks workflow)
   and the unit tests in `ntf-roster/test/`.
 - Hand log changes: run `node hand-log/test/e2e.mjs`.
-- Selection changes: run `node selection/test/model.test.mjs` and `node selection/test/e2e.mjs`.
+- Selection changes: run `node selection/test/model.test.mjs` and `node selection/test/e2e.mjs`; its rules (in `logbook/firestore.rules`) have `selection/test/rules.emulator.mjs`, run by `tools/test-rules.sh`.
 - People changes, and evals changes to `cloud.js`, `ui-core.js` or the People panes in `ui-admin.js`: run `node people/test/e2e.mjs`.
 - Page editor changes (`edit/`): run `node edit/test/e2e.mjs` and `node hand-babies/test/e2e.mjs` (it opens the editor).
 - Feedback button or Worker changes (`feedback/`, `worker/`): run `node feedback/test/e2e.mjs` (through the real Worker).

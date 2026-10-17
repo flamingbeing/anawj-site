@@ -10,6 +10,7 @@ import {
   INTRO, SCORES, parseNames, cleanRound, encodeRound, readRoundText, cleanAnswers, blank, statusOf, progress, warnings,
   formBody, formUrl, answersText, summary, resultsCSV, demoRound,
 } from './model.js';
+import * as store from './store.js';
 
 applyTheme();
 
@@ -30,6 +31,7 @@ const K = { round: `${NS}-round`, ans: (c, e) => `${NS}-ans-${c}-${e}`, subs: c 
 let round = null;      // the open round, or null
 let answers = {};      // this respondent's answers, by applicant id
 let sent = null;       // { at, via } once this respondent sent
+let isCom = false;     // on the selection committee (may read the responses)
 
 // A round link: the round travels after #r= . Read it before anything else so it survives sign-in.
 (function takeLink() {
@@ -41,19 +43,33 @@ let sent = null;       // { at, via } once this respondent sent
   else setTimeout(() => toast('That link didn’t work. Ask for a new one.'), 400);
 })();
 
-function loadRound() {
-  round = cleanRound(get(K.round, null)) || (cloud.demo ? demoRound() : null);
+// The round: the open one in the shared store, else the newest closed one (staff and the committee still read it), else
+// one that came in a link or was set up on this device.
+async function loadRound() {
+  let shared = null;
+  if (S.user && mayAnswer()) { try { const all = await store.listRounds(); shared = all.find(r => r.status === 'open') || all[0] || null; } catch (e) { console.warn('Shared rounds unavailable', e); } }
+  round = shared || cleanRound(get(K.round, null)) || (cloud.demo ? demoRound() : null);
 }
-function loadMine() {
+async function loadMine() {
   answers = {}; sent = null;
   if (!round || !S.user) return;
-  answers = cleanAnswers(round, get(K.ans(round.cycle, S.user.email), {}).a);
-  sent = get(K.ans(round.cycle, S.user.email), {}).sent || null;
+  const mine = get(K.ans(round.cycle, S.user.email), {});
+  answers = cleanAnswers(round, mine.a);
+  sent = mine.sent || null;
+  if (round.shared) {
+    try {
+      const r = await store.myResponse(round.cycle, S.user.email);
+      if (r) { sent = { at: Number(r.updatedAt?.toMillis ? r.updatedAt.toMillis() : r.updatedAt) || Date.now(), via: 'store' }; if (!mine.a) answers = cleanAnswers(round, r.answers); }
+      else if (sent?.via === 'store') sent = null;
+    } catch (e) { console.warn('Couldn’t check for a sent response', e); }
+  }
 }
 const saveMine = () => put(K.ans(round.cycle, S.user.email), { a: answers, sent });
 const isStaff = () => !!(S.roles.admin || S.roles.pd);
 const mayAnswer = () => isStaff() || !!S.roles.resident || (!!S.roles.faculty && S.roles.faculty.status !== 'INACTIVE');
-const subs = () => (round ? get(K.subs(round.cycle), []) : []);
+const subs = () => (round && !round.shared ? get(K.subs(round.cycle), []) : []);
+const canResults = () => !!S.roles.pd || isCom;
+const isOpen = () => !round?.shared || round.status === 'open';
 
 // ---------- routing ----------
 
@@ -61,7 +77,7 @@ const route = () => {
   const [a, b] = location.hash.replace(/^#\/?/, '').split('/');
   if (a === 'a' && round?.applicants.some(x => x.id === b)) return { name: 'a', id: b };
   if (['review', 'done'].includes(a)) return { name: a };
-  if (['setup', 'results'].includes(a) && isStaff()) return { name: a };
+  if ((a === 'setup' && isStaff()) || (a === 'results' && canResults())) return { name: a };
   return { name: 'home' };
 };
 const go = hash => { location.hash = hash; };
@@ -89,7 +105,7 @@ function account() {
     h('div', { class: 'e-actions' },
       round ? h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: async () => {
         if (!await confirmBox('Clear my answers?', 'This removes your scores and comments from this device. If you haven’t sent them, they’re gone.', 'Clear', true)) return;
-        del(K.ans(round.cycle, S.user.email)); m.close(); loadMine(); render();
+        del(K.ans(round.cycle, S.user.email)); m.close(); loadMine().then(render);
       } }, 'Clear my answers') : null,
       h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Close'),
       h('button', { class: 'a-btn', type: 'button', onclick: async () => { m.close(); await cloud.signOut(); location.reload(); } }, 'Sign out')),
@@ -114,6 +130,7 @@ function homeScreen() {
   const p = progress(round, answers);
   const pct = Math.round((p.done / p.total) * 100);
   return h('div', { class: 'e-stack' },
+    !isOpen() ? h('div', { class: 'e-warn-note' }, 'This round is closed. You can still look at your answers, but they can’t be sent any more.') : null,
     h('section', { class: 'e-card sl-intro' },
       h('h2', { class: 'e-h2', style: 'margin-top:0' }, round.title),
       INTRO.map(t => h('p', {}, t)),
@@ -167,17 +184,19 @@ function reviewScreen() {
   const w = warnings(round, answers);
   const nameIn = h('input', { class: 'e-input', id: 'sl-name', autocomplete: 'name', value: S.user.name || '', maxlength: 120 });
   const status = h('p', { class: 'e-small', 'aria-live': 'polite' });
-  const send = h('button', { class: 'a-btn e-go', type: 'button' }, sent ? 'Send again' : 'Send');
+  const send = h('button', { class: 'a-btn e-go', type: 'button', disabled: !isOpen() }, sent ? 'Send again' : 'Send');
   send.onclick = async () => {
     const who = nameIn.value.trim() || S.user.email;
-    if (sent && !await confirmBox('Send again?', 'You already sent these. The committee will get a second copy.', 'Send again')) return;
+    if (sent && !await confirmBox('Send again?', round.shared ? 'This replaces what you sent before.' : 'You already sent these. The committee will get a second copy.', 'Send again')) return;
     if (p.scored + p.partial === 0 && !await confirmBox('Nothing to send', 'You haven’t scored or commented on anyone. Send anyway?', 'Send anyway')) return;
     send.disabled = true; status.textContent = 'Sending…';
     try {
       const via = await deliver(who);
       sent = { at: Date.now(), via }; saveMine();
-      const list = subs().filter(s => s.by !== S.user.email); list.push({ by: S.user.email, name: who, at: sent.at, answers });
-      put(K.subs(round.cycle), list);
+      if (via !== 'store') {
+        const list = subs().filter(s => s.by !== S.user.email); list.push({ by: S.user.email, name: who, at: sent.at, answers });
+        put(K.subs(round.cycle), list);
+      }
       go('#done');
     } catch (e) { status.textContent = 'Couldn’t send: ' + errText(e) + ' Your answers are safe on this device; try again, or copy them below.'; send.disabled = false; }
   };
@@ -190,7 +209,8 @@ function reviewScreen() {
     h('section', { class: 'e-card' },
       h('label', { class: 'e-label', for: 'sl-name' }, 'Your name, as the committee will see it'),
       nameIn,
-      h('p', { class: 'e-hint' }, round.form ? 'Your answers go to the selection committee’s form. Nothing else is kept online.' : 'This round isn’t connected to a form yet, so “Send” keeps your answers on this device and shows them to the committee here. Use Copy to send them another way.'),
+      !isOpen() ? h('p', { class: 'e-warn-note' }, 'This round is closed, so answers can’t be sent any more.') : null,
+      h('p', { class: 'e-hint' }, round.shared ? 'Your answers go to the selection committee and the programme directors, who see who said what. Nobody else can read them.' : round.form ? 'Your answers go to the selection committee’s form. Nothing else is kept online.' : 'This round isn’t connected to a form yet, so “Send” keeps your answers on this device and shows them to the committee here. Use Copy to send them another way.'),
       h('div', { class: 'e-actions' }, send,
         h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(answersText(round, nameIn.value.trim() || S.user.name, answers)); toast('Copied'); } catch { toast('Couldn’t copy. Use Download.'); } } }, 'Copy'),
         h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => download(`feedback-${round.cycle}.txt`, new Blob([answersText(round, nameIn.value.trim() || S.user.name, answers)], { type: 'text/plain' })) }, 'Download')),
@@ -200,6 +220,7 @@ function reviewScreen() {
 // Stage 1 delivery: post to the Google Form when the round is wired to one (the reply can't be read from another site, so
 // "sent" means the browser handed it over; the committee checks the response sheet). Otherwise it stays on this device.
 async function deliver(who) {
+  if (round.shared) { await store.sendResponse(round, S.user, who, answers); return 'store'; }
   if (cloud.demo || !round.form) return 'device';
   if (!navigator.onLine) throw new Error('No signal.');
   await fetch(formUrl(round), { method: 'POST', mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer', body: formBody(round, who, answers) });
@@ -209,7 +230,7 @@ async function deliver(who) {
 function doneScreen() {
   header('Thank you');
   fill(app, h('div', { class: 'e-stack sl-col' }, empty('Sent. Thank you.',
-    sent?.via === 'form' ? 'Your feedback went to the selection committee. You can come back and change it, then send again.' : 'Your feedback is saved on this device for the committee.',
+    sent?.via === 'store' || sent?.via === 'form' ? 'Your feedback went to the selection committee. You can come back and change it, then send again.' : 'Your feedback is saved on this device for the committee.',
     h('div', { class: 'e-actions' }, h('button', { class: 'a-btn', type: 'button', onclick: () => go('#') }, 'Back to the list')))));
 }
 
@@ -218,12 +239,12 @@ function doneScreen() {
 function setupScreen() {
   header('Set up the round');
   const titleIn = h('input', { class: 'e-input', id: 'su-title', value: round?.title || 'Applicant feedback', maxlength: 200 });
-  const cycleIn = h('input', { class: 'e-input', id: 'su-cycle', value: round?.cycle === 'round' || !round ? '' : round.cycle, maxlength: 20, placeholder: 'e.g. 2027' });
+  const cycleIn = h('input', { class: 'e-input', id: 'su-cycle', value: round?.cycle === 'round' || !round ? '' : round.cycle, maxlength: 20, placeholder: 'e.g. 2027', disabled: !!round?.shared });
   const names = h('textarea', { class: 'e-textarea', id: 'su-names', rows: 8, placeholder: 'One name per line, in the order they should appear' });
   names.value = round ? round.applicants.map(a => a.name).join('\n') : '';
-  const wired = round?.form ? 'Connected to a Google Form.' : 'Not connected to a form: answers stay on each person’s device.';
+  const wired = round?.shared ? `Published (${round.status}): residents and faculty see it as soon as they open the app.` : round?.form ? 'Connected to a Google Form.' : 'Not published: answers stay on each person’s device, or go to the Google Form if the round is connected to one.';
   const out = h('div', {});
-  const save = () => {
+  const build = () => {
     const apps = parseNames(names.value);
     if (!apps.length) { toast('Add at least one name.'); return null; }
     // keep ids, and any form wiring, for names that were already there
@@ -232,10 +253,18 @@ function setupScreen() {
     const used = new Set(); merged.forEach((a, i) => { if (used.has(a.id)) a.id = 'n' + (i + 1); used.add(a.id); });
     const next = cleanRound({ title: titleIn.value, cycle: cycleIn.value || 'round', applicants: merged, form: round?.form });
     if (!next) { toast('That round isn’t valid.'); return null; }
-    put(K.round, next); round = next; loadMine(); return next;
+    return next;
+  };
+  const save = () => { const next = build(); if (!next) return null; put(K.round, next); round = next; loadMine(); return next; };
+  // the shared store: everyone who may answer sees the round; close it to stop answers
+  const publish = async status => {
+    const next = build(); if (!next) return;
+    if (next.cycle === 'round') { toast('Give the round an intake (for example 2027) first.'); return; }
+    if (!round?.shared && !await confirmBox('Publish the round?', 'The applicants’ names go to the shared store, and every resident and faculty member in APMES can see them and answer.', 'Publish')) return;
+    try { round = await store.saveRound(next, status); await loadMine(); toast(status === 'open' ? 'Published' : 'Closed'); render(); } catch (e) { toast('Couldn’t save. ' + errText(e)); }
   };
   const link = () => {
-    const r = save(); if (!r) return;
+    const r = round?.shared ? build() : save(); if (!r) return;
     const url = `${location.origin}${location.pathname}#r=${encodeRound(r)}`;
     fill(out, h('p', { class: 'e-small' }, 'Send this link privately (WhatsApp or email) to residents and faculty. It carries the applicants’ names, so don’t post it anywhere public:'),
       h('textarea', { class: 'e-textarea sl-code', readonly: true, 'aria-label': 'Private link', onfocus: e => e.target.select() }, url),
@@ -248,10 +277,15 @@ function setupScreen() {
       h('label', { class: 'e-label', for: 'su-title' }, 'Title'), titleIn,
       h('label', { class: 'e-label', for: 'su-cycle', style: 'margin-top:12px;display:block' }, 'Intake'), cycleIn,
       h('label', { class: 'e-label', for: 'su-names', style: 'margin-top:12px;display:block' }, 'Applicants'), names,
-      h('p', { class: 'e-hint' }, wired + ' Names stay on this device and in the link you share; they are never in the app’s code.'),
+      h('p', { class: 'e-hint' }, wired + ' Names are never in the app’s code.'),
       h('div', { class: 'e-actions' },
-        h('button', { class: 'a-btn', type: 'button', onclick: () => { if (save()) toast('Saved on this device'); } }, 'Save'),
-        h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: link }, 'Make the private link')), out),
+        round?.shared
+          ? [h('button', { class: 'a-btn', type: 'button', onclick: () => publish(round.status) }, 'Save changes'),
+            h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => publish(round.status === 'open' ? 'closed' : 'open') }, round.status === 'open' ? 'Close the round' : 'Reopen the round')]
+          : [h('button', { class: 'a-btn', type: 'button', onclick: () => publish('open') }, 'Publish to everyone'),
+            h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => { if (save()) toast('Saved on this device'); } }, 'Save on this device only')],
+        h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: link }, 'Make a private link')), out),
+    committeeCard(),
     h('section', { class: 'e-card' },
       h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'Already have a round?'),
       h('p', { class: 'e-small' }, 'Paste a link or the round file (it may also connect the round to the committee’s Google Form).'),
@@ -259,33 +293,74 @@ function setupScreen() {
       h('div', { class: 'e-actions' }, h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => {
         const r = readRoundText(imp.value);
         if (!r) { toast('That didn’t look like a round.'); return; }
-        put(K.round, r); round = r; loadMine(); toast('Round loaded'); render();
+        put(K.round, r); round = r; loadMine().then(() => { toast('Round loaded'); render(); });
       } }, 'Load it'))),
-    round ? h('section', { class: 'e-card' },
+    round && !round.shared ? h('section', { class: 'e-card' },
       h('button', { class: 'a-btn a-btn--danger a-btn--tinted', type: 'button', onclick: async () => {
         if (!await confirmBox('Remove the round?', 'This removes the round and the answers kept on this device. The Google Form’s responses aren’t touched.', 'Remove', true)) return;
         [K.round, K.ans(round.cycle, S.user.email), K.subs(round.cycle)].forEach(del); round = null; answers = {}; sent = null; go('#');
       } }, 'Remove the round from this device')) : null));
 }
 
-function resultsScreen() {
+// who may read the responses besides the PDs: kept by admins and PDs
+function committeeCard() {
+  const box = h('div', {});
+  const email = h('input', { class: 'e-input', id: 'cm-email', type: 'email', autocomplete: 'off', placeholder: 'name@example.com', 'aria-label': 'Committee member’s email' });
+  const name = h('input', { class: 'e-input', id: 'cm-name', autocomplete: 'off', placeholder: 'Name', 'aria-label': 'Committee member’s name' });
+  const draw = async () => {
+    let list = [];
+    try { list = await store.listCommittee(); } catch (e) { fill(box, h('p', { class: 'e-alert' }, 'Couldn’t load the committee. ' + errText(e))); return; }
+    fill(box, list.length ? h('div', { class: 'e-list' }, list.map(m => h('div', { class: 'e-row e-row--static' },
+      h('span', { class: 'e-row__body' }, h('span', { class: 'e-row__title' }, m.name || m.email), m.name ? h('span', { class: 'e-row__meta' }, m.email) : null),
+      h('button', { class: 'a-btn a-btn--tinted a-btn--sm', type: 'button', 'aria-label': 'Remove ' + (m.name || m.email), onclick: async () => {
+        try { await store.removeCommittee(m.email); draw(); } catch (e) { toast('Couldn’t remove. ' + errText(e)); }
+      } }, 'Remove')))) : h('p', { class: 'e-small' }, 'No one yet. The programme directors always see the responses.'));
+  };
+  draw();
+  return h('section', { class: 'e-card' },
+    h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'Selection committee'),
+    h('p', { class: 'e-small' }, 'They read every response, with names, as the programme directors do. Use the email they sign in with.'),
+    box,
+    h('div', { class: 'e-stack', style: 'margin-top:12px' }, email, name),
+    h('div', { class: 'e-actions' }, h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: async () => {
+      try { await store.saveCommittee({ email: email.value, name: name.value }); email.value = ''; name.value = ''; draw(); } catch (e) { toast(errText(e)); }
+    } }, 'Add')));
+}
+
+async function resultsScreen() {
   header('Results');
-  const list = subs();
   if (!round) { fill(app, empty('No round', '', null)); return; }
+  const n = seq;
+  let list;
+  if (round.shared) {
+    fill(app, h('p', { class: 'e-loading' }, 'Loading…'));
+    try { list = (await store.listResponses(round.cycle)).map(r => ({ by: r.email, name: r.name, at: r.updatedAt, answers: cleanAnswers(round, r.answers) })); }
+    catch (e) { fill(app, h('p', { class: 'e-alert' }, 'Couldn’t load the responses. ' + errText(e))); return; }
+    if (n !== seq) return;
+  } else list = subs();
   const sum = summary(round, list);
+  const staffBar = tabs('results');
   fill(app, h('div', { class: 'e-stack e-wide' },
-    h('div', { class: 'e-note' }, `${list.length} ${list.length === 1 ? 'response was' : 'responses were'} sent from this device. Answers sent to the Google Form are in its response sheet, not here (stage 1); a shared results screen comes with the cloud store (PLAN.md).`),
+    staffBar,
+    h('div', { class: 'e-note' }, round.shared
+      ? `${round.title} (${round.status}): ${list.length} ${list.length === 1 ? 'response' : 'responses'}. Only PDs and the committee see this screen.`
+      : `${list.length} ${list.length === 1 ? 'response was' : 'responses were'} sent from this device. Answers sent to the Google Form are in its response sheet; publish the round to see everyone’s here.`),
     h('div', { class: 'e-table-wrap', tabindex: '0', role: 'region', 'aria-label': 'Scores by applicant' }, h('table', { class: 'e-table' },
       h('thead', {}, h('tr', {}, ['Applicant', 'Mean', 'Scores', 'Didn’t interact'].map(x => h('th', { scope: 'col' }, x)))),
       h('tbody', {}, sum.map(s => h('tr', {}, h('th', { scope: 'row' }, s.name), h('td', { class: 'sl-mean' }, s.mean == null ? '–' : s.mean.toFixed(1)), h('td', {}, String(s.n)), h('td', {}, String(s.skipped))))))),
     sum.filter(s => s.comments.length).map(s => h('section', { class: 'e-card' }, h('h2', { class: 'e-h3', style: 'margin-top:0' }, s.name),
       h('ul', { class: 'sl-comments' }, s.comments.map(c => h('li', {}, c.text, ' ', h('span', { class: 'sl-who' }, '· ' + c.by)))))),
+    list.length ? h('section', { class: 'e-card' }, h('h2', { class: 'e-h3', style: 'margin-top:0' }, 'Who has answered'),
+      h('p', { class: 'e-small' }, list.map(s => s.name).sort((a, b) => a.localeCompare(b)).join(', '))) : null,
     h('div', { class: 'e-actions' }, h('button', { class: 'a-btn', type: 'button', disabled: !list.length, onclick: () => download(`results-${round.cycle}.csv`, new Blob([resultsCSV(round, list)], { type: 'text/csv' })) }, 'Download CSV'))));
+  window.aRefreshBar?.();
 }
 
 // ---------- render and boot ----------
 
 let seq = 0;
+const tabs = cur => (isStaff() || canResults())
+  ? segment([['home', 'Feedback', true], ['results', 'Results', canResults()], ['setup', 'Set up', isStaff()]].filter(t => t[2]).map(([id, label]) => ({ id, label })), cur, id => go(id === 'home' ? '#' : '#' + id)) : null;
 async function render() {
   const n = ++seq;
   if (!S.user) return;
@@ -296,8 +371,7 @@ async function render() {
   }
   if (n !== seq) return;
   const r = route();
-  const staffBar = isStaff() && ['home', 'setup', 'results'].includes(r.name)
-    ? segment([['home', 'Feedback'], ['results', 'Results'], ['setup', 'Set up']].map(([id, label]) => ({ id, label })), r.name, id => go(id === 'home' ? '#' : '#' + id)) : null;
+  const staffBar = ['home', 'setup'].includes(r.name) ? tabs(r.name) : null;   // Results draws its own, after it has loaded
   if (r.name === 'a') return applicantScreen(r.id);
   if (r.name === 'review' && round) return reviewScreen();
   if (r.name === 'done') return doneScreen();
@@ -319,12 +393,12 @@ function signInScreen() {
     cloud.demo ? h('p', { class: 'e-small' }, 'Demo: made-up applicants, kept only in this browser.') : null));
 }
 
-loadRound();
 cloud.watchUser(async u => {
   S.user = u;
   if (!u) { S.roles = { admin: false, pd: false }; signInScreen(); return; }
   try { S.roles = await cloud.getRoles(u.email); } catch (e) { S.roles = { admin: false, pd: false }; toast('Couldn’t check your access. ' + errText(e)); }
-  loadRound(); loadMine();
+  await loadRound(); await loadMine();
+  try { isCom = await store.isCommittee(u.email); } catch { isCom = false; }
   render();
 });
 if (!cloud.enabled) fill(app, h('p', { class: 'e-alert' }, 'Sign-in isn’t set up.'));
