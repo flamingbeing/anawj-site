@@ -229,6 +229,7 @@ file or straight into a new Google Sheet:
   `test/sheetgen.test.mjs`. Rebuilt from the real November sheet (private check script in the owner's private notes): about 94% of its 3,293 formulas came out
   identical text; the rest were explained by damage in the hand-made sheet (a `#REF!` in one person's Sunday points, one row's formulas shifted a
   column so they showed `#VALUE!`) and by its manpower ranges stopping one row short of the last person. The generated form has neither.
+- Real-Google dry run: `tools/sheetgen-dryrun.mjs` builds the same request for made-up people, creates a throwaway "DRY RUN ... (delete me)" spreadsheet with an access token (`SHEETS_TOKEN`), reads it back and checks every total and count against the day cells plus the merges, colour rules and frozen corner (`--print-body` prints just the request). Its checks were run against LibreOffice's recalculation with a faked API: 647 values, 0 wrong. The owner asked firetop to run it for real (17 Oct 2026).
 - Open: seniors' rows (from last month's sheet or People), the leave and request cells (typed in the sheet by the juniors), the other tabs
   (WR / premed, call roster, leave waitlist), the band boundaries for the leave rows, and writing the whole thing to a Google Sheet in real life.
 

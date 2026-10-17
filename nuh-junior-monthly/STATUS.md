@@ -1,17 +1,24 @@
 # NUH Junior Monthly: status
 
-Last updated: 2026-10-16 by Claude Code (jm1).
+Last updated: 2026-10-17 by Claude Code (jm1).
 
 ## Now
 - Each session keeps its own line in `status/<session>.md` (`status/jm1.md`); read it before starting, edit only yours.
 
 ## Waits on the owner
-- **A dry run on a copy of a month's sheet** (read from Google, check, Fill, write back, undo, lock). Real Google sign-in
-  and the real Sheets API are untested: everything so far used a fake. Do it on a copy, never the rosterer's live sheet.
-- The rosterer signs in once (Google shows an "unverified app" warning: Advanced, then continue). She has the rosterer
-  role (set 16 Oct).
+- **firetop's two jobs (sent 17 Oct 2026; reply pending):** (1) a real-Google dry run of "Create a new Google Sheet" with `tools/sheetgen-dryrun.mjs`
+  (a throwaway file, then deleted); (2) back up the owner's Drive folder of monthly sheets into the private repo as .xlsx with formulas and
+  colours. Real Google sign-in and the real Sheets API are otherwise untested (everything in the app used a fake): do the first real runs on a copy,
+  never the rosterer's live sheet.
+- Answers for the R1 to R3 rosterer (and the month's sheet from scratch): what the leave bands (SR, JR, non-resident rows in the manpower block) are meant
+  to cover; whether a holiday on a Friday or Saturday should add points; where the consultants' rows come from (last month's sheet or People).
+- The People app question: who creates the month's sheet (now: copied by hand from last month's) and whether the master rotations sheet's FELLOWS,
+  MOPEX and External blocks are enough for the staff list (the owner's trial plan: import the master rotations into People, pull them here, generate the
+  base sheet).
+- The rosterer signs in once (Google shows an "unverified app" warning: Advanced, then continue). She has the rosterer role (set 16 Oct).
 - Roles: whoever only needs to look can be made a viewer (More › Cloud › Members).
-- The rosterer's review of the predicted rules (marked To confirm), and the redone step-by-step guide (private notes).
+- The rosterer's review of the R1 to R3 rules (all off until "Turn on all the R1 to R3 rules"; the pool rules need the strong / weak list imported in
+  People › Tags) and of the rules marked To confirm (Confirm / Confirm all on the Rules tab).
 - Reminders set for the owner: 23 Oct (balance over a posting that straddles two months), 16 Dec (thinning old saves).
 
 ## Next (agreed order)
@@ -25,6 +32,12 @@ Last updated: 2026-10-16 by Claude Code (jm1).
    Also open: where the staff list comes from for a future month (People for residents, the roster app for fellows, MOPEX, RR, NHG and
    locums; the sheet stays the truth), which the owner is still thinking about (asks: who creates the month's sheet, and does the rotations
    document cover fellows and MOPEX).
+0b. **Start a month from the master rotations (the owner's trial, 17 Oct 2026).** Built so far: the whole sheet can be generated for any people, rows and month
+   length, formulas included (`js/sheetgen*.js`, More › Make this month's sheet from scratch; NOTES.md "Making the month's sheet from scratch"). Next: (a) the
+   month's staff list from the master rotations sheet (People's reader; residents, fellows, MOPEX, external residents; grade from the section), seniors'
+   rows from last month; (b) every posting the sheet shows mapped from the master codes with People's code key (write the mapping table for the owner to
+   confirm); (c) feed (a) and (b) into `specFromState`; (d) the other tabs (WR / premed, call roster, leave waitlist) and the rest of the sheet's leave and
+   request cells stay typed in the sheet. The People side belongs to the People sessions: plan with them, do not merge into their files.
 1. ~~Share the sheet layout in the cloud copy~~ done with Save/Pull covering every month (see Recently done). Rules deployed.
 2. ~~A per-person "no calls until" date~~ done (see Recently done). Still to do: a suggested date for new people read from the
    sheet (first month they appear).
@@ -43,6 +56,9 @@ Last updated: 2026-10-16 by Claude Code (jm1).
    with the owner's sheet and the real roster. Design in NOTES.md, "Rotations from People".
 
 ## Recently done
+- #749 The monthly sheet can be built from scratch (any month length and number of people, formulas and colour rules), as an Excel file or a new Google Sheet;
+  #750 the real-Google dry-run script. #744 Confirm / Confirm all take the To confirm tag off rules. #743 Fill on the Check tab, R1 to R3 ticks in Fill (they turn the
+  R1 to R3 rules on), Try again / Try 5 more compare drafts by score, preferences read "Priority n" and Check can order by it. #741 unlocking a month no longer asks to confirm.
 - #735 request screening (more than 4 requests, more than 2 no-premed, same-day pool clashes), the strong / weak MO pools and their import (People › Tags);
   #736 the Rules tab explains the order things happen in and groups rules by topic, and the R1 to R3 rosterer's rules (all off until "Turn on all
   the R1 to R3 rules"); then the Saturday-after-ICU rule, the Fri to Sun call cap (a tag) and pool call requests gets its call.
@@ -63,6 +79,12 @@ Last updated: 2026-10-16 by Claude Code (jm1).
 - #703 The import moves people to their new grade. #702 A month is saved as one JSON string (index-entry limit).
 
 ## Decisions
+- 17 Oct 2026: no separate "good to have" tier: a preference's weight is its priority (Check can order by it); rules get sets that switch off together later (e.g. MedHub), not built yet (owner).
+- 17 Oct 2026: the R1 to R3 rosterer's rules: `R_` is the same as `R`; `X/NP` counts as one request; more than 4 requests or more than 2 no-premed in a month is flagged; at most one call request a
+  day from a pool; strong / weak MO1, MO2 and MO3 pools come from her manpower list (People › Tags import); Fill's R1 to R3 ticks turn the R1 to R3 rules on (owner).
+- 17 Oct 2026: rebuild the whole monthly form from scratch rather than copy last month's, to find out early whether it is doable; Create a new Google Sheet needs only the Sheets scope the app already has;
+  the real-Google dry run and the Drive backup go to firetop (owner).
+- 17 Oct 2026: the master rotations sheet has FELLOWS, MOPEX and External Residents blocks, so the month's staff list can come from it; People's APMES list stays residents, faculty and PDs (owner's trial plan, to confirm).
 - 15 Oct 2026: own app, own subdomain, NUHS design; fill the existing Google Sheet rather than replace it (owner).
 - 15 Oct 2026: "weekend" in the fellows' ICU limit means Saturday and Sunday (owner).
 - 16 Oct 2026: the sheet import moves people to the group their new grade shows (ticked in the review, newest month
