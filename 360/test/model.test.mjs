@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   GROUPS, TOTAL_MAX, cleanProject, cleanLines, cleanEntry, blankEntry, carryOver, cleanNominee, cleanNominees, nomineeCounts, canAdd,
   problems, warnings, progress, snapshot, entryDoc, msfDoc, suggestFaculty, contactEmail, monthText, dayText, pastDeadline, demoRound,
+  PURGE_DAYS, markLabel, roundId, cleanRoundInput, purgeAt, purgeDue, roster, rosterCounts, csvCell, nomineesCSV, projectsCSV, mailto, emailList,
 } from '../js/model.js';
 
 // projects
@@ -112,4 +113,71 @@ assert.ok(!pastDeadline({ deadline: '2026-03-01' }, '2026-02-01'));
 assert.ok(!pastDeadline({}, '2026-02-01'));
 const dr = demoRound(new Date('2026-10-17T00:00:00Z'));
 assert.deepEqual([dr.round, dr.status, dr.deadline], ['demo', 'open', '2026-11-07']);
+
+// ---- the coordinators' side ----
+assert.equal(PURGE_DAYS, 60);
+assert.equal(markLabel('ok'), 'Checked'); assert.equal(markLabel(undefined), 'To check'); assert.equal(markLabel('x'), 'To check');
+assert.equal(roundId([], new Date('2026-10-17T00:00:00Z')), 'r2026-10');
+assert.equal(roundId(['r2026-10'], new Date('2026-10-17T00:00:00Z')), 'r2026-10-2');
+assert.equal(roundId(['r2026-10', 'r2026-10-2'], new Date('2026-10-17T00:00:00Z')), 'r2026-10-3');
+assert.ok(roundId([], new Date()).length <= 20);
+assert.equal(cleanRoundInput({ title: '  ' }), null);
+assert.deepEqual(cleanRoundInput({ title: ' CCC  Dec ', deadline: '2026-12-01' }), { title: 'CCC Dec', deadline: '2026-12-01' });
+assert.equal(cleanRoundInput({ title: 'x', deadline: 'soon' }).deadline, '');
+// retention: nominees go 60 days after a round closes
+const day = 86400000, t0 = Date.UTC(2026, 0, 1);
+assert.equal(purgeAt({ status: 'open', closedAt: t0 }), 0);
+assert.equal(purgeAt({ status: 'closed' }), 0, 'no close time: never purged by guesswork');
+assert.equal(purgeAt({ status: 'closed', closedAt: t0 }), t0 + 60 * day);
+assert.equal(purgeAt({ status: 'closed', closedAt: 0, updatedAt: t0 }), t0 + 60 * day, 'falls back to the last update');
+assert.ok(!purgeDue({ status: 'closed', closedAt: t0 }, t0 + 59 * day));
+assert.ok(purgeDue({ status: 'closed', closedAt: t0 }, t0 + 60 * day));
+assert.ok(!purgeDue({ status: 'open', closedAt: t0 }, t0 + 999 * day));
+
+// the roster: active residents, who has sent, nominee marks
+const people = [
+  { rid: 'R1', name: 'Zed Last', email: 'zed@x.com', status: 'ACTIVE' },
+  { rid: 'R2', name: 'Amy First', email: 'AMY@x.com', status: 'ACTIVE' },
+  { rid: 'R3', name: 'Gone', email: 'gone@x.com', status: 'GRADUATED' },
+  { rid: 'R4', name: 'Bob Mid', email: 'bob@x.com', status: 'ACTIVE' },
+];
+const ents = { 'amy@x.com': { name: 'Amy First', projects: [{ title: 'P1' }, { title: 'P2' }] }, 'bob@x.com': { name: 'Bob Mid', noProjects: true }, 'new@x.com': { name: 'Not On List' } };
+const ms = { 'amy@x.com': { nominees: [{ id: 'a', group: 'senior', name: 'S1', email: 's1@x.com' }, { id: 'b', group: 'peer', name: 'P1', email: 'p1@x.com' }, { id: 'c', group: 'allied', name: 'A1', email: 'a1@x.com' }] } };
+const rv = { 'amy@x.com': { marks: { a: 'ok', b: 'swap' } } };
+const rows = roster(people, ents, ms, rv);
+assert.deepEqual(rows.map(r => r.email), ['zed@x.com', 'amy@x.com', 'bob@x.com', 'new@x.com'], 'not sent first, then by name');
+assert.ok(!rows.some(r => r.email === 'gone@x.com'), 'graduated residents are left out');
+const amy = rows.find(r => r.email === 'amy@x.com');
+assert.deepEqual([amy.sent, amy.projects, amy.nominees], [true, 2, 3]);
+assert.deepEqual(amy.marks, { ok: 1, swap: 1, sent: 0, todo: 1 });
+assert.equal(rows.find(r => r.email === 'bob@x.com').noProjects, true);
+assert.ok(rows.find(r => r.email === 'new@x.com').extra, 'someone not on the list is flagged');
+assert.deepEqual(rosterCounts(rows), { total: 4, sent: 3, nominees: 3, toCheck: 1 });
+
+// CSV is safe to open in a spreadsheet
+assert.equal(csvCell('plain'), 'plain');
+assert.equal(csvCell('a,b'), '"a,b"');
+assert.equal(csvCell('say "hi"'), '"say ""hi"""');
+assert.equal(csvCell('=SUM(A1)'), "'=SUM(A1)");
+assert.equal(csvCell('=1,2'), '"\'=1,2"');
+assert.equal(csvCell('+1'), "'+1"); assert.equal(csvCell('-2'), "'-2"); assert.equal(csvCell('@x'), "'@x");
+assert.equal(csvCell('one\ntwo'), 'one two');
+assert.equal(csvCell(null), '');
+const round = { title: 'CCC Dec', status: 'open' };
+const items = [{ resident: { name: '=Evil', email: 'amy@x.com' }, nominees: ms['amy@x.com'].nominees, marks: rv['amy@x.com'].marks }];
+const nc = nomineesCSV(round, items).split('\r\n');
+assert.equal(nc[0], 'Round,Resident,Resident email,Group,Nominee,Nominee email,Status');
+assert.equal(nc.length, 5, 'header, three nominees, trailing newline');
+assert.ok(nc[1].includes("'=Evil") && nc[1].endsWith('Checked'), 'the resident name cannot run as a formula');
+assert.ok(nc[2].endsWith('Ask for a different person') && nc[3].endsWith('To check'));
+const pc = projectsCSV(round, [{ resident: { name: 'Amy', email: 'amy@x.com' }, entry: { projects: [{ title: 'P1', supervisor: 'Dr S', status: 'Completed', start: '2026-01', end: '2026-06', note: 'n' }], admin: ['Quality committee'] } }, { resident: { name: 'Bob', email: 'bob@x.com' }, entry: { noProjects: true } }]).split('\r\n');
+assert.equal(pc.length, 5);
+assert.ok(pc[1].includes('Scholarly project,P1,Dr S,Completed,2026-01,2026-06,n'));
+assert.ok(pc[2].includes('Committee / admin work,Quality committee'));
+assert.ok(pc[3].includes('None to report'));
+// mailto
+const m = mailto({ name: 'Dr S', email: 'dr.s+x@y.com' }, 'Amy First', { title: 'CCC Dec' });
+assert.ok(m.startsWith('mailto:dr.s%2Bx%40y.com?subject='));
+assert.ok(decodeURIComponent(m).includes('Amy First has nominated you') && decodeURIComponent(m).includes('(CCC Dec)'));
+assert.equal(emailList(['A@x.com', 'a@x.com', 'bad', ' b@y.co ']), 'a@x.com, b@y.co');
 console.log('ccc 360 model: all checks passed');

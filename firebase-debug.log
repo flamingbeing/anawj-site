@@ -1,0 +1,9 @@
+[debug] [2026-10-17T05:15:25.868Z] ----------------------------------------------------------------------
+[debug] [2026-10-17T05:15:25.870Z] Command:       /opt/node22/bin/node /root/.cache/anawj-rules/node_modules/.bin/firebase emulators:exec --config /tmp/tmp.ezjwyIbqpn/firebase.json --only firestore --project demo-ntf-roster cd ntf-roster && node test/rules.emulator.mjs
+[debug] [2026-10-17T05:15:25.870Z] CLI Version:   13.35.1
+[debug] [2026-10-17T05:15:25.870Z] Platform:      linux
+[debug] [2026-10-17T05:15:25.870Z] Node Version:  v22.22.0
+[debug] [2026-10-17T05:15:25.871Z] Time:          Sat Oct 17 2026 05:15:25 GMT+0000 (Coordinated Universal Time)
+[debug] [2026-10-17T05:15:25.871Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-10-17T05:15:26.038Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]

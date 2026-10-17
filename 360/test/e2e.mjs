@@ -14,7 +14,7 @@ const MIME = { html: 'text/html', js: 'text/javascript', css: 'text/css', svg: '
 
 const exe = process.env.CHROMIUM_PATH || (fs.existsSync('/opt/pw-browsers/chromium') && !fs.statSync('/opt/pw-browsers/chromium').isDirectory() ? '/opt/pw-browsers/chromium' : null);
 const b = await chromium.launch(exe ? { executablePath: exe, args: ['--no-sandbox'] } : {});
-const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, serviceWorkers: 'block' });
+const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, serviceWorkers: 'block', acceptDownloads: true });
 const outside = [];
 await ctx.route(/^https:\/\/apmes\.anawj\.com\//, async route => {
   const u = new URL(route.request().url());
@@ -48,7 +48,7 @@ const setStore = fn => page.evaluate(src => { const d = JSON.parse(localStorage.
 
 // 1. A resident opens the demo round
 await page.goto(BASE + '360/?demo=reset');
-await page.getByRole('heading', { name: 'CCC round (demo)' }).waitFor();
+await page.locator('main h2', { hasText: 'CCC round (demo)' }).waitFor();
 assert.equal(await page.locator('.e-list .e-row').count(), 2);
 assert.match(await page.textContent('main'), /Only the programme coordinators and directors see this/);
 await axe('home'); await shot('1-home');
@@ -132,7 +132,7 @@ assert.equal(st.entries[key].projects[0].title, 'Audit of postoperative nausea a
 // 7. Nothing to report: the box needs no projects, and a new round carries last round's projects but not its nominees
 await setStore(() => { d.rounds.demo.status = 'closed'; d.rounds.demo.updatedAt = 1; d.rounds.next = { round: 'next', title: 'Next CCC round', status: 'open', deadline: '', updatedAt: Date.now() }; });
 await page.reload();
-await page.getByRole('heading', { name: 'Next CCC round' }).waitFor();
+await page.locator('main h2', { hasText: 'Next CCC round' }).waitFor();
 assert.match(await page.textContent('main'), /carried over from “CCC round \(demo\)”/);
 await page.getByRole('button', { name: /Scholarly projects/ }).click();
 assert.equal(await page.getByLabel('Title').inputValue(), 'Audit of postoperative nausea and vomiting', 'projects carry over');
@@ -149,11 +149,121 @@ assert.equal(await page.getByRole('button', { name: /^Add / }).count(), 0, 'no a
 assert.equal(await page.getByLabel('Senior doctor name').isDisabled(), true);
 await axe('closed');
 
-// 9. Staff are not residents: they see the coordinators' placeholder, not the resident form
+// 9. Coordinators: a fresh demo round with two residents who have sent and five who have not
+await page.evaluate(() => localStorage.removeItem('ccc-demo-store'));
 await page.goto(BASE + '360/?demo=admin');
-await page.getByText('The coordinators’ view is coming').waitFor();
-assert.equal(await page.locator('.e-list .e-row').count(), 0);
-await axe('staff');
+await page.getByRole('heading', { name: 'Rounds' }).waitFor();
+assert.equal(await page.locator('.e-list .e-row').count(), 1);
+await axe('rounds'); await shot('7-staff-rounds');
+await page.getByRole('button', { name: /CCC round \(demo\)/ }).click();
+await page.getByText('2 of 7 active residents have sent · 4 nominees · 4 to check').waitFor();
+await axe('round'); await shot('8-staff-round');
+await page.getByRole('button', { name: 'Not sent', exact: true }).click();
+assert.equal(await page.locator('.e-list .e-row').count(), 5);
+assert.match(await page.textContent('main'), /Chandra Rao/);
+assert.doesNotMatch(await page.textContent('main'), /Aiden Tan/);
+await page.getByRole('button', { name: 'Everyone', exact: true }).click();
+
+// 10. One resident: read the projects, mark a nominee, open the email link (which marks it emailed)
+await page.getByRole('button', { name: /Aiden Tan/ }).click();
+await page.getByRole('heading', { name: 'Scholarly projects' }).waitFor();
+assert.match(await page.textContent('main'), /Audit of ward handover/);
+assert.match(await page.textContent('main'), /Intubation workshop/);
+await page.getByRole('group', { name: 'Status for Dr Hana Lee' }).getByRole('button', { name: 'Checked' }).click();
+await page.getByRole('group', { name: 'Status for Dr Hana Lee' }).getByRole('button', { name: 'Checked' }).and(page.locator('[aria-pressed=true]')).waitFor();
+const link = page.getByRole('link', { name: 'Email Bea Lim' });
+assert.match(await link.getAttribute('href'), /^mailto:bea\.lim%40example\.com\?subject=Multisource%20feedback%20for%20Aiden%20Tan/);
+await link.evaluate(a => a.addEventListener('click', e => e.preventDefault()));   // the test has no mail app
+await link.click();
+await page.getByRole('group', { name: 'Status for Bea Lim' }).waitFor();
+await page.waitForFunction(() => /"bea\.lim@example\.com"[^}]*"sent"|"sent"/.test(localStorage.getItem('ccc-demo-store') || ''));
+st = await store();
+const marks = Object.values(st.review).find(r => r.email === 'aiden.tan@example.com').marks;
+assert.deepEqual(Object.values(marks).sort(), ['ok', 'sent'], 'one checked, one emailed');
+await axe('resident detail'); await shot('9-staff-resident');
+await page.reload();
+await page.getByRole('heading', { name: 'Scholarly projects' }).waitFor();
+assert.equal(await page.getByRole('group', { name: 'Status for Dr Hana Lee' }).getByRole('button', { name: 'Checked' }).getAttribute('aria-pressed'), 'true', 'marks are kept');
+
+// 11. Hostile text from a resident is shown as text and made safe in the CSV
+await setStore(() => { const k = 'demo|aiden.tan@example.com'; d.msf[k].nominees.push({ id: 'evil', group: 'other', name: '=HYPERLINK("http://x")', email: 'evil@example.com' }, { id: 'evil2', group: 'other', name: '<img src=x onerror=window.__x2=1>', email: 'evil2@example.com' }); });
+await page.reload();
+await page.getByText('<img src=x onerror=window.__x2=1>').waitFor();
+assert.equal(await page.evaluate(() => window.__x2), undefined, 'nominee text is never run as HTML');
+await page.getByRole('button', { name: 'Back', exact: true }).click();
+await page.locator('main h2', { hasText: 'CCC round (demo)' }).waitFor();
+const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Nominees (CSV)' }).click()]);
+const csv = fs.readFileSync(await dl.path(), 'utf8');
+assert.match(csv, /^Round,Resident,Resident email,Group,Nominee,Nominee email,Status\r\n/);
+assert.match(csv, /Dr Hana Lee,dr\.hana\.lee@example\.com,Checked/);
+assert.match(csv, /"'=HYPERLINK\(""http:\/\/x""\)"/, 'a nominee cannot inject a formula');
+assert.equal(dl.suggestedFilename(), 'ccc-nominees-demo.csv');
+const [dl2] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Projects (CSV)' }).click()]);
+assert.match(fs.readFileSync(await dl2.path(), 'utf8'), /Scholarly project,Audit of ward handover,Dr Hana Lee,Ongoing,2026-02/);
+
+// 12. Close the round (residents are locked out of editing), reopen it, edit it
+await page.getByRole('button', { name: 'Close the round' }).click();
+await page.getByRole('button', { name: 'Close the round' }).last().click();
+await page.getByText(/Nominees' contact details are deleted on /).waitFor();
+assert.equal((await store()).rounds.demo.status, 'closed');
+assert.ok((await store()).rounds.demo.closedAt > 0);
+await page.getByRole('button', { name: 'Reopen' }).click();
+await page.getByText(/deleted 60 days after you close the round/).waitFor();
+assert.equal((await store()).rounds.demo.closedAt, undefined, 'reopening clears the close time');
+await page.getByRole('button', { name: 'Edit', exact: true }).click();
+await page.getByLabel('Name').fill('CCC round, renamed');
+await page.getByRole('button', { name: 'Save' }).click();
+await page.locator('main h2', { hasText: 'CCC round, renamed' }).waitFor();
+
+// 13. Open a new round
+await page.getByRole('button', { name: 'Back', exact: true }).click();
+await page.getByRole('button', { name: 'Open a new round' }).click();
+await page.getByLabel('Name').fill('CCC round, next');
+await page.getByRole('button', { name: 'Open the round' }).click();
+await page.locator('main h2', { hasText: 'CCC round, next' }).waitFor();
+st = await store();
+assert.equal(Object.keys(st.rounds).length, 2);
+assert.match(Object.keys(st.rounds).find(k => k !== 'demo'), /^r\d{4}-\d{2}/);
+
+// 14. Delete one resident's nominees, then the rest of a round's
+await page.getByRole('button', { name: 'Back', exact: true }).click();
+await page.getByRole('button', { name: /CCC round, renamed/ }).click();
+await page.getByRole('button', { name: /Bea Lim/ }).click();
+await page.getByRole('button', { name: 'Delete these nominees now' }).click();
+await page.getByRole('button', { name: 'Delete', exact: true }).click();
+await page.locator('main h2', { hasText: 'CCC round, renamed' }).waitFor();
+st = await store();
+assert.equal(st.msf['demo|bea.lim@example.com'], undefined);
+assert.ok(st.entries['demo|bea.lim@example.com'], 'projects are kept');
+await page.getByRole('button', { name: 'Delete nominees now' }).click();
+await page.getByRole('button', { name: 'Delete', exact: true }).click();
+await page.waitForFunction(() => Object.keys(JSON.parse(localStorage.getItem('ccc-demo-store')).msf).length === 0);
+
+// 15. The 60-day clean-up: a round closed 61 days ago loses its nominees when staff open the app; projects stay
+await page.evaluate(() => localStorage.removeItem('ccc-demo-store'));
+await page.goto(BASE + '360/?demo=admin');
+await page.getByRole('heading', { name: 'Rounds' }).waitFor();
+await setStore(() => { d.rounds.demo.status = 'closed'; d.rounds.demo.closedAt = Date.now() - 61 * 86400000; });
+await page.reload();
+await page.getByText(/Deleted 2 nominee lists from rounds closed more than 60 days ago/).waitFor();
+st = await store();
+assert.deepEqual(Object.keys(st.msf), [], 'old nominees are gone');
+assert.equal(Object.keys(st.entries).length, 2, 'projects are kept');
+await page.evaluate(() => localStorage.removeItem('ccc-demo-store'));
+await page.goto(BASE + '360/?demo=admin');
+await setStore(() => { d.rounds.demo.status = 'closed'; d.rounds.demo.closedAt = Date.now() - 59 * 86400000; });
+await page.reload();
+await page.getByRole('heading', { name: 'Rounds' }).waitFor();
+assert.equal(Object.keys((await store()).msf).length, 2, 'a round closed 59 days ago keeps its nominees');
+
+// 16. A resident does not see the coordinators' view, even by typing the address
+await page.evaluate(() => localStorage.removeItem('ccc-demo-store'));
+await page.goto(BASE + '360/?demo');
+await page.locator('main h2', { hasText: 'CCC round (demo)' }).waitFor();
+assert.equal(await page.getByRole('link', { name: /Coordinators/ }).count(), 0);
+await page.goto(BASE + '360/?demo#staff');
+await page.locator('main h2', { hasText: 'CCC round (demo)' }).waitFor();
+assert.equal(await page.getByRole('heading', { name: 'Rounds' }).count(), 0);
 
 assert.deepEqual(outside, [], 'the demo reaches nothing outside the site');
 assert.deepEqual(errors, [], 'no console errors');
