@@ -61,7 +61,14 @@ like the older lists (`owners/`, `admins/`, `pds/`), which still work; retiring 
 - `accessLog/{id}` `{ by, to, change, at }` is append-only (the app writes it in the same batch as the grant); readable by Admin staff,
   PCs and owners.
 - Faculty records also take optional `core`, `ccc` (booleans) and `workEmail`.
-- Not built yet: the Access pane in People (a table of people by role) and the paste boxes that tick core/CCC and add PCs by name or email.
+- **People › Access is built** (17 Oct 2026, taken over from the CCC 360 session's checkpoint #752): `people/js/access.js` (pure logic, `mayChange`
+  mirrors the rules) and `access-ui.js`. A list of people with role chips (owners/Admin staff/PCs edit, PDs look), Add / edit / remove, "Paste
+  people" (pick a role; each line is matched by sign-in email, work email or name and shown before anything is saved), "Paste a list to tick"
+  (Core faculty or CCC members, faculty list only, nobody is unticked) and "Recent changes" (the access log; owners/admins only). The Faculty form
+  also has Work email, Core faculty and CCC member. `cloud.getRoles` now also reads `access/{email}` and `owners/{email}` and returns
+  `owner` and `pc`; `listAccess`, `saveAccess`, `removeAccess` (each with its log entry in one batch) and `listAccessLog` are in `evals/js/cloud.js`,
+  with a demo twin in `demo-backend.js` (demo users `staff` = Admin staff, `pdonly`; the demo admin is also the owner). Roles still on the older
+  lists (`owners/`, `admins/`, `pds/`) work but are not shown there; moving them across is the later "retire the old lists" job.
 
 ## Rotations (read-only; owner, 16 Oct 2026)
 
