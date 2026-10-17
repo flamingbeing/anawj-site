@@ -28,6 +28,10 @@ The rule for new apps is in `AGENTS.md`.
 | `anawj.com/edit/` (decided in step 5) | `edit/` | Stays on `anawj.com`: see "The page editor" below. |
 | `ask.anawj.com/` | `ask/` | Ask Claude, the owner's page; behind Cloudflare Access; its API `/api/ask` is `worker/ask.js` (`edit/NOTES.md`). |
 
+An app that moves to another site: give its host a `moved` entry in `worker/routes.js` (`{ moved: { '/bis/': 'https://anantf.com/bis/' } }`;
+the rest of the path and the query are kept), leave a noindex stub `index.html` that forwards at its old GitHub Pages folder, and
+take its tests, labels and screenshot paths out of `.github/` and `tools/` (16 Oct 2026, #668).
+
 Single-app subdomains serve the app at the root; shared ones keep a path per app. Folders in the repo don't need
 renaming: the hosting maps each address to its folder.
 
