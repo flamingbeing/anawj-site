@@ -6,20 +6,20 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-17 by Claude Code, Logbook 3 (log3), at its handover to APMES Logbook (`status/log3.md`; log2's is `status/log2.md`).
+Last updated: 2026-10-17 by Claude Code, APMES Logbook (merged log1, log2, log3; `status/apmes-logbook.md`).
 
 ## Now
 
-Each session keeps its own line in `status/<session>.md` (`log1.md`, `log2.md`, `log3.md`, `codex.md`; a new session adds
+Each session keeps its own line in `status/<session>.md` (`apmes-logbook.md`, `codex.md`; a new session adds
 its own file), so sessions never edit the same lines. Read them all before starting; edit only yours.
-- log2 handed over on 17 Oct to the merged session APMES Logbook: open queue, decisions and waits in `status/log2.md`
+- log1, log2 and log3 merged on 17 Oct into one session, APMES Logbook: open queue, decisions and waits in `status/apmes-logbook.md`
   (no open PRs, nothing half-done).
 
 ## Waiting on the owner
 
 - **log2's checks** (17 Oct): real-phone sign-in (installed app, Firefox for Android); each Send to preset on an iPhone;
   Themes (Card style, Your themes) and Sync reflection notes on a phone; say go for log2's queue items 0, 0b, 1
-  (`status/log2.md`).
+  (`status/apmes-logbook.md`).
 
 - **Don't re-import the old Form workbook from Admin for now** (15 Oct): three verified bugs only bite on a re-import (deleted Form
   cases come back, redated or edited ones double). Fixes are queued in `status/wip/README.md`.
@@ -36,7 +36,7 @@ its own file), so sessions never edit the same lines. Read them all before start
 - A weekly drift check runs on the home computer and messages the owner's phone (details in the owner's private notes).
 - **Delete the test "ZZ" case again** (14 Oct): its first delete hit the zombie-delete bug (fixed in #519); after the
   site updates, reload and delete it once more (the old attempt sits as a conflict in Recent changes on that phone).
-- The response sheet's public link was closed (16 Oct, owner OK): glance once at its Apps Script Executions page (`onFormSubmit`, `logbookOutboxRun`) and say "fine" or the error. Other log3 items: `status/log3.md`.
+- The response sheet's public link was closed (16 Oct, owner OK): glance once at its Apps Script Executions page (`onFormSubmit`, `logbookOutboxRun`) and say "fine" or the error. Other log3 items: `status/apmes-logbook.md`.
 - **Try the 6-hour build** (13–14 Oct): Settings → Profile → Personal; Logbook day → + Daily note; Settings → Advanced
   logging → Labelled parts; Settings → Sync (GitHub / Drive / Dropbox); Send to. Everything new is off until switched on.
   Notes with text open in Preview (⋯ → Edit to type): say if they should open ready to type instead.
@@ -65,7 +65,7 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Next (agreed queue)
 
-- **From log2, waiting on go** (details in `status/log2.md`): 0. the reflection editor's save status follows the
+- **From log2, waiting on go** (details in `status/apmes-logbook.md`): 0. the reflection editor's save status follows the
   save queue live; 0b. sign-in by redirect in the installed app and Firefox for Android; 1. Paeds by age (≤ 16 ticks,
   > 16 drops every Paeds guess) and pasted lists follow "Tick confident suggestions automatically".
 
@@ -150,7 +150,7 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 - 2026-10-17: log1, log2 and log3 merge into one session, APMES Logbook, which carries on from the `status/` files.
 - 2026-10-16 (log3): Public/private split (`AGENTS.md`, "Keep the repo public-safe"); git history left as it is on purpose; the shared anantf-site gets only neutral wording; roster example names in tests are made up; the response sheet's public link was closed.
-- 2026-10-17 (log2): Owner merged the three logbook sessions into one, "APMES Logbook"; log2 handed over (`status/log2.md`).
+- 2026-10-17 (log2): Owner merged the three logbook sessions into one, "APMES Logbook"; log2 handed over (`status/apmes-logbook.md`).
 - 2026-10-16 (log2): Owner: "do what you recommend": Card style in Themes, other look settings in Advanced display; Your
   themes with save / export / import; Sync writes reflection notes (off by default, never deletes); icons never emoji.
 - 2026-10-16 (log2): Markdown day heading default plain; Group by / Sort in the Filter panel so the List looks as before.
