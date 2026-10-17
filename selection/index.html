@@ -13,9 +13,9 @@
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap" media="print" onload="this.media='all'">
 <script>
-  // Selection lives at apmes.anawj.com/selection/ (one sign-in with the logbook, evals and People). Send visitors on from
+  // Selection lives at apmes.anawj.com/360/ (one sign-in with the logbook, evals and People). Send visitors on from
   // anawj.com, keeping the part after # (a round link). A no-op on apmes.anawj.com, previews and localhost.
-  if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname)) location.replace('https://apmes.anawj.com' + location.pathname + location.search + location.hash);
+  if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname)) location.replace('https://apmes.anawj.com/360/' + location.search + location.hash);
   // evals' theme choice applies here too
   try { var t = localStorage.getItem('evals-theme'); if (t === 'auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light'; } catch (e) {}
 </script>

@@ -8,10 +8,10 @@ Stage 1 built and tested in demo (`NOTES.md`, `PLAN.md`). Each session edits onl
 
 ## Waiting on the owner
 
-- **Try it:** open the preview link's `/selection/?demo`, then (real round) paste the round file from the private notes into
+- **Try it:** open the preview link's `/360/?demo`, then (real round) paste the round file from the private notes into
   Set up › Load it and make the private link. Check the first real send in the Form's response sheet before telling everyone.
 - **Decide stage 2:** where shared answers live and who may read them (`PLAN.md`).
-- Nothing to do in Cloudflare: `apmes.anawj.com/selection/` is served by the existing worker route on merge.
+- Nothing to do in Cloudflare: `apmes.anawj.com/360/` is served by the existing worker route on merge.
 
 ## Decisions
 

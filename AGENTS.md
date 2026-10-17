@@ -11,7 +11,7 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
   (add a yearly intake, year check, CSV, import from the monthly roster, a read-only rotations view), at `apmes.anawj.com/people/`; admins and PDs only. It reuses evals' code. Start
   with `people/NOTES.md`.
 - `selection/`: APMES Selection 360, confidential feedback by residents and faculty on residency applicants (a 1-5 score and a
-  comment each), at `apmes.anawj.com/selection/`; same sign-in as logbook, evals and People. Applicant names are never in the
+  comment each), at `apmes.anawj.com/360/` (folder `selection/`); same sign-in as logbook, evals and People. Applicant names are never in the
   repo (private notes). Start with `selection/NOTES.md`, then `selection/PLAN.md`.
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`), at `nuhroster.anawj.com` (the old `anawj.com/nuh-roster/` redirects). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
 - `ntf-roster/`: NTF (Ng Teng Fong) anaesthesia monthly duty roster: calls, PM shifts, leave and requests on one grid,

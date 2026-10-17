@@ -16,7 +16,7 @@ const round = cleanRound({ title: 'T', cycle: '2027', applicants: parseNames('Zo
 t('round survives a link, including non-ASCII names', () => {
   const back = decodeRound(encodeRound(round));
   assert.deepEqual(back, round);
-  assert.deepEqual(readRoundText('https://x/selection/#r=' + encodeRound(round)), round);
+  assert.deepEqual(readRoundText('https://x/360/#r=' + encodeRound(round)), round);
   assert.deepEqual(readRoundText(JSON.stringify(round)), round);
   assert.equal(decodeRound('nonsense!!'), null);
   assert.equal(readRoundText('{bad'), null);

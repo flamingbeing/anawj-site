@@ -18,7 +18,7 @@ const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceSc
 const posted = [];
 await ctx.route(/^https:\/\/apmes\.anawj\.com\//, async route => {
   const u = new URL(route.request().url());
-  let rel = decodeURIComponent(u.pathname).replace(/^\//, '');
+  let rel = decodeURIComponent(u.pathname).replace(/^\//, '').replace(/^360\//, 'selection/');
   if (!/^(selection|people|evals|logbook|nuhsdesign)\//.test(rel)) return route.fulfill({ status: 404, body: 'not found' });
   if (rel.endsWith('/')) rel += 'index.html';
   const f = path.join(root, rel);
@@ -45,7 +45,7 @@ const axe = async (label, pg = page) => {
 const shot = async name => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, name + '.png'), fullPage: true }); } };
 
 // 1. A resident opens the demo round
-await page.goto(BASE + 'selection/?demo=reset');
+await page.goto(BASE + '360/?demo=reset');
 await page.getByRole('button', { name: /Alex Demo/ }).waitFor();
 assert.equal(await page.locator('.e-list .e-row').count(), 6);
 assert.match(await page.textContent('main'), /Confidential/);
@@ -74,7 +74,7 @@ assert.ok(await page.getByRole('radio', { name: /5\s*Best fit/ }).isDisabled());
 await page.getByRole('button', { name: /Casey ›/ }).click();
 await page.getByRole('radio', { name: /2\s*Below par/ }).check({ force: true });
 await page.goBack(); await page.goBack(); await page.goBack();
-await page.goto(BASE + 'selection/?demo#review');
+await page.goto(BASE + '360/?demo#review');
 await page.getByText('Worth a second look').waitFor();
 assert.match(await page.textContent('main'), /Casey Example.*has a score but no comment/);
 assert.match(await page.textContent('main'), /1 scored with a comment/);
@@ -85,7 +85,7 @@ await page.getByRole('button', { name: 'Send', exact: true }).click();
 await page.getByText('Sent. Thank you.').waitFor();
 assert.equal(posted.length, 0, 'the demo never posts to the form');
 await axe('done'); await shot('4-done');
-await page.goto(BASE + 'selection/?demo#');
+await page.goto(BASE + '360/?demo#');
 await page.getByText(/· sent/).waitFor();
 
 // 6. The admin sees the result and can download it
@@ -108,11 +108,11 @@ await page.fill('#su-names', '1. Zoë Tan\n2. Lee Wei\nZoë Tan');
 await page.fill('#su-title', 'Test round');
 await page.getByRole('button', { name: 'Make the private link' }).click();
 const link = await page.locator('textarea[aria-label="Private link"]').inputValue();
-assert.match(link, /selection\/#r=/);
+assert.match(link, /360\/#r=/);
 await axe('setup'); await shot('6-setup');
 const other = await ctx.newPage();
 other.on('pageerror', e => errors.push(String(e)));
-await other.goto(link.replace(/^[^#]*selection\//, BASE + 'selection/?demo=resident') );
+await other.goto(link.replace(/^[^#]*360\//, BASE + '360/?demo=resident') );
 await other.getByRole('button', { name: /Zoë Tan/ }).waitFor();
 assert.equal(await other.locator('.e-list .e-row').count(), 2, 'repeated names are dropped');
 assert.match(await other.textContent('main'), /Test round/);
