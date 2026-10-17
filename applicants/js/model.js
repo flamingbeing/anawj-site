@@ -1,21 +1,27 @@
 // APMES Applicants: the logic, free of page code so test/model.test.mjs can run it in Node.
-// A "round" is one selection exercise (e.g. the 2027 intake): a title, the applicants to rate and, optionally, where
-// the answers go (a Google Form). Real applicant names are never in this repo: the admin pastes them in the app and
-// shares the round as a private link (the round travels in the part of the link after #, which servers never see).
+// A "round" is one selection exercise (e.g. the 2027 intake): a title, the applicants to rate, the questions asked about each
+// applicant and, optionally, where the answers go (a Google Form). Real applicant names are never in this repo: the admin
+// pastes them in the app (published to the shared store, or shared as a private link: the round travels in the part of
+// the link after #, which servers never see).
 
 export const MAX_APPLICANTS = 200;
-export const SCORES = [
-  [1, 'Unsuitable'], [2, 'Below par'], [3, 'Acceptable'], [4, 'Good'], [5, 'Best fit'],
-];
+export const MAX_QUESTIONS = 8;
+export const SCALE = [1, 2, 3, 4, 5];
 export const INTRO = [
   'The selection exercise is starting soon. We would really appreciate your honest feedback on the applicants below. As successful applicants will form part of our family, we would like to gather insights and understanding of our applicants based on your interactions.',
-  'Please give each applicant an overall suitability for residency score from 1 (unsuitable) to 5 (best fit).',
-  'More importantly, please write comments and support them with specific examples.',
+  'Please give each applicant an overall suitability score from 1 (unsuitable) to 5 (best fit), and, where you can, comments with specific examples. If you haven’t worked with someone, one tap skips them.',
   'Your response is confidential, and we will keep it so.',
+];
+// What is asked about each applicant until the admin changes it (ids "score" and "comment" are what the first version of
+// the app and the department's Google Form used, so earlier answers still fit).
+export const DEFAULT_QUESTIONS = [
+  { id: 'score', type: 'scale', label: 'Overall suitability for residency', low: 'Unsuitable', high: 'Best fit', required: true },
+  { id: 'comment', type: 'text', label: 'Comments', hint: 'Strengths, weaknesses or concerns, with a specific example', required: false },
 ];
 
 const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const num = v => (Number.isInteger(v) && v > 0 && v < 1e10 ? v : null);
+const RESERVED = new Set(['na', 'v']);
 
 // One name per line. Bullets, numbers and blank lines are dropped; repeats are ignored.
 export function parseNames(text) {
@@ -30,9 +36,29 @@ export function parseNames(text) {
   return out;
 }
 
+// The questions: up to 8, each a 1-5 score (with the words at its two ends) or a free-text box; any may be required.
+export function cleanQuestions(list) {
+  if (!Array.isArray(list) || !list.length) return DEFAULT_QUESTIONS.map(q => ({ ...q }));
+  const seen = new Set(), out = [];
+  for (const q of list.slice(0, MAX_QUESTIONS)) {
+    const label = str(q?.label, 200);
+    if (!label) continue;
+    let id = str(q.id, 20).toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (!id || RESERVED.has(id) || seen.has(id)) { let i = out.length + 1; while (seen.has('q' + i)) i++; id = 'q' + i; }
+    seen.add(id);
+    const type = q.type === 'scale' ? 'scale' : 'text';
+    const item = { id, type, label, required: !!q.required };
+    if (type === 'scale') { item.low = str(q.low, 30); item.high = str(q.high, 30); }
+    else if (str(q.hint, 200)) item.hint = str(q.hint, 200);
+    out.push(item);
+  }
+  return out.length ? out : DEFAULT_QUESTIONS.map(q => ({ ...q }));
+}
+export const scaleQuestions = round => round.questions.filter(q => q.type === 'scale');
+
 // Checks a round that was pasted or arrived in a link; returns a clean copy, or null.
 // form (optional): { id, nameEntry } the Google Form's public id and the respondent-name field; each applicant may carry
-// entry: { score, comment }, the numeric ids of that applicant's two fields in the form.
+// entry: { score, comment }, the numeric ids of that applicant's two fields in the form (only with the default questions).
 export function cleanRound(r) {
   if (!r || typeof r !== 'object' || !Array.isArray(r.applicants)) return null;
   const seen = new Set();
@@ -46,7 +72,7 @@ export function cleanRound(r) {
     applicants.push(e ? { id, name, entry: e } : { id, name });
   }
   if (!applicants.length) return null;
-  const out = { v: 1, title: str(r.title, 200) || 'Applicant feedback', cycle: str(r.cycle, 20) || 'round', applicants };
+  const out = { v: 2, title: str(r.title, 200) || 'Applicant feedback', cycle: str(r.cycle, 20) || 'round', applicants, questions: cleanQuestions(r.questions) };
   const f = r.form;
   if (f && /^[A-Za-z0-9_-]{20,80}$/.test(f.id || '') && num(f.nameEntry) && applicants.every(a => a.entry)) out.form = { id: f.id, nameEntry: f.nameEntry };
   return out;
@@ -73,47 +99,64 @@ export function readRoundText(text) {
   return decodeRound(m ? m[1] : t);
 }
 
-// ---- one respondent's answers: { [applicantId]: { score: 1-5|null, comment: '', na: bool } } ----
+// ---- one respondent's answers: { [applicantId]: { na: bool, [questionId]: 1-5 | text } } ----
 
-export const blank = () => ({ score: null, comment: '', na: false });
+const isAnswered = (q, v) => (q.type === 'scale' ? Number.isInteger(v) && v >= 1 && v <= 5 : typeof v === 'string' && v.trim() !== '');
+export const hasAnswer = (round, r) => !!r && round.questions.some(q => isAnswered(q, r[q.id]));
+export const blank = () => ({ na: false });
 export function cleanAnswers(round, raw) {
   const out = {};
   for (const a of round.applicants) {
     const r = raw && raw[a.id] || {};
-    const score = Number.isInteger(r.score) && r.score >= 1 && r.score <= 5 ? r.score : null;
-    const na = !!r.na && score == null && !str(r.comment, 5000);
-    out[a.id] = { score, comment: typeof r.comment === 'string' ? r.comment.slice(0, 5000) : '', na };
+    const o = { na: false };
+    for (const q of round.questions) {
+      const v = r[q.id];
+      if (q.type === 'scale') { if (Number.isInteger(v) && v >= 1 && v <= 5) o[q.id] = v; }
+      else if (typeof v === 'string' && v.trim()) o[q.id] = v.slice(0, 5000);
+    }
+    o.na = !!r.na && !hasAnswer(round, o);   // answering someone cancels "haven't worked with them"
+    out[a.id] = o;
   }
   return out;
 }
-// 'scored' (a score and a comment), 'partial' (one of them), 'skipped' (didn't interact), 'todo'
-export function statusOf(a) {
-  if (!a) return 'todo';
-  if (a.na) return 'skipped';
-  const c = !!a.comment.trim();
-  return a.score && c ? 'scored' : a.score || c ? 'partial' : 'todo';
+// 'skipped' (hasn't worked with them), 'done' (something answered, every required question answered), 'partial', 'todo'
+export function statusOf(round, r) {
+  if (!r) return 'todo';
+  if (r.na) return 'skipped';
+  if (!hasAnswer(round, r)) return 'todo';
+  return round.questions.every(q => !q.required || isAnswered(q, r[q.id])) ? 'done' : 'partial';
 }
 export function progress(round, answers) {
-  const n = { scored: 0, partial: 0, skipped: 0, todo: 0 };
-  for (const a of round.applicants) n[statusOf(answers[a.id])]++;
-  return { ...n, total: round.applicants.length, done: n.scored + n.skipped };
+  const n = { done: 0, partial: 0, skipped: 0, todo: 0 };
+  for (const a of round.applicants) n[statusOf(round, answers[a.id])]++;
+  return { ...n, total: round.applicants.length, finished: n.done + n.skipped };
 }
-// Things worth a second look before sending (never blocks it: nothing in the original form was required).
+// The first applicant after position `from` (default: from the start) that still needs an answer, wrapping round; null when none.
+export function nextUnanswered(round, answers, from = -1) {
+  const n = round.applicants.length;
+  for (let k = 1; k <= n; k++) {
+    const x = round.applicants[(from + k + n) % n];
+    const st = statusOf(round, answers[x.id]);
+    if (st === 'todo' || st === 'partial') return x;
+  }
+  return null;
+}
+// Things worth a second look before sending. Never blocks sending; a comment is never needed on its own (only a question
+// the admin marked required is chased, and not for people marked "haven't worked with them").
 export function warnings(round, answers) {
   const w = [];
   for (const a of round.applicants) {
     const r = answers[a.id];
-    const s = statusOf(r);
-    if (s === 'partial' && r.score && !r.comment.trim()) w.push({ id: a.id, name: a.name, text: 'has a score but no comment' });
-    else if (s === 'partial') w.push({ id: a.id, name: a.name, text: 'has a comment but no score' });
-    else if (s === 'todo') w.push({ id: a.id, name: a.name, text: 'not answered yet' });
+    const s = statusOf(round, r);
+    if (s === 'todo') w.push({ id: a.id, name: a.name, text: 'not answered yet' });
+    else if (s === 'partial') w.push({ id: a.id, name: a.name, text: 'still needs: ' + round.questions.filter(q => q.required && !isAnswered(q, r[q.id])).map(q => q.label).join(', ') });
   }
   return w;
 }
 
 // ---- sending ----
 
-// The body for the Google Form's formResponse address (one field per question).
+// The body for the Google Form's formResponse address (one field per question; only with the default questions).
 export function formBody(round, respondent, answers) {
   const p = new URLSearchParams();
   p.set('entry.' + round.form.nameEntry, respondent);
@@ -121,7 +164,7 @@ export function formBody(round, respondent, answers) {
     const r = answers[a.id];
     if (!r || r.na) continue;
     if (r.score) p.set('entry.' + a.entry.score, String(r.score));
-    if (r.comment.trim()) p.set('entry.' + a.entry.comment, r.comment.trim());
+    if (typeof r.comment === 'string' && r.comment.trim()) p.set('entry.' + a.entry.comment, r.comment.trim());
   }
   return p;
 }
@@ -132,27 +175,33 @@ export function answersText(round, respondent, answers) {
   const lines = [round.title, `From: ${respondent}`, ''];
   for (const a of round.applicants) {
     const r = answers[a.id];
-    if (!r || statusOf(r) === 'todo') continue;
-    lines.push(a.name, r.na ? 'Did not interact' : `Score: ${r.score || '-'}`, r.comment.trim() ? r.comment.trim() : '', '');
+    const s = statusOf(round, r);
+    if (s === 'todo') continue;
+    lines.push(a.name);
+    if (r.na) lines.push('Did not work with them');
+    else for (const q of round.questions) if (isAnswered(q, r[q.id])) lines.push(`${q.label}: ${r[q.id]}`);
+    lines.push('');
   }
   return lines.join('\n').trim() + '\n';
 }
 
-// ---- results (admins and PDs): submissions = [{ by, name, at, answers }] ----
+// ---- results (PDs and the committee): subs = [{ by, name, at, answers }] ----
 
 export function summary(round, subs) {
   return round.applicants.map(a => {
-    const scores = [], comments = [];
-    let skipped = 0;
+    const scales = scaleQuestions(round).map(q => ({ id: q.id, label: q.label, n: 0, sum: 0, mean: null }));
+    const comments = [];
+    let skipped = 0, answered = 0;
     for (const s of subs) {
       const r = s.answers[a.id];
       if (!r) continue;
       if (r.na) skipped++;
-      if (r.score) scores.push(r.score);
-      if (r.comment.trim()) comments.push({ by: s.name, text: r.comment.trim() });
+      if (hasAnswer(round, r)) answered++;
+      for (const sc of scales) if (Number.isInteger(r[sc.id])) { sc.n++; sc.sum += r[sc.id]; }
+      for (const q of round.questions) if (q.type === 'text' && typeof r[q.id] === 'string' && r[q.id].trim()) comments.push({ by: s.name, q: q.label, text: r[q.id].trim() });
     }
-    const mean = scores.length ? scores.reduce((x, y) => x + y, 0) / scores.length : null;
-    return { id: a.id, name: a.name, n: scores.length, mean, skipped, comments };
+    for (const sc of scales) { if (sc.n) sc.mean = sc.sum / sc.n; delete sc.sum; }
+    return { id: a.id, name: a.name, scales, skipped, answered, comments };
   });
 }
 const cell = v => {
@@ -160,19 +209,46 @@ const cell = v => {
   if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;   // a spreadsheet must not run a comment as a formula
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 };
+// One row per answer: applicant, respondent, sent, question, answer
 export function resultsCSV(round, subs) {
-  const rows = [['applicant', 'respondent', 'sent', 'score', 'did_not_interact', 'comment']];
+  const rows = [['applicant', 'respondent', 'sent', 'question', 'answer']];
   for (const s of subs) for (const a of round.applicants) {
     const r = s.answers[a.id];
-    if (!r || statusOf(r) === 'todo') continue;
-    rows.push([a.name, s.name, new Date(s.at).toISOString(), r.score ?? '', r.na ? 'yes' : '', r.comment.trim()]);
+    const st = statusOf(round, r);
+    if (st === 'todo') continue;
+    const when = new Date(s.at).toISOString();
+    if (r.na) { rows.push([a.name, s.name, when, '(did not work with them)', 'yes']); continue; }
+    for (const q of round.questions) if (isAnswered(q, r[q.id])) rows.push([a.name, s.name, when, q.label, r[q.id]]);
   }
   return rows.map(r => r.map(cell).join(',')).join('\n') + '\n';
 }
 
+// ---- photos: the stored form is the base64 JPEG only (see rules: selection/{cycle}/photos/{id}.jpeg) ----
+
+export const MAX_PHOTO_B64 = 80000;
+export const photoSrc = jpeg => (typeof jpeg === 'string' && jpeg && jpeg.length <= MAX_PHOTO_B64 && /^[A-Za-z0-9+/=]+$/.test(jpeg) ? 'data:image/jpeg;base64,' + jpeg : null);
+// Which applicant a photo file belongs to, by its file name: "lim-zhan-foong.jpg" or "Lim Zhan Foong 2.png" match "Lim Zhan Foong".
+export function matchPhotoFile(round, fileName) {
+  const norm = s => String(s).toLowerCase().replace(/\.[a-z0-9]+$/, '').replace(/[^a-z]+/g, '');
+  const f = norm(fileName);
+  if (!f) return null;
+  const exact = round.applicants.filter(a => norm(a.name) === f);
+  if (exact.length === 1) return exact[0];
+  const hits = round.applicants.filter(a => { const n = norm(a.name); return n && (f.startsWith(n) || n.startsWith(f) && f.length >= 6); });
+  return hits.length === 1 ? hits[0] : null;
+}
+
 // ---- demo round (made-up names only) ----
 
+export const DEMO_NAMES = ['Alex Demo', 'Bao Sample', 'Casey Example', 'Dani Placeholder', 'Eli Test', 'Fern Mockup', 'Gus Specimen', 'Hana Template'];
 export function demoRound() {
-  const names = ['Alex Demo', 'Bao Sample', 'Casey Example', 'Dani Placeholder', 'Eli Test', 'Fern Mockup'];
-  return { v: 1, title: 'Applicant feedback (demo)', cycle: 'demo', applicants: names.map((name, i) => ({ id: 'a' + (i + 1), name })) };
+  return { v: 2, title: 'Applicant feedback (demo)', cycle: 'demo', applicants: DEMO_NAMES.map((name, i) => ({ id: 'a' + (i + 1), name })), questions: DEFAULT_QUESTIONS.map(q => ({ ...q })) };
+}
+// A passport-shaped placeholder picture (SVG, not a real person) for the demo.
+export function demoPhoto(i) {
+  const bg = ['#cfe3f4', '#f6dcc0', '#d7ead2', '#ead3e6', '#f2e6b8', '#cdeae6', '#e5d6c8', '#d8dcf2'][i % 8];
+  const skin = ['#e8b894', '#c68c64', '#f1cfae', '#a86f4a', '#d9a47c', '#8d5a3b', '#f4d9bd', '#b9835a'][i % 8];
+  const shirt = ['#2f5d8a', '#7a2f3a', '#3b6b4f', '#4b4a6b', '#6b5a2f', '#2f6b6b', '#5a3b2f', '#3b3f6b'][i % 8];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 270"><rect width="210" height="270" fill="${bg}"/><path d="M20 270c4-52 38-72 85-72s81 20 85 72z" fill="${shirt}"/><rect x="88" y="150" width="34" height="50" rx="12" fill="${skin}"/><ellipse cx="105" cy="108" rx="40" ry="50" fill="${skin}"/></svg>`;
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
 }

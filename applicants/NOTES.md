@@ -29,9 +29,24 @@ as in the department's Google Form it replaces ("360 feedback on residency appli
   Demo data uses `sel-demo-…` keys and never touches a real round.
 - UI is the NUHS app kit through evals' `style.css` (like People): top band, `.a-*` classes, 44px+ targets, axe-checked.
 
+## What it does now (17 Oct 2026)
+
+- **Fast to fill in:** Start opens the first applicant who still needs an answer; one tap scores (1 to 5), a comment is optional, Next sits
+  in a bar fixed to the bottom, and "I haven't worked with them" is one tap that moves on by itself. The overview is a grid of passport
+  photos with a tick for done. Review shows only people who still need an answer; a score without a comment is never flagged.
+- **Editable questions** (Set up): up to 8 per applicant, each a 1-5 score (with words for the two ends) or a text box, any can be marked
+  required. Stored with the round (`questions`); the standard two have ids `score` and `comment`, which the first version and the Google
+  Form used, so older answers still fit. Answers are flat per applicant: `{ na, <questionId>: value }`.
+- **Photos** (Set up, published rounds only): per person, or many at once by file name ("lim-zhan-foong.jpg"). `js/photo.js` crops to 7:9 and
+  210 x 270 px as a JPEG of a few KB; stored as base64 in `selection/{cycle}/photos/{applicantId}`. Everyone who may answer can read them
+  (that is the point); only admins and PDs write. Not in private-link rounds (too big for a link).
+- **Demo** (`/applicants/?demo`; `?demo=reset` starts it over): a published round of eight made-up applicants with placeholder portraits, a
+  committee member and four people's answers, so the photo grid, the questionnaire, Results and Set up can all be tried; the account
+  sheet switches between resident, faculty and admin.
+
 ## How it's built
 
-- `js/model.js`: all logic, no page code (`test/model.test.mjs`): applicant list parsing, the round and its link
+- `js/photo.js`: the passport crop (browser only). `js/model.js`: all logic, no page code (`test/model.test.mjs`): applicant list parsing, the round and its link
   (`encodeRound` / `readRoundText`), answers and their status, warnings, the Google Form body (`formBody`, `formUrl`),
   results summary and CSV (formula-safe).
 - `js/app.js`: screens (home list, one applicant, review and send, thank you; Set up and Results for staff).

@@ -82,6 +82,29 @@ await t('committee member cannot add others', assertFails(setDoc(doc(com, 'selec
 await t('committee emails are lower case', assertFails(setDoc(doc(adm, 'selectionCommittee', 'Mixed@Example.com'), { name: 'x' })));
 await t('an admin on the committee reads responses', assertSucceeds(setDoc(doc(adm2, 'selectionCommittee', ADMIN2), { name: 'Admin Two' })).then(() => assertSucceeds(getDocs(collection(adm2, 'selection', 'c1', 'responses')))));
 
+
+// ---- questions and photos ----
+const photo = (o = {}) => ({ jpeg: '/9j/4AAQSkZJRg==', updatedAt: 1, ...o });
+await t('round with questions', assertSucceeds(setDoc(doc(pd, 'selection', 'q1'), round({ cycle: 'q1', questions: [{ id: 'score', type: 'scale', label: 'Score', required: true }] }))));
+await t('too many questions', assertFails(setDoc(doc(pd, 'selection', 'q2'), round({ cycle: 'q2', questions: Array.from({ length: 11 }, (_, i) => ({ id: 'q' + i, type: 'text', label: 'x' })) }))));
+await t('questions must be a list', assertFails(setDoc(doc(pd, 'selection', 'q3'), round({ cycle: 'q3', questions: 'nope' }))));
+await t('empty question list', assertFails(setDoc(doc(pd, 'selection', 'q4'), round({ cycle: 'q4', questions: [] }))));
+await t('pd adds a photo', assertSucceeds(setDoc(doc(pd, 'selection', 'c1', 'photos', 'a1'), photo())));
+await t('admin replaces a photo', assertSucceeds(setDoc(doc(adm, 'selection', 'c1', 'photos', 'a1'), photo({ updatedAt: 2 }))));
+for (const [who, db] of [['resident', res], ['faculty', fac], ['pd', pd], ['admin', adm]]) await t(`${who} reads a photo`, assertSucceeds(getDoc(doc(db, 'selection', 'c1', 'photos', 'a1'))));
+await t('resident lists photos', assertSucceeds(getDocs(collection(res, 'selection', 'c1', 'photos'))));
+await t('stranger cannot read a photo', assertFails(getDoc(doc(str, 'selection', 'c1', 'photos', 'a1'))));
+await t('signed out cannot read a photo', assertFails(getDoc(doc(anon, 'selection', 'c1', 'photos', 'a1'))));
+await t('resident cannot add a photo', assertFails(setDoc(doc(res, 'selection', 'c1', 'photos', 'a2'), photo())));
+await t('committee cannot add a photo', assertFails(setDoc(doc(com, 'selection', 'c1', 'photos', 'a2'), photo())));
+await t('photo takes no extra fields', assertFails(setDoc(doc(pd, 'selection', 'c1', 'photos', 'a2'), photo({ note: 'x' }))));
+await t('photo must be a string', assertFails(setDoc(doc(pd, 'selection', 'c1', 'photos', 'a2'), photo({ jpeg: 5 }))));
+await t('photo cannot be empty', assertFails(setDoc(doc(pd, 'selection', 'c1', 'photos', 'a2'), photo({ jpeg: '' }))));
+await t('photo size limit', assertFails(setDoc(doc(pd, 'selection', 'c1', 'photos', 'a2'), photo({ jpeg: 'A'.repeat(80001) }))));
+await t('photo at the size limit', assertSucceeds(setDoc(doc(pd, 'selection', 'c1', 'photos', 'a3'), photo({ jpeg: 'A'.repeat(80000) }))));
+await t('pd removes a photo', assertSucceeds(deleteDoc(doc(pd, 'selection', 'c1', 'photos', 'a3'))));
+await t('resident cannot remove a photo', assertFails(deleteDoc(doc(res, 'selection', 'c1', 'photos', 'a1'))));
+
 await env.cleanup();
 console.log(fail ? `selection rules: ${fail} of ${n} checks failed` : `selection rules: ${n} checks passed`);
 process.exit(fail ? 1 : 0);
