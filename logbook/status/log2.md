@@ -1,13 +1,44 @@
 # Now: Claude Code, Logbook 2 (log2)
 
-**Claude Code, Logbook 2 (log2)** (branch `ccr-afac5e7a-99esax`): the 15 Oct "what's left" queue is built and merged:
-#665/#667/#669 Select and Bulk edit (9–9d), #671/#674 Search (9e), #677 Grid (10), #679 paging (11), #680 Send to
-presets (12), #686 Group by and Sort (14), #689/#690 Markdown (15), #691 BMI highlight (2), Year comparison (5b, this
-PR). Card style (raised / outlined / flat) left as is: Borders, Shadows and Flat already cover it.
-16 Oct follow-up (owner: "do what you recommend"): Card style in Themes with the line strength in Advanced display;
-Your themes (save a Custom look, Export / Import); Sync writing reflection notes (per place, off by default).
-Waiting on the owner: a real-phone check of sign-in (installed app and Firefox for Android), and of each new Send to
-preset on an iPhone (Apple Notes Shortcut, Email, Telegram, Drafts, Bear, Things, Day One).
+**Handed over 17 Oct 2026 to the merged session "APMES Logbook" (session_016HpHN2kgnP6mwgTMoZ6yCN).** log2 is
+archived after this; the new session carries on from this file. Branch was `ccr-afac5e7a-99esax`.
+
+### Open work
+- **No open PRs. Nothing unpushed or half-done.** Everything below is merged on main (last code PR #717).
+- Known small quirk, not fixed: Settings → Themes → Your themes: the "Custom" hint doesn't refresh while a slider is
+  dragged (it updates on release or the next redraw). Fix in `ui-settings.js` renderThemes (listen to `input`, not only
+  `change`) if the owner notices.
+
+### PRs merged by log2 (15–17 Oct)
+#651–#664 (earlier queue items 2–9h), #665 #667 #669 Select and Bulk edit (cases, Notes, Reflections), #671 #674 Global
+search, #677 Grid as a spreadsheet, #679 Paging, #680 Send to presets, #686 Group by and Sort (in the Filter panel),
+#689 #690 Markdown (day heading styles, date formats, reflections / notes under their case), #691 BMI highlight, #692
+Year comparison (Faculty Analytics), #694 Card style (Themes) with line strength in Advanced display, #696 Your themes
+(save a Custom look, Export / Import .json), #698 Sync writes reflection notes (per place, off by default), #715
+search icon as a line icon (not 🔍), #717 grab bar under the List box and the Notes bin icon on long press.
+
+### Owner decisions this session (all in NOTES.md now)
+- Markdown day heading default is plain `2026-10-10` (not `[[…]]`).
+- Group by / Sort live in the Filter panel so the List looks exactly as before.
+- "Do what you recommend" (16 Oct): card style in Themes, line strength and the other look settings in Advanced
+  display; Sync writes reflection notes, off by default, never deletes files.
+- Custom theme mode: changing a theme says Custom; Save this look, Export, Import.
+- Icons follow the theme (no emoji in the header).
+- "I approve the firebase changes" (16 Oct): nothing was pending from log2 at the time; no rules changed by log2.
+
+### Waiting on the owner
+- Real-phone checks: sign-in in the installed app and on Firefox for Android (see queue item 0b); each Send to preset
+  on an iPhone (Apple Notes Shortcut, Email, Telegram, Drafts, Bear, Things, Day One); a look at Themes (Card style,
+  Your themes) and Settings → Sync reflection notes on a phone.
+- Say go for queue items 0, 0b and 1 below (agreed, not yet started).
+
+### Next (numbered, start from the top)
+Items 0, 0b and 1 below are the open queue; every other numbered item further down is built (kept for reference).
+
+### Background and messages
+- No scheduled tasks (create_trigger / send_later), no watch_url hooks, no PR subscriptions (all unsubscribed).
+- Messages: Firetop offered help (my reply couldn't be sent from the cloud); log3 and CCC 360 sent information only.
+  None needs a reply.
 
 Agreed queue (one PR each, in order, once he says go):
 0. **Bug, first (waiting on the owner's OK to build ahead of the plan):** the reflection editor's "Saved locally ·
@@ -90,7 +121,7 @@ Agreed queue (one PR each, in order, once he says go):
    Select none · Bulk edit… · Done"; the popup has Change (a row per field, each "Unchanged" until chosen) and Actions
    (export or share just these, merge (Notes), move to the bin); Review changes → warning → Save; the same popup on
    Logbook, Notes and Reflections.
-9e. **Built (Search PRs: page, engine, operators, grouped results, tap opens; chips, saved searches, bulk select).** **Global search** (owner): a 🔍 in the header on every tab (can also go on the bar; `/` on a computer). The Logbook
+9e. **Built (Search PRs: page, engine, operators, grouped results, tap opens; chips, saved searches, bulk select).** **Global search** (owner): a search icon (line icon since #715) in the header on every tab (can also go on the bar; `/` on a computer). The Logbook
    search language (search-ops.js) plus `in:cases|reflections|notes`, `heading:`, `status:draft|complete`,
    `is:interesting|planned`, `has:reflection|note`, `no:tag`, `linked:`; an ⓘ list of them; filter chips (type, dates,
    tags, status, Interesting) kept in step with the typed operators. Results grouped by type with counts, Best match or
@@ -114,8 +145,7 @@ Agreed queue (one PR each, in order, once he says go):
    category names. Compact off: the table as now.
 9i/9j. **Themes and suggested colours: built** (Themes PR, 15 Oct): Settings → Themes (Classic cards, Inspired
    searchable list, Suggest a theme), swatches, background tint, spacing, tab bar style, heading font, Top band.
-   ACGME-style added from the owner's screenshots (15 Oct). Still to do: card style (raised / outlined / flat) not built (borders
-   and shadows cover it for now).
+   ACGME-style added from the owner's screenshots (15 Oct). Card style (raised / outlined / flat) built in #694; Your themes in #696.
 10. **Built (Grid PR).** **Grid as a spreadsheet:** thin lines, no boxed inputs; drag to resize columns (per device, double-tap resets);
     lines per row 1 / 2 / 3 / Fit to content.
 11. **Built (Paging PR).** **Paging by default** (owner's call, 15 Oct): 100 per page, 25 / 50 / 100 / 300 / All (per device); "‹ Page 2 of
@@ -129,7 +159,7 @@ Agreed queue (one PR each, in order, once he says go):
     ☆ Interesting, Plan for later) / None; Sort Newest / Oldest / Initials A–Z / Most tags. Headings fold with counts;
     per device. Pages count cases ("(continued)" on a split group); when selecting, a group heading selects the
     group (a case in several groups is selected once). After paging.
-15. **Built in part (Markdown PR 1: day heading styles, date formats and file dates, previews). Markdown PR 2: reflections and linked notes under their case (None / Link / Embed / Full text; Link and Embed only in the export, the full text elsewhere). Not built, waiting on the owner: Sync writing the reflection notes (Sync's ledger, bases and paths are per day; reflection files need their own keys, renames when a title or date changes, and deletions: worth it?).** **Markdown, one PR** (Copy / Share, Send to, Sync, the notes zip, all alike): Settings → Markdown → "Reflections in
+15. **Built (#689, #690 Markdown; #698 Sync writes the reflection notes, per place, off by default, never deletes).** **Markdown, one PR** (Copy / Share, Send to, Sync, the notes zip, all alike): Settings → Markdown → "Reflections in
     the day's note": None / Link / Embed (Obsidian `![[…]]`) / Full text (copied under its case); the same for linked
     notes. **Sync also writes the reflection notes** (a Reflections folder, same names and folders as the zip) so Link
     and Embed work in a synced vault. Where no reflection note can exist (Copy / Share, Send to apps other than

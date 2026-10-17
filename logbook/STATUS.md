@@ -6,14 +6,20 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-16 by Claude Code, Logbook 3 (log3).
+Last updated: 2026-10-17 by Claude Code, Logbook 2 (log2), at its handover to APMES Logbook.
 
 ## Now
 
 Each session keeps its own line in `status/<session>.md` (`log1.md`, `log2.md`, `log3.md`, `codex.md`; a new session adds
 its own file), so sessions never edit the same lines. Read them all before starting; edit only yours.
+- log2 handed over on 17 Oct to the merged session APMES Logbook: open queue, decisions and waits in `status/log2.md`
+  (no open PRs, nothing half-done).
 
 ## Waiting on the owner
+
+- **log2's checks** (17 Oct): real-phone sign-in (installed app, Firefox for Android); each Send to preset on an iPhone;
+  Themes (Card style, Your themes) and Sync reflection notes on a phone; say go for log2's queue items 0, 0b, 1
+  (`status/log2.md`).
 
 - **Don't re-import the old Form workbook from Admin for now** (15 Oct): three verified bugs only bite on a re-import (deleted Form
   cases come back, redated or edited ones double). Fixes are queued in `status/wip/README.md`.
@@ -59,6 +65,10 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Next (agreed queue)
 
+- **From log2, waiting on go** (details in `status/log2.md`): 0. the reflection editor's save status follows the
+  save queue live; 0b. sign-in by redirect in the installed app and Firefox for Android; 1. Paeds by age (≤ 16 ticks,
+  > 16 drops every Paeds guess) and pasted lists follow "Tick confident suggestions automatically".
+
 0. **Data-safety bug hunt: first round done and merged (#523), then parked at the owner's request ("come back to
    bugfixing later", 14 Oct).** Left in `logbook/PLAN-go-live-bugfix.md` ("Parked findings"): imports (item 7) and an app
    left open for days (item 9) untested; Firefox random seed 285932884 (a device keeps a stale copy of a case after its edit
@@ -81,6 +91,13 @@ its own file), so sessions never edit the same lines. Read them all before start
      12 Oct: busiest day 23.6k reads / 16.7k writes (bulk work), normal day ~4k reads; free tier 50k/20k a day.
 
 ## Recently done
+
+- #686 #689 #690 #691 #692 #694 #696 #698 #715 #717 (log2, 16–17 Oct): Group by and Sort (Filter panel); Markdown day
+  heading styles, date formats, reflections and notes under their case; BMI highlight; Year comparison (Faculty);
+  Card style; Your themes (save, export, import); Sync writes reflection notes (off by default); line search icon;
+  List box grab bar; Notes bin icon on long press.
+- #665–#680 (log2, 15–16 Oct): bulk select and edit (cases, Notes, Reflections), global search, Grid as a
+  spreadsheet, paging, more Send to presets.
 
 - #583 #584 #586 #587 #589 Logbook reliability fixes from the 15 Oct audit: saves after a conflict sync or say so and devices show
   the server's copy; bulk tag/merge/re-import through the queue; backup restore never overwrites newer work; reflection bin deletes
@@ -129,6 +146,11 @@ its own file), so sessions never edit the same lines. Read them all before start
 - #289 Polish 6a: settings pages use switches, ✓ lists and one-line help (ⓘ for more); Advanced pages under headings.
 
 ## Decisions log
+
+- 2026-10-17 (log2): Owner merged the three logbook sessions into one, "APMES Logbook"; log2 handed over (`status/log2.md`).
+- 2026-10-16 (log2): Owner: "do what you recommend": Card style in Themes, other look settings in Advanced display; Your
+  themes with save / export / import; Sync writes reflection notes (off by default, never deletes); icons never emoji.
+- 2026-10-16 (log2): Markdown day heading default plain; Group by / Sort in the Filter panel so the List looks as before.
 
 - 2026-10-16 (log3): Live Firebase and Cloudflare changes go as jobs to the home-computer session instead of to the owner
   (`OPERATIONS.md`, "The home computer").
