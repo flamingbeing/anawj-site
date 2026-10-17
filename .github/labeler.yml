@@ -24,6 +24,9 @@ hand-babies:
 people:
   - changed-files:
       - any-glob-to-any-file: 'people/**'
+selection:
+  - changed-files:
+      - any-glob-to-any-file: 'selection/**'
 hand-log:
   - changed-files:
       - any-glob-to-any-file: 'hand-log/**'
