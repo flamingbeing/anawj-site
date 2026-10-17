@@ -48,7 +48,7 @@ own) and the page scores 0.70 or better; it is marked `check_alignment`. `--min-
 a manifest and numbered contact sheets; a Claude Code session or a person reads them into `readings-a.json`; a second,
 independent pass (the bigger `b-NN` sheets, a fresh session) into `readings-b.json`; then
 `scan.py --readings readings-a.json --readings2 readings-b.json ...` compares the two and flags every disagreement. With only
-`--readings` there is one read and no second opinion; with `--no-read` the owner types every written value in the review
+`--readings` there is one read and no second opinion; with `--no-read` the person scanning types every written value in the review
 screen.
 
 **The template must look like the paper.** Field places and the alignment template are rendered from the blank `.docx`. If
@@ -74,15 +74,14 @@ change); it prints why any field was not placed (the paper form has no per-readi
   with a stand-in reader, one deliberate misread that must be flagged). Needs OpenCV, LibreOffice, `pdftoppm`.
 - `node prewarm/tools/scan/review.e2e.mjs <scan.json>` (review page at phone size, axe), static server on 8080.
 
-## Where it stands (15 Oct 2026)
+## Where it stands
 
 Tried on a handful of real pages with a stand-in reader (a person-equivalent reading the saved crops, via
 `--export-crops` / `--readings`): alignment, ticks and crop placement all held, and every misread was flagged (trial
-numbers in the owner's private notes).
+numbers are in the owner's private notes).
 
 **The live reader (`readers.AnthropicReader`) has never run, so its accuracy and cost are unmeasured.** It is shelved
-for now (owner, 15 Oct 2026); every reading so far was a stand-in, and both reads in a stand-in run are the same text,
+for now; every reading so far was a stand-in, and both reads in a stand-in run are the same text,
 so there is no second opinion. Check a sample of temperatures against the paper.
 
-Still to prove: a "No pre-warming" patient's page 4 (the option whose tick also ticks "Not applicable"; the owner will bring
-one), other handwriting and other patients (a bigger batch), and the live reader.
+Still to prove: a "No pre-warming" patient's page 4 (the option whose tick also ticks "Not applicable"), other handwriting and other patients (a bigger batch), and the live reader.

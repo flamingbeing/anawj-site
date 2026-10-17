@@ -42,18 +42,9 @@ missing was one obvious screen to keep them, and an easy way to add the yearly b
 - No rules change: everything here was already allowed for admins and PDs (`logbook/firestore.rules`).
 - No service worker (an online admin tool). `anawj.com/people/` redirects to `apmes.anawj.com/people/`.
 
-## Who runs permissions (owner, 17 Oct 2026)
-
-The People session (this one) is the **orchestrator for permissions and manpower across the APMES family of apps**
-(People, logbook, evals, CCC 360): who holds which role (owner, Admin staff, PC, PD), the access log, and who is on the
-faculty, core and CCC lists. It also helps supplement manpower for the roster apps (NUH Junior Monthly, NTF roster, NUH
-roster) where People can supply it (e.g. rotations, grades, people lists). Other sessions send it requests (role changes,
-new lists, rules for who may see what); it **accepts them autonomously** and does the work on its own branch, but a
-rules change still follows the repo rules (tests, green Checks) and a handover PR still waits for the owner.
-
 ## Roles (`access/`; rules in `logbook/firestore.rules`, tests `people/test/rules.emulator.mjs`)
 
-Owner, 17 Oct 2026: roles are edited in the app, not the console or firetop. `access/{google-email}` = `{ email, name, roles, updatedAt,
+Owner, 17 Oct 2026: roles are edited in the app, not in the Firebase console or by hand. `access/{google-email}` = `{ email, name, roles, updatedAt,
 updatedBy }`, roles from `owner`, `admin` (Admin staff), `pc` (programme coordinator, same powers as Admin staff) and `pd`. A role there counts
 like the older lists (`owners/`, `admins/`, `pds/`), which still work; retiring them is a later, planned job.
 - Owners grant and remove anything. Admin staff and PCs grant admin, pc and pd but never owner, and never change their own record.
@@ -77,8 +68,7 @@ still be in the page: pick elements by class, not by text alone.
 ## Rotations (read-only; owner, 16 Oct 2026)
 
 People › Rotations shows the department's master block rotation sheet (an .xlsx downloaded from Google Sheets) as a week by
-week grid, a person's weeks per posting across the year tabs, and people per posting per week. Plan, decisions and who may
-see it: `STATUS.md`. The sheet's real details (names, the code key's answers) are in the owner's private notes.
+week grid, a person's weeks per posting across the year tabs, and people per posting per week. Plan and decisions: the owner's private notes. The sheet's real details (names, the code key's answers) are in the owner's private notes.
 
 - `js/rotations.js`: the reader and the code key, free of page code (`test/rotations.test.mjs`). `js/rotations-ui.js`: the
   screen. Everything happens in the browser; the file is not uploaded or saved, and the sheet is not changed. Only admins
@@ -118,14 +108,4 @@ see it: `STATUS.md`. The sheet's real details (names, the code key's answers) ar
 - Faculty from the monthly roster: it has no consultants (they're left off the junior roster) and no emails.
 - Prewarm study team: joins by code.
 
-## Ideas for later
-
-- Bulk status change (e.g. a whole intake to Graduated) and an "R5s this year" list before July.
-- Faculty "last assessed" date from evals, to spot inactive assessors.
-- Take over grade and postings from NUH Junior Monthly (owner's plan), so the roster app reads People's list and the
-  import goes away. Link by email, `rid` underneath (decisions in `STATUS.md`, 16 Oct 2026).
-- Rotations (owner's plan, 16 Oct 2026): placements by week from the department's master rotation sheet, who has done what,
-  manpower, and a one-way export of the critical postings to NUH Junior Monthly. Stage 1 is read-only and in the browser;
-  design and the sheet's notation (`-E`, `KIV`, slashes, origin tags) in `STATUS.md`, decisions log.
-- "Change email": an admin action that moves a person's logbook and evaluations to a new email without losing history
-  (details in `STATUS.md`). Faculty and PDs need a permanent ID or a previous-emails list first.
+Plans, permissions decisions and ideas for later: details in the owner's private notes.

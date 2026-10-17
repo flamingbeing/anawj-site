@@ -2,7 +2,7 @@
 
 Residents and faculty give confidential feedback on residency applicants: a 1 to 5 suitability score and a comment for each,
 as in the department's Google Form it replaces ("360 feedback on residency applicants"; owner, 17 Oct 2026). At
-`apmes.anawj.com/applicants/` (folder `applicants/`; moved from `/360/` on 17 Oct 2026, because the owner's CCC 360 collection form is a different app and takes `/360/`) (`?demo` for made-up applicants). Plan and what comes next: `PLAN.md`.
+`apmes.anawj.com/applicants/` (folder `applicants/`; moved from `/360/` on 17 Oct 2026, because the owner's CCC 360 collection form is a different app and takes `/360/`) (`?demo` for made-up applicants). Plan and what comes next: details in the owner's private notes.
 
 ## Rules
 

@@ -2,7 +2,7 @@
 
 What the app is, what we know about the NTF anaesthesia department's monthly roster, how the app is built and the
 decisions behind it. Read this before changing `ntf-roster/`. `SPEC.md` is the module contract (state shape, exports,
-rule types); `STATUS.md` is what is happening now.
+rule types); What is happening now is kept outside this repo.
 
 The repo is public: never commit real staff names, rosters, leave or the department's sheets. Demo and tests use
 made-up names only.
@@ -21,10 +21,7 @@ launch) and can **fill the calls and shifts automatically** (Auto-fill).
 - Reference products for the quality bar: QGenda, Amion, Lightning Bolt, RosterLab, Deputy (colour-coded duty
   chips, sticky grid, request layer, live rule checks, fairness counts, one-click auto-fill with preview).
 
-## The department (what the sheets showed; the owner confirms)
-
-Learned from department sheets the owner shared (read in a session scratchpad only, never committed; details in the
-owner's private notes).
+## The department (the owner confirms)
 
 ### Groups (sheet order)
 
@@ -40,9 +37,6 @@ owner's private notes).
 | `jr` | JUNIOR RESIDENTS | junior |
 | `locum` | LOCUM / LOCUMS | junior |
 | `mo` | MEDICAL OFFICERS | junior |
-
-About 60 people a month. Names on the sheet can carry a
-bracket note with the posting and its dates, e.g. "Name (R4-SR1 25/5/26-13/9/26)" or "Name (B) 6/5/26-7/9/26".
 
 Tags (app-only labels): `babymo` Baby MO (a new MO, never on call alone), `parttime`, `pain` (APS), `icu`.
 
@@ -67,9 +61,7 @@ or note-like), **derived** (worked out, never stored).
 | NUH, ICM, LT, Mtg, Teach | At NUH, ICU posting, liver transplant, meeting, teaching | other | |
 | x | Post call | derived | the day after an overnight shift; never stored, ignored on import |
 
-**Unconfirmed** (seen on the sheets, meaning not known; the importer offers to add them as kind "other" or keep them
-as notes): HC, NS (14 cells in Dec), AH (5), JR (5; as a cell code, not the group), and what "(B)" after an MO's name
-means (probably Baby MO). Free text like `3-4.30pm`, `bcls-pm`, `Clinic UG` goes into the cell note.
+Some codes seen on the sheets have meanings nobody has confirmed; the importer offers to add them as kind "other" or keep them as notes (which codes: details in the owner's private notes).
 
 ### Numbers the default rules guess
 
@@ -171,32 +163,9 @@ third of the tries. On the practice department, November's 82 must-fix problems 
 The dialog shows the first draft's counts at once. The preview shows shifts added and removed, must-fix and soft counts
 before and after, and anything unfilled; Apply is one undo step.
 
-## Speed (Oct 2026)
+## Speed and walkthrough
 
-The owner found the first version slow on a phone. What keeps it quick, and what to keep in mind when changing it:
-
-- **Grid edits swap cells, not the grid.** `renderGrid()` builds each person's row from a signature (`rowSig`: their
-  cells, the day before the month, problems, details, the selected cell); a row whose signature is unchanged reuses
-  last render's HTML, and a changed row swaps only the cells (and footer counts) that differ. The duty-colour
-  `<style>`, the toolbar selects and the paint bar are rewritten only when they change (rewriting a `<style>`
-  restyles every element on the page). The cell editor is built once and updated in place.
-- **Full redraws are progressive** (another month, back from another tab, a filter, Auto-fill or an import changing
-  most rows): the rows in the grid's window go in first, then the rest over the next frames; rows above the window
-  wait in a spacer (`tr.r-spacer`) sized from the last drawing, and the scroll position is corrected when they arrive.
-  Code that needs a row that may not be drawn yet calls `flushRows()` (`selBtn()`, keyboard moves and paint already
-  do). The first screen after the app starts is drawn whole.
-- **The rule check** (`evaluate`, about 5 ms a month on a laptop) rules out most person-days with one bit test per
-  code list (`compileCodes`) and lists each person's request days once (`requests` rules), which also made Auto-fill's
-  search about twice as fast with identical results.
-- **Start-up**: the first screen's modules are fetched side by side; weekdays and the duty map are memoised in
-  `model.js`. The Google Fonts stylesheet in `index.html` is render-blocking (it held the first paint by ~0.4 s on a
-  slow connection in testing): self-hosted fonts with `font-display: swap`, or a non-blocking link, remove that.
-- **Guard**: `node ntf-roster/test/perf.e2e.mjs` (Playwright, phone size, CPU 4x slower) times tap a cell → editor,
-  tap a code → grid, and switch month, against budgets of about 2x the Oct 2026 numbers. Not in the Checks workflow.
-- Measured in Chromium at 390 px with the CPU 4x slower (medians, before → after): switch month 0.75 s → 0.32 s
-  until the new month shows (about 0.8 s until every row is in, as before); tab to Roster 0.83 s → 0.35 s; tap a code
-  → grid 0.35 s → 0.26 s; rule builder live check 0.16 s → 0.07 s; Auto-fill to the preview 3.4 s → 1.1 s (laptop
-  2.8 s → 0.7 s). On a laptop: switch month 150 → 70 ms, tab to Roster 150 → 67 ms, tap a code 66 → 43 ms.
+How the app stays quick on a phone, and the first-time help (checklist, tour, practice tasks), are in [docs/speed.md](docs/speed.md) and [docs/walkthrough.md](docs/walkthrough.md).
 
 ## Screens
 
@@ -209,47 +178,6 @@ Excel/PDF/CSV/ICS export, backup and restore, settings and public holidays, team
 Hash routes (the month comes from `m`, else from `d`; changing month writes `m` into the link):
 `#roster?m=2026-11&p=<staffId>`, `#day?d=2026-11-03`, `#people?s=staff|groups|tags|codes`,
 `#rules?edit=<ruleId>|new`, `#check?rule=<ruleId>&v=fairness|coverage`, `#more`.
-
-## Walkthrough (first-time help: `js/guide.js`, `js/tour.js`)
-
-The owner asked for a walkthrough for a first-time user (15 Oct 2026). Four parts, all in the NUHS look (square panels
-with a navy top rule, navy titles and primary buttons, only controls rounded), like the NUH roster's Practice tour:
-
-- **Getting started** (your own roster only, never practice): the welcome screen of an empty roster, then a card at the
-  top of Roster with six steps that tick themselves off: staff added; People › Duty codes opened; a rule opened in
-  Rules; any leave or request; an Auto-fill applied (auto codes in the cells); an export, print or backup. The three
-  that the data can't show, plus Hide and "finished", are kept in `state.settings.onboarding` (so they travel with
-  backups and team sharing) through `store.mark()`, which is not an undo step. All six done: "All set" for a few
-  seconds, then the card goes; Help › Getting started checklist shows it again. Laptops show the steps as a row with
-  the open one's words below; phones and the welcome screen as a list. Folded or open is per device
-  (`ntf-roster-guide`; folded by default on phones). Edit the steps in `STEPS` at the top of `guide.js`.
-- **The tour** (coach marks): `TOUR_STEPS` at the top of `tour.js` is the step list: `{ id, title, text, target, tab,
-  maxH, count, only, phone, laptop }` (`only: 'laptop'` for a stop that is only at that size, like People). `target` is the value of a `data-tour="…"` attribute (add one to the control you want
-  lit), or a list where the first is the step's own control and the rest are lit too (the tab that leads there);
-  `phone` / `laptop` replace fields at that size; a step whose control isn't on screen is skipped. It switches tabs as it
-  goes (replacing the history entry, so Back still works) and its own history entry means the phone's Back ends it; at
-  the end the app is back where the tour started and focus returns to the button that opened it. Keys: → or Enter
-  next, ← back, Esc skips. The card docks above the tab bar on phones. Practice opens it once per device; your own
-  roster offers "Take the 1-minute tour" on the checklist (with no staff yet it opens practice in a new tab, where every
-  control has something to point at). Seen or skipped: localStorage `ntf-roster-tour` = `{ v, done }`; bump `TOUR_V`
-  to show a changed tour to everyone again. It never touches roster data, and the app's own keys (Ctrl+Z included)
-  wait while it is open. Next takes focus (with its ring) only for keyboard use; after a tap, or when practice opens it
-  by itself, the card itself does. Crossing 720 px mid-tour redoes the step at the new size.
-- **Try it yourself** (practice only): three tasks in a small card, each ticked from store changes: give someone leave,
-  add a "never on call together" rule for two named juniors (Rules › Add rule › Between two people, which now starts
-  as never on Call), Auto-fill next month and Apply. "Show me" lights the control to tap next, inside a window too: the
-  task card sits above windows (z-index 81, below the tour), which make room for it underneath. A tick's few seconds
-  start once no window is open, so it is seen. `?demo&try` starts it,
-  `?demo&tour` the tour (links from your own roster's Help).
-- **Help**: the "?" in the header (on phones too) opens a sheet: Take the tour · Try it yourself · Getting started
-  checklist · Keyboard shortcuts (not on touch-only phones; the `?` key still opens them). On phones Getting started
-  also shows above Day, where the app opens. More › Help has "Show the walkthrough".
-- Test: `test/tour.e2e.mjs` (in Checks). `test/e2e.mjs` and `test/perf.e2e.mjs` mark the tour as seen first, so practice
-  doesn't open it under them.
-
-Lesson (17 Oct 2026): a closed sheet or picker stays in the page for a moment with `.out` on its backdrop. Any code that
-looks for "the open sheet" (Show me in `js/guide.js`) must skip elements inside `.out`, or it picks the closing one and
-the tour test flakes on slow CI.
 
 ## Excel (`js/io.js`)
 

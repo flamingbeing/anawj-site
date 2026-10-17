@@ -1,5 +1,3 @@
-# Now: Claude Code, hand assessment session
+# hand: session status
 
-Branch `claude/amazing-goodall-erq636`. Moving the page to `hand.anawj.com/babies/` (SUBDOMAINS.md step 2; PR open until checked live; then tell the homepage session). Last work (13 Oct 2026): update bar removed,
-Firefox check, Elson figure fixed, EDC and EIP/EDM tests corrected (#305, #306, #309, #312). Next: wait for the owner's
-phone check, clinical read-through and any `Page edits:` issues. Delete this file when the session ends for good.
+Session status moved to the owner's private notes. See [../NOTES.md](../NOTES.md).

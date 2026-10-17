@@ -9,7 +9,7 @@ nothing comes back to the Form or its sheet. About 15 minutes on a computer, onc
 
 1. **Authentication → Sign-in method → Add new provider → Email/Password**: turn on "Email/Password" (leave
    "Email link" off). Save.
-2. **Authentication → Users → Add user**: an email that names the job, e.g. `formbot@anawj.com` (it never receives
+2. **Authentication → Users → Add user**: an email that names the job, e.g. `formbot@<your domain>` (it never receives
    mail), and a long random password (a password manager's generator). Copy the new user's **User UID**.
 3. **Firestore Database → Data → Start collection** `formBots` → Document ID: paste the UID → one field, e.g.
    `note` (string) `Google Form script`. Save. (The rules let only accounts listed here write to the inbox; nobody

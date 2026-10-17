@@ -1,4 +1,3 @@
-# Now: Claude Code, NTF Roster session
+# NTF roster: session status
 
-Branch `claude/practical-pasteur-ff2uqp` (15 Oct 2026). #580, #605, #606 merged (NUHS look, speed kept). This PR: the
-first-time walkthrough. App status: `ntf-roster/STATUS.md`. Delete this file when the session ends.
+Session status moved to the owner's private notes. See [../ntf-roster/NOTES.md](../ntf-roster/NOTES.md).

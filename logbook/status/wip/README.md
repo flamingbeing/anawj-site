@@ -20,9 +20,9 @@ corrections) stay in `findings/*.json` for the follow-ups below. Delete this fol
 5. Design gap for the owner: a Form-only resident's cases stay in the inbox (and their counts summary goes stale) until they
    open the app.
 
-## Soak runs (Firetop, local emulator)
+## Soak runs (the owner's private helper, local emulator)
 
 Final, on d195cdd (#583's tip): **12 of 12 pass**. Firefox 358733102, 76113342, 835480189, 561493112, 642390865 (the round-7
 stall didn't repeat), 119100182 (failed on the old main); Chromium SLOW=1 76113342, 440929881, 457040346, 638535459, 194105582,
 131229630 (failed on the old main); plus local Chromium 419136196 and 46813064. WebKit conflicts gave no result. Nothing is
-queued on Firetop; its summary stays on that computer.
+queued on the owner's private helper; its summary stays on that computer.

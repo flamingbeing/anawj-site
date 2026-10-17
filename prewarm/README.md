@@ -4,8 +4,8 @@ Phone app for the op-day bedside data of the prewarming RCT: temperatures every 
 event times, intra-op details, PACU and satisfaction. Lives at `prewarmstudy.anawj.com` (it moved from `anawj.com/prewarm/`, which now moves phones across once they have nothing waiting); `?demo` opens a separate demo
 store with a fake patient.
 
-- **Study-day runbook for the team: `RUNBOOK.md`.** Improvement list from the 14 Oct review: `IMPROVEMENT-PLAN.md`.
-- Plan and decisions: `PLAN.md`. Status: `STATUS.md`. Lasting rules: `NOTES.md`.
+- **Study-day runbook for the team: `RUNBOOK.md`.** 
+- Lasting rules: `NOTES.md` (topic detail in `docs/`). Plans, decisions and status are in the owner's private notes.
 - `js/headers.js`: the eCRF template's 572 headers and sections, verbatim. `js/schema.js`: every template column as a
   field, in column order, plus op-day extras the template lacks. `js/app.js`: the screens. `js/store.js`: records with
   a timestamp per field (merge-ready for sharing). `js/xlsx.js` + `js/export.js`: the Excel export.

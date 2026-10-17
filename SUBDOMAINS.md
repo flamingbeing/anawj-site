@@ -1,9 +1,10 @@
 # Subdomains
 
-Plan agreed with the owner on 13 Oct 2026. Apps that save data or sign people in get their own subdomain, so the
-browser keeps their saved data, sign-ins and offline copies apart; one bad page can't reach another app's data.
-Related static pages share a subdomain by topic. `anawj.com` keeps only the status page and a few shared pages.
-The rule for new apps is in `AGENTS.md`.
+The rule (owner, 13 Oct 2026): apps that save data or sign people in get their own subdomain, so the browser keeps
+their saved data, sign-ins and offline copies apart; one bad page can't reach another app's data. Related static pages
+share a subdomain by topic. `anawj.com` keeps only the status page and a few shared pages. Each new roster gets its own
+subdomain. The rule for new apps is in `AGENTS.md`. The move steps and progress log are kept in the owner's private
+notes; every step is done.
 
 ## Where everything goes
 
@@ -16,8 +17,8 @@ The rule for new apps is in `AGENTS.md`.
 | `hand.anawj.com/handlog/` | `hand-log/` | Hand DOPS/Mini-CEX log; data on the phone only, no sign-in (owner, 13 Oct 2026). |
 | `prewarmstudy.anawj.com/` | `prewarm/` | **Real study data.** The name is a reminder that it holds sensitive data and stays isolated. |
 | `nuhroster.anawj.com/` | `nuh-roster/` | Own Firebase project `nuh-roster`. |
-| `nuhjuniormonthly.anawj.com/` | `nuh-junior-monthly/` | NUH junior monthly roster helper (15 Oct 2026). Data in the browser. Needs the owner's custom-domain click. |
-| `ntfroster.anawj.com/` | `ntf-roster/` | NTF anaesthesia monthly duty roster (15 Oct 2026). Data in the browser until its own Firebase project `ntf-roster` exists. Needs the owner's custom-domain click. |
+| `nuhjuniormonthly.anawj.com/` | `nuh-junior-monthly/` | NUH junior monthly roster helper (15 Oct 2026). Data in the browser. |
+| `ntfroster.anawj.com/` | `ntf-roster/` | NTF anaesthesia monthly duty roster (15 Oct 2026). Data in the browser until its own Firebase project `ntf-roster` exists. |
 | `apmes.anawj.com/logbook/` | `logbook/` | With evals: one Firebase project (`apmes-logbook`), one sign-in. |
 | `apmes.anawj.com/evals/` | `evals/` | |
 | `apmes.anawj.com/people/` | `people/` | The people lists logbook and evals share (admins and PDs; 13 Oct 2026). |
@@ -38,116 +39,26 @@ renaming: the hosting maps each address to its folder.
 Every old `anawj.com/<folder>/` address becomes a redirect to the new one, keeping the path, query and `#` part.
 That matters most for prewarm's PACU nurse links and QR codes, and for the logbook's `?demo` links.
 
-The roster's address is `nuhroster.anawj.com` (owner, 13 Oct: he may manage other rosters later, each with its own subdomain).
+## How the hosting works
 
-## Who does what, in order
+One Cloudflare Worker, `anawj-preview` (also the PR previews), serves the subdomains. Code: `worker/sites.js`; the
+address-to-folder table is `SITES` in `worker/routes.js` (same as the table above; change both together). Workers Builds
+deploys it on every merge to `main` (build command `node tools/stamp-versions.mjs`).
 
-One step at a time; each is merged and checked before the next starts. Each session updates its own app's
-`STATUS.md` and touches no other app's files. When a step is done, its session tells the homepage session
-(its id is in the owner's private notes), which starts the next one and ticks it here.
+- A subdomain serves **only** its own folders; any other path is a 404. Every response carries
+  `X-Robots-Tag: noindex, nofollow`. One-app hosts serve the app at the root (its folder name works too).
+- Every host also serves `/nuhsdesign/` (styles only) and `/feedback/` (the feedback button's script): `SHARED` in
+  `worker/routes.js`. Nothing else is shared.
+- `apmes.anawj.com` serves Firebase's sign-in helper pages (`/__/auth/`, `/__/firebase/`; `apmes-auth/firebase/init.json`)
+  and just `apmes/guidebook/` from `apmes/`.
+- Any other address (PR previews, the copy of main) serves the whole repo. To try a subdomain on a preview, use
+  `<preview>/_sites/hand.anawj.com/babies/`.
+- No data or storage in the Worker. The one API is owner-only, on `ask.anawj.com` (`worker/ask.js`); its secrets live
+  in Cloudflare, never in the repo; previews never answer it.
+- Tests: `node worker/test/routes.test.mjs` and `node worker/test/sites.test.mjs`.
 
-1. **Hosting** — Logbook 1 (log1). A live Cloudflare Worker that serves `main` at the subdomains, maps each address
-   to its folder (table above), deploys on every merge to `main` and stamps service-worker versions like
-   `.github/workflows/pages.yml` does. Keep the PR previews working. Write the owner's Cloudflare clicks (custom
-   domains or DNS records, as for `edit.anawj.com` in `edit/NOTES.md`) into this file. Nothing moves yet.
-2. **hand.anawj.com** — the CMC joint surgical trainer session moves `cmcj/`, then the hand assessment crash course
-   session moves `hand-babies/` to `/babies/` and removes the `hand/` redirect. No sign-in, so this proves the
-   hosting with nothing at risk.
-3. **prewarmstudy.anawj.com** — the Prewarming Webapp session, between cases only. Before the switch: every reading
-   on every phone is saved to Firestore (nothing waiting offline), and the move changes no data. Its sign-in domain
-   stays `prewarm-study.firebaseapp.com`; the owner adds `prewarmstudy.anawj.com` to the project's authorised
-   domains. Nurse links and QR codes keep working through the redirect. Phones on the old worker are moved on with
-   `anawj.com/prewarm-update/`. Check the next case's phones before it starts.
-4. **nuhroster.anawj.com** — the NUH Roster session. The owner adds the address to the `nuh-roster` Firebase project's
-   authorised domains and the Google sign-in client.
-5. **apmes.anawj.com** — Logbook 1 (log1) leads, with the MedHub Evaluations session for `evals/`. Sign-in domain
-   moves from `anawj.com` to `apmes.anawj.com` (copy the `__/auth/` helper files); the owner updates the
-   `apmes-logbook` authorised domains, the Google sign-in client, Google Drive and Dropbox. log1 also decides where
-   `edit/` and `edit.anawj.com` go, and moves them.
+## The page editor
 
-After each move: tests pass against the new address, previews still work, the app's `NOTES.md`/`README.md` show the
-new address, and every page keeps `<meta name="robots" content="noindex, nofollow">`.
-
-## How the hosting works (step 1, log1)
-
-One Cloudflare Worker, `anawj-preview` (the one that already serves the PR previews), now also serves the subdomains.
-Its code is `worker/sites.js`; the address-to-folder table is `SITES` in `worker/routes.js` (same as the table above;
-change both together). It serves the repo's files as they are on `main`: Workers Builds deploys it on every merge to
-`main` (build command `node tools/stamp-versions.mjs`, so service-worker versions are stamped, as for GitHub Pages),
-and builds a preview for every PR.
-
-- A subdomain serves **only** its own folders: `hand.anawj.com` can't reach `logbook/`, `prewarmstudy.anawj.com` can't
-  reach anything but `prewarm/`, and so on; a path outside them is a 404 (an address with no slash gets one, query
-  kept). Every response carries `X-Robots-Tag: noindex, nofollow`.
-- One-app hosts (`prewarmstudy.`, `nuhroster.`) serve the app at the root, and its own folder name works too
-  (`prewarmstudy.anawj.com/prewarm/…`) so an app can move before its absolute links are tidied.
-- **Shared folders:** every host also serves `/nuhsdesign/` (the NUHS-style design files, styles only, no data), so an
-  app on a subdomain can link `../nuhsdesign/tokens.css` (`SHARED` in `worker/routes.js`), and `/feedback/` (the feedback
-  button's script, no data; `edit/NOTES.md`, "Feedback button"). They are the only folders subdomains
-  share; everything else stays per app. The old `/design/` path was served alongside it for phones still on an older copy,
-  and retired on 13 Oct 2026 (nothing linked it any more; the old folder held only a copy of `tokens.css`).
-- **Sign-in helper pages on `apmes.`:** `apmes.anawj.com/__/auth/` and `/__/firebase/` serve Firebase's sign-in helper
-  pages (the same scripts as `anawj.com/__/auth/`; `apmes-auth/firebase/init.json` is `apmes.`'s own copy with
-  `authDomain` `apmes.anawj.com`). Only that host serves them. `anawj.com/__/` stays as it is until nothing uses it.
-- **The guidebook on `apmes.`:** `apmes.anawj.com/apmes/guidebook/` serves just that folder of `apmes/` (the evals app reads
-  `../apmes/guidebook/dops-expectations.md`); the rest of `apmes/` is not served there.
-- Any other address (the previews on `workers.dev`, the copy of main) serves the whole repo as before.
-- **Trying a subdomain before it exists:** on a PR preview, `<preview>/_sites/hand.anawj.com/babies/` serves what
-  `hand.anawj.com/babies/` will. (Real hosts don't take that route.)
-- No data and no storage in the Worker: it serves files, plus one owner-only API on `ask.anawj.com` (`worker/ask.js`,
-  Ask Claude), the only part with secrets (a GitHub token for issues, the Access team and audience), kept in
-  Cloudflare, never in the repo. Previews never answer that API. Workers' free plan allows 100,000 requests a
-  day; every request goes through the Worker (a page load without a cached service worker is a few dozen). If that is
-  ever not enough, Workers Paid is $5 a month.
-- Tests: `node worker/test/routes.test.mjs` and `node worker/test/sites.test.mjs` (in the merge checklist in `AGENTS.md`).
-
-### The owner's Cloudflare clicks (after the step 1 PR is merged and its build has finished)
-
-Do these **after** the merge, not before: until then the Worker still serves the whole repo everywhere.
-For each of `hand.anawj.com`, `prewarmstudy.anawj.com`, `nuhroster.anawj.com`, `apmes.anawj.com` (any order):
-
-1. <https://dash.cloudflare.com> → **Workers & Pages** → the `anawj-preview` Worker → **Settings** → **Domains & Routes**.
-2. **Add** → **Custom domain** → type the address → **Add domain**. Cloudflare makes the DNS record and the certificate
-   itself (anawj.com's DNS is already on Cloudflare); it can take a few minutes.
-3. Nothing else (no DNS record by hand, no redirect rule, nothing in Firebase yet: sign-in domains come with each
-   app's own move in steps 3 to 5).
-
-Check: each address answers with its app (`hand.anawj.com/babies/` the hand assessment, `hand.anawj.com/cmcj/` the
-trainer, `apmes.anawj.com/logbook/?demo`, `apmes.anawj.com/evals/?demo`, `nuhroster.anawj.com/?demo`,
-`prewarmstudy.anawj.com/`); the same apps still work at their old `anawj.com/<folder>/` addresses (GitHub Pages, until
-each one's step makes it a redirect), and `hand.anawj.com/logbook/` is a 404.
-
-Later addresses take the same two clicks once their PR is merged: `anaes.anawj.com` (BIS to DSA) was added by the owner
-and checked on 14 Oct 2026 (`/bis/` 200; `/` and `/logbook/` 404). `ntfroster.anawj.com` (NTF Roster, 15 Oct 2026) is
-waiting for its click; until then the app works on the PR preview and at `anawj.com/ntf-roster/` (GitHub Pages).
-
-## The page editor (decided in step 5)
-
-`anawj.com/edit/` and `edit.anawj.com` stay where they are. The editor shows the page in a same-origin frame and reads and
-marks its text, so it can only edit pages served from its own origin; and `anawj.com` still serves every app folder (the
-GitHub Pages copy), forwarding only top-level visits (the forwards check `top === self`, so they never fire inside the
-editor's frame). So `edit.anawj.com/<old path>` keeps working for every page, suggested edits still name repo paths, and the
-"Suggest an edit" link on the hand pages (`anawj.com/edit/?page=…`) is correct. Do not stop serving the old folders at
-`anawj.com` without moving the editor (it would need to be served on each subdomain, `/edit/` shared like `/design/`, with
-`edit.anawj.com` turned into a lookup from old path to new host).
-
-## Progress
-
-- [x] Plan written (homepage session)
-- [x] 1. Hosting (log1): Worker merged (#352, #354); the four custom domains were added by the owner and checked 13 Oct (each address answers with its app, noindex, stamped versions; other apps' folders are 404s)
-- [x] 2. hand.anawj.com (CMC trainer, hand assessment; run side by side): #357 (`cmcj/`) and #356 (`hand-babies/` to
-  `/babies/`, `hand/` removed), checked live 13 Oct; old addresses forward with path, query and `#` kept (a top-level-only
-  host check in each `index.html`, no Worker change)
-- [x] Shared design folder: every subdomain serves `/design/` and `/nuhsdesign/` (log1, #358); `design/` moved to
-  `nuhsdesign/` (NUHS-style Design, #363), checked live 13 Oct. The old `/design/` path was
-  retired on 13 Oct 2026 (log1): nothing links it, and `design/` is deleted
-- [x] 3. prewarmstudy.anawj.com (Prewarming Webapp): #364, #382, live 13 Oct after the day's case. A phone moves only
-  when nothing is waiting on it. Checked on the owner's phones: an old nurse link lands on the new address, admin
-  password sign-in works, a team phone moves and rejoins in one tap, readings sync between phones
-- [x] 4. nuhroster.anawj.com (NUH Roster): #361, live 13 Oct; old address forwards with path, query and `#` kept, and a
-  browser with a roster saved at the old address is offered a download first. Authorised domain added by the owner;
-  a real Google sign-in works (owner, 13 Oct)
-- [x] 5. apmes.anawj.com (log1, with MedHub Evaluations): logbook #370, evals #367, helper pages and guidebook #368; live 13 Oct. The
-  owner added `apmes.anawj.com` to the Firebase authorised domains and the Google sign-in client's redirect URIs and origin, and
-  a real Google sign-in works at the new address. Old `anawj.com/logbook/` and `/evals/` forward (path, query and `#` kept). Drive and Dropbox backups also work at the new address (the owner added
-  `https://apmes.anawj.com/logbook/` as a redirect URI to the Google Web client and to the Dropbox app).
+`anawj.com/edit/` and `edit.anawj.com` stay on `anawj.com`: the editor frames the page and reads its text, so it can
+only edit pages from its own origin, and `anawj.com` still serves every app folder (forwarding only top-level visits).
+Do not stop serving the old folders there without moving the editor.
