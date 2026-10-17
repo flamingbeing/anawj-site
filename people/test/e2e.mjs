@@ -265,6 +265,60 @@ await page.locator('dialog[open]').getByRole('button', { name: 'Add' }).click();
 await page.getByText('pat.director@example.com').waitFor();
 await axe('pds'); await shot('4-pds');
 
+// 7b. Access: roles kept in the app (add, paste, tick core and CCC, the log; then as Admin staff and as a PD)
+await page.goto(BASE + 'people/?demo=admin#access');
+await page.getByRole('button', { name: 'Paste people' }).waitFor();
+assert.match(await page.textContent('main'), /Demo Admin Staff[\s\S]*Dr Demo PD/);
+await axe('access'); await shot('7-access');
+await page.getByRole('button', { name: 'Add', exact: true }).click();
+await page.locator('dialog[open] input').nth(0).fill('Pat Coordinator');
+await page.locator('dialog[open] input').nth(1).fill('Pat.Coord@example.com');
+await page.getByLabel('Owner').waitFor();   // the owner sees the Owner role
+await page.locator('dialog[open]').getByLabel('Programme coordinator').check();
+await axe('access edit', page);
+await page.locator('dialog[open]').getByRole('button', { name: 'Save' }).click();
+await page.locator('.e-row__meta', { hasText: 'pat.coord@example.com' }).waitFor();
+assert.match(await page.textContent('main'), /admin@example\.com → pat\.coord@example\.com: added as Programme coordinator/);
+// paste: a known faculty member by name, a new person by email and name, someone nobody knows
+await page.getByRole('button', { name: 'Paste people' }).click();
+await page.locator('dialog[open] textarea').fill('Hana Lee\nSam New, sam.new@example.com\nNobody Known');
+await page.getByText(/found by name/).waitFor();
+assert.match(await page.textContent('dialog[open]'), /No email, and no one on the lists has that name/);
+await axe('access paste', page);
+await page.locator('dialog[open]').getByRole('button', { name: 'Give role to 2' }).click();
+await page.locator('dialog.a-alert[open], dialog.e-confirm[open]').getByRole('button', { name: 'Give role' }).click();
+await page.locator('.e-row__meta', { hasText: 'dr.hana.lee@example.com' }).waitFor();
+await page.locator('.e-row__meta', { hasText: 'sam.new@example.com' }).waitFor();
+// tick core and CCC by pasting
+await page.getByRole('button', { name: 'Paste a list to tick' }).click();
+await page.locator('dialog[open] textarea').fill('Dr Ivan Chua\ndr.julia.menon@example.com\nSam New, sam.new@example.com');
+await page.getByText(/Not on the faculty list/).waitFor();
+await page.locator('dialog[open]').getByRole('button', { name: 'Tick 2' }).click();
+await page.locator('dialog.a-alert[open], dialog.e-confirm[open]').getByRole('button', { name: 'Tick' }).click();
+await page.getByText('2 core faculty').waitFor();
+await page.goto(BASE + 'people/?demo=admin#faculty');
+await page.locator('.e-row__title', { hasText: 'Dr Ivan Chua' }).waitFor();
+assert.match(await page.locator('.e-row', { hasText: 'Dr Ivan Chua' }).textContent(), /Core/);
+await page.locator('.e-row', { hasText: 'Dr Kumar Siva' }).click();   // the faculty form has the work email and the two ticks
+await page.locator('dialog[open]').getByLabel('CCC member').check();
+await page.locator('dialog[open]').getByLabel(/Work email/).fill('Kumar.Siva@work.example');
+await page.locator('dialog[open]').getByRole('button', { name: 'Save' }).click();
+await page.locator('.e-row', { hasText: 'Dr Kumar Siva' }).getByText('CCC').waitFor();
+// as Admin staff (not an owner): no Owner role to give; as a PD: the list is read-only, no log
+await page.goto(BASE + 'people/?demo=admin#access');
+await page.getByRole('button', { name: 'Paste people' }).waitFor();
+await page.evaluate(async () => { const c = await import('/evals/js/cloud.js'); c.setDemoRole('staff'); });
+await page.getByText('Recent changes').waitFor();
+await page.getByRole('button', { name: 'Add', exact: true }).click();
+await page.locator('dialog[open] input[type=checkbox]').first().waitFor();
+assert.equal(await page.locator('dialog[open]').getByLabel('Owner').count(), 0);
+await page.locator('dialog[open]').getByRole('button', { name: 'Cancel' }).click();
+await page.evaluate(async () => { const c = await import('/evals/js/cloud.js'); c.setDemoRole('pdonly'); });
+await page.getByText('Only owners, Admin staff and PCs change roles.').waitFor();
+assert.equal(await page.getByRole('button', { name: 'Paste people' }).count(), 0);
+assert.equal(await page.getByText('Recent changes').count(), 0);
+await axe('access as PD');
+
 // 8. Faculty and applications render (evals' own screens)
 await page.goto(BASE + 'people/?demo=admin#faculty');
 await page.getByRole('button', { name: 'Paste list' }).waitFor();

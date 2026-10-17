@@ -296,4 +296,37 @@ await t('reset reseeds', async () => {
   assert.equal((await D.listFaculty()).length, 6);
 });
 
+await t('access: roles, the log and who may change what', async () => {
+  D.resetDemo();
+  as('admin');                                               // the demo admin is an owner
+  assert.equal((await D.getRoles(ADM.email)).owner, true);
+  await D.saveAccess({ email: 'PC@example.com', name: 'A PC', roles: ['pc'], change: 'added as Programme coordinator' });
+  assert.equal((await D.listAccess()).find(a => a.email === 'pc@example.com').roles[0], 'pc');
+  assert.equal((await D.listAccessLog())[0].to, 'pc@example.com');
+  await rejects(D.saveAccess({ email: ADM.email, name: 'x', roles: ['pd'] }), /Owner/);        // not their own owner role
+  await rejects(D.saveAccess({ email: 'x@example.com', name: 'x', roles: ['boss'] }), /unknown role/);
+  as('staff');                                               // Admin staff: grants, but never Owner, and not on themselves
+  assert.deepEqual([(await D.getRoles(D.DEMO_USERS.staff.email)).admin, (await D.getRoles(D.DEMO_USERS.staff.email)).owner], [true, false]);
+  await D.saveAccess({ email: 'pd2@example.com', name: 'PD two', roles: ['pd'] });
+  await rejects(D.saveAccess({ email: 'o@example.com', name: 'o', roles: ['owner'] }), /owner/i);
+  await rejects(D.saveAccess({ email: D.DEMO_USERS.staff.email, name: 'x', roles: ['admin', 'pd'] }), /own roles/);
+  await rejects(D.removeAccess(D.DEMO_USERS.staff.email));
+  await D.removeAccess('pd2@example.com');
+  assert.equal((await D.listFaculty()).length, 6);           // Admin staff still read the faculty list
+  as('pdonly');                                              // a PD looks but cannot change roles or read the log
+  assert.ok((await D.listAccess()).length);
+  await rejects(D.saveAccess({ email: 'q@example.com', name: 'q', roles: ['pd'] }));
+  await rejects(D.listAccessLog());
+  as('resident');
+  await rejects(D.listAccess());
+});
+await t('faculty keep core, ccc and the work email', async () => {
+  as('admin');
+  await D.saveFaculty({ email: 'Dr.Hana.Lee@example.com', name: 'Dr Hana Lee', status: 'ACTIVE', core: true, ccc: false, workEmail: 'Hana_Lee@WORK.example' });
+  const f = (await D.listFaculty()).find(x => x.email === 'dr.hana.lee@example.com');
+  assert.deepEqual([f.core, f.ccc, f.workEmail], [true, false, 'hana_lee@work.example']);
+  await D.saveFaculty({ ...f, workEmail: '' });
+  assert.equal((await D.listFaculty()).find(x => x.email === f.email).workEmail, undefined);
+});
+
 console.log(`${n} demo backend checks passed`);

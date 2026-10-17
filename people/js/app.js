@@ -9,6 +9,7 @@ import { S, h, fill, add, toast, cloud, icon, initials, modal, confirmBox, downl
 import { residentsPane, facultyPane, applicationsPane, clearResidentsCache, pasteDialog, field, input, select, cleanEmail, validEmail, nextRid } from '../../evals/js/ui-admin.js';
 import { residentYear, todayISO } from '../../evals/js/engine.js';
 import { rotationsScreen } from './rotations-ui.js';
+import { accessScreen } from './access-ui.js';
 import { parseIntake, yearIssues, yearCounts, peopleCSV, academicYear, parseRosterList, rosterChanges, itemPatch } from './batch.js';
 
 applyTheme();
@@ -19,16 +20,18 @@ const subEl = document.getElementById('sub');
 const backEl = document.getElementById('back');
 const meEl = document.getElementById('me');
 
-const TABS = [['residents', 'Residents'], ['faculty', 'Faculty'], ['pds', 'PDs'], ['rotations', 'Rotations'], ['applications', 'Applications']];
-const SCREENS = { residents: 'Residents', faculty: 'Faculty', pds: 'Programme directors', applications: 'Applications', rotations: 'Rotations', intake: 'Add a new intake', check: 'Year check', roster: 'Import from the monthly roster' };
+const TABS = [['residents', 'Residents'], ['faculty', 'Faculty'], ['pds', 'PDs'], ['rotations', 'Rotations'], ['access', 'Access'], ['applications', 'Applications']];
+const SCREENS = { residents: 'Residents', faculty: 'Faculty', pds: 'Programme directors', applications: 'Applications', rotations: 'Rotations', access: 'Access', intake: 'Add a new intake', check: 'Year check', roster: 'Import from the monthly roster' };
 const route = () => { const r = location.hash.replace(/^#\/?/, '').split('/')[0]; return SCREENS[r] ? r : 'residents'; };
 const err = e => errText(e);
 
 let data = null;   // { res, fac, pds, apps }
 async function loadAll() {
   const [res, fac, apps, pds] = await Promise.all([cloud.listResidents(), cloud.listFaculty(), cloud.listApplications(), cloud.listPDs()]);
+  // the roles and their log need not stop the other lists loading (the log is for admins and owners only)
+  const [access, log] = await Promise.all([cloud.listAccess().catch(() => []), (S.roles.admin || S.roles.owner) ? cloud.listAccessLog(30).catch(() => []) : null]);
   clearResidentsCache();
-  data = { res, fac, apps, pds };
+  data = { res, fac, apps, pds, access, log };
   S.faculty = fac;
 }
 const reload = async () => { data = null; await render(); };
@@ -47,7 +50,7 @@ backEl.addEventListener('click', () => { location.hash = '#residents'; });
 function account() {
   const m = modal('Account', [
     h('p', {}, S.user.name, h('br'), h('span', { class: 'e-small' }, S.user.email)),
-    h('p', { class: 'e-small' }, S.roles.admin ? 'Admin' : 'Programme director', ' · the same sign-in as the logbook and evals.'),
+    h('p', { class: 'e-small' }, S.roles.owner ? 'Owner' : S.roles.pc ? 'Programme coordinator' : S.roles.admin ? 'Admin' : 'Programme director', ' · the same sign-in as the logbook and evals.'),
     h('p', { class: 'e-small' }, h('a', { href: '../logbook/' }, 'Open the logbook'), ' · ', h('a', { href: '../evals/' }, 'Open evals')),
     h('div', { class: 'e-actions' },
       h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Close'),
@@ -407,7 +410,7 @@ async function render() {
   const pending = data.apps.filter(a => a.status === 'pending').length;
   const tabbed = TABS.some(([id]) => id === r);
   const body = r === 'intake' ? intakeScreen() : r === 'check' ? checkScreen() : r === 'roster' ? rosterScreen() : r === 'rotations' ? rotationsScreen({ demo: cloud.demo }) : r === 'faculty' ? facultyPane({ fac: data.fac, reload })
-    : r === 'pds' ? pdsScreen() : r === 'applications' ? applicationsPane({ apps: data.apps, fac: data.fac, res: data.res, reload }) : residentsScreen();
+    : r === 'access' ? accessScreen({ access: data.access, log: data.log, fac: data.fac, res: data.res, pds: data.pds, reload }) : r === 'pds' ? pdsScreen() : r === 'applications' ? applicationsPane({ apps: data.apps, fac: data.fac, res: data.res, reload }) : residentsScreen();
   // the app kit's large title, then the segmented control for the four lists
   fill(app, h('div', { class: 'e-admin e-wide' },
     h('div', { class: 'e-titlebox' }, h('h1', { class: 'a-title' }, r === 'residents' ? 'People' : SCREENS[r])),

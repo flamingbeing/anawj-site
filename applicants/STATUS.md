@@ -14,6 +14,11 @@ Stage 1 and stage 2 (shared store) built and tested in demo and in the rules emu
   of the rules is in the run's report. Decide: retention (when to delete the responses) and reminders.
 - Nothing to do in Cloudflare: `apmes.anawj.com/applicants/` is served by the existing worker route on merge.
 
+## Update (17 Oct 2026, later)
+
+Added: passport photos, editable questions, a faster questionnaire (fewer taps and scrolls, no comment needed, skip with one tap) and a
+fuller demo. This needs a rules change (photos subcollection, `questions` field), live on merge.
+
 ## What happened (17 Oct 2026)
 
 Built in one session from the owner's Google Form "360 feedback on residency applicants (2027 intake)" (36 applicants, a 1-5 score and a

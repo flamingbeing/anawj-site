@@ -614,6 +614,7 @@ export function facultyPane({ fac, reload }) {
     fill(list, rows.length ? rows.map(f => h('button', { type: 'button', class: 'e-row', onclick: () => editFaculty(f, fac, reload) },
       avatar(f.name || f.email),
       h('span', { class: 'e-row__body' }, h('span', { class: 'e-row__title' }, f.name || '(no name)'), h('span', { class: 'e-row__meta' }, f.email)),
+      f.core ? h('span', { class: 'e-tag' }, 'Core') : null, f.ccc ? h('span', { class: 'e-tag' }, 'CCC') : null,
       f.status === 'INACTIVE' ? h('span', { class: 'e-chip e-chip--cancelled' }, 'Inactive') : null,
       icon('edit', 'e-row__chev'))) : h('p', { class: 'e-small', style: 'padding:12px 16px;margin:0' }, q ? 'No match.' : 'No faculty yet.'));
   };
@@ -638,17 +639,23 @@ function editFaculty(f, fac, reload) {
   const name = input({ value: f?.name || '', autocomplete: 'name', required: true });
   const email = input({ type: 'email', value: f?.email || '', readonly: f ? true : null, required: true, autocapitalize: 'off', spellcheck: 'false' });
   const status = select([['ACTIVE', 'Active'], ['INACTIVE', 'Inactive (can’t be chosen as assessor)']], f?.status || 'ACTIVE');
+  const workEmail = input({ type: 'email', value: f?.workEmail || '', autocapitalize: 'off', spellcheck: 'false', placeholder: 'name@nuhs.edu.sg' });
+  const core = h('input', { type: 'checkbox', id: 'fac-core', checked: !!f?.core }), ccc = h('input', { type: 'checkbox', id: 'fac-ccc', checked: !!f?.ccc });
+  const tick = (box, label) => h('div', { class: 'e-check' }, box, h('label', { for: box.id }, label));
   const msg = h('p', { class: 'e-alert', hidden: true, role: 'alert' });
   const m = modal(f ? 'Edit faculty' : 'Add faculty', h('form', { onsubmit: async e => {
     e.preventDefault();
     const em = cleanEmail(email.value), nm = name.value.trim();
-    const bad = !nm ? 'Enter a name.' : !validEmail(em) ? 'Enter a valid email.' : !f && fac.some(x => x.email === em) ? `${em} is already on the list.` : null;
+    const we = cleanEmail(workEmail.value);
+    const bad = !nm ? 'Enter a name.' : !validEmail(em) ? 'Enter a valid email.' : !f && fac.some(x => x.email === em) ? `${em} is already on the list.`
+      : we && !validEmail(we) ? 'The work email isn’t a valid email.' : null;
     if (bad) { msg.hidden = false; msg.textContent = bad; return; }
-    try { await cloud.saveFaculty({ ...(f || {}), email: em, name: nm, status: status.value }); m.close(); toast(f ? 'Saved' : `${nm} added`); reload(); }
+    try { await cloud.saveFaculty({ ...(f || {}), email: em, name: nm, status: status.value, workEmail: we, core: core.checked, ccc: ccc.checked }); m.close(); toast(f ? 'Saved' : `${nm} added`); reload(); }
     catch (e2) { msg.hidden = false; msg.textContent = 'Couldn’t save. ' + err(e2); }
   } },
     field('Name', name), field('Google account email', email), f ? null : h('p', { class: 'e-hint' }, 'The email they sign in with.'),
-    field('Status', status), msg,
+    field('Status', status), field('Work email (optional)', workEmail), h('p', { class: 'e-hint' }, 'The NUHS address, if it isn’t the one they sign in with.'),
+    h('div', { class: 'e-checks' }, tick(core, 'Core faculty'), tick(ccc, 'CCC member')), msg,
     h('div', { class: 'e-actions' },
       h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: () => m.close() }, 'Cancel'),
       h('button', { class: 'a-btn', type: 'submit' }, f ? 'Save' : 'Add'))));

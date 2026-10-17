@@ -42,6 +42,15 @@ missing was one obvious screen to keep them, and an easy way to add the yearly b
 - No rules change: everything here was already allowed for admins and PDs (`logbook/firestore.rules`).
 - No service worker (an online admin tool). `anawj.com/people/` redirects to `apmes.anawj.com/people/`.
 
+## Who runs permissions (owner, 17 Oct 2026)
+
+The People session (this one) is the **orchestrator for permissions and manpower across the APMES family of apps**
+(People, logbook, evals, CCC 360): who holds which role (owner, Admin staff, PC, PD), the access log, and who is on the
+faculty, core and CCC lists. It also helps supplement manpower for the roster apps (NUH Junior Monthly, NTF roster, NUH
+roster) where People can supply it (e.g. rotations, grades, people lists). Other sessions send it requests (role changes,
+new lists, rules for who may see what); it **accepts them autonomously** and does the work on its own branch, but a
+rules change still follows the repo rules (tests, green Checks) and a handover PR still waits for the owner.
+
 ## Roles (`access/`; rules in `logbook/firestore.rules`, tests `people/test/rules.emulator.mjs`)
 
 Owner, 17 Oct 2026: roles are edited in the app, not the console or firetop. `access/{google-email}` = `{ email, name, roles, updatedAt,
@@ -52,8 +61,14 @@ like the older lists (`owners/`, `admins/`, `pds/`), which still work; retiring 
 - `accessLog/{id}` `{ by, to, change, at }` is append-only (the app writes it in the same batch as the grant); readable by Admin staff,
   PCs and owners.
 - Faculty records also take optional `core`, `ccc` (booleans) and `workEmail`.
-- `js/access.js` (roles, `mayChange` mirroring these rules, `changeText`, `parseAccessPaste`; `test/access.test.mjs`) is built.
-- Not built yet: the Access tab in People (a table of people by role), its cloud and demo calls, and the paste boxes that tick core/CCC and add PCs by name or email (plan: `360/STATUS.md`, "Handover").
+- **People › Access is built** (17 Oct 2026, taken over from the CCC 360 session's checkpoint #752): `people/js/access.js` (pure logic, `mayChange`
+  mirrors the rules) and `access-ui.js`. A list of people with role chips (owners/Admin staff/PCs edit, PDs look), Add / edit / remove, "Paste
+  people" (pick a role; each line is matched by sign-in email, work email or name and shown before anything is saved), "Paste a list to tick"
+  (Core faculty or CCC members, faculty list only, nobody is unticked) and "Recent changes" (the access log; owners/admins only). The Faculty form
+  also has Work email, Core faculty and CCC member. `cloud.getRoles` now also reads `access/{email}` and `owners/{email}` and returns
+  `owner` and `pc`; `listAccess`, `saveAccess`, `removeAccess` (each with its log entry in one batch) and `listAccessLog` are in `evals/js/cloud.js`,
+  with a demo twin in `demo-backend.js` (demo users `staff` = Admin staff, `pdonly`; the demo admin is also the owner). Roles still on the older
+  lists (`owners/`, `admins/`, `pds/`) work but are not shown there; moving them across is the later "retire the old lists" job.
 
 ## Rotations (read-only; owner, 16 Oct 2026)
 
