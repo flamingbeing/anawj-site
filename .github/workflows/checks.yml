@@ -31,7 +31,7 @@ jobs:
       - name: Repo check
         run: node tools/check.mjs
       - name: Unit tests
-        run: for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs ntf-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs nuh-junior-monthly/test/*.test.mjs; do echo "== $f"; node "$f" || exit 1; done
+        run: for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs ntf-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs selection/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs nuh-junior-monthly/test/*.test.mjs; do echo "== $f"; node "$f" || exit 1; done
       - name: Proof-read (pages and documents)
         run: node tools/proofread.mjs
 
@@ -82,6 +82,7 @@ jobs:
           - { name: NTF roster, run: always, cmd: "node ntf-roster/test/e2e.mjs && node ntf-roster/test/tour.e2e.mjs && (node ntf-roster/test/perf.e2e.mjs || node ntf-roster/test/perf.e2e.mjs)" }
           - { name: NUH junior monthly, run: always, cmd: "node nuh-junior-monthly/test/e2e.mjs" }
           - { name: People, run: always, cmd: "node people/test/e2e.mjs" }
+          - { name: Selection, run: always, cmd: "node selection/test/e2e.mjs" }
     name: browser (${{ matrix.name }})
     env:
       GO: ${{ matrix.run == 'always' || needs.changes.outputs[matrix.run] == 'true' }}

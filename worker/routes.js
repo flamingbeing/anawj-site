@@ -24,7 +24,7 @@ export const SITES = {
   // scripts are the same files anawj.com serves; init.json is this host's own copy (authDomain apmes.anawj.com).
   // Ask Claude, the owner's page (behind Cloudflare Access; its API is worker/ask.js)
   'ask.anawj.com': { root: 'ask/' },
-  'apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/people/': 'people/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth/firebase/' } },
+  'apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/people/': 'people/', '/selection/': 'selection/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth/firebase/' } },
 };
 
 // The one folder every host serves as it is: the shared design files (styles only, no data), so a subdomain's apps can
