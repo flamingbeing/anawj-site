@@ -137,6 +137,9 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
   holds for most apps. **Vital apps get more care:** `prewarm/` (live study data) and `logbook/` (live soon): full
   tests before merging, preview links for the owner, and nothing merged into them while a prewarm case is being
   collected if the owner has said one is running.
+- **Save tokens** (owner, 17 Oct 2026; plan in the private repo): while iterating, run only the touched app's e2e spec;
+  run the full suite once before merge. Screenshots only for visual changes: one, viewport-sized. Debug logic with
+  text (logs, asserts), not screenshots. CI already posts PR screenshots, so don't repeat them.
 - **Goal now:** find diverse use cases. Ideas and the longer-term direction are in [ROADMAP.md](ROADMAP.md).
 - **Merging:** merge your own PRs once the checks above pass, then report (with the PR link). Merge by the number the
   PR's creation returned, never a guessed next number (13 Oct 2026: a guess merged another session's PR early). Exceptions: Claude
