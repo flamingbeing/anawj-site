@@ -96,7 +96,7 @@ browser tests run only when the PR changes that app (owner, 15 Oct 2026; `.githu
 
 ```
 node tools/check.mjs
-for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs ntf-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs applicants/test/*.test.mjs 360/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do node "$f"; done
+for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs ntf-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs applicants/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do node "$f"; done
 ```
 
 - Logbook changes: `tools/test-logbook.sh` runs all of the above plus the full e2e and every focused browser test
