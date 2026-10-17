@@ -215,3 +215,4 @@ and GitHub PRs to exchange pushed code and task context.
   where a general rule allows immediate merging.
 - New cloud sessions get the skill through the repository clone. Do not modify an
   active Claude branch just to install these instructions.
+- Token savers: `.claude/settings.json` denies reading `__/` (Firebase hosting files), `vendor/` folders, generated data files (edit their build scripts instead) and the old brainstorm file. Ask the owner if one is really needed.

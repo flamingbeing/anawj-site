@@ -76,6 +76,16 @@
       "Bash(firebase *)",
       "Bash(npx firebase-tools*)",
       "Bash(npx -y firebase-tools*)"
+    ],
+    "deny": [
+      "Read(./__/**)",
+      "Read(**/vendor/**)",
+      "Read(./evals/js/catalogue.js)",
+      "Read(./evals/js/forms.js)",
+      "Read(./logbook/js/demo-seed.js)",
+      "Read(./logbook/js/keywords.js)",
+      "Read(./prewarm/js/headers.js)",
+      "Read(./logbook/ideas/brainstorm-2026-10-13.md)"
     ]
   },
   "hooks": {
