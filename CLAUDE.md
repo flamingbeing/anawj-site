@@ -3,7 +3,6 @@
 @AGENTS.md
 
 The shared instructions are in `AGENTS.md` (imported above). Only Claude Code–specific notes belong in this file.
-If the owner's private notes are attached, start with their hub skill.
 
 ## Firebase and Cloudflare: only on demand, only with the owner's approval
 
