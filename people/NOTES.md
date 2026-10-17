@@ -42,6 +42,18 @@ missing was one obvious screen to keep them, and an easy way to add the yearly b
 - No rules change: everything here was already allowed for admins and PDs (`logbook/firestore.rules`).
 - No service worker (an online admin tool). `anawj.com/people/` redirects to `apmes.anawj.com/people/`.
 
+## Roles (`access/`; rules in `logbook/firestore.rules`, tests `people/test/rules.emulator.mjs`)
+
+Owner, 17 Oct 2026: roles are edited in the app, not the console or firetop. `access/{google-email}` = `{ email, name, roles, updatedAt,
+updatedBy }`, roles from `owner`, `admin` (Admin staff), `pc` (programme coordinator, same powers as Admin staff) and `pd`. A role there counts
+like the older lists (`owners/`, `admins/`, `pds/`), which still work; retiring them is a later, planned job.
+- Owners grant and remove anything. Admin staff and PCs grant admin, pc and pd but never owner, and never change their own record.
+  Nobody drops their own owner role or deletes their own record, so an owner always remains. A PD cannot grant roles.
+- `accessLog/{id}` `{ by, to, change, at }` is append-only (the app writes it in the same batch as the grant); readable by Admin staff,
+  PCs and owners.
+- Faculty records also take optional `core`, `ccc` (booleans) and `workEmail`.
+- Not built yet: the Access pane in People (a table of people by role) and the paste boxes that tick core/CCC and add PCs by name or email.
+
 ## Rotations (read-only; owner, 16 Oct 2026)
 
 People › Rotations shows the department's master block rotation sheet (an .xlsx downloaded from Google Sheets) as a week by
