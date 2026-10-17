@@ -719,5 +719,87 @@ service cloud.firestore {
         && d.answers is map && d.answers.size() <= 200
         && d.updatedAt == request.time;
     }
+
+    // CCC 360 (ccc/): what the programme coordinators (PCs) collect before a CCC meeting. A round is ccc/{round} (title,
+    // open or closed, deadline): admins, PDs and PCs write it; residents, PCs, PDs and admins read it. Each resident writes
+    // only their own scholarly-project entry, ccc/{round}/entries/{email}, and their own nominees for multisource feedback,
+    // ccc/{round}/msf/{email}, while the round is open. Nominees are third parties' contact details, so they sit apart from
+    // the projects so they can be deleted on their own after the round (the app deletes them 60 days after closing).
+    // PCs (cccPCs/{email}, kept by admins and PDs) and PDs read every entry and nominee list; plain admins do not.
+    // ccc/{round}/review/{email} holds the PCs' marks on one resident's nominees (written by PCs and PDs only).
+    function cccResident() {
+      return signedIn() && exists(/databases/$(database)/documents/members/$(me()))
+        && isResident(get(/databases/$(database)/documents/members/$(me())).data.rid);
+    }
+    function cccPC() {
+      return signedIn() && exists(/databases/$(database)/documents/cccPCs/$(me()));
+    }
+    function cccStaff() {
+      return isPD() || cccPC();
+    }
+    function cccOpen(round) {
+      return get(/databases/$(database)/documents/ccc/$(round)).data.status == 'open';
+    }
+    match /cccPCs/{email} {
+      allow get: if isOwner(email);
+      allow list: if isAdmin() || isPD();
+      allow create, update: if (isAdmin() || isPD()) && email == email.lower()
+        && request.resource.data.keys().hasOnly(['name'])
+        && optString(request.resource.data, 'name', 200);
+      allow delete: if isAdmin() || isPD();
+    }
+    match /ccc/{round} {
+      allow read: if isAdmin() || cccStaff() || cccResident();
+      allow create, update: if (isAdmin() || cccStaff()) && round.size() <= 20 && validCccRound(round, request.resource.data);
+      allow delete: if isAdmin() || isPD();
+      match /entries/{email} {
+        allow get: if isOwner(email);
+        allow read: if cccStaff();
+        allow create, update: if isOwner(email) && email == email.lower() && cccResident() && cccOpen(round)
+          && validCccEntry(email, request.resource.data);
+        allow delete: if isPD();
+      }
+      match /msf/{email} {
+        allow get: if isOwner(email);
+        allow read: if cccStaff();
+        allow create, update: if isOwner(email) && email == email.lower() && cccResident() && cccOpen(round)
+          && validCccMsf(email, request.resource.data);
+        allow delete: if cccStaff() || (isOwner(email) && cccOpen(round));
+      }
+      match /review/{email} {
+        allow read: if cccStaff();
+        allow create, update: if cccStaff() && email == email.lower()
+          && request.resource.data.keys().hasOnly(['email', 'marks', 'updatedAt'])
+          && request.resource.data.email == email
+          && request.resource.data.marks is map && request.resource.data.marks.size() <= 40
+          && optNumber(request.resource.data, 'updatedAt');
+        allow delete: if cccStaff();
+      }
+    }
+    function validCccRound(round, d) {
+      return d.keys().hasOnly(['round', 'title', 'status', 'deadline', 'closedAt', 'updatedAt'])
+        && d.round == round
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 200
+        && d.status in ['open', 'closed']
+        && optString(d, 'deadline', 20) && optNumber(d, 'closedAt') && optNumber(d, 'updatedAt');
+    }
+    function validCccEntry(email, d) {
+      return d.keys().hasOnly(['email', 'name', 'noProjects', 'projects', 'admin', 'teaching', 'conferences', 'updatedAt'])
+        && d.email == email
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 120
+        && (!('noProjects' in d) || d.noProjects is bool)
+        && d.projects is list && d.projects.size() <= 30
+        && d.admin is list && d.admin.size() <= 30
+        && d.teaching is list && d.teaching.size() <= 30
+        && d.conferences is list && d.conferences.size() <= 30
+        && d.updatedAt == request.time;
+    }
+    function validCccMsf(email, d) {
+      return d.keys().hasOnly(['email', 'name', 'nominees', 'updatedAt'])
+        && d.email == email
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 120
+        && d.nominees is list && d.nominees.size() <= 20
+        && d.updatedAt == request.time;
+    }
   }
 }
