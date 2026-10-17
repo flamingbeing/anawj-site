@@ -1,8 +1,7 @@
 #!/bin/bash
 # Firestore rules tests for logbook/firestore.rules (logbook, evals, applicants and CCC 360 suites), prewarm/firestore.rules, nuh-roster/firestore.rules, ntf-roster/firestore.rules and nuh-junior-monthly/firestore.rules in the local emulator, with fake
 # accounts and the demo project "demo-logbook": nothing reaches the live Firebase projects and no sign-in is needed.
-# Needs Java and, once per machine, the test tools (the cloud environment's setup script installs them there):
-#   npm install --prefix ~/.cache/anawj-rules firebase-tools@13 @firebase/rules-unit-testing firebase
+# Needs Java. The test tools install on first use (below), once per machine, into ~/.cache/anawj-rules.
 set -u
 cd "$(dirname "$0")/.."
 TOOLS="${RULES_TOOLS:-$HOME/.cache/anawj-rules}"
