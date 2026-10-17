@@ -70,6 +70,10 @@ like the older lists (`owners/`, `admins/`, `pds/`), which still work; retiring 
   with a demo twin in `demo-backend.js` (demo users `staff` = Admin staff, `pdonly`; the demo admin is also the owner). Roles still on the older
   lists (`owners/`, `admins/`, `pds/`) work but are not shown there; moving them across is the later "retire the old lists" job.
 
+Lessons (Access): the demo twin (`evals/js/demo-backend.js`) must use one `adminEmail`/`pdEmail` helper everywhere; a role kept only in `access/`
+failed `listFaculty` until every `s.admins[...]` check went through it. In e2e, a hash-only `goto` does not reload, so a closing dialog can
+still be in the page: pick elements by class, not by text alone.
+
 ## Rotations (read-only; owner, 16 Oct 2026)
 
 People › Rotations shows the department's master block rotation sheet (an .xlsx downloaded from Google Sheets) as a week by
