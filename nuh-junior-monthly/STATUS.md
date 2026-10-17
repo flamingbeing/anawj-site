@@ -1,15 +1,14 @@
 # NUH Junior Monthly: status
 
-Last updated: 2026-10-17 by Claude Code (jm1).
+Last updated: 2026-10-17 (later) by Claude Code (jm1).
 
 ## Now
 - Each session keeps its own line in `status/<session>.md` (`status/jm1.md`); read it before starting, edit only yours.
 
 ## Waits on the owner
-- **firetop's two jobs (sent 17 Oct 2026; reply pending):** (1) a real-Google dry run of "Create a new Google Sheet" with `tools/sheetgen-dryrun.mjs`
-  (a throwaway file, then deleted); (2) back up the owner's Drive folder of monthly sheets into the private repo as .xlsx with formulas and
-  colours. Real Google sign-in and the real Sheets API are otherwise untested (everything in the app used a fake): do the first real runs on a copy,
-  never the rosterer's live sheet.
+- **Decision on the Drive permission for generated sheets:** option A (the app makes its own shared folder) or B (the owner picks the existing folder with Google's file picker); see Next 0a. Either way the owner makes a one-time change on the Google consent screen (the app cannot).
+- **The owner's go** on building 0a. The rosterers' editor emails go in the app's box (not in this repo).
+- Firetop's results (17 Oct 2026): the real-Google dry run passed (28, 30 and 31 days, 14 to 20 people); the Drive sheets are backed up in the private repo; the .xlsx export keeps formulas, colours and conditional-format order but loses protected ranges (details in the owner's private notes).
 - Answers for the R1 to R3 rosterer (and the month's sheet from scratch): what the leave bands (SR, JR, non-resident rows in the manpower block) are meant
   to cover; whether a holiday on a Friday or Saturday should add points; where the consultants' rows come from (last month's sheet or People).
 - The People app question: who creates the month's sheet (now: copied by hand from last month's) and whether the master rotations sheet's FELLOWS,
@@ -22,6 +21,11 @@ Last updated: 2026-10-17 by Claude Code (jm1).
 - Reminders set for the owner: 23 Oct (balance over a posting that straddles two months), 16 Dec (thinning old saves).
 
 ## Next (agreed order)
+0a. **Generated sheet: locks, formula tabs, Drive permission (planned with the owner 17 Oct 2026; not built).**
+   - *Locks*: the Request tab is locked by default (rosterers can edit) and opened for the juniors while they place requests, then locked again; the Junior Call Roster and WR / Premed Roster tabs are locked all the time; the Leave Waitlist tab is always open. Build: protected ranges in the generated request (`addProtectedRange`; Sheets scope is enough), an editor-emails box in the app (the owner may later give rosterers a role in People; the app can read People only through an agreed route, to plan with the People sessions), and an *Open for requests / Lock* button.
+   - *Formula tabs*: the Junior Call Roster and WR / Premed Roster tabs are pure `IFERROR(INDEX(Request!C:C, MATCH("R1", Request!<day column>, 0), 0), "")` lookups (every cell), so the generator writes them as formulas and they fill from the Request tab; the Leave Waitlist tab is empty. Map each block's day columns from a real tab (the private notes have the backups) for 28 to 31 days; keep formulas, never values.
+   - *Drive permission*: `drive.file` (files the app created) is the narrow choice. It cannot see existing folders, so either (A, recommended) the app creates its own folder once, sets it to anyone with the link can edit and files each month's sheet in it, or (B) the owner picks the existing folder with Google's file picker (needs a picker developer key). It needs a one-time scope change on the Google consent screen by the owner (give the exact clicks), and each signed-in person approves once.
+   - *Still manual*: public holidays, the block rotations until 0b, opening/locking the Request tab, listing editors, checking the legend and month text. A checklist panel after generating should say so. Not yet copied: cell notes, column widths, fonts, number formats, carry-over from last month.
 0. **Waitlist step 2: revisit in a week (owner, 16 Oct 2026: "maybe in a week"; about 23 Oct).** The plan: the Leave tab (read only, #733) gets
    status changes (a person's waitlist colour set from the app, written back to the sheet with the same "check nothing changed" safeguard
    and an undo) and a new **daily rosterer** member role who may change waitlist status only (the daily rosterers run the NUH daily
@@ -79,6 +83,7 @@ Last updated: 2026-10-17 by Claude Code (jm1).
 - #703 The import moves people to their new grade. #702 A month is saved as one JSON string (index-entry limit).
 
 ## Decisions
+- 17 Oct 2026: generated sheets should copy the department's locks (Request locked by default and opened for requests; call roster and WR / premed tabs locked; Leave Waitlist open) and make the call roster and WR / premed tabs as formulas that read the Request tab; the owner wants the Drive permission added first because the app needs more permissions to work on its own (option A or B still to choose) (owner).
 - 17 Oct 2026: no separate "good to have" tier: a preference's weight is its priority (Check can order by it); rules get sets that switch off together later (e.g. MedHub), not built yet (owner).
 - 17 Oct 2026: the R1 to R3 rosterer's rules: `R_` is the same as `R`; `X/NP` counts as one request; more than 4 requests or more than 2 no-premed in a month is flagged; at most one call request a
   day from a pool; strong / weak MO1, MO2 and MO3 pools come from her manpower list (People › Tags import); Fill's R1 to R3 ticks turn the R1 to R3 rules on (owner).

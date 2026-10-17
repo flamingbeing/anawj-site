@@ -1,12 +1,11 @@
 # NUH junior monthly: session jm1 (Claude Code, cloud)
 
-Last updated: 2026-10-17.
+Last updated: 2026-10-17 (later).
 
 ## Now
-- Open PR #750 (the dry-run script; tools and notes only) on branch `ccr-ed5de555-h993cd`; merge it when its Checks are green, then reset the branch to main.
-- Waiting on firetop's reply to two jobs (the real-Google dry run, and the Drive folder backup into the private repo). If the dry run fails, fix `js/sheetgen-gsheets.js` first
-  (the request body), then rerun `tools/sheetgen-dryrun.mjs`.
-- Resume with STATUS.md "Next": item 0 (waitlist step 2, revisit about 23 Oct) and 0b (start a month from the master rotations).
+- Nothing open: #750 (the dry-run script) is merged and the session branch `ccr-ed5de555-h993cd` is level with main. No code is half-done.
+- Planning with the owner, **not yet built** (waiting on the owner's go on option A below): sheet locks, the formula tabs and the Drive permission for generated sheets (STATUS.md "Next" 0a).
+- Resume with STATUS.md "Next": 0a, then 0b (start a month from the master rotations), then 0 (waitlist step 2, about 23 Oct).
 
 ## Things this session set up that a later session should know
 - Reminders (scheduled tasks in this session's account): thinning old saves on 16 Dec 2026; balancing across a posting that straddles two months on 23 Oct 2026. If this session is
