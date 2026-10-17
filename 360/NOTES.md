@@ -62,6 +62,23 @@ after any change to them: a first version broke the evals decline and reassign c
   with `textContent`, never as HTML.
 - **Peers are typed in, not picked.** Residents can read the faculty list but not the residents' list (rules), so only senior doctors
   (and others) are suggested from faculty. Opening the residents' list to residents would expose emails, so it is not done.
-- Staff (PD, Admin staff, PC) who are not residents see a placeholder until the coordinators' view is built.
+- Staff (PD, Admin staff, PC; `S.roles.admin/pd/owner` from `getRoles`, which reads `access/`) who are not residents go straight to the coordinators' view; residents who are also staff get a "Coordinators' view" button.
 - Tests: `node 360/test/model.test.mjs`, `node 360/test/e2e.mjs` (demo at 390 px, axe on each screen, a send and a change, carry-over,
   a closed round, nothing outside the site reached).
+
+## The coordinators' view (`js/staff.js`, 17 Oct 2026)
+
+- **Rounds:** open a new round (name, optional send-by date; the id is `r<year>-<month>`, made unique), edit it, close it (asks first; stores
+  `closedAt`), reopen it (clears `closedAt`). Residents see the newest open round; the app warns if more than one is open.
+- **A round:** who has sent (active residents from People, plus anyone who sent but is not on the list), the nominees to check, a filter
+  (Everyone / Not sent / To check), CSV exports of the nominees and of the projects, and a button that copies the emails of residents who
+  have not sent (to chase them).
+- **One resident:** their projects and lists, and each nominee with Checked / Ask for a different person, kept in `review/`. "Email" is a
+  `mailto:` link to the nominee with the text filled in (`mailto` in `model.js`; edit it in the mail app) and marks them Emailed. The app
+  never sends mail.
+- **Retention:** nominees' contact details are deleted 60 days after a round closes. The check (`purgeExpired`) runs whenever staff open
+  the app; a round with no close time is never purged by guesswork. Staff can also delete one resident's nominees, or a round's, at once.
+  Projects stay. Deleting a whole round is not offered; if it ever is, delete its nominees first (rules do not cascade).
+- **CSV safety:** every cell that starts with `=`, `+`, `-`, `@` or a tab gets a leading apostrophe (`csvCell`); all resident text is put on
+  the page as text only. Tested with hostile names.
+- **Not built:** a reminder email, the resident's view of the coordinators' marks (deliberately never shown), and a custom email text.

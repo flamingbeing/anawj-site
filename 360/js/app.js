@@ -1,7 +1,7 @@
 // APMES CCC 360: before a CCC meeting the programme coordinators (PCs) need each resident's scholarly projects and the
 // people who should give them multisource feedback (MSF). This is the resident's half: fill both in, send, and change
 // them until the PCs close the round. It reuses evals' sign-in and people lists (../../evals/js/), so the residents are
-// the ones already in People; what is new is here, in model.js and in store.js. The coordinators' half comes next.
+// the ones already in People; what is new is here, in model.js and in store.js. The coordinators' half is staff.js.
 // With ?demo: a made-up round and people, the evals demo sign-in, and nothing leaves the browser.
 
 import { S, h, fill, toast, cloud, modal, confirmBox, empty, applyTheme, errText, initials, debounce, row } from '../../evals/js/ui-core.js';
@@ -10,6 +10,7 @@ import {
   problems, warnings, progress, snapshot, suggestFaculty, contactEmail, monthText, dayText, pastDeadline,
 } from './model.js';
 import * as store from './store.js';
+import { staffScreen } from './staff.js';
 
 applyTheme();
 
@@ -33,20 +34,18 @@ let sentSnap = null;   // snapshot of what was last sent (null: nothing sent yet
 let sentAt = 0;
 let carried = null;    // the earlier round whose projects were carried over, if any
 let faculty = [];      // for the nominee picker
-let staffRoles = [];   // roles in access/ (staff see the coordinators' view)
 
 const isResident = () => !!S.roles.resident;
-const isStaff = () => !!(S.roles.admin || S.roles.pd) || staffRoles.some(r => ['owner', 'admin', 'pc', 'pd'].includes(r));
+const isStaff = () => !!(S.roles.admin || S.roles.pd || S.roles.owner);   // PDs, Admin staff and PCs (getRoles reads access/ too)
 const isOpen = () => round?.status === 'open';
 const locked = () => !isOpen();
 
 // ---------- loading ----------
 
 async function loadAll() {
-  rounds = []; round = null; faculty = []; staffRoles = [];
+  rounds = []; round = null; faculty = [];
   entry = blankEntry(); nominees = []; sentSnap = null; sentAt = 0; carried = null;
   if (!S.user) return;
-  try { staffRoles = await store.myRoles(S.user.email); } catch (e) { console.warn('Roles unavailable', e); }
   if (!isResident()) return;
   rounds = await store.listRounds();
   round = rounds.find(r => r.status === 'open') || rounds[0] || null;
@@ -70,17 +69,18 @@ const dirty = () => sentSnap !== snapshot(entry, nominees);
 // ---------- routing ----------
 
 const route = () => {
-  const a = location.hash.replace(/^#\/?/, '').split('/')[0];
-  return ['projects', 'nominees', 'review'].includes(a) && round && isResident() ? a : 'home';
+  const [a, ...rest] = location.hash.replace(/^#\/?/, '').split('/');
+  if (a === 'staff' && isStaff()) return { name: 'staff', parts: rest };
+  return { name: ['projects', 'nominees', 'review'].includes(a) && round && isResident() ? a : 'home' };
 };
 const go = hash => { location.hash = hash; };
 
-function header(title, { back = false } = {}) {
+function header(title, { back = false, to = '#' } = {}) {
   titleEl.textContent = title;
   document.title = title === 'APMES CCC 360' ? title : `${title} · APMES CCC 360`;
   subEl.textContent = 'Demo'; subEl.hidden = !cloud.demo;
   backEl.hidden = !back;
-  backEl.onclick = () => go('#');
+  backEl.onclick = () => go(to);
   fill(meEl, S.user ? h('button', { type: 'button', class: 'a-bar-btn e-appbar__me', title: S.user.email, 'aria-label': 'Account', onclick: account }, h('span', { class: 'a-avatar', 'aria-hidden': 'true' }, initials(S.user.name || S.user.email))) : null);
 }
 
@@ -117,9 +117,8 @@ function homeScreen() {
   header('APMES CCC 360');
   if (!S.user) return;
   if (!isResident()) {
-    return fill(app, isStaff()
-      ? empty('The coordinators’ view is coming', 'Residents fill in their projects and feedback nominees here. You will see everyone’s entries, mark nominees and export the list on this page soon.')
-      : empty('For residents', `${S.user.email} isn’t on the resident list. Ask a coordinator to check People.`, h('a', { class: 'a-btn', href: '../evals/' }, 'Open evals')));
+    if (isStaff()) return go('#staff');   // coordinators and directors who are not residents go straight to their view
+    return fill(app, empty('For residents', `${S.user.email} isn’t on the resident list. Ask a coordinator to check People.`, h('a', { class: 'a-btn', href: '../evals/' }, 'Open evals')));
   }
   if (!round) return fill(app, empty('No round open', 'The programme coordinators open a round before each CCC meeting. You will see it here.'));
   const p = progress(entry, nominees);
@@ -141,7 +140,8 @@ function homeScreen() {
     h('div', { class: 'e-card e-card--flush' }, h('div', { class: 'e-list' },
       row({ name: 'P', title: 'Scholarly projects', meta: 'Projects, committees, teaching and conferences', chip: pChip, onclick: () => go('#projects') }),
       row({ name: 'F', title: 'Feedback nominees', meta: GROUPS.map(g => `${c[g.id]} ${g.label.toLowerCase()}`).join(' · '), chip: nChip, onclick: () => go('#nominees') }))),
-    isOpen() ? h('div', { class: 'e-actions' }, h('button', { class: 'a-btn e-go', type: 'button', onclick: () => go('#review') }, sentSnap ? 'Review and send again' : 'Review and send')) : null));
+    isOpen() ? h('div', { class: 'e-actions' }, h('button', { class: 'a-btn e-go', type: 'button', onclick: () => go('#review') }, sentSnap ? 'Review and send again' : 'Review and send')) : null,
+    isStaff() ? h('div', { class: 'e-actions e-actions--start' }, h('a', { class: 'a-btn a-btn--tinted', href: '#staff' }, 'Coordinators’ view')) : null));
 }
 
 // ---------- scholarly projects ----------
@@ -287,9 +287,10 @@ async function render() {
   const n = ++seq;
   if (!S.user) return;
   const r = route();
-  if (r === 'home') homeScreen();
-  else if (r === 'projects') projectsScreen();
-  else if (r === 'nominees') nomineesScreen();
+  if (r.name === 'staff') { await staffScreen(r.parts, { app, header, go, render }); if (n !== seq) return; }
+  else if (r.name === 'home') homeScreen();
+  else if (r.name === 'projects') projectsScreen();
+  else if (r.name === 'nominees') nomineesScreen();
   else reviewScreen();
   if (n !== seq) return;
   window.aRefreshBar?.();

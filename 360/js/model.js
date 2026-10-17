@@ -157,3 +157,86 @@ export function demoRound(today = new Date()) {
   const d = new Date(today.getTime() + 21 * 86400000);
   return { round: 'demo', title: 'CCC round (demo)', status: 'open', deadline: d.toISOString().slice(0, 10), updatedAt: today.getTime() };
 }
+
+// ---- the coordinators' side ----
+
+export const PURGE_DAYS = 60;    // nominees' contact details are deleted this long after a round closes
+export const MARKS = [['ok', 'Checked'], ['swap', 'Ask for a different person'], ['sent', 'Emailed']];
+export const markLabel = m => (MARKS.find(([k]) => k === m) || [, 'To check'])[1];
+
+// A round's id from the month it opens (r2026-10), made unique among `taken`; at most 20 characters (the rules).
+export function roundId(taken = [], now = new Date()) {
+  const base = 'r' + now.toISOString().slice(0, 7);
+  const t = new Set(taken);
+  if (!t.has(base)) return base;
+  for (let i = 2; i < 100; i++) if (!t.has(base + '-' + i)) return base + '-' + i;
+  return base + '-' + Math.random().toString(36).slice(2, 6);
+}
+export function cleanRoundInput({ title, deadline } = {}) {
+  const t = str(title, 200);
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(String(deadline || '')) ? String(deadline) : '';
+  return t ? { title: t, deadline: d } : null;
+}
+// when a closed round's nominees are due to be deleted (ms), or 0 if the round is open or has no close time
+export function purgeAt(round) {
+  if (!round || round.status !== 'closed') return 0;
+  const at = Number(round.closedAt) || Number(round.updatedAt) || 0;
+  return at ? at + PURGE_DAYS * 86400000 : 0;
+}
+export const purgeDue = (round, now = Date.now()) => { const at = purgeAt(round); return !!at && at <= now; };
+
+// One row per active resident (and anyone who sent but is not on the list): who has sent, and how the nominees stand.
+// residents: [{ rid, name, email, status, rYear? }]; entries/msfs/reviews: { [email]: doc }.
+export function roster(residents, entries = {}, msfs = {}, reviews = {}) {
+  const rows = []; const seen = new Set();
+  const row = (email, name, extra = {}) => {
+    const e = entries[email] ? cleanEntry(entries[email]) : null;
+    const ns = cleanNominees(msfs[email]?.nominees);
+    const marks = reviews[email]?.marks || {};
+    const count = { ok: 0, swap: 0, sent: 0, todo: 0 };
+    for (const n of ns) count[marks[n.id] in count ? marks[n.id] : 'todo']++;
+    rows.push({ email, name, sent: !!(entries[email] || msfs[email]), projects: e ? e.projects.length : 0, noProjects: !!e?.noProjects, nominees: ns.length, marks: count, ...extra });
+    seen.add(email);
+  };
+  for (const r of residents || []) {
+    const email = lc(r.email);
+    if (!email || seen.has(email) || r.status !== 'ACTIVE') continue;
+    row(email, r.name || email, { rid: r.rid, rYear: r.rYear });
+  }
+  for (const email of new Set([...Object.keys(entries), ...Object.keys(msfs)])) if (!seen.has(email)) row(email, entries[email]?.name || msfs[email]?.name || email, { extra: true });
+  return rows.sort((a, b) => (a.sent - b.sent) || String(a.name).localeCompare(String(b.name)));
+}
+export const rosterCounts = rows => ({ total: rows.length, sent: rows.filter(r => r.sent).length, nominees: rows.reduce((n, r) => n + r.nominees, 0), toCheck: rows.reduce((n, r) => n + r.marks.todo, 0) });
+
+// ---- CSV and email links ----
+
+// A spreadsheet runs a cell that starts with = + - @ as a formula, so those get a leading apostrophe.
+export function csvCell(v) {
+  let s = String(v ?? '').replace(/\r?\n/g, ' ');
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return /[",]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+const csv = rows => rows.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
+// items: [{ resident: { name, email }, nominees: [...], marks: {} }]
+export function nomineesCSV(round, items) {
+  const rows = [['Round', 'Resident', 'Resident email', 'Group', 'Nominee', 'Nominee email', 'Status']];
+  for (const it of items) for (const n of it.nominees) rows.push([round.title, it.resident.name, it.resident.email, GROUP[n.group]?.one || n.group, n.name, n.email, markLabel(it.marks?.[n.id])]);
+  return csv(rows);
+}
+export function projectsCSV(round, items) {
+  const rows = [['Round', 'Resident', 'Resident email', 'Kind', 'Title or line', 'Supervisor', 'Status', 'Start', 'End', 'Notes']];
+  for (const it of items) {
+    const e = cleanEntry(it.entry);
+    if (e.noProjects) rows.push([round.title, it.resident.name, it.resident.email, 'Scholarly project', 'None to report', '', '', '', '', '']);
+    for (const p of e.projects) rows.push([round.title, it.resident.name, it.resident.email, 'Scholarly project', p.title, p.supervisor, p.status, p.start, p.end, p.note]);
+    for (const l of LISTS) for (const line of e[l.key]) rows.push([round.title, it.resident.name, it.resident.email, l.label, line, '', '', '', '', '']);
+  }
+  return csv(rows);
+}
+// a mailto: link to one nominee (the coordinator edits the text in their mail app)
+export function mailto(nominee, residentName, round) {
+  const subject = `Multisource feedback for ${residentName}`;
+  const body = `Dear ${nominee.name},\n\n${residentName} has nominated you to give multisource feedback ahead of the Clinical Competency Committee meeting (${round?.title || 'CCC'}). The programme coordinators will send you the feedback form shortly. Thank you for your time.\n\nProgramme coordinators`;
+  return `mailto:${encodeURIComponent(nominee.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+export const emailList = list => [...new Set((list || []).map(x => lc(x)).filter(x => EMAIL_RE.test(x)))].join(', ');
