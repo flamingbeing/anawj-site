@@ -198,3 +198,11 @@ export async function undoChanges(source, lay, changes) {
   const bad = ours.filter(c => norm(back.get(c.cell)) !== norm(c.from));
   return { restored: ours, skipped, verified: !bad.length };
 }
+
+// Make a brand-new spreadsheet from a body built by sheetgen-gsheets.js (one call: values, formulas, colours, merges and
+// colour rules). Needs only the Sheets scope the app already asks for; the new file lands in the signed-in person's Drive.
+// Returns { id, url, gid }.
+export async function createSpreadsheet(body) {
+  const j = await call(`${API.replace(/\/$/, '')}?fields=${encodeURIComponent('spreadsheetId,spreadsheetUrl,sheets.properties.sheetId')}`, { method: 'POST', body });
+  return { id: j.spreadsheetId, url: j.spreadsheetUrl, gid: String((j.sheets && j.sheets[0] && j.sheets[0].properties.sheetId) || 0) };
+}
