@@ -3,7 +3,7 @@
 Short and current, like `logbook/STATUS.md` (same layout and rules). Lasting rules and lessons go in `NOTES.md`.
 Each session edits only its own line under **Now**; update with `/save-state` (Claude Code) or `$save-state` (Codex).
 
-Last updated: 2026-10-14 by Claude Code, Evals 1 (evals1).
+Last updated: 2026-10-17 by Claude Code, Evals 1 (evals1).
 
 ## Now
 
@@ -29,6 +29,8 @@ Read them all before starting; edit only yours.
 
 ## Recently done
 
+- #565 App version and "Get the latest version" at the bottom of More (small print; clears only evals' saved copy). The
+  repo rule for it is in `AGENTS.md`; a browser test for both lines is not added yet.
 - 14 Oct batch (5 h improvement run, all merged unless noted): #406 don't lose unsent work, plain errors;
   #409 assessor sign-in from a link (WhatsApp browser, `?as=`, wrong account); #411 Email/WhatsApp reminders;
   #412 Progress "Ask for next", filter, early-R1 deadline; #413 PD cohort sort, committee CSV, flags by resident,
