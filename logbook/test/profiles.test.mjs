@@ -7,7 +7,9 @@ const PARTS = ['interesting', 'parsed', 'sugg', 'recent', 'still', 'groupsave', 
 
 // the presets: Basic leaves out the extras (not Reflect), logbook only Reflect too, Personal the APMES parts
 {
-  for (const k of ['grid', 'analytics', 'reflExtras', 'case:sugg', 'case:recent', 'case:still', 'case:plan']) assert.equal(presetOn('basic', k), false, k);
+  for (const k of ['grid', 'reflExtras', 'case:sugg', 'case:recent', 'case:still', 'case:plan']) assert.equal(presetOn('basic', k), false, k);
+  // full Analytics in every profile (owner, 15 Oct 2026)
+  for (const m of ['logbook', 'basic', 'advanced', 'personal', 'faculty']) assert.equal(presetOn(m, 'analytics'), true, m);
   assert.equal(presetOn('basic', 'reflect'), true);
   assert.equal(presetOn('logbook', 'reflect'), false);
   for (const k of SWITCH_KEYS.filter(k => !OPT_IN.includes(k))) { assert.equal(presetOn('advanced', k), true, k); assert.equal(presetOn('faculty', k), true, k); }
@@ -30,7 +32,8 @@ const PARTS = ['interesting', 'parsed', 'sugg', 'recent', 'still', 'groupsave', 
 {
   const old = { mode: 'basic', basicOn: ['grid', 'case:quick'], caseHide: ['plan', 'parsed'] };
   assert.equal(shownIn(old, 'basic', 'grid'), true);
-  assert.equal(shownIn(old, 'basic', 'analytics'), false);
+  assert.equal(shownIn(old, 'basic', 'analytics'), true, 'Analytics is on in every profile now');
+  assert.equal(shownIn(old, 'basic', 'reflExtras'), false);
   assert.equal(shownIn(old, 'basic', 'case:sugg'), true, 'an older case:quick turned both halves on');
   assert.equal(shownIn(old, 'basic', 'case:recent'), true);
   assert.equal(shownIn({ mode: 'basic', basicOn: ['case:sugg'] }, 'basic', 'case:recent'), false, 'the halves apart');
@@ -100,7 +103,7 @@ const PARTS = ['interesting', 'parsed', 'sugg', 'recent', 'still', 'groupsave', 
   const basic = { mode: 'basic' };
   const toAdv = switchChanges(basic, 'basic', 'advanced');
   assert.deepEqual(toAdv.off, []);
-  assert.deepEqual(toAdv.on, ['grid', 'analytics', 'reflExtras', 'case:interesting', 'case:sugg', 'case:recent', 'case:groupsave', 'case:plan', 'case:still']);
+  assert.deepEqual(toAdv.on, ['grid', 'reflExtras', 'case:interesting', 'case:sugg', 'case:recent', 'case:groupsave', 'case:plan', 'case:still']);
   const toPersonal = switchChanges(basic, 'basic', 'personal');
   assert.deepEqual(toPersonal.off, ['targets', 'totals', 'portfolio', 'year', 'reflHeadings', 'saveToast', 'apmesTitle']);
   assert.ok(!toPersonal.on.includes('case:still'), 'Still needed stays off going from Basic to Personal');
@@ -110,25 +113,26 @@ const PARTS = ['interesting', 'parsed', 'sugg', 'recent', 'still', 'groupsave', 
   assert.deepEqual(switchChanges({ mode: 'personal', show: { targets: true } }, 'personal'), { on: [], off: ['targets'] });
 }
 
-// tabs: Analytics starts in More everywhere (Case, Logbook, Totals, Reflections, More); Personal puts Notes on the bar,
-// Faculty / PCs the Admin portal (Case logs and Analytics in More); Basic: logbook only keeps Reflections in More
+// tabs (owner, 15 Oct 2026): logbook only Case · Logbook · Totals · More; Basic + Reflections; Advanced + Reflections ·
+// Analytics; Personal Case · Logbook · Notes · Reflections · Analytics · More; Faculty / PCs Totals · Admin · More
 {
   assert.ok(!offBar('personal').includes('notes'));
   assert.ok(offBar('advanced').includes('notes'));
   assert.ok(!offBar('faculty').includes('totals') && !offBar('faculty').includes('admin') && offBar('faculty').includes('caselogs') && offBar('faculty').includes('progress'));
-  assert.ok(offBar('advanced').includes('progress') && !offBar('advanced').includes('totals'));
+  assert.ok(!offBar('advanced').includes('progress') && !offBar('advanced').includes('totals'));
+  assert.ok(!offBar('personal').includes('progress') && !offBar('personal').includes('notes'));
   assert.ok(offBar('basic').includes('progress') && !offBar('basic').includes('reflect'));
   assert.ok(offBar('logbook').includes('reflect'));
   assert.equal(presetHidesTab('faculty', 'log'), true);
   assert.equal(tabsAfter(null, 'advanced', 'basic'), null, 'a device with no saved tabs follows the profile by itself');
   assert.deepEqual(new Set(tabsAfter(['account'], 'advanced', 'basic')), new Set(['account', 'progress']));
   const personal = new Set(tabsAfter(['progress', 'reflect', 'account', 'notes'], 'logbook', 'personal'));
-  assert.ok(!personal.has('notes') && personal.has('progress') && !personal.has('reflect') && personal.has('account'), 'Analytics stays in More');
+  assert.ok(!personal.has('notes') && !personal.has('progress') && !personal.has('reflect') && personal.has('account'), 'Personal puts Notes and Analytics on the bar');
   const fac = new Set(tabsAfter([], 'advanced', 'faculty'));
   assert.ok(fac.has('log') && fac.has('logbook') && fac.has('reflect') && fac.has('caselogs') && fac.has('progress') && !fac.has('totals') && !fac.has('admin'));
   // tabs placed by hand that neither profile moves stay put: Notes on the bar and Logbook hidden, Basic to Advanced
   const hand = ['account', 'settings', 'recovery', 'data', 'progress', 'caselogs', 'admin', 'logbook'];
-  assert.deepEqual(new Set(tabsAfter(hand, 'basic', 'advanced')), new Set(hand), 'Analytics stays in More');
+  assert.deepEqual(new Set(tabsAfter(hand, 'basic', 'advanced')), new Set(hand.filter(x => x !== 'progress')), 'Advanced puts Analytics on the bar; the rest stay put');
   assert.deepEqual(tabsAfter(hand, 'basic', 'basic'), hand, 'the same profile moves nothing');
   // Personal to Advanced takes Notes back into More (Personal put it on the bar)
   assert.ok(tabsAfter(['account'], 'personal', 'advanced').includes('notes'));
@@ -153,10 +157,10 @@ const PARTS = ['interesting', 'parsed', 'sugg', 'recent', 'still', 'groupsave', 
 {
   const old = P.legacyShow({ mode: 'basic', basicOn: ['grid', 'case:plan'], caseHide: [] }, 'basic');
   assert.deepEqual(old, { grid: true, 'case:plan': true });
-  const show = replaceShow({ grid: false, 'case:plan': false, analytics: true }, old);
+  const show = replaceShow({ grid: false, 'case:plan': false, analytics: false }, old);
   assert.equal(shownIn({ basicOn: ['grid', 'case:plan'], show }, 'basic', 'grid'), true);
   assert.equal(shownIn({ show }, 'basic', 'case:plan'), true);
-  assert.equal(shownIn({ show }, 'basic', 'analytics'), false, 'the account’s other switches go back to the profile');
+  assert.equal(shownIn({ show }, 'basic', 'analytics'), true, 'the account’s other switches go back to the profile');
   assert.deepEqual(P.legacyShow({ mode: 'advanced', caseHide: ['quick', 'plan'] }, 'advanced'), { 'case:sugg': false, 'case:recent': false, 'case:plan': false });
   assert.equal(P.legacyShow({ show: { grid: true }, basicOn: ['grid'] }, 'basic'), null, 'a file with show uses its show');
   assert.equal(P.legacyShow({ weekStart: 0 }, 'basic'), null);

@@ -687,3 +687,39 @@ console.log('engine tests passed');
  assert.equal(versionLabel('no-sw'),'no-sw');
  assert.equal(versionLabel(''),'unknown');
 }
+
+// an age over 120 years is a number, not an age (15 Oct 2026)
+{
+  const { splitAge, humanAge } = await import('../js/engine.js');
+  assert.deepEqual(splitAge('150M fake TKR'), { age: '', rest: '150M fake TKR' });
+  assert.deepEqual(splitAge('999 lap chole'), { age: '', rest: '999 lap chole' });
+  assert.equal(splitAge('120F fake TKR').age, '120F');
+  assert.equal(splitAge('300/12 fake').age, '300/12');   // months: left as typed
+  assert.equal(humanAge('150y'), '150y');
+  assert.equal(humanAge('99yoF'), '99 years · female');
+}
+
+// Detection settings (15 Oct 2026): off, starts to skip, one-letter initials
+{
+  const { splitInitials, skipStart, cleanSkip, detectionFrom } = await import('../js/engine.js');
+  const on = { off: false, skip: [], oneLetter: false };
+  assert.deepEqual(splitInitials('AB 45F fake lap chole', undefined, { ...on, off: true }), { initials: '', details: 'AB 45F fake lap chole' });
+  const skip = { ...on, skip: ['===', 'Pt:'] };
+  assert.deepEqual(splitInitials('=== AB 45F fake', undefined, skip), { initials: 'AB', details: '45F fake' });
+  assert.deepEqual(splitInitials('pt: ZQ 30F fake', undefined, skip), { initials: 'ZQ', details: '30F fake' });
+  assert.deepEqual(splitInitials('=== fake lap chole', undefined, skip), { initials: '', details: '=== fake lap chole' }, 'no initials: the text kept as typed');
+  assert.equal(skipStart('=== Pt: AB', ['===', 'Pt:']), 'AB');
+  assert.deepEqual(cleanSkip('===, Pt:\n  \n#'), ['===', 'Pt:', '#']);
+  assert.deepEqual(detectionFrom({ detectInitials: false, skipStarts: 'x', oneLetterInitials: true }), { off: true, skip: ['x'], oneLetter: true });
+  assert.deepEqual(detectionFrom({}), on);
+  // one letter: off by default (an age or "/" still makes it initials); on, a lone capital is, except I and A
+  assert.equal(splitInitials('J fake lap chole', undefined, on).initials, '');
+  assert.equal(splitInitials('J 45F fake', undefined, on).initials, 'J');
+  const one = { ...on, oneLetter: true };
+  assert.equal(splitInitials('J fake lap chole', undefined, one).initials, 'J');
+  assert.equal(splitInitials('J (bed 4) fake', undefined, one).initials, 'J');
+  assert.equal(splitInitials('I fake lap chole', undefined, one).initials, '');
+  assert.equal(splitInitials('A fake lap chole', undefined, one).initials, '');
+  assert.equal(splitInitials('A (bed 4) fake', undefined, one).initials, 'A');
+  assert.equal(splitInitials('j fake lap chole', undefined, one).initials, '', 'lower case stays text');
+}

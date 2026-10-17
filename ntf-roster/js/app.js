@@ -5,6 +5,7 @@
 
 let M = null;      // model.js
 let R = null;      // rules.js (may be missing while it is being built)
+let G = null;      // guide.js: Getting started, Help, the tour (tour.js) and "Try it yourself"
 
 const TABS = {
   roster: { label: 'Roster', icon: 'grid', mod: './ui-roster.js' },
@@ -47,6 +48,10 @@ const ICON_PATHS = {
   ok: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
   back: '<path d="M19 12H5M11 18l-6-6 6-6"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.4a2.6 2.6 0 015 .9c0 1.8-2.5 2.3-2.5 4"/><path d="M12 17.3h.01"/>',
+  tour: '<circle cx="12" cy="12" r="9"/><path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z"/>',
+  task: '<path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6.2l1.3 1.3L7.3 5M3.5 12.2l1.3 1.3 2.5-2.5M3.5 18.2l1.3 1.3 2.5-2.5"/>',
+  flag: '<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>',
 };
 function icon(name, cls = '') {
   const p = ICON_PATHS[name] || '';
@@ -101,6 +106,8 @@ const app = {
   isDemo: false,
   setMonth, go, toast, sheet, confirm: confirmBox, evaluation, isPhone,
   selectCell(date, staffId) { app.selectedCell = date && staffId ? { date, staffId } : null; },
+  // first-time help (guide.js, tour.js)
+  onboard, refreshGuide: renderGuide, openAutofill, shortcuts: () => shortcutsSheet(), settled,
   model: null,
   rules: null,
 };
@@ -284,12 +291,13 @@ function confirmBox(msg, { ok = 'OK', danger = false } = {}) {
 // ---------- header ----------
 function renderNav() {
   const tabs = $('#tabs');
-  tabs.innerHTML = DESKTOP_TABS.map(t => `<a href="#${t}" class="tab" data-tab="${t}" title="${TABS[t].label}">${icon(TABS[t].icon)}<span>${TABS[t].label}</span></a>`).join('');
+  // (data-tour: what the first-time tour lights, tour.js)
+  tabs.innerHTML = DESKTOP_TABS.map(t => `<a href="#${t}" class="tab" data-tab="${t}" data-tour="tab-${t}" title="${TABS[t].label}">${icon(TABS[t].icon)}<span>${TABS[t].label}</span></a>`).join('');
   const bb = $('#bottombar');
-  bb.innerHTML = PHONE_TABS.map(t => `<a href="#${t}" class="bb-tab" data-tab="${t}">${icon(TABS[t].icon)}<span class="bb-label">${TABS[t].label}</span>${t === 'check' ? '<span class="bb-badge" hidden></span>' : ''}</a>`).join('');
+  bb.innerHTML = PHONE_TABS.map(t => `<a href="#${t}" class="bb-tab" data-tab="${t}" data-tour="tab-${t}">${icon(TABS[t].icon)}<span class="bb-label">${TABS[t].label}</span>${t === 'check' ? '<span class="bb-badge" hidden></span>' : ''}</a>`).join('');
   $('#undo').innerHTML = icon('undo');
   $('#redo').innerHTML = icon('redo');
-  $('#help').innerHTML = icon('keyboard');
+  $('#help').innerHTML = icon('help');
   $('#prevm').innerHTML = icon('left');
   $('#nextm').innerHTML = icon('right');
   $('#autofill').innerHTML = `${icon('spark')}<span class="lbl">Auto-fill</span>`;
@@ -358,13 +366,22 @@ function parseHash() {
   return { tab, params, key: raw };
 }
 
-function go(tab, params = {}) {
+// replace: change this history entry's address instead of adding one (the tour moves between tabs this way, so Back
+// still means what it meant before the tour)
+function go(tab, params = {}, { replace = false } = {}) {
   // a sheet just closed and its history entry is still being taken back: navigate once that has landed
-  if (backPending) { const p = backPending; backPending = null; p.then(() => go(tab, params)); setTimeout(() => { if (backDone) { const r = backDone; backDone = null; r(); } }, 400); return; }
+  if (backPending) { const p = backPending; backPending = null; p.then(() => go(tab, params, { replace })); setTimeout(() => { if (backDone) { const r = backDone; backDone = null; r(); } }, 400); return; }
   const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null && v !== '')).toString();
   const hash = '#' + tab + (q ? '?' + q : '');
   if (location.hash === hash) route();
+  else if (replace) { try { history.replaceState(history.state, '', hash); } catch (e) { /* ignore */ } route(); }
   else location.hash = hash;
+}
+
+// resolves once a closing sheet's history.back() has landed (a new history entry made before then would be taken
+// back by it)
+function settled() {
+  return backPending ? Promise.race([backPending, new Promise(r => setTimeout(r, 450))]) : Promise.resolve();
 }
 
 function route() {
@@ -383,6 +400,7 @@ async function doRoute() {
   if (sameTab && typeof current.view.route === 'function') {   // my views take new params without remounting
     current.key = key;
     try { current.view.route(params); } catch (e) { console.error(e); }
+    renderGuide();   // (the checklist isn't shown over one person's month)
     return;
   }
   unmountView();
@@ -392,16 +410,27 @@ async function doRoute() {
   main.dataset.tab = tab;
   document.body.dataset.tab = tab;
   const state = app.store.get();
+  guideSlot = null;
   if (!(state.staff || []).length && (tab === 'roster' || tab === 'day' || tab === 'check')) {
-    main.append(welcomeCard());
+    // the first screen of an empty roster: a welcome with the Getting started checklist (guide.js)
+    if (G) {
+      const w = G.welcomeScreen(app);
+      main.append(w.el);
+      guideSlot = w.slot; guideWelcome = true;
+      renderGuide();
+    } else main.append(welcomeCard());
     current.view = { welcome: true };
     return;
   }
   const el = h('div', { class: `view view-${tab}` });
   if (tab === 'more' && isPhone()) el.append(phoneMoreLinks());
+  // your own roster: Getting started sits above the grid until it is hidden or finished (and above Day on a phone,
+  // where the app opens)
+  if ((tab === 'roster' || (tab === 'day' && isPhone())) && !app.isDemo && G) { guideSlot = h('div', { class: 'guide-slot', hidden: true }); guideWelcome = false; el.append(guideSlot); }
   const host = h('div', { class: 'view-host' });
   el.append(host);
   main.append(el);
+  renderGuide();
   current.el = el;
   let mod;
   try {
@@ -466,6 +495,19 @@ function welcomeCard() {
         h('button', { type: 'button', class: 'btn btn-primary', onclick: () => go('more'), html: `${icon('upload')}<span>Import Excel sheet</span>` }),
         h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => go('people'), html: `${icon('plus')}<span>Add staff</span>` }),
         h('a', { class: 'btn btn-ghost', href: './?demo', target: '_blank', rel: 'noopener', html: `${icon('eye')}<span>Try the practice department</span>` }))));
+}
+
+// ---------- first-time help (guide.js) ----------
+let guideSlot = null, guideWelcome = false;
+function renderGuide() {
+  if (!G || !guideSlot || !guideSlot.isConnected) return;
+  try { G.renderChecklist(app, guideSlot, { welcome: guideWelcome }); } catch (e) { console.error(e); }
+}
+// A Getting started tick the data can't show (the duty codes looked at, a rule opened, an export or backup made):
+// kept in settings.onboarding, not an undo step. Only for your own roster.
+function onboard(key) {
+  if (app.isDemo || !app.store || typeof app.store.mark !== 'function') return;
+  app.store.mark({ [key]: true });
 }
 
 // ---------- bars ----------
@@ -547,6 +589,7 @@ function isTyping(el) {
 }
 
 function onKeydown(e) {
+  if (document.body.classList.contains('touring')) return;   // (the tour's dialog is open: no undo behind it)
   const mod = e.ctrlKey || e.metaKey;
   if (document.querySelector('.sheet-back') && !mod) return;
   if (mod && !e.altKey && (e.key === 'z' || e.key === 'Z')) {
@@ -606,6 +649,8 @@ async function start() {
   const quiet = p => { p.catch(() => {}); return p; };
   const pM = quiet(import('./model.js')), pR = quiet(import('./rules.js')), pS = quiet(import('./store.js'));
   const pD = demo ? quiet(import('./demo.js')) : null;
+  const pG = quiet(import('./guide.js'));
+  quiet(import('./tour.js'));   // (guide.js needs it: fetched side by side, not after it)
   quiet(import((TABS[location.hash.replace(/^#/, '').split('?')[0]] || TABS[isPhone() ? 'day' : 'roster']).mod));
   try {
     M = await pM;
@@ -615,6 +660,7 @@ async function start() {
     return;
   }
   try { R = await pR; } catch (e) { console.warn('rules.js not loaded; rule checks are off', e); }
+  try { G = await pG; } catch (e) { console.warn('guide.js not loaded; no first-time help', e); }
   app.model = M; app.rules = R;
   app.isDemo = demo;
   let demoState = null;
@@ -640,7 +686,7 @@ async function start() {
 
   $('#undo').addEventListener('click', doUndo);
   $('#redo').addEventListener('click', doRedo);
-  $('#help').addEventListener('click', shortcutsSheet);
+  $('#help').addEventListener('click', () => (G ? G.openHelp(app) : shortcutsSheet()));
   $('#prevm').addEventListener('click', () => setMonth(M.addMonths(app.month, -1)));
   $('#nextm').addEventListener('click', () => setMonth(M.addMonths(app.month, 1)));
   $('#today').addEventListener('click', goToday);
@@ -655,9 +701,16 @@ async function start() {
     wasPhone = now;
     markTabs();
     if (current.view && typeof current.view.update === 'function') current.view.update(app.store.get(), { resize: true });
+    renderGuide();
   });
 
   app.store.subscribe((state, info) => {
+    // a Getting started tick (settings.onboarding) changes nothing the rule check or the screens show
+    if (info && info.source === 'mark') {
+      if (evalCache) evalCache.state = state;
+      renderGuide();
+      return;
+    }
     evalCache = null;
     clearErrorToasts();
     if (info && info.source === 'external') toast(info.label, { kind: /^Not saved/.test(info.label) ? 'error' : 'ok' });
@@ -666,11 +719,24 @@ async function start() {
     if (current.view && typeof current.view.update === 'function') {
       try { current.view.update(state, info); } catch (e) { console.error(e); }
     }
+    renderGuide();
   });
 
   await route();
   document.body.classList.add('ready');
   window.ntfApp = app;   // handy in the console and for browser tests
+
+  // Practice: the tour opens by itself once per device (Not now is right there). Links from your own roster's Help ask
+  // for the tour (?demo&tour) or the guided tasks (?demo&try); the extra word comes off the address straight away.
+  if (demo && G) {
+    const q = new URLSearchParams(location.search);
+    const wantTour = q.has('tour'), wantTry = q.has('try');
+    if (wantTour || wantTry) { try { history.replaceState(history.state, '', location.pathname + '?demo' + location.hash); } catch (e) { /* ignore */ } }
+    let seen = true;
+    try { seen = (await import('./tour.js')).tourDone(); } catch (e) { /* no tour */ }
+    if (wantTry) G.startTasks(app);
+    else if (wantTour || !seen) G.takeTour(app);
+  }
 
   // Offline app shell (sw.js): offer the new version when one has downloaded.
   import('./version.js')

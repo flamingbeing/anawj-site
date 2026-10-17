@@ -10,17 +10,19 @@ The rule for new apps is in `AGENTS.md`.
 | Address | Folder now | Notes |
 |---|---|---|
 | `anawj.com/` | `index.html` | Status page only. Stays on GitHub Pages. |
-| `anaes.anawj.com/bis/` | `bis-dsa/` | Static, anaesthesia teaching: BIS to DSA simulator (14 Oct 2026). Live; old `anawj.com/bis-dsa/` forwards. |
-| `anaes.anawj.com/ot/` | `ot-sim/` | Static, anaesthesia teaching: OT simulator (GA, monitor, crises). Same host as `/bis/`, so no new domain click (14 Oct 2026). |
+| `anaes.anawj.com/bis/`, `/ot/` | (none) | Forwards to `anantf.com/bis/` and `anantf.com/ot/`: the BIS to DSA and OT simulators moved to the anantf site on 16 Oct 2026. `anawj.com/bis-dsa/` and `/ot-sim/` are stub pages forwarding there too. |
 | `hand.anawj.com/cmcj/` | `cmcj/` | Static, hand surgery. |
 | `hand.anawj.com/babies/` | `hand-babies/` | Static, hand surgery. The old `hand/` redirect goes. |
 | `hand.anawj.com/handlog/` | `hand-log/` | Hand DOPS/Mini-CEX log; data on the phone only, no sign-in (owner, 13 Oct 2026). |
 | `prewarmstudy.anawj.com/` | `prewarm/` | **Real study data.** The name is a reminder that it holds sensitive data and stays isolated. |
 | `nuhroster.anawj.com/` | `nuh-roster/` | Own Firebase project `nuh-roster`. |
+| `nuhjuniormonthly.anawj.com/` | `nuh-junior-monthly/` | NUH junior monthly roster helper (15 Oct 2026). Data in the browser. Needs the owner's custom-domain click. |
 | `ntfroster.anawj.com/` | `ntf-roster/` | NTF anaesthesia monthly duty roster (15 Oct 2026). Data in the browser until its own Firebase project `ntf-roster` exists. Needs the owner's custom-domain click. |
 | `apmes.anawj.com/logbook/` | `logbook/` | With evals: one Firebase project (`apmes-logbook`), one sign-in. |
 | `apmes.anawj.com/evals/` | `evals/` | |
 | `apmes.anawj.com/people/` | `people/` | The people lists logbook and evals share (admins and PDs; 13 Oct 2026). |
+| `apmes.anawj.com/applicants/` | `applicants/` | Confidential feedback on residency applicants, by the same residents and faculty (17 Oct 2026). |
+| `apmes.anawj.com/360/` | `360/` | CCC 360: scholarly projects and multisource feedback nominees, collected from residents for the programme coordinators before a CCC meeting (17 Oct 2026). |
 | `anawj.com/privacy/` | `privacy/` | Stays: the Google sign-in consent screen points here. |
 | `anawj.com/prewarm-update/` | `prewarm-update/` | Stays until no phone runs the old prewarm worker, then becomes a redirect. |
 | `anawj.com/edit/` (decided in step 5) | `edit/` | Stays on `anawj.com`: see "The page editor" below. |
@@ -38,7 +40,7 @@ The roster's address is `nuhroster.anawj.com` (owner, 13 Oct: he may manage othe
 
 One step at a time; each is merged and checked before the next starts. Each session updates its own app's
 `STATUS.md` and touches no other app's files. When a step is done, its session tells the homepage session
-(`session_01F6SrdrEnHJKzjEAr5LcDy8`), which starts the next one and ticks it here.
+(its id is in the owner's private notes), which starts the next one and ticks it here.
 
 1. **Hosting** — Logbook 1 (log1). A live Cloudflare Worker that serves `main` at the subdomains, maps each address
    to its folder (table above), deploys on every merge to `main` and stamps service-worker versions like

@@ -11,7 +11,7 @@ export const EVAL_FIELDS = ['id', 'rid', 'residentEmail', 'residentName', 'asses
 // fields a patch may remove by passing null (Firestore deleteField)
 export const REMOVABLE = ['assessment', 'metrics', 'declineReason', 'declinedAt', 'submittedAt', 'seenAt', 'chasedAt'];
 export const RESIDENT_FIELDS = ['rid', 'name', 'email', 'status', 'intake', 'rYear', 'smo'];
-export const FACULTY_FIELDS = ['email', 'name', 'status', 'updatedAt'];
+export const FACULTY_FIELDS = ['email', 'name', 'status', 'updatedAt', 'core', 'ccc', 'workEmail'];
 export const APPLICATION_FIELDS = ['uid', 'email', 'name', 'role', 'note', 'status', 'createdAt', 'decidedAt', 'decidedBy'];
 export const RESIDENT_STATUSES = ['ACTIVE', 'ON LEAVE', 'SMO', 'GRADUATED', 'ATTRITED'];
 export const STATUSES = ['draft', 'requested', 'submitted', 'declined', 'cancelled'];
@@ -101,6 +101,10 @@ export function cleanFaculty(f, now = Date.now()) {
   out.email = lc(out.email);
   out.name = String(out.name ?? '').slice(0, 200);
   out.status = out.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE';
+  // groups (core faculty, CCC members) and the NUHS work email: only kept when set, so older records stay as they were
+  if ('core' in out) out.core = out.core === true;
+  if ('ccc' in out) out.ccc = out.ccc === true;
+  if ('workEmail' in out) { out.workEmail = lc(out.workEmail).slice(0, 200); if (!out.workEmail) delete out.workEmail; }
   out.updatedAt = now;
   return plain(out);
 }

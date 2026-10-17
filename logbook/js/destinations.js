@@ -19,6 +19,22 @@ export const PRESETS = [
     hint: 'Opens WhatsApp to choose who gets it.' },
   { id: 'upnote', name: 'UpNote', uri: 'upnote://x-callback-url/note/new?text={content}', fileName: '{date}', mode: 'replace',
     hint: 'Check this link against UpNote’s own help before relying on it.' },
+  // (log2 12, 16 Oct 2026: iPhone users especially. Each link follows the app's own documented format; check each on
+  // a real iPhone before relying on it)
+  { id: 'applenotes', name: 'Apple Notes (iPhone, via a Shortcut)', uri: 'shortcuts://run-shortcut?name=Logbook%20to%20Notes&input=text&text={content}', fileName: '{date}', mode: 'replace',
+    hint: 'Needs a Shortcut named “Logbook to Notes” on the iPhone: see “Apple Notes on an iPhone” below.' },
+  { id: 'email', name: 'Email', uri: 'mailto:?subject={title}&body={content}', fileName: '{date}', mode: 'replace',
+    hint: 'Opens your mail app with the text in a new email: you choose who gets it.' },
+  { id: 'telegram', name: 'Telegram', uri: 'tg://msg?text={content}', fileName: '{date}', mode: 'replace',
+    hint: 'Opens Telegram to choose who gets it (needs the Telegram app).' },
+  { id: 'drafts', name: 'Drafts', uri: 'drafts://x-callback-url/create?text={content}', fileName: '{date}', mode: 'replace',
+    hint: 'Makes a new draft in Drafts.' },
+  { id: 'bear', name: 'Bear', uri: 'bear://x-callback-url/create?title={title}&text={content}', fileName: '{date}', mode: 'replace',
+    hint: 'Makes a new note in Bear.' },
+  { id: 'things', name: 'Things', uri: 'things:///add?title={title}&notes={content}', fileName: '{date}', mode: 'replace',
+    hint: 'Makes a to-do in Things with the text in its notes.' },
+  { id: 'dayone', name: 'Day One', uri: 'dayone2://post?entry={content}', fileName: '{date}', mode: 'replace',
+    hint: 'Makes a new Day One entry.' },
   { id: 'custom', name: 'Other app', uri: '', fileName: '{date}', mode: 'replace',
     hint: 'Any app that opens from a link: type its template, with {content} where the text goes.' },
 ];

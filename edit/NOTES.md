@@ -143,7 +143,7 @@ Anyone else gets Cloudflare's sign-in page and can't pass it.
 1. Cloudflare → Workers & Pages → `anawj-preview` → Settings → Domains & Routes → Add → Custom domain →
    `ask.anawj.com`.
 2. Cloudflare Zero Trust (one.dash.cloudflare.com; pick a team name if asked; Free plan) → Access → Applications → Add
-   → Self-hosted: domain `ask.anawj.com`; policy **Allow**, include **Emails**: your email; sign-in: one-time PIN.
+   → Self-hosted: domain `ask.anawj.com`; policy **Allow** for the owner only; sign-in: one-time PIN.
    Save, then copy the application's **Audience (AUD) tag**.
 3. GitHub → Settings → Developer settings → Fine-grained tokens → Generate: repository access **only anawj-site**;
    permissions **Issues: Read and write**, **Pull requests: Read-only**; expiry a year.
@@ -152,7 +152,7 @@ Anyone else gets Cloudflare's sign-in page and can't pass it.
    `ACCESS_TEAM` (your Zero Trust team name, the part before `.cloudflareaccess.com`), `ACCESS_AUD` (step 2).
 Check: open `ask.anawj.com` on your phone, enter the PIN emailed to you, and send a small ask; until step 4 the page
 answers "Ask Claude is not set up yet: the Worker has no …" (naming what's missing). **Set up and working 14 Oct 2026**
-(Access team `red-sun-ceba`; the first try put the secrets in the Build box by mistake).
+(the first try put the secrets in the Build box by mistake).
 
 ## Weekly proof-read
 
@@ -163,8 +163,8 @@ nothing. Fix its list in one PR ("Site: proof-read fixes"). Run it any time with
 
 ## Daily check (routine)
 
-A Claude Code routine, **Page edits check** (`trig_01XYgiWzGVyXSPiJX6bPPtPd`, set up 13 Oct 2026 at the owner's
-request), runs every day at 8:58 am Singapore time in a fresh cloud session:
+A Claude Code routine, **Page edits check** (set up 13 Oct 2026 at the owner's
+request; its id is in the owner's private notes), runs every day at 8:58 am Singapore time in a fresh cloud session:
 
 - It reads open `Page edits:` issues, skipping any already linked to a PR from an earlier run. With none, it stops
   without posting.

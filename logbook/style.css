@@ -376,6 +376,8 @@ code, kbd { font-size: calc(13px * var(--fs, 1)); background: var(--chip); paddi
 .top { background: linear-gradient(90deg, var(--s1) 0 25%, var(--s2) 25% 50%, var(--s3) 50% 75%, var(--s4) 75% 100%) top / 100% 5px no-repeat, var(--panel); border-bottom: 1px solid var(--edge, var(--line)); }
 .top, .top[class] { padding-top: max(17px, calc(env(safe-area-inset-top, 0px) + 5px)); }
 .top h1, section.card h2, h2, h3 { color: var(--heading); }
+/* Themes → Heading font (themes.js lookCss sets --font-head) */
+.top h1, h1, h2, h3 { font-family: var(--font-head, var(--font-ui)); }
 a { color: var(--accent); }
 :focus-visible { outline: 3px solid var(--heading); outline-offset: 2px; }
 input:focus, select:focus, textarea:focus { border-color: var(--heading); box-shadow: none; outline: 3px solid var(--heading); outline-offset: 1px; }
@@ -619,6 +621,12 @@ button.icon-btn { min-width: 40px; }
 .parsed { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; min-height: 22px; margin: 4px 2px 2px; font-size: calc(13px * var(--fs, 1)); color: var(--muted); }
 .parsed .pi small { font-size: calc(11px * var(--fs, 1)); text-transform: uppercase; letter-spacing: .04em; }
 .parsed .pi b { color: var(--ink); }
+/* the initials and age read from the box, in the colours of their highlights there */
+.parsed .pi-ini b { color: var(--accent); }
+.parsed .pi-age b { color: var(--warn, #b45309); }
+/* each is a button: a tap keeps that text in the case instead; struck through until tapped again */
+.parsed button.pi { display: inline-block; white-space: nowrap; width: auto; background: none; border: 0; padding: 0 2px; margin: 0; min-height: 24px; font: inherit; color: inherit; cursor: pointer; border-radius: 4px; box-shadow: none; }
+.parsed button.pi.undone b { text-decoration: line-through; color: var(--muted); }
 .parsed .pi.none { color: var(--warn); }
 .parsed .pi.grow { flex: 1 1 8em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tag-row { display: flex; align-items: center; gap: 8px; }
@@ -915,6 +923,13 @@ ul.te-list.te-pills li.te-pillitem.te-head.drop-after::after { top: auto; bottom
 details.an-sec > summary { display: flex; flex-direction: column; align-items: flex-start; text-align: left; line-height: calc(1.3 * var(--lh, 1)); min-height: 0; padding: 4px 0; }
 details.an-sec > summary .an-t { font-weight: 700; color: var(--heading); font-size: calc(15px * var(--fs, 1)); }
 details.an-sec > summary .an-s { font-weight: 400; color: var(--muted); font-size: calc(13px * var(--fs, 1)); }
+/* Analytics Edit mode: the cards as rows to drag, move or hide */
+.an-editbar { margin: 0 0 8px; align-items: center; }
+.an-edit-list { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 6px; }
+.an-edit-list li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--edge, var(--line)); border-radius: calc(10px * var(--round, 1)); background: var(--panel); }
+.an-edit-list li.dragging { position: relative; z-index: 2; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+.an-grip { cursor: grab; touch-action: none; user-select: none; font-size: 20px; line-height: 1; padding: 8px 4px; color: var(--muted); }
+.an-edit-name { flex: 1; font-weight: 600; }
 details.an-sec > summary::marker { content: ''; }
 .an-body h3 { font-size: calc(13px * var(--fs, 1)); margin: 14px 0 6px; color: var(--muted); }
 .an-bars { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; height: 120px; align-items: end; }
@@ -1019,6 +1034,33 @@ details.refl-foot { margin: 4px 4px 12px; }
 .accent-pick .accent-input::-webkit-color-swatch { border: 0; border-radius: calc(7px * var(--round, 1)); }
 .accent-pick .accent-input::-moz-color-swatch { border: 0; border-radius: calc(7px * var(--round, 1)); }
 .accent-pick .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+/* suggested colours (Settings → Themes → Colour): round swatches in rows, the device's picker last */
+.swatches { display: grid; gap: 8px; margin: 6px 0 4px; }
+.swatch-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.swatch-group { width: 64px; flex: none; font-size: calc(13px * var(--fs, 1)); color: var(--muted); }
+.swatch { width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent); background: var(--sw, conic-gradient(#e4002b, #e57200, #f6e7a6, #7d9a78, #178fd7, #8a7a9e, #e4002b)); cursor: pointer; position: relative; flex: none; }
+.swatch[aria-pressed="true"], .swatch.custom.on { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--ink); }
+.swatch.custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.swatch.custom:focus-within { outline: 3px solid var(--heading); outline-offset: 3px; }
+/* Settings → Themes: Classic as cards, Inspired as a searchable list */
+.theme-now { margin: 0 0 6px; }
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin: 6px 0 10px; }
+.theme-card, .theme-row { display: flex; text-align: left; gap: 4px; padding: 8px; min-height: 0; border: 1px solid var(--edge, var(--line)); border-radius: calc(10px * var(--round, 1)); background: var(--panel); color: var(--ink); cursor: pointer; font: inherit; }
+.theme-card { flex-direction: column; align-items: stretch; }
+.theme-card small, .theme-row small { color: var(--muted); font-size: calc(12px * var(--fs, 1)); line-height: 1.3; }
+.theme-card[aria-pressed="true"], .theme-row[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.theme-sw { display: flex; flex-direction: column; height: 46px; border-radius: calc(6px * var(--round, 1)); overflow: hidden; background: var(--tb); border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); flex: none; }
+.theme-row .theme-sw { width: 64px; }
+.theme-band { display: flex; height: 6px; flex: none; }
+.theme-band i { flex: 1; }
+.theme-card-in { flex: 1; margin: 6px; border-radius: 4px; background: var(--tp); display: flex; align-items: center; gap: 4px; padding: 0 5px; }
+.theme-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ta); flex: none; }
+.theme-line { flex: 1; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--ta) 45%, transparent); }
+.theme-find { width: 100%; margin: 6px 0 8px; }
+.theme-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 360px; overflow-y: auto; }
+.theme-row { width: 100%; align-items: center; gap: 10px; }
+.theme-row .mt { display: flex; flex-direction: column; min-width: 0; }
+.theme-list .empty { color: var(--muted); padding: 6px 2px; }
 .install-steps { margin: 4px 0 8px; padding-left: 20px; line-height: calc(1.6 * var(--lh, 1)); }
 /* Analytics at a glance (folded Logbook / Reflections cards) */
 .glance { align-self: stretch; display: flex; flex-direction: column; gap: 8px; margin: 8px 0 2px; }
@@ -1374,8 +1416,9 @@ ul.cases .c-tags { -webkit-mask-image: linear-gradient(to right, #000 calc(100% 
 /* a copy of the box's text on top of it, the words see-through and only the marks showing, like a highlighter pen */
 .box-wrap .box-marks { position: absolute; z-index: 1; margin: 0; box-sizing: border-box; border-style: solid; border-color: transparent; color: transparent; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; overflow: hidden; pointer-events: none; }
 .box-wrap .box-marks mark { color: transparent; border-radius: 4px; box-shadow: 0 0 0 1px transparent; }
-.box-wrap .box-marks mark.m-ini { background: color-mix(in srgb, var(--accent) 22%, transparent); }
-.box-wrap .box-marks mark.m-age { background: color-mix(in srgb, var(--warn, #b45309) 24%, transparent); }
+.box-wrap .box-marks mark.m-ini { background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: inset 0 -2px 0 var(--accent); border-radius: 2px; }
+.box-wrap .box-marks mark.m-bmi { background: color-mix(in srgb, #7c3aed 9%, transparent); box-shadow: inset 0 -2px 0 #7c3aed; border-radius: 2px; }
+.box-wrap .box-marks mark.m-age { background: color-mix(in srgb, var(--warn, #b45309) 10%, transparent); box-shadow: inset 0 -2px 0 var(--warn, #b45309); border-radius: 2px; }
 .box-wrap .paste-btn, .box-wrap .clear-btn { z-index: 2; }
 /* the line under the box: only what the age was read as */
 .parsed .pi b { font-weight: 700; }
@@ -1445,10 +1488,10 @@ html.flat body { background: var(--panel); }
 html.flat :is(section.card, details.card) { background: transparent; border-color: transparent; box-shadow: none; padding-inline: 4px; margin-bottom: 4px; }
 html.flat .tabs, html.flat header.top { box-shadow: none; }
 /* Button style: the buttons that aren't the main one */
-html:is(.btn-filled, .btn-tinted, .btn-plain) :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.demo-flag):not(.grid-cats):not(.danger) { border-color: transparent; }
-html.btn-filled :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.demo-flag):not(.grid-cats) { background: color-mix(in srgb, var(--ink) 8%, var(--panel)); }
-html.btn-tinted :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.demo-flag):not(.grid-cats) { background: var(--accent-soft); color: var(--accent); }
-html.btn-plain :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.demo-flag):not(.grid-cats) { background: transparent; color: var(--accent); }
+html:is(.btn-filled, .btn-tinted, .btn-plain) :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.pi):not(.demo-flag):not(.grid-cats):not(.danger) { border-color: transparent; }
+html.btn-filled :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.pi):not(.demo-flag):not(.grid-cats) { background: color-mix(in srgb, var(--ink) 8%, var(--panel)); }
+html.btn-tinted :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.pi):not(.demo-flag):not(.grid-cats) { background: var(--accent-soft); color: var(--accent); }
+html.btn-plain :is(main, dialog) :is(button, .btn):not(.primary):not(.link):not(.linkish):not(.chip):not(.search-x):not(.lb-day):not(.info-btn):not(.flag):not(.swatch):not(.pi):not(.demo-flag):not(.grid-cats) { background: transparent; color: var(--accent); }
 /* Icons instead of words: common buttons (class ib) show their icon and keep the word for screen readers */
 .ib .ib-ico, .ib .ib-n { display: none; }
 html.icon-btns .ib .ib-n { display: inline; font-weight: 700; }
@@ -1525,7 +1568,7 @@ details.day-note-box > summary { cursor: pointer; color: var(--muted); font-weig
 /* Labelled parts (parts.js, ui-parts.js): labels in bold on Logbook rows and marked in the case box; the Learning
    points page; the label editor and case template in Advanced logging */
 ul.cases .t .part-l, .points-list .part-l { font-weight: 700; }
-.box-wrap .box-marks mark.m-lab { background: color-mix(in srgb, var(--ok, #1a7f37) 18%, transparent); }
+.box-wrap .box-marks mark.m-lab { background: color-mix(in srgb, var(--ok, #1a7f37) 9%, transparent); box-shadow: inset 0 -2px 0 var(--ok, #1a7f37); border-radius: 2px; }
 .too-long { margin: 4px 2px; }
 .lb-points { margin: 8px 0 0; font-size: calc(14px * var(--fs, 1)); }
 ul.points-list { list-style: none; margin: 0; padding: 0; }
@@ -1596,3 +1639,134 @@ html:not(.rows-short) ul.cases .c-tags > * { max-width: 100%; }
 /* Settings, bottom: the app version and "Get the latest version", small and quiet */
 .app-ver { text-align: center; margin: -6px 0 6px; font-size: calc(12px * var(--fs, 1)); }
 .app-ver .linkish { background: none; border: 0; box-shadow: none; padding: 0 4px; min-height: 44px; color: var(--accent); font: inherit; text-decoration: underline; }
+/* More: privacy and credits as fine print (owner, 15 Oct 2026) */
+.fine-print { margin: 14px 6px 4px; font-size: calc(12px * var(--fs, 1)); color: var(--muted); line-height: calc(1.45 * var(--lh, 1)); }
+.fine-print p { margin: 0 0 6px; }
+.fine-print b { color: var(--muted); font-weight: 600; }
+/* More: its title with Edit beside it */
+.more-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.more-head h2 { margin: 0; }
+/* a page's section heading outside the cards (Profile → Show or hide) */
+h2.set-heading { margin: 18px 6px 4px; }
+/* the grab bar under the case box: drag to set its height (a phone can't use the browser's corner handle) */
+.box-grab { height: 28px; margin: -2px 0 2px; display: flex; align-items: center; justify-content: center; cursor: ns-resize; touch-action: none; user-select: none; }
+.box-grab::before { content: ''; width: 44px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 22%, transparent); }
+.box-grab.dragging::before, .box-grab:hover::before { background: var(--accent); }
+.box-grab:focus-visible { outline: 3px solid var(--heading); outline-offset: -2px; border-radius: 6px; }
+/* Totals, Compact (on by default): initials across the top, short category names in at most a quarter of the width */
+table.totals.compact th, table.totals.compact td { padding: 3px 4px; }
+table.totals.compact th.ini-h { white-space: nowrap; vertical-align: bottom; }
+table.totals.compact .ini-btn { min-height: 32px; padding: 0 4px; font-weight: 700; color: inherit; }
+table.totals.compact th.me .ini-btn { color: var(--accent); }
+table.totals.compact td.cat, table.totals.compact td.cat .cat-in { max-width: 25vw; }
+table.totals.compact td.cat .cat-in { overflow-x: visible; overflow-wrap: anywhere; }   /* no sideways scroll in a narrow column */
+/* Logbook calendar, Show reflections (off by default): a mark on days with a reflection, the reflection under its case */
+.lb-refl { position: absolute; right: 4px; top: 4px; width: 7px; height: 7px; border-radius: 2px; background: var(--ok, #1a7f37); opacity: .85; }
+ul.cases li.refl-under { padding: 2px 0 8px 28px; border-top: 0; }
+ul.cases li.refl-under button { min-height: 32px; text-align: left; }
+.lb-reflsw { font-size: calc(13px * var(--fs, 1)); }
+/* Logbook → Select: a checkbox on each row, the chosen ones tinted, the bar held at the bottom (above the tab bar) */
+.lb-wrap.selecting ul.cases li:not(.monthhead):not(.refl-under) { padding-left: 42px; }
+.lb-wrap.selecting ul.cases li:not(.monthhead)::after, .lb-wrap.selecting ul.cases .acts { display: none; }
+.lb-wrap.selecting ul.cases .note-flag { pointer-events: none; }
+.notes-page.selecting ul.notes-rows li { position: relative; padding-left: 42px; }
+/* while selecting, each note has its own bin at the right (16 Oct 2026) */
+.notes-page.selecting ul.notes-rows li { grid-template-columns: 74px 1fr auto; }
+.notes-page ul.notes-rows .note-del { align-self: center; color: var(--danger, #b42318); min-width: 40px; min-height: 40px; }
+.notes-page ul.notes-rows .note-del .ico.i { width: 20px; height: 20px; }
+.notes-page.selecting .note-case { pointer-events: none; }
+.notes-page ul.notes-rows li.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.notes-page ul.notes-rows li .sel-box, .lb-wrap ul.cases li .sel-box { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; min-height: 0; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.lb-wrap ul.cases li.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.sel-bar { position: sticky; bottom: calc((var(--tabbar-h) + var(--safe-b)) / var(--ui-zoom, 1)); z-index: 10; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--edge, var(--line)); border-radius: var(--radius, calc(14px * var(--round, 1))); box-shadow: 0 -6px 12px -10px rgba(0,0,0,.35); }
+.sel-bar[hidden] { display: none; }
+.sel-bar .sel-n { font-weight: 700; margin-right: 4px; }
+/* Bulk edit…: a row per field (name, then the choice and what it needs); the warning; samples before → after */
+.bulk-h { margin: 14px 0 4px; font-size: calc(15px * var(--fs, 1)); }
+.bulk-row { display: grid; grid-template-columns: 8.5em 1fr; gap: 6px 10px; align-items: start; padding: 6px 0; border-bottom: 1px solid var(--edge, var(--line)); }
+.bulk-l { font-weight: 600; padding-top: 8px; }
+.bulk-c select, .bulk-c input { width: 100%; }
+.bulk-extra { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.bulk-extra:empty { display: none; }
+.bulk-extra > * { flex: 1 1 12em; }
+.bulk-extra > span { flex: 0 0 auto; }
+.bulk-acts { flex-wrap: wrap; gap: 6px; }
+.bulk-lines { margin: 4px 0 8px; padding-left: 20px; }
+.bulk-warn { padding: 8px 10px; border-radius: 8px; background: var(--warn-bg); color: var(--ink); }
+.bulk-samples { list-style: none; margin: 4px 0 8px; padding: 0; font-size: calc(13px * var(--fs, 1)); }
+.bulk-samples li { padding: 6px 0; border-bottom: 1px solid var(--edge, var(--line)); }
+.bulk-btns { margin-top: 14px; }
+@media (max-width: 560px) { .bulk-row { grid-template-columns: 1fr; } .bulk-l { padding-top: 0; } }
+/* a press and hold selects: no text selection or iOS callout under the finger (Copy is in the row menu) */
+@media (pointer: coarse) { .notes-page ul.notes-rows li, .lb-wrap ul.cases li:not(.monthhead) { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }
+/* Search (🔍 in the header; log2 9e) */
+.who-search { min-height: 40px; min-width: 40px; padding: 2px 8px; border-radius: 999px; background: transparent; border: 1px solid var(--edge, var(--line)); font-size: calc(15px * var(--fs, 1)); line-height: 1; }
+.who-search { display: inline-flex; align-items: center; justify-content: center; color: var(--ink); }
+.who-search .ico.i { width: calc(19px * var(--fs, 1)); height: calc(19px * var(--fs, 1)); vertical-align: middle; }
+.gs-help { list-style: none; margin: 8px 0; padding: 8px 10px; border: 1px solid var(--edge, var(--line)); border-radius: 8px; font-size: calc(13px * var(--fs, 1)); }
+.gs-help[hidden] { display: none; }
+.gs-help li { padding: 3px 0; }
+.gs-sortbar { margin: 8px 0 0; }
+.gs-group { margin-top: 14px; }
+.gs-h { margin: 0 0 4px; font-size: calc(15px * var(--fs, 1)); }
+.gs-list { list-style: none; margin: 0 0 6px; padding: 0; }
+.gs-list > li { border-bottom: 1px solid var(--edge, var(--line)); padding: 2px 0 6px; }
+.gs-item { display: flex; flex-direction: column; align-items: stretch; gap: 2px; width: 100%; text-align: left; background: transparent; border: 0; padding: 8px 4px 2px; min-height: 44px; color: inherit; font: inherit; cursor: pointer; }
+.gs-item:hover { background: var(--row-alt); }
+.gs-top { display: flex; gap: 8px; justify-content: space-between; align-items: baseline; }
+.gs-date { white-space: nowrap; font-size: calc(13px * var(--fs, 1)); }
+.gs-snip { font-size: calc(14px * var(--fs, 1)); color: var(--ink); overflow-wrap: anywhere; }
+.gs-meta { font-size: calc(12px * var(--fs, 1)); }
+.gs-item mark, .gs-title mark { background: color-mix(in srgb, var(--accent) 22%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.gs-links { display: flex; gap: 12px; padding: 0 4px; }
+/* Search: chips (kind, dates, tag, drafts, Interesting), dates panel, saved searches, selecting */
+.gs-chips { margin: 8px 0 0; gap: 6px; }
+.gs-chips .chip { min-height: 32px; }
+.gs-chips .chip-select { min-height: 32px; border-radius: 999px; padding: 2px 10px; width: auto; }
+.gs-chips .chip-select.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.gs-dates { gap: 8px; margin: 6px 0 0; }
+.gs-dates[hidden] { display: none; }
+.gs-date-in { flex: 1 1 10em; margin: 0; }
+.gs-saved { margin: 6px 0 0; }
+.gsearch.selecting .gs-list > li { position: relative; padding-left: 40px; }
+.gsearch .gs-list > li .sel-box { position: absolute; left: 6px; top: 14px; width: 24px; height: 24px; min-height: 0; margin: 0; accent-color: var(--accent); }
+.gsearch .gs-list > li.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* The Grid as a spreadsheet (log2 10): thin lines, cells without boxes, resizable columns, 1–3 lines or Fit per row */
+table.grid.sheet { border-collapse: collapse; width: 100%; }
+table.grid.sheet.sized { table-layout: fixed; width: max-content; min-width: 100%; }
+table.grid.sheet th, table.grid.sheet td { border: 1px solid var(--edge, var(--line)); padding: 0; vertical-align: top; }
+table.grid.sheet th { position: relative; text-align: left; font-size: calc(13px * var(--fs, 1)); padding: 6px 26px 6px 8px; background: var(--row-alt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+table.grid.sheet input, table.grid.sheet textarea { border: 0; border-radius: 0; background: transparent; width: 100%; min-height: 36px; padding: 7px 8px; box-shadow: none; font: inherit; }
+table.grid.sheet td.date input { width: 100%; }
+table.grid.sheet td.ini input { width: 100%; }
+table.grid.sheet textarea { height: auto; min-height: 36px; resize: none; display: block; line-height: 1.35; overflow: hidden; }
+table.grid.sheet.fit textarea { overflow: hidden; }
+table.grid.sheet input:focus, table.grid.sheet textarea:focus { outline: 2px solid var(--focus, var(--accent)); outline-offset: -2px; }
+table.grid.sheet td.cats { padding: 4px 6px; }
+table.grid.sheet .grid-cats { border: 0; background: transparent; padding: 2px; min-height: 32px; width: 100%; display: flex; flex-wrap: wrap; justify-content: flex-start; text-align: left; }
+.col-grip { position: absolute; right: 0; top: 0; bottom: 0; width: 24px; cursor: col-resize; touch-action: none; z-index: 2; }
+.col-grip::after { content: ''; position: absolute; right: 2px; top: 20%; bottom: 20%; width: 2px; border-radius: 1px; background: var(--muted); opacity: .35; }
+.col-grip:hover::after, .col-grip:focus-visible::after { opacity: 1; background: var(--accent); }
+.grid-opts { gap: 10px; margin: 0 0 8px; }
+/* Logbook pages (log2 11): ‹ Page 2 of 14 · dates › and how many a page */
+.lb-pager { gap: 6px; margin: 0 0 8px; flex-wrap: wrap; }
+.lb-pager.bottom { justify-content: center; margin: 12px 0 0; }
+.lb-pager select { width: auto; max-width: 100%; }
+.lb-pagesel { flex: 0 1 auto; min-width: 0; }
+
+/* Logbook List: Group by and Sort (log2 14; in the Filter panel); a group's heading folds it */
+ul.cases li.monthhead.lb-ghead { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
+.lb-gfold { flex: 1; min-width: 0; min-height: 36px; display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 0 6px; background: none; border: 0; padding: 2px 0; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; text-align: left; cursor: pointer; box-shadow: none; }
+.lb-gfold .muted { font-weight: 600; text-transform: none; letter-spacing: 0; }
+ul.cases li.lb-planned a { display: block; padding: 8px 4px; }
+
+/* Faculty Analytics: Year comparison (log2 5b) */
+.yc-table { border-collapse: collapse; width: 100%; font-size: calc(14px * var(--fs, 1)); }
+.yc-table th, .yc-table td { text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.yc-table td:nth-child(2) { font-variant-numeric: tabular-nums; }
+.yc-table tr.yc-behind td:first-child { font-weight: 600; }
+
+/* Themes → Your themes (16 Oct 2026): a saved look per row, with × to delete */
+.my-themes .my-theme { display: flex; align-items: stretch; gap: 6px; }
+.my-themes .my-theme .theme-row { flex: 1; min-width: 0; }
+.my-themes .bar input[type=text] { flex: 1; min-width: 0; }

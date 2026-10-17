@@ -51,7 +51,8 @@ step with the code ("As built" at the end lists what the code adds to it).
 ```js
 state = {
   v: 1,
-  settings: { dept: 'NTFGH Department of Anaesthesia', holidays: { '2026-11-08': 'Deepavali' } },
+  settings: { dept: 'NTFGH Department of Anaesthesia', holidays: { '2026-11-08': 'Deepavali' },
+              onboarding: { codes: true, rules: true, shared: false, hidden: false, done: false } },   // optional: Getting started ticks (guide.js)
   groups: [ { id: 'cons', name: 'Senior consultants / consultants', kind: 'senior' }, … ],   // sheet order
   tags:   [ { id: 'babymo', name: 'Baby MO', help: 'New MO, never on call alone' }, … ],
   staff:  [ { id, name, short: '', group: 'mo', tags: ['babymo'], fte: 1, start: '', end: '', note: '', active: true } ],
@@ -347,7 +348,14 @@ What the code adds to the contract above. Keep this list in step with the code.
 - **Offline app**: `sw.js` (`VERSION = 'ntf-roster-v1'`, stamped at deploy) caches the shell; ExcelJS and the
   Firebase SDK are cached on first use. `version.js`: `registerSW({ onUpdate })`, `renderVersion(el)`, `getLatest()`,
   `appVersion()`, `versionLabel()`; More ends with the two version lines.
-- **Tests**: `test/e2e.mjs` (browser, desktop and phone, axe) is in the Checks workflow with the unit tests.
+- **First-time help (Oct 2026)**: `js/guide.js` (Getting started checklist, Help sheet, "Try it yourself") and `js/tour.js`
+  (the coach-mark tour, `TOUR_STEPS`, and `showMe` spotlights). `settings.onboarding` holds only the Getting started
+  ticks the data can't show (`codes`, `rules`, `shared`) plus `hidden` and `done`, all booleans (`migrate` drops anything
+  else); `store.mark(patch)` sets them without an undo step (subscribers get `source: 'mark'`), and undo/redo keep the
+  newer ticks. The app also has `app.onboard(key)`, `app.refreshGuide()`, `app.openAutofill()`, `app.shortcuts()`,
+  `app.settled()` and `go(tab, params, { replace })`. Tour seen per device: localStorage `ntf-roster-tour`
+  (`{ v, done }`); checklist folded: `ntf-roster-guide`. Controls the tour lights carry `data-tour="…"`.
+- **Tests**: `test/e2e.mjs` (browser, desktop and phone, axe) and `test/tour.e2e.mjs` (first-time help) are in the Checks workflow with the unit tests.
   `test/perf.e2e.mjs` (speed budgets on a slowed phone) is run by hand.
 - **Speed (Oct 2026)**: the grid patches changed cells and draws full redraws progressively (`NOTES.md`, Speed); a
   spacer row `tr.r-spacer` can sit at the top of the grid's body for a few frames, and `flushRows()` draws whatever

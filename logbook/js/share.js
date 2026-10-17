@@ -10,8 +10,11 @@ import { ensureNotes, dayMayHaveNotes } from './ui-notepad.js';
 
 // the user's Markdown format (an older Copy & share format carries over), and the names they see
 export const mdFormat = () => cleanMarkdown(settings().markdown, settings().shareFormat);
-// labels: the labelled parts in use (Settings → Advanced logging), for Bold labels in Settings → Markdown
-export const mdCtx = () => ({ catName, catShort, tagName, labels: labelsOn(settings()) });
+// labels: the labelled parts in use (Settings → Advanced logging), for Bold labels in Settings → Markdown; a case's
+// reflections and linked notes (Settings → Markdown, under each case: off by default). No reflection notes exist
+// where this text goes, so Link and Embed give the full text.
+export const mdCtx = () => ({ catName, catShort, tagName, labels: labelsOn(settings()),
+  reflectionsOf: c => (S.reflections || []).filter(r => r.caseId === c.id), notesOf: c => (Array.isArray(S.notes) ? S.notes : []).filter(n => n.caseId === c.id) });
 export const caseText = c => mdCase(c, mdFormat(), mdCtx());
 export const dayCases = date => (S.cases || []).filter(c => c.date === date).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 // the day's cases, or the ones given (the Logbook's calendar passes what the filter shows)

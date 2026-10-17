@@ -183,7 +183,8 @@ portfolio content.
   sticky line you tap anywhere to jump to a date. Reflection rows: initials with a small JR, the date on one line
   ("11 Sep", or "11 Sep 25" in an earlier year); a heading's counts never split over two lines. Analytics cards show
   the summary and one bar folded; "You and your year" (the spread strips) is inside the opened card.
-- **Case box marks** (polish 4): the initials and the age/sex are highlighted inside the case box (a see-through copy
+- **Case box marks** (polish 4): the initials, the age/sex, labelled parts and (log2 2) the BMI the suggestions read
+  (`suggest.js` `bmiAt`, purple) are highlighted inside the case box (a see-through copy
   of its text on top, `.box-marks`, styled from the box's own computed font and padding so the wrapping matches).
   The line under the box says only what the age was read as ("6m = 6 years · male"): kept on purpose, as the check
   that 6m means years and 6mo months. The initials and procedure are no longer repeated there.
@@ -297,7 +298,7 @@ portfolio content.
   keys, after a confirm; custom CSS is switched off but kept, own font files stay stored.
 - **Look options, Oct 2026** (device keys): **Corners** (Display, `round` 0 Square / 1 / 2 Normal / 3 Very round): every
   border-radius in style.css (and the reflection editor's inline ones) is `calc(Npx * var(--round, 1))`; tag tick
-  boxes cap at 1.2 so they never look like radio buttons. **Soft shadows instead of lines** (`shadows`, cards only; **on by default**, owner 12 Oct 2026: `shadows: false` = lines).
+  boxes cap at 1.2 so they never look like radio buttons. **Card style** (Themes; owner, 16 Oct 2026; `cardStyle` / `cardPatch` in display.js): Raised = soft shadows (default; owner 12 Oct 2026), Outlined = lines (`shadows: false`), Flat = no lines and no page cards (`flat`). It replaced the Soft shadows switch and the Flat end of the Borders slider; the line strength (`borders`, Borderless … Normal) moved to Advanced display → Look as **Line strength**, kept while Flat is on.
   **Bigger tap targets on the Case tab** (Advanced display, `bigTaps`). **Tab bar order and hidden tabs** (Advanced
   display, `tabOrder` / `tabHidden`, `arrangeTabs` in ui-settings.js): ↑ ↓ and a switch per tab; More can't be
   hidden, at least two and at most seven (`MAX_BAR`, More included; owner, Oct 2026) stay. Every page in the More list
@@ -339,7 +340,19 @@ portfolio content.
   fill-ins are all empty goes; a value is never read again as a template. Options: date format, categories as
   names / codes / #tags, wiki or Markdown links, case notes per month or day, reflection folders (month, heading,
   flat), file name pattern, front matter fields, the reflection templates (title, summary, each point, figure,
-  references). Default day: `[[YYYY-MM-DD]]`, then `1. AB` / case, a blank line between cases; no tags. An older
+  references). Default day: `YYYY-MM-DD` (plain since log2 15; it was `[[YYYY-MM-DD]]`), then `1. AB` / case, a blank
+  line between cases; no tags. **Day heading** (`dayHeadStyle`): Plain / Heading (`# date`) / Link (`{{dateLink}}`,
+  `[[file date|date]]` or a Markdown link) / Custom (the `dayHead` box; a heading typed before the styles existed is
+  Custom); one case follows the style unless its box was typed. **Dates** (`dateFormat`): 2026-10-10, 20261010,
+  10 Oct 2026, Sat 10 Oct 2026, 10/10/2026 or Custom (`datePattern`: YYYY YY MMMM MMM MM M DD D dddd ddd, [text]
+  literal; `fmtPattern`). **File names and link targets** (`fileDate`): As the dates (slashes become spaces) or their
+  own; they name the export's day notes, reflection files' {{date}} and what Link points to. Sync's own file name
+  pattern (Settings → Sync) is separate. Changing the heading makes Sync rewrite each synced day once (3-way merge
+  keeps the user's edits). **Under each case** (`reflInDay`: None (default) / Link / Embed `![[…]]` / Full text;
+  `notesInDay`: None / Full text): a case's reflections and linked notes after it in a day and in one case, their
+  headings two levels down. Link and Embed need the reflection's own note (`ctx.reflPath`): the export, and Sync places
+  with **Also sync reflection notes**; Copy, Share, Send to and other Sync places give the full text (Markdown links can't embed: a link). A linked note under its case
+  leaves the day's Notes. e2e: `md-format.mjs`. An older
   `settings.shareFormat` (the Copy & share format) carries over until the Markdown page is saved; `share-format.js`
   is kept for that and its tests. Previews use the user's own latest day and reflection.
 - **Sync** (Settings → Sync, `#sync`; `ui-sync.js` page + run, `sync-remote.js` calls, `sync-md.js` pure and tested;
@@ -365,6 +378,13 @@ portfolio content.
   (`forgetSync`). Drive/Dropbox reuse the backup sign-in (`signInFor`, pending `action: 'sync'`, `back` page);
   tokens stay memory-only, so a run resumed after one sign-in never leaves for a second (the other place waits for
   the next tap). ID check once per run. e2e: `test/e2e/sync.mjs` fakes all three APIs.
+- **Sync reflection notes** (log2 15; owner said build it, 16 Oct 2026; off unless chosen, per place: `target.reflections`):
+  one note per reflection in `Reflections/…` beside the day files, named and foldered as the Markdown export names
+  them (`reflectionFiles` in sync-md.js, in a stable order: date, created, id), inside the usual marked block, so no
+  front matter and no figures. Ledger keys `r:<id>` with the file's `path`; a reflection whose name changes (title,
+  date, heading) gets a new file and the old one is left (Sync never deletes a file; the run says how many); a
+  deleted reflection's file stays. Only on those places do a day's Link and Embed point at the notes (the day text
+  differs per place). Tested in `sync-md.test.mjs` and `e2e/sync.mjs`.
 - **Save to Google Drive / Dropbox** (Backup card; `cloud-save.js`, ids and pure helpers in `backup-targets.js`,
   tested): sign-in leaves the page and comes back, no popups (Oct 2026: on the owner's phone popups lost their
   opener, so Drive stayed on a blank page and Dropbox did nothing). Drive = OAuth implicit grant (token in the
@@ -442,7 +462,9 @@ portfolio content.
     (owner, 15 Oct 2026): **Case logs** first (`#caselogs`, `ui-caselogs.js`: residents by year with total cases, tags
     behind / due, reflections; tap → `#caselog`, that resident's counts per tag against the targets (`totalsTable` with
     one column), reflection headings met, Excel download), then **Analytics** as programme analytics (`renderProgramme`:
-    who's behind, the tags most residents are behind on; no totals), then their own Case, Logbook, Reflections. All from the counts
+    who's behind, the tags most residents are behind on, and the **Year comparison**: each target tag's median in the
+    year picked, the target due next, residents with half the median or less from a median of 4 (`year-compare.js`,
+    unit-tested); no totals), then their own Case, Logbook, Reflections. All from the counts
     summaries, never case details. The rules let active
     faculty read `summaries/` (counts are no secret, owner); they still can't read the residents list, cases,
     reflections or notes. Case logs is listed in More for them in other profiles.
@@ -574,6 +596,108 @@ portfolio content.
   line break or space, `splitOverflow`) and puts the rest in a note linked to it ("Rest of the case · AB", Notes'
   100-note limit checked first). "Plan for later" refuses a long row (planned cases can't carry a note).
 
+### Themes (Settings → Themes; `themes.js`; owner, 15 Oct 2026)
+
+- A theme is a bundle of this device's look settings (`THEME_KEYS`); picking one sets them all (Undo in the toast),
+  and changing any afterwards shows "Custom (based on …)". Classic themes are cards; Inspired ones ("Obsidian-style",
+  colours, corners and type only, never logos, paid fonts or brand names beyond "-style") are a searchable list.
+  No celebrity or brand palettes (owner). New ideas come in through "Suggest a theme" (private feedback).
+- Display keeps layout (compact, start tab, header and tab bar, rows); Themes holds looks: light or dark, colour
+  swatches (NUH, muted, pastel, Custom), Colourful, background tint, Top band, card style, corners, spacing, tab
+  bar style, heading font, fonts, line spacing. Advanced display keeps the fine controls (line strength, button style).
+- **Your themes** (owner, 16 Oct 2026; `my-themes.js`, unit-tested; e2e `my-themes.mjs`): once the look is Custom, the
+  "Your themes" card says so and offers Save this look under a name (`display().myThemes`, this device, up to 12, a
+  name already there is replaced; light or dark is kept with it). Saved looks are picked like any theme ("Now: Night
+  shift (yours)"), × deletes with Undo. **Export…** writes `my-logbook-themes.json` (`kind: apmes-logbook-themes`);
+  **Import…** adds a file's themes, only known look keys with checked values. The Themes reset leaves them alone; the
+  settings file carries them.
+- **Top band: only the NUHS theme keeps the NUH stripe; other themes bring their own four colours** (owner, 15 Oct
+  2026; an exception to AGENTS.md's four-quarter band, for the logbook only). The Top band setting overrides it: the
+  theme's colours (default), shades of my colour, the NUH stripe, or none.
+- The CSS for the settings that aren't classes comes from `lookCss` into `<style id="look-css">`, cached as
+  `apmes-logbook-look-css` for the first paint. A new look key goes in `THEME_KEYS`, `DISPLAY_KEYS` and settings-file
+  `PLAIN`; `themes.test.mjs` round-trips every theme.
+
+- **Reset all settings** (Settings, last card; owner, 15 Oct 2026): this device only, or the account too
+  (`settings-file.js` `resetAccountPatch`: your year, profile, saved searches, send and sync places and the app's
+  bookkeeping stay; tags and shorthand only when ticked). Saves a settings file first by default; Undo in the toast.
+
+- **Analytics Edit mode** (owner, 15 Oct 2026): Edit above the cards; drag by ⠿ or the arrows, Hide / Show, Reset
+  layout, Done. Saved for the account as `settings.anLayout { order, hidden }` (`analytics.js` arrangeCards: cards a
+  profile lacks are left out; new cards land in their default place). A new card needs an id in `CARD_NAMES`.
+
+- **Default tab bars** (owner, 15 Oct 2026; `profiles.js` PROFILE_ON / PROFILE_OFF): logbook only Case · Logbook ·
+  Totals · More; Basic + Reflections; Advanced + Reflections · Analytics; Personal Case · Logbook · Notes · Reflections ·
+  Analytics · More; Faculty / PCs Totals · Admin · More. Devices arranged by hand keep their arrangement.
+- **More page:** two groups (More's pages with Settings last; Account and help), privacy and credits as fine print. Its
+  Edit mode (per device) drags the tab bar and More's own list (`display().moreOrder`), Pin / Take off (a full bar asks
+  which tab it replaces). The drag code is shared: `drag-list.js`.
+
+- **Recover** (More; owner, 15 Oct 2026): one page for Needs attention (unsynced or clashing changes: Retry, Keep mine
+  / Keep theirs), Recently deleted (the recycle bin, all devices), Unfinished drafts and Earlier versions (this device),
+  each folded with a count. The bin is no longer in Settings; search "recycle" finds it here.
+- **Case box height** (this device): the grab bar under the box sets a kept height (`display().boxHeight`; the List
+  box, paste a list, has its own bar and `listHeight`, owner 16 Oct 2026; double-tap
+  resets); Grow as I type (`boxGrow`, on by default) grows it to two thirds of the screen.
+- **Totals Compact** (this device, on by default): initials across the top (`analytics.js` shortNames; a tap names the
+  person), short category names, a key under the table; Show targets at the bottom. Excel keeps full names.
+- **Select and Bulk edit** (Logbook List and the calendar's day list; log2 9 / 9d): press and hold a row (with
+  Accessibility → Press and hold on, the hold opens the row menu, which has Select), or the Select button. A tap then
+  ticks a row; the bar at the bottom has Select all (the whole search, not only the rows drawn), Select none, Bulk edit…
+  and Done. Bulk edit… (`ui-bulk.js`, the rules in `bulk-change.js`): Change has a row per field, each "Unchanged"
+  until chosen (date, initials, case summary replace / add to the end / find and replace with exact capitals, tags
+  add / remove / replace, Interesting); Actions has Copy, Share, Send to and Move to the bin for just these. Review
+  changes lists the changes, warns when something is replaced, shows up to three before → after; from 20 cases an
+  overwriting change's button says how many. Save goes through `updateMany` (a case changed elsewhere keeps that
+  version); Undo in the toast puts back only cases nobody has changed since. The old "Tag N cases…" is now "Edit N
+  cases…" (Filter → More): every case in the search, selected, into Bulk edit. Not in the grid (it has its own editing).
+- **Notes: a bin on each note while selecting** (owner, 16 Oct 2026): press and hold (or Select), then the red bin at a
+  note's right moves just that note to the recycle bin (`moveToBin`, Undo in the message); the selection stays. The
+  bin icon is `trash` in ui-core.js. e2e: `notes-select.mjs`.
+- **Notes: Select and Bulk edit** (log2 9b): the same bar and popup (`ui-bulk.js` bulkDialog; the notes' fields in
+  `ui-bulk-notes.js`, the rules in `note-bulk.js`). Change: date (set or clear; a daily note keeps its day, its id is the
+  date), title (replace / add in front / find and replace), text (add to the end / find and replace), unlink from the
+  case. Actions: Merge into one (a new note, each selected one under its title in date order, the earliest date, the
+  case if they all share it; the originals go to the bin, Undo brings them back), Copy, Share, Send to, Download (zip),
+  Move to the bin.
+- **Reflections: Select and Bulk edit** (log2 9c): the header's Edit is now **Select** (press and hold a row starts it
+  too); dragging between headings stays in it. The old Select all / Clear / Mark complete / Delete selected toolbar is
+  the shared bar and popup (`ui-bulk-refl.js`, rules in `refl-bulk.js`). Change: heading (a sub-type stays where the
+  new heading has it), status (complete only when nothing is missing, as one at a time: the review says what the
+  others still need), portfolio export in / out, JR, date. Actions: Copy, Share, Send to (Markdown, as Settings →
+  Markdown makes it), Move to the bin. Word export of just these is not built: the portfolio export takes the ticked
+  ones (use Portfolio export: in / out).
+- **Grid as a spreadsheet** (log2 10): thin cell lines, inputs without boxes; drag a heading's right edge to resize a
+  column (`display().gridCols`, this device; ← → on the focused edge too; a double-tap resets it, "Reset column
+  widths" resets all); Lines per row 1 / 2 / 3 / Fit to text (`display().gridLines`; the summary is a textarea that
+  grows to its text with Fit).
+- **Send to presets** (log2 12): Apple Notes through a Shortcut named “Logbook to Notes” (`shortcuts://run-shortcut?
+  name=…&input=text&text=…`; setup steps folded on the Send to page), Email (mailto), Telegram (`tg://msg`), Drafts,
+  Bear, Things, Day One, besides Obsidian, WhatsApp, UpNote and Other app. Keep, Notion and OneNote take no text from
+  a link: the page says to use Share. Each link follows the app's documented format; check them on a real iPhone.
+- **Pages** (log2 11; owner's call, 15 Oct): the Logbook List and Grid show 100 cases a page (25 / 50 / 100 / 300 /
+  All, this device: `display().pageSize`, unset = 100); "‹ Page 2 of 14 ›" with a list of the pages and each page's
+  dates to jump to (`paging.js`, unit-tested); a new search, filter or view goes back to page 1; the Calendar stays
+  monthly. Replaces "Show more".
+- **Group by and Sort** (log2 14): in the Filter panel while the List shows (so the List looks as before), Group by Month (default) / Day / Week / Residency year / APMES tag
+  (a case under each of its tags; the heading has "12 of 20 for the target") / Your tags / Flags (No tag yet,
+  ☆ Interesting, Plan for later) / None, and Sort Newest (default) / Oldest / Initials A–Z / Most tags; this device
+  (`display().lbGroup` / `lbSort`, unset = the defaults). The default looks exactly as before (Jump on each month);
+  any other choice draws headings that fold (tap) and say how many cases, "(continued)" across a page, and "Select
+  these N" while selecting. Pure grouping in `lb-group.js` (unit-tested); pages count the rows shown.
+- **Search** (log2 9e, first part): a line magnifier (`ic('search')`, never an emoji: it follows the theme; owner,
+  16 Oct 2026) in the header on every tab, or / on a computer (not while typing), opens
+  `#search` (`ui-search.js`; the engine `global-search.js`, unit-tested). One box over cases (planned ones too),
+  reflections and notes (loaded the first time Search opens; offline works on what is on the device). The Logbook's
+  search language plus in:, status:, is:interesting / is:planned, has:reflection / has:note, no:tag, linked:yes / no,
+  heading:, tag:, diagnosis:; ⓘ lists them and a tap adds one. Results grouped by kind with counts, Best match or
+  Newest, the words marked; a tap opens the case (edit page), the reflection (editor) or the note (Done comes back to
+  Search); a case found links its reflection and notes. Chips (Cases / Reflections / Notes, Dates, Tag…, Drafts,
+  Interesting) add or take out their operator in the box (after: / before: for dates) and light up from what is typed:
+  the box is the one source. Saved searches are the Logbook's list (`settings.savedSearches`); one saved on Search has
+  `global: true` and the magnifier icon, and runs in Search when tapped on the Logbook. Select ticks results into bulk edit: one
+  kind opens its own popup; several kinds share the date (`ui-bulk-mixed.js`), with Copy and Move to the bin.
+
 ## Data, roles and photos (`firestore.rules`)
 
 - **App owner:** `owners/{email}`, set by hand in the Firebase console. May read logbooks and cases and import
@@ -638,6 +762,12 @@ portfolio content.
   stores it in the demo store (the demo admin plays the owner). Tests: `test/e2e/feedback.mjs`, rules suite.
 
 ## Tags and suggestions (`tags.js`, `suggest.js`)
+
+- **Detection** (Settings → Logging → Detection; owner, 15 Oct 2026): account settings `detectInitials` (false: never
+  read initials from the text), `skipStarts` ("===, Pt:", dropped before initials, only when initials follow) and
+  `oneLetterInitials` (a lone capital is initials; I and A still need an age, "/" or "("). `ui-core.settings()` passes
+  them into engine.js (`setDetection`), so the box, pastes and spreadsheets read initials alike. The line under the
+  Case box shows what was read; a tap keeps it as text for that case only (`draft.noIni`, `draft.noAge`).
 
 - Tag numbers ("16", "20iii") come from the APMES portfolio's Section 4 table and the old Google Form; they stay as
   internal IDs (Section 4 fill, old-form import, CSV IDs) but are never shown: Still needed, Totals, the Excel backup
@@ -879,7 +1009,7 @@ The first tap selects a tag in List or Pills and opens a small read-only details
 Notes v1 followed in its own PR (Claude, after the handover): see **Notes** under "Where things are".
 
 - **Drift check lesson (15 Oct 2026):** an edit or delete in a resident's account found by the drift check is the resident's own
-  work until they say otherwise (a resident's (202411) deliberate duplicate clean-up was first undone as "accidental"). Ask the owner to
+  work until they say otherwise (a resident's deliberate duplicate clean-up was first undone as "accidental"). Ask the owner to
   ask the resident before restoring, and keep a before-snapshot of anything written back.
 
 Reliability-hour lessons (15 Oct 2026): a cloud container with 4 CPUs runs only 2 agents per workflow, so run one workflow per area

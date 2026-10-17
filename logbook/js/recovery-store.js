@@ -89,7 +89,7 @@ export function recordSignature(record) {
 export function checkWrite(current, desired, base) {
   if (recordSignature(current) === recordSignature(desired)) return false;
   if (recordSignature(current) !== recordSignature(base)) {
-    const error = new Error('This record changed elsewhere. Both versions are kept in Recent changes');
+    const error = new Error('This record changed elsewhere. Both versions are kept in Recover');
     error.code = 'write-conflict'; error.remote = current || null; throw error;
   }
   return true;

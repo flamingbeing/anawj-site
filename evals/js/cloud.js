@@ -70,6 +70,12 @@ function queued(p) {
   p.catch(e => { if (late) { console.error('Sync failed', e); for (const cb of syncErrorListeners) cb(e); } });
   return Promise.race([p, new Promise(r => setTimeout(() => { late = true; r(); }, ACK_WAIT))]);
 }
+// For apps built on evals' sign-in that keep their own collections (selection/): the Firestore handle and the same
+// offline-friendly write. Never used in the demo.
+export async function firestore() {
+  const { db, F } = await sdk();
+  return { db, F, queued };
+}
 // a read that answers null instead of failing when access is denied or the device is offline
 const soft = p => p.catch(e => {
   if (!['permission-denied', 'unavailable'].includes(e?.code)) console.warn('Read failed', e);
@@ -140,19 +146,24 @@ export async function signOut() {
 
 // ---- roles ----
 
-// { admin, pd, resident: residents doc|null (ACTIVE preferred), faculty: faculty doc|null, application: own application|null }
+// { admin, pd, owner, pc, resident: residents doc|null (ACTIVE preferred), faculty: faculty doc|null, application: own application|null }
+// admin is true for the old admins/ list, Admin staff and programme coordinators (PCs have Admin staff's powers); pd and owner
+// likewise count both the older lists (pds/, owners/) and roles kept in the app (access/{email}.roles, People › Access).
 export async function getRoles(email) {
   if (demo) return D.getRoles(email);
   email = lc(email);
   const { db, F, auth } = await sdk();
   const uid = auth.currentUser?.uid;
-  const [adm, pd, res, fac, app] = await Promise.all([
+  const [adm, pd, res, fac, app, acc, own] = await Promise.all([
     soft(F.getDoc(F.doc(db, 'admins', email))),
     soft(F.getDoc(F.doc(db, 'pds', email))),
     soft(F.getDocs(F.query(F.collection(db, 'residents'), F.where('email', '==', email), F.limit(5)))),
     soft(F.getDoc(F.doc(db, 'faculty', email))),
     uid ? soft(F.getDoc(F.doc(db, 'applications', uid))) : null,
+    soft(F.getDoc(F.doc(db, 'access', email))),
+    soft(F.getDoc(F.doc(db, 'owners', email))),
   ]);
+  const roles = acc?.exists() && Array.isArray(acc.data().roles) ? acc.data().roles : [];
   const residents = res ? res.docs.map(d => d.data()).sort((a, b) => (b.status === 'ACTIVE') - (a.status === 'ACTIVE')) : [];
   // members/{email} → { rid }: lets the rules tell a resident by email (needed to read the faculty list)
   if (residents[0]) {
@@ -160,8 +171,10 @@ export async function getRoles(email) {
     if (!m?.exists() || m.data().rid !== residents[0].rid) await soft(queued(F.setDoc(F.doc(db, 'members', email), { rid: String(residents[0].rid) })));
   }
   return {
-    admin: !!adm?.exists(),
-    pd: !!pd?.exists(),
+    admin: !!adm?.exists() || roles.includes('admin') || roles.includes('pc'),
+    pd: !!pd?.exists() || roles.includes('pd'),
+    owner: !!own?.exists() || roles.includes('owner'),
+    pc: roles.includes('pc'),
     resident: residents[0] || null,
     faculty: fac?.exists() ? fac.data() : null,
     application: app?.exists() ? app.data() : null,
@@ -192,12 +205,60 @@ export async function listResidents() {
     .sort((a, b) => String(a.rid).localeCompare(String(b.rid)));
 }
 
+// the ACTIVE residents (name, email, year): any resident may read these (rules: residents/); the query must ask for ACTIVE
+export async function listActiveResidents() {
+  if (demo) return D.listActiveResidents();
+  const { db, F } = await sdk();
+  return (await F.getDocs(F.query(F.collection(db, 'residents'), F.where('status', '==', 'ACTIVE')))).docs.map(d => d.data())
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
 export async function saveResident(r) {
   if (demo) return D.saveResident(r);
   const { db, F } = await sdk();
   const doc = cleanResident(r);
   await queued(F.setDoc(F.doc(db, 'residents', doc.rid), doc));
   return doc;
+}
+
+// ---- access: who holds which role (People › Access) ----
+// access/{email} = { email, name, roles, updatedAt, updatedBy }; accessLog/{id} = { by, to, change, at } is written in the same batch
+// (rules: logbook/firestore.rules). Admin staff, PCs, PDs and owners list; the log is for Admin staff, PCs and owners.
+
+export async function listAccess() {
+  if (demo) return D.listAccess();
+  const { db, F } = await sdk();
+  return (await F.getDocs(F.collection(db, 'access'))).docs.map(d => ({ ...d.data(), email: d.id }))
+    .sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email)));
+}
+
+export async function saveAccess({ email, name, roles, change } = {}) {
+  if (demo) return D.saveAccess({ email, name, roles, change });
+  const { db, F, auth } = await sdk();
+  const e = lc(email), by = lc(auth.currentUser?.email);
+  const doc = { email: e, name: String(name ?? '').slice(0, 200), roles: [...new Set(roles || [])], updatedAt: F.serverTimestamp(), updatedBy: by };
+  const b = F.writeBatch(db);
+  b.set(F.doc(db, 'access', e), doc);
+  b.set(F.doc(F.collection(db, 'accessLog')), { by, to: e, change: String(change || 'changed').slice(0, 300), at: F.serverTimestamp() });
+  await queued(b.commit());
+}
+
+export async function removeAccess(email, change) {
+  if (demo) return D.removeAccess(email, change);
+  const { db, F, auth } = await sdk();
+  const e = lc(email), by = lc(auth.currentUser?.email);
+  const b = F.writeBatch(db);
+  b.delete(F.doc(db, 'access', e));
+  b.set(F.doc(F.collection(db, 'accessLog')), { by, to: e, change: String(change || 'removed').slice(0, 300), at: F.serverTimestamp() });
+  await queued(b.commit());
+}
+
+// newest first; { by, to, change, at (ms) }
+export async function listAccessLog(n = 50) {
+  if (demo) return D.listAccessLog(n);
+  const { db, F } = await sdk();
+  const snap = await F.getDocs(F.query(F.collection(db, 'accessLog'), F.orderBy('at', 'desc'), F.limit(n)));
+  return snap.docs.map(d => { const x = d.data(); return { by: x.by, to: x.to, change: x.change, at: x.at?.toMillis ? x.at.toMillis() : Number(x.at) || 0 }; });
 }
 
 // ---- applications to join as faculty or resident ----

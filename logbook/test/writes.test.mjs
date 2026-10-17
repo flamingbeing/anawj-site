@@ -123,8 +123,8 @@ test('a save after a conflict made on this device’s own version fails and is k
   f.remote.set('R', { ...r0, text: 'Fake start (laptop)' });
   // the reflection editor: the first autosave meets the conflict; its base stays, so each next autosave fails too
   await assert.rejects(f.queue.save('reflection', 'a', { ...r0, text: 'Fake start + para 1' }, r0), /changed elsewhere/);
-  await assert.rejects(f.queue.save('reflection', 'a', { ...r0, text: 'Fake start + para 1 + 2' }, r0), /Recent changes/);
-  await assert.rejects(f.queue.save('reflection', 'a', { ...r0, text: 'Fake start + para 1 + 2 + 3' }, r0), /Recent changes/);
+  await assert.rejects(f.queue.save('reflection', 'a', { ...r0, text: 'Fake start + para 1 + 2' }, r0), /in Recover/);
+  await assert.rejects(f.queue.save('reflection', 'a', { ...r0, text: 'Fake start + para 1 + 2 + 3' }, r0), /in Recover/);
   assert.equal(await f.queue.flush(50), false);
   assert.equal(f.remote.get('R').text, 'Fake start (laptop)');
   assert.deepEqual(states(f.queue, 'R'), ['conflict:Fake start + para 1 + 2 + 3', 'archived:Fake start + para 1 + 2', 'conflict:Fake start + para 1']);
@@ -296,7 +296,7 @@ test('a save on the other copy says this device’s version is kept, and keeps i
   const shown = f.queue.overlay('case', 'a', [clone(f.remote.get('F'))])[0];
   await f.queue.save('case', 'a', { ...shown, tags: ['1:fake'] }, shown);
   assert.equal(await f.queue.flush(), true);
-  assert.deepEqual(notices, ['Your version from this device is kept in Recent changes']);
+  assert.deepEqual(notices, ['Your version from this device is kept in Recover']);
   for (let i = 0; i < 101; i++) await f.queue.save('note', 'a', { id: 'n' + i, text: 'Fake note ' + i });
   assert.equal(await f.queue.flush(), true);
   assert.ok([...f.records.values()].some(x => x.record.details === 'Fake details typed in theatre' && x.state === 'archived'), 'still in Recent changes');

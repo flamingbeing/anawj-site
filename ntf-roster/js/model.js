@@ -133,6 +133,9 @@ export function defaultState() {
 // hand-made file could hold is made safe here: lists hold objects with a string id (or code), duty kinds and colours
 // are from a fixed set (they end up in class names and styles), and maps are plain objects.
 export const DUTY_KINDS = ['shift', 'leave', 'request', 'other', 'derived'];
+// settings.onboarding: the Getting started ticks the data can't show (duty codes looked at, a rule opened, an export
+// or backup made) and whether the checklist was hidden or finished (guide.js)
+export const ONBOARDING_KEYS = ['codes', 'rules', 'shared', 'hidden', 'done'];
 const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
 const str = (v, dflt = '') => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : dflt);
 const COLOUR = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/;
@@ -170,6 +173,12 @@ export function migrate(s) {
   s.settings.dept = str(s.settings.dept, 'NTFGH Department of Anaesthesia');
   if (!isObj(s.settings.holidays)) s.settings.holidays = {};
   for (const [k, v] of Object.entries(s.settings.holidays)) if (!/^\d{4}-\d{2}-\d{2}$/.test(k) || typeof v !== 'string') delete s.settings.holidays[k];
+  // Getting started ticks (guide.js): only true or false, only the known keys
+  if (isObj(s.settings.onboarding)) {
+    const ob = {};
+    for (const k of ONBOARDING_KEYS) if (typeof s.settings.onboarding[k] === 'boolean') ob[k] = s.settings.onboarding[k];
+    s.settings.onboarding = ob;
+  } else delete s.settings.onboarding;
   const byId = (list, idKey = 'id') => (Array.isArray(list) ? list : []).filter(x => isObj(x) && str(x[idKey])).map(x => ({ ...x, [idKey]: str(x[idKey]) }));
   s.groups = byId(s.groups).map(g => ({ ...g, name: str(g.name, g.id), kind: g.kind === 'senior' || g.kind === 'junior' ? g.kind : (g.kind ? 'other' : g.kind) }));
   if (!s.groups.length) s.groups = clone(DEFAULT_GROUPS);

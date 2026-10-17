@@ -4,7 +4,7 @@
 // No DOM and no network here, so it is unit-tested (test/sync-md.test.mjs). The calls are in sync-remote.js,
 // the page and the run in ui-sync.js.
 
-import { fill } from './markdown.js';
+import { fill, cleanMarkdown, reflectionPath, reflectionNote } from './markdown.js';
 import { fingerprint } from './destinations.js';
 import { merge3, MINE_MARK, SPLIT_MARK, THEIRS_MARK } from './merge3.js';
 
@@ -150,6 +150,8 @@ export function cleanTarget(t) {
     name: str(t.name, 40) || KIND_NAMES[t.kind],
     fileName: str(t.fileName, 120) || DEFAULT_FILE,
     from: ISO.test(t.from || '') ? t.from : '',
+    // also a note per reflection (log2 15; off unless chosen), so the day's Link and Embed find them
+    ...(t.reflections === true ? { reflections: true } : {}),
   };
   if (t.kind === 'github') {
     out.owner = NAME_RE.test(str(t.owner, 100)) ? str(t.owner, 100) : '';
@@ -168,11 +170,32 @@ export function cleanSync(v) {
   return { targets, remind: !!o.remind };
 }
 // the path of the day's file inside the destination
-export function targetPath(t, date) {
-  const name = dayFileName(t.fileName, date);
+export const targetPath = (t, date) => placePath(t, dayFileName(t.fileName, date));
+// a file's path inside the destination (beside the day files)
+export function placePath(t, name) {
   if (t.kind === 'dropbox') return `${DROPBOX_DIR}/${name}`;
   if (t.kind === 'github') return (t.folder ? t.folder + '/' : '') + name;
   return `${DRIVE_DIR}/${name}`;
+}
+
+// ---- reflection notes (Sync → "Also sync reflection notes"; log2 15) ----
+// One file per reflection, named and foldered as the Markdown export names them (Reflections/2026-10/…), beside the
+// day files, so the day's Link and Embed (Settings → Markdown) find them. In a stable order, so a reflection keeps its
+// name between runs while its date, heading and title stay. No front matter (it must open a file, and the app writes
+// inside its marked block) and no figures. Ledger keys are "r:<id>"; a reflection renamed gets a new file and the
+// old one is left as it is (sync never deletes a file); a deleted reflection's file stays too.
+export const REFL_KEY = /^r:[\w-]{1,40}$/;
+export function reflectionFiles(reflections, m) {
+  const f = { ...cleanMarkdown(m), frontMatter: false }, used = new Set();
+  const order = [...(reflections || [])].filter(r => r && r.id && !r.deleted)
+    .sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')) || (a.createdAt || 0) - (b.createdAt || 0) || String(a.id).localeCompare(String(b.id)));
+  return order.map(r => { const path = reflectionPath(r, f, used); return { key: 'r:' + String(r.id).replace(/[^\w-]/g, '').slice(0, 40), id: r.id, date: r.date || '', path, text: reflectionNote(r, f, { path }) }; });
+}
+// the reflection notes to write for one place: new, changed, or under a new name -> [{ key, path, renamed }]
+export function changedRefls(ledger, id, files, fps) {
+  const was = (ledger && ledger[id]) || {};
+  return files.filter(x => !(was[x.key] && was[x.key].fp === fps[x.key] && was[x.key].path === x.path))
+    .map(x => ({ ...x, renamed: !!(was[x.key] && was[x.key].path && was[x.key].path !== x.path) }));
 }
 
 // ---- the ledger: what this device last synced, per destination and day ----
@@ -183,16 +206,18 @@ export function cleanSyncLedger(l) {
   if (!l || typeof l !== 'object' || Array.isArray(l)) return out;
   for (const [id, days] of Object.entries(l).slice(0, 40)) {
     if (!days || typeof days !== 'object' || Array.isArray(days)) continue;
-    const kept = Object.entries(days).filter(([d, v]) => ISO.test(d) && v && typeof v === 'object' && typeof v.fp === 'string')
-      .sort(([x], [y]) => (x < y ? -1 : 1)).slice(-5000)   // the latest dates, if ever that many
-      .map(([d, v]) => [d, { fp: v.fp.slice(0, 20), ...(typeof v.rev === 'string' && v.rev ? { rev: v.rev.slice(0, 100) } : {}) }]);
+    const ok = ([d, v]) => v && typeof v === 'object' && typeof v.fp === 'string';
+    const entry = ([d, v]) => [d, { fp: v.fp.slice(0, 20), ...(typeof v.rev === 'string' && v.rev ? { rev: v.rev.slice(0, 100) } : {}), ...(typeof v.path === 'string' && v.path ? { path: v.path.slice(0, 300) } : {}) }];
+    const kept = [...Object.entries(days).filter(([d, v]) => ISO.test(d) && ok([d, v]))
+      .sort(([x], [y]) => (x < y ? -1 : 1)).slice(-5000),   // the latest dates, if ever that many
+    ...Object.entries(days).filter(([k, v]) => REFL_KEY.test(k) && ok([k, v])).slice(0, 2000)].map(entry);   // reflection notes
     out[String(id).slice(0, 20)] = Object.fromEntries(kept);
   }
   return out;
 }
-export function markSynced(ledger, id, date, fp, rev = '') {
+export function markSynced(ledger, id, date, fp, rev = '', path = '') {
   const l = cleanSyncLedger(ledger);
-  l[id] = { ...(l[id] || {}), [date]: { fp, ...(rev ? { rev } : {}) } };
+  l[id] = { ...(l[id] || {}), [date]: { fp, ...(rev ? { rev } : {}), ...(path ? { path } : {}) } };
   return l;
 }
 // Which place a target id's ledger was written for. This device's ledger and bases follow a target id, but the

@@ -1,5 +1,5 @@
 // Fake data only. Regressions from the bug hunt of 13 Oct 2026 that need a browser: a move to the recycle bin whose
-// delete fails takes its copy out of the bin again (at once, or when it fails after being accepted); Tag N cases, a tag
+// delete fails takes its copy out of the bin again (at once, or when it fails after being accepted); Edit N cases (Bulk edit), a tag
 // merge and a spreadsheet's changed rows keep a case changed on another device (audit, 14 Oct 2026); Settings search
 // finds the Settings page's own cards and Account; a settings file from before the `show` map wins over the account's
 // switches, and one that changes the profile moves this device's tabs as picking it does; the APMES switches that need
@@ -68,7 +68,7 @@ try { for (const width of [390, 1280]) {
       if (!rec._deleted) return cloud.commitRecord(email, kind, rec, bs);
       await new Promise(r => setTimeout(r, 600));
       const remote = await cloud.saveCase(email, { ...c, details: 'fake hernia repair, edited on another device', updatedAt: Date.now() });
-      throw Object.assign(new Error('This record changed elsewhere. Both versions are kept in Recent changes'), { code: 'write-conflict', remote });
+      throw Object.assign(new Error('This record changed elsewhere. Both versions are kept in Recover'), { code: 'write-conflict', remote });
     } });
     await moveToBin('case', S.cases.find(x => x.id === c.id));
     return c.id;
@@ -76,7 +76,7 @@ try { for (const width of [390, 1280]) {
   assert.equal(await outboxEntry(keptId), null, 'taken out once the delete was accepted');
   await poll(async () => /edited on another device/.test((await outboxEntry(keptId))?.details || ''), 'the kept version went back into the outbox');
   await p.evaluate(async () => { const { writes, cloud, S } = await import('./js/ui-core.js'); writes.configure({ backend: cloud.commitRecord }); S.resident = null; });
-  // ---- Tag N cases, a tag merge and a spreadsheet's changed rows keep a case changed on another device (audit, 14 Oct
+  // ---- Edit N cases (Bulk edit), a tag merge and a spreadsheet's changed rows keep a case changed on another device (audit, 14 Oct
   // 2026: they put this device's stale copy over it). The other device's edit goes straight into the demo store, so
   // this page doesn't hear of it, as a phone offline in theatre wouldn't. ----
   await p.evaluate(async () => {
@@ -92,11 +92,12 @@ try { for (const width of [390, 1280]) {
   await p.getByLabel('Search cases').fill('Fakebulk case');
   await p.getByRole('button', { name: 'Filter' }).click();
   await p.locator('button.lb-fold', { hasText: 'More' }).click();
-  await p.locator('button', { hasText: /^Tag 5 cases/ }).click();
-  await p.locator('dialog[open] select').nth(1).selectOption('u:fakeone');
-  await p.locator('dialog[open]').getByRole('button', { name: 'Apply' }).click();
-  await p.locator('dialog[open]').getByRole('button', { name: 'Add', exact: true }).click();
-  await toastSays(/4 cases updated\. 1 kept as it was changed on another device \(keep that version in Recent changes, then tag them again\)/);
+  await p.locator('button', { hasText: /^Edit 5 cases/ }).click();
+  await p.locator('dialog[open]').getByLabel('Tags', { exact: true }).selectOption('add');
+  await p.locator('dialog[open]').getByLabel('Tag to add').selectOption('u:fakeone');
+  await p.locator('dialog[open]').getByRole('button', { name: 'Review changes' }).click();
+  await p.locator('dialog[open]').getByRole('button', { name: 'Save' }).click();
+  await toastSays(/4 cases updated\. 1 kept as it was changed on another device \(keep that version in Recover, then edit them again\)/);
   assert.equal((await onServer('a')).details, 'Fakebulk changed elsewhere', 'Tag N cases: the edit made elsewhere stays');
   assert.equal((await onServer('a')).tags, undefined); assert.deepEqual((await onServer('b')).tags, ['u:fakeone']);
   const fakeTags = () => p.evaluate(async () => (await import('./js/ui-core.js')).tagSet().filter(x => /^u:fake/.test(x.k)).map(x => x.k));
@@ -142,19 +143,19 @@ try { for (const width of [390, 1280]) {
   await search('export settings', 'Settings file', 'Settings');
   await search('import settings', 'Settings file', 'Settings');
   await search('connect claude', 'Connect Claude', 'Settings');
-  await search('recycle', 'Recycle bin', 'Settings');
+  await search('recycle', 'Recycle bin', 'More');
   await search('delete account', 'Delete account', 'Account');
   await search('section 1', 'Portfolio details (Section 1)', 'Account');
   // (the year picker is on Account for people not on the programme list)
   if (!(await p.evaluate(async () => !!(await import('./js/ui-core.js')).S.resident))) await search('residency', 'Residency year', 'Account');
-  // a result on this page scrolls to its card; the bin opens
+  // a result on this page scrolls to its card; the bin is Recover's Recently deleted
   await p.getByLabel('Search settings').fill('export settings');
   await p.locator('.settings-search li a', { hasText: 'Settings file' }).click();
   await p.locator('section.flash h2', { hasText: 'Settings file' }).waitFor();
   await p.getByLabel('Search settings').fill('recycle');
   await p.locator('.settings-search li a', { hasText: 'Recycle bin' }).click();
-  await p.locator('dialog[open]').getByText('Recycle bin', { exact: true }).first().waitFor();
-  await p.locator('dialog[open]').getByRole('button', { name: 'Close' }).click();
+  await p.locator('.recover-sec[data-sec=deleted][open] .bin-view').waitFor();
+  await p.evaluate(() => { location.hash = '#settings'; });
 
   // ---- a settings file from before `show` (basicOn, caseHide) wins over the account's switches ----
   await p.evaluate(async () => {
@@ -367,6 +368,22 @@ try { for (const width of [390, 1280]) {
   await p.locator('#toast', { hasText: 'was changed on another device, so it was kept' }).waitFor();
   await poll(() => p.evaluate(async () => (await import('./js/ui-core.js')).S.reflections.some(r => r.id === 'fake-refl-stale' && r.summary === '900 finished words')), 'the newer reflection shows');
   assert.equal(await p.evaluate(async () => { const { S, cloud } = await import('./js/ui-core.js'); return (await cloud.listBin(S.user.email)).filter(e => e.data.id === 'fake-refl-stale').length; }), 0, 'no copy left in the bin');
+
+  // ---- the reflection editor's save line follows the queue: pending while the server is held, then Synced (it was
+  // read once after the save, so it said pending under a header that said Synced; 15 Oct 2026) ----
+  await core(async () => {
+    const { S, cloud, writes } = await import('./js/ui-core.js');
+    let release; window.__held = new Promise(r => { release = r; }); window.__release = release;
+    writes.configure({ backend: async (...a) => { await window.__held; return cloud.commitRecord(...a); } });
+    const r = await cloud.saveReflection(S.user.email, { id: 'fake-refl-live', headingId: 'thyroid', initials: 'ZY', title: 'Fake live', summary: 'saved text', status: 'draft' });
+    (await import('./js/ui-reflect.js')).openReflection(r);
+  });
+  await p.waitForSelector('.refl-editor input[placeholder="Title"]');
+  await p.locator('.refl-editor input[placeholder="Title"]').fill('Fake live, typed');
+  const line = p.locator('.refl-editor span[aria-live="polite"]', { hasText: /pending sync|Synced|Saving/ }).first();
+  await line.filter({ hasText: 'Saved locally · pending sync' }).waitFor({ timeout: 6000 });
+  await core(async () => { const { writes, cloud } = await import('./js/ui-core.js'); window.__release(); writes.configure({ backend: cloud.commitRecord }); });
+  await poll(async () => (await line.textContent()) === 'Synced', 'the save line did not follow the queue to Synced');
 
   assert.deepEqual(errors, [], 'console errors');
   await ctx.close();

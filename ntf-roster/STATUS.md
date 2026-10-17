@@ -8,11 +8,9 @@ Last updated: 2026-10-15 by Claude Code (NTF Roster build session, branch `claud
 
 ## The request (owner, 15 Oct 2026)
 
-"Make an NTF roster web app for NTF anaesthesia, usable from both phone and laptop. No restrictions on the interface;
-reference high-quality rostering apps. No need to be the same logic or interface as my NUH roster app. I will need to
-constantly add rules and combination restrictions after the app is published, so build that in too." His uploads
-(the department's monthly leave request sheets, the Dept Ops leave plan, a teaching programme) hold real names: they
-were read in a session scratchpad only and are **never committed**. What was learned is in `NOTES.md`.
+An NTF anaesthesia roster app for phone and laptop, to the standard of good rostering apps, free to differ from the
+NUH roster app, with rules and combination restrictions the owner can keep adding after launch. The department sheets
+he shared hold real names: read in a session scratchpad only, **never committed**. What was learned is in `NOTES.md`.
 
 ## Now
 
@@ -44,6 +42,11 @@ merged or live.
 4. Known limits in `NOTES.md` if they bite (cell editor length, month-switch redraw time).
 
 ## Recently done
+
+- 2026-10-15: first-time walkthrough (owner: "can you make a walkthrough for first time user?"), in the NUHS look:
+  Getting started checklist on your own roster (six steps that tick themselves), a 10-stop interface tour (practice
+  opens it once; "?" Help and More › Show the walkthrough replay it), three "Try it yourself" practice tasks, and the
+  Help sheet. `test/tour.e2e.mjs` added to Checks. Branch `ntf-tour2` (not pushed yet).
 
 - 2026-10-15: back to the NUHS design system (owner, after trying NTF's app design in #605): the look is the first
   version's again; the speed work from #605 stays (grid patches cells, progressive month redraw, live rule checks once per

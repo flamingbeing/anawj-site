@@ -2,22 +2,24 @@
 // "You" card (youCard), used by ui-account.js; the More page's cards are in more-cards.js.
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
-import { sortCodes, uid, academicYear, withParents, weekStart, humanAge } from './engine.js';
+import { sortCodes, uid, academicYear, withParents, weekStart, humanAge, cleanSkip } from './engine.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, facultyRole, shows, setShown, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, updateMany, updatedToast, UNDO_SECS, rowIcon } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace, placeNewTag } from './tags.js';
 import { pickDialog, CASE_PARTS, AFTER_SAVE, RECENT_COUNTS } from './ui-log.js';
 import { recentCount as snapRecent } from './logging.js';
 import { OPERATOR_HELP } from './search-ops.js';
-import { DEFAULT_ACCENT, cleanAccent } from './colors.js';
-import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS } from './markdown.js';
+import { DEFAULT_ACCENT, cleanAccent, SWATCHES } from './colors.js';
+import { THEMES, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, SPACINGS, TAB_STYLES, BANDS, HEAD_FONTS } from './themes.js';
+import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS, HEAD_STYLES, mdDate, fileDate } from './markdown.js';
 import { checkCss } from './custom-css.js';
+import { cleanMine, saveMine, minePatch, matchMine, exportText, importText } from './my-themes.js';
 import { FONTS, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont } from './fonts.js';
 import { SWITCHES, switchLabel, switchChanges, applyPatch, resetPatch, tabsAfter } from './profiles.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 import { partsSettings } from './ui-parts.js';
 import { labelsOn } from './parts.js';
 import { deviceOn, deviceChanges, deviceReset, DEVICE_SWITCHES } from './device-presets.js';
-import { applyCompact, applyTheme, cachedTheme, TEXT_SIZES, ZOOMS, applyTextSize, applyZoom, applyAccent, display, setDisplay, applyDisplay, LINE_WIDTHS, LINE_HEIGHTS, CONTRASTS, MOTIONS, BUTTON_STYLES, defaultTitle, BORDERS, ROUNDS, roundLevel, BAR_TABS, barTabs, MAX_BAR, arrangeTabs, setTabOnBar, borderLevel, cleanTitle, IPHONE_APP, START_TABS } from './display.js';
+import { applyCompact, applyTheme, cachedTheme, TEXT_SIZES, ZOOMS, applyTextSize, applyZoom, applyAccent, display, setDisplay, applyDisplay, LINE_WIDTHS, LINE_HEIGHTS, CONTRASTS, MOTIONS, BUTTON_STYLES, defaultTitle, BORDERS, ROUNDS, roundLevel, BAR_TABS, barTabs, MAX_BAR, arrangeTabs, setTabOnBar, borderLevel, cleanTitle, IPHONE_APP, START_TABS, CARD_STYLES, cardStyle, cardPatch } from './display.js';
 import { resetLink, help, toggle } from './settings-rows.js';
 // (the display helpers are still exported from here: the e2e tests import them from this file)
 export * from './display.js';
@@ -69,7 +71,7 @@ function pick(label, opts, cur, set, line, ...more) {
 const lookPick = (k, label, opts, dflt, line, ...more) =>
   pick(label, opts, display()[k] ?? dflt, v => applyDisplay(setDisplay({ [k]: v === dflt ? null : v })), line, ...more);
 const DEVICE_NOTE = () => h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.');
-const THEMES = [['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED (pure black)'], ['auto', 'Auto (match the phone)']];
+const THEME_MODES = [['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED (pure black)'], ['auto', 'Auto (match the phone)']];
 const slider = (label, names, level, dflt, onLevel) => {
   const note = h('span', { class: 'hint', style: 'margin:0' }, names[level]);
   return h('div', { class: 'field', style: 'margin-top:10px' }, h('label', { class: 'field', style: 'margin:0' }, label,
@@ -83,27 +85,145 @@ export function renderDisplay() {
     displayPreview(),
     h('section', { class: 'card' },
       h('h2', {}, 'Display'),
-      pick('Light or dark', THEMES, cachedTheme(), v => applyTheme(v)),
-      h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
-      help('Tap to pick any colour. Light and dark versions stay easy to read.'),
-      pick('Colourful', COLOURFUL, st.colourful === true ? 'tabs' : st.colourful || 'off', v => applyDisplay(setDisplay({ colourful: v === 'off' ? null : v })),
-        'A colour for each tab.', 'With the default colour, the tabs follow the NUH stripe at the top: Case orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.'),
+      h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Colours, light or dark, corners, fonts and ready-made looks are in ', h('a', { href: '#themes' }, 'Themes'), '.'),
       toggle('Compact mode', st.compact, v => { applyCompact(v); setDisplay({ compact: v }); }, 'Smaller chips, rows and spacing, so more tags fit.'),
-      // Flat first: no lines and no page cards (its own key, so the saved border levels keep their meaning)
-      slider('Borders', ['Flat (no lines, no cards)', ...BORDERS], st.flat ? 0 : borderLevel(st) + 1, BORDERS.length,
-        n => applyDisplay(setDisplay(n === 0 ? { flat: true, borders: 0 } : { flat: null, borders: n === null ? null : n - 1 }))),
-      slider('Corners', ROUNDS.map(([n]) => n), roundLevel(st), 2, n => applyDisplay(setDisplay({ round: n }))),
-      toggle('Soft shadows instead of lines around cards (default)', st.shadows !== false, v => applyDisplay(setDisplay({ shadows: v ? null : false }))),
       // the tab the app opens on (a link or shortcut to a tab still opens that tab)
       pick('Open the app on', START_TABS, st.startTab || 'log', v => { setDisplay({ startTab: v }); toast('Saved'); }),
       DEVICE_NOTE()),
-    resetLink('light or dark, colour, Colourful, compact, borders, corners, shadows and the start tab on this device', () => {
-      applyTheme('light'); applyDisplay(setDisplay({ accent: null, colourful: null, compact: null, borders: null, flat: null, round: null, shadows: null, startTab: null }));
-    }),
-    advancedLink('displayadv', 'Advanced display settings', 'The header and tab bar, Logbook rows, fonts and spacing, the Case tab layout, custom CSS'));
+    resetLink('compact mode and the start tab on this device', () => { applyDisplay(setDisplay({ compact: null, startTab: null })); }),
+    advancedLink('displayadv', 'Advanced display settings', 'The header and tab bar, Logbook rows, page width, the Case tab layout, custom CSS'));
+}
+
+// Settings → Themes (#themes; owner, 15 Oct 2026): ready-made looks (themes.js) and the look settings themselves,
+// moved here from Display. Picking a theme sets its bundle of settings at once (Undo in the toast); changing any
+// of them afterwards makes it "Custom (based on …)". Everything on this device only.
+const themeSwatch = t => {
+  const band = t.band || (t.look.band === 'none' ? null : ['#e57200', '#e4002b', '#178fd7', '#002f6c']);
+  const tint = TINTS[t.look.bgTint] || {};
+  const dark = !!t.mode;
+  const bg = (dark ? tint.dark?.bg : tint.light?.bg) || (dark ? '#121417' : '#f3f3f3');
+  const panel = (dark ? tint.dark?.panel : tint.light?.panel) || (dark ? '#1b1e23' : '#ffffff');
+  return h('span', { class: 'theme-sw', 'aria-hidden': 'true', style: `--tb:${bg};--tp:${panel};--ta:${t.look.accent || (t.keep ? cleanAccent(display().accent) || DEFAULT_ACCENT : DEFAULT_ACCENT)}` },
+    h('span', { class: 'theme-band' }, (band || [panel, panel, panel, panel]).map(c => h('i', { style: `background:${c}` }))),
+    h('span', { class: 'theme-card-in' }, h('i', { class: 'theme-dot' }), h('i', { class: 'theme-line' })));
+};
+function pickTheme(t) {
+  const before = display(), beforeMode = cachedTheme();
+  const patch = themePatch(t, before);
+  if (t.mode) { applyTheme(t.mode); patch.themeMode = true; } else if (before.themeMode) { applyTheme('light'); patch.themeMode = null; }
+  applyDisplay(setDisplay(patch));
+  hooks.render();
+  toast(`Theme: ${t.name}`, { action: 'Undo', onaction: () => {
+    applyTheme(beforeMode);
+    applyDisplay(setDisplay(Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode'].map(k => [k, before[k] ?? null]))));
+    hooks.render();
+  } });
+}
+let themeQuery = '';
+resetters.push(() => { themeQuery = ''; });
+function inspiredList() {
+  const st = display(), { theme, custom } = themeState(st);
+  const list = h('ul', { class: 'theme-list', role: 'list' });
+  const paint = () => {
+    const q = themeQuery.trim().toLowerCase();
+    const found = THEMES.filter(t => t.group === 'inspired' && (!q || (t.name + ' ' + t.desc).toLowerCase().includes(q)));
+    fill(list, found.length ? found.map(t => h('li', {}, h('button', { type: 'button', class: 'theme-row', 'aria-pressed': String(t.id === theme.id && !custom), onclick: () => pickTheme(t) },
+      themeSwatch(t), h('span', { class: 'mt' }, h('b', {}, t.name), h('small', {}, t.desc))))) : h('li', { class: 'empty' }, 'No theme matches. Suggest one below.'));
+  };
+  paint();
+  return h('div', { class: 'theme-inspired' },
+    h('input', { type: 'search', class: 'theme-find', placeholder: 'Find a theme (WhatsApp, Notion, dark…)', 'aria-label': 'Find a theme', value: themeQuery, oninput: e => { themeQuery = e.target.value; paint(); } }),
+    list);
+}
+export function renderThemes() {
+  const st = display(), { theme, custom } = themeState(st);
+  const look = (k, label, opts, dflt, line) => pick(label, opts, st[k] ?? dflt, v => applyDisplay(setDisplay({ [k]: v === dflt ? null : v })) || hooks.render(), line);
+  return h('div', { class: 'set-page themes-page' },
+    displayPreview(),
+    h('section', { class: 'card' },
+      h('h2', {}, 'Themes'),
+      h('p', { class: 'theme-now' }, 'Now: ', h('b', {}, matchMine(st.myThemes, st) && custom ? `${matchMine(st.myThemes, st).name} (yours)` : themeLabel(st))),
+      help('A theme sets the colours, light or dark, corners, lines, fonts and spacing in one go. Change anything below afterwards; your changes stay.'),
+      h('h3', {}, 'Classic'),
+      h('div', { class: 'theme-grid' }, THEMES.filter(t => t.group === 'classic').map(t => h('button', { type: 'button', class: 'theme-card', 'aria-pressed': String(t.id === theme.id && !custom), onclick: () => pickTheme(t) },
+        themeSwatch(t), h('b', {}, t.name), h('small', {}, t.desc)))),
+      h('h3', {}, 'Inspired'),
+      help('In the style of other apps: their colours, corners and type, never their logos.'),
+      inspiredList(),
+      h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('button', { type: 'button', class: 'small', onclick: async () => {
+        const m = await import('./ui-feedback.js'); m.setFeedbackDraft?.('Theme suggestion: '); location.hash = '#feedback';
+      } }, 'Suggest a theme'))),
+    myThemesCard(st, custom),
+    h('section', { class: 'card' },
+      h('h2', {}, 'Colour and light'),
+      pick('Light or dark', THEME_MODES, cachedTheme(), v => { applyTheme(v); setDisplay({ themeMode: null }); hooks.render(); }),
+      h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
+      help('Pastels show as a soft tint, with a deeper shade for text and buttons so everything stays easy to read.'),
+      pick('Colourful', COLOURFUL, st.colourful === true ? 'tabs' : st.colourful || 'off', v => { applyDisplay(setDisplay({ colourful: v === 'off' ? null : v })); hooks.render(); },
+        'A colour for each tab.', 'With the default colour, the tabs follow the NUH stripe at the top: Case orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.'),
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Background',
+        h('select', { 'aria-label': 'Background', onchange: e => { applyDisplay(setDisplay({ bgTint: e.target.value === 'auto' ? null : e.target.value })); hooks.render(); } },
+          Object.entries(TINTS).map(([k, t]) => h('option', { value: k, selected: (st.bgTint || 'auto') === k }, t.label)))),
+      look('band', 'Top band', BANDS, 'theme', 'The four-colour strip along the top. NUHS keeps the NUH stripe; other themes bring their own.')),
+    h('section', { class: 'card' },
+      h('h2', {}, 'Shape and type'),
+      pick('Card style', CARD_STYLES, cardStyle(st), v => { applyDisplay(setDisplay(cardPatch(v))); hooks.render(); }, 'How cards and lists stand off the page. How strong the lines are: Advanced display.'),
+      slider('Corners', ROUNDS.map(([n]) => n), roundLevel(st), 2, n => applyDisplay(setDisplay({ round: n }))),
+      look('spacing', 'Spacing', SPACINGS, 'normal'),
+      look('tabStyle', 'Tab bar style', TAB_STYLES, 'underline', 'How the tab you’re on is marked.'),
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Heading font',
+        h('select', { 'aria-label': 'Heading font', onchange: e => { applyDisplay(setDisplay({ headFont: e.target.value === 'same' ? null : e.target.value })); hooks.render(); } },
+          HEAD_FONTS.map(([k, t]) => h('option', { value: k, selected: (st.headFont || 'same') === k }, t)))),
+      fontPicker('ui'),
+      fontPicker('log'),
+      lookPick('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
+      DEVICE_NOTE()),
+    resetLink('the theme and every look setting on this page (light, the NUHS colours, lines, corners, fonts and spacing) on this device', () => {
+      applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'fontUiName', 'fontLogName'].map(k => [k, null])) }));
+    }));
 }
 // Settings → Display → Advanced display settings (#displayadv), under headings (owner, 13 Oct 2026): the header and
 // tab bar, Logbook rows, text, the Case tab layout, then custom CSS
+// Your themes (owner, 16 Oct 2026; my-themes.js): once anything on this page changes the look is Custom, and this card
+// offers to keep it under a name. Saved themes are picked like any other; Export and Import move them as a file.
+function myThemesCard(st, custom) {
+  const mine = cleanMine(st.myThemes), now = matchMine(mine, st);
+  const put = list => { setDisplay({ myThemes: list.length ? list : null }); hooks.render(); };
+  const name = h('input', { type: 'text', maxlength: '40', 'aria-label': 'Name for this look', placeholder: 'e.g. Night shift', value: now ? now.name : '' });
+  const save = () => {
+    try { put(saveMine(display().myThemes, name.value, display(), cachedTheme())); toast(`Saved as “${name.value.trim()}”`); }
+    catch (err) { toast(err.message); }
+  };
+  const use = t => {
+    const before = display(), beforeMode = cachedTheme();
+    if (t.mode) applyTheme(t.mode);
+    applyDisplay(setDisplay(minePatch(t))); hooks.render();
+    toast(`Theme: ${t.name}`, { action: 'Undo', onaction: () => { applyTheme(beforeMode); applyDisplay(setDisplay(Object.fromEntries([...THEME_KEYS, 'theme'].map(k => [k, before[k] ?? null])))); hooks.render(); } });
+  };
+  const drop = t => {
+    const before = display().myThemes;
+    put(cleanMine(before).filter(x => x.id !== t.id));
+    toast(`Deleted “${t.name}”`, { action: 'Undo', onaction: () => put(cleanMine(before)) });
+  };
+  const exportAll = () => { download('my-logbook-themes.json', new Blob([exportText(mine)], { type: 'application/json' })); toast('Themes saved as a file'); };
+  const importBtn = fileButton('Import…', '.json,application/json', async file => {
+    try { const r = importText(await file.text(), display().myThemes); put(r.list); toast(`${r.added} theme${r.added === 1 ? '' : 's'} added`); }
+    catch (err) { toast(err.message); }
+  }, 'btn small');
+  return h('section', { class: 'card my-themes' },
+    h('h2', {}, 'Your themes'),
+    custom && !now ? h('p', { class: 'tip', role: 'note' }, 'You’ve changed this theme: it’s now Custom. Save it to pick it again later.')
+      : help('Change anything on this page, then save the look here under a name of your own.'),
+    h('div', { class: 'bar', style: 'margin:6px 0 0' }, name, h('button', { type: 'button', class: custom && !now ? 'primary' : '', onclick: save }, now ? 'Save changes' : 'Save this look')),
+    mine.length ? h('ul', { class: 'theme-list', role: 'list', style: 'margin-top:10px' }, mine.map(t => h('li', { class: 'my-theme' },
+      h('button', { type: 'button', class: 'theme-row', 'aria-pressed': String(!!now && now.id === t.id), onclick: () => use(t) },
+        themeSwatch({ look: t.look, mode: t.mode === 'dark' || t.mode === 'oled' ? t.mode : null }), h('span', { class: 'mt' }, h('b', {}, t.name), h('small', {}, t.mode ? `Yours · ${t.mode}` : 'Yours'))),
+      h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Delete ${t.name}`, title: 'Delete', onclick: () => drop(t) }, '×')))) : null,
+    h('div', { class: 'bar', style: 'margin:10px 0 0' },
+      mine.length ? h('button', { type: 'button', class: 'small', onclick: exportAll }, 'Export…') : null, importBtn),
+    help('Export saves your themes as a file to keep or send to someone; Import adds themes from such a file. Only look settings travel, never cases or names.'));
+}
+
 export function renderDisplayAdvanced() {
   const st = display();
   const set = (k, off = null) => v => applyDisplay(setDisplay({ [k]: v || off }));
@@ -112,6 +232,9 @@ export function renderDisplayAdvanced() {
     h('section', { class: 'card' },
       h('h2', {}, 'Advanced display'),
       h('h3', {}, 'Look'),
+      help('Card style, corners, colours and fonts are in ', h('a', { href: '#themes' }, 'Themes'), '.'),
+      // the strength of the lines around cards, fields, buttons and chips (Flat, in Card style, hides them all)
+      slider('Line strength', BORDERS, borderLevel(st), BORDERS.length - 1, n => applyDisplay(setDisplay({ borders: n }))),
       lookPick('btnStyle', 'Button style', BUTTON_STYLES, 'outlined', 'The buttons that aren’t the main one on a screen.'),
       toggle('Icons instead of words on common buttons', st.iconBtns, set('iconBtns'), 'Share, Copy, Notes and Filter.', 'Each still says its name to screen readers, and on a computer when you point at it.'),
       toggle('Plain calendar', st.calPlain, set('calPlain'), 'Numbers with the count under them, no tiles.', 'Today in a coloured circle, the day you picked in a dark one.'),
@@ -131,10 +254,8 @@ export function renderDisplayAdvanced() {
       toggle('Shorter Logbook rows', st.rowShort, set('rowShort'), 'One line for the case, one grey line of tags, no buttons.', 'The initials and case in bold, the short date at the right. Tap a row to open it; press and hold (Accessibility) for Copy and Reflect.'),
       toggle('Copy button on each Logbook row', st.rowCopy, set('rowCopy'), 'Off unless you switch it on.', 'The ⋯ menu, if you use it, still copies one case.'),
       toggle('Copy button for each day', st.dayCopy, set('dayCopy'), 'Beside Share when you pick a day in the calendar.', 'Off unless you switch it on. Share already sends the whole day (or copies it, where sharing isn’t possible).'),
-      h('h3', {}, 'Text'),
-      fontPicker('ui'),
-      fontPicker('log'),
-      lookPick('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
+      h('h3', {}, 'Page'),
+      help('Fonts and line spacing are in Themes.'),
       lookPick('lineWidth', 'Page width', LINE_WIDTHS, 'normal', 'How wide the app gets on a computer or tablet.', 'Was “Line width”. Phones always use the full screen. The Case tab keeps its two panes.'),
       h('h3', {}, 'Case tab layout'),
       toggle('Case tab upside down (phones)', st.caseInverted, v => applyDisplay(setDisplay({ caseInverted: v })),
@@ -143,8 +264,8 @@ export function renderDisplayAdvanced() {
       toggle('Pin the search box at the top of the Logbook and Reflections', st.pinSearch, set('pinSearch'), 'They stay in view while the list scrolls under them.'),
       DEVICE_NOTE()),
     customCssCard(),
-    resetLink('the name in the header, fonts, line spacing and width, the tab bar (order and hidden tabs) and header options, the Logbook row buttons, upside down, pinning and custom CSS (switched off; your CSS is kept), and the button style, icons, plain calendar, page titles and shorter rows on this device', () =>
-      applyDisplay(setDisplay({ appTitle: null, fontUi: null, fontUiName: null, fontLog: null, fontLogName: null, lineWidth: null, lineHeight: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, tabOrder: null, tabHidden: null, rowMenu: null, rowCopy: null, dayCopy: null, btnStyle: null, iconBtns: null, calPlain: null, pageTitles: null, rowShort: null }))));
+    resetLink('the line strength, the name in the header, the page width, the tab bar (order and hidden tabs) and header options, the Logbook row buttons, upside down, pinning and custom CSS (switched off; your CSS is kept), and the button style, icons, plain calendar, page titles and shorter rows on this device', () =>
+      applyDisplay(setDisplay({ borders: null, appTitle: null, lineWidth: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, tabOrder: null, tabHidden: null, rowMenu: null, rowCopy: null, dayCopy: null, btnStyle: null, iconBtns: null, calPlain: null, pageTitles: null, rowShort: null }))));
 }
 export function renderAccessibility() {
   const st = display();
@@ -186,6 +307,7 @@ function tabArranger() {
     const hideSet = new Set(hidden);
     const toggle = (id, show) => setTabOnBar(id, show, paint);
     fill(wrap, h('span', {}, 'Tabs on the bar'),
+      h('p', { class: 'hint', style: 'margin:2px 0 6px' }, 'Also on the More page: Edit, to drag the bar and More’s own list. ', h('a', { href: '#more' }, 'Open More')),
       h('ul', { class: 'tab-order' }, order.map((id, i) => h('li', {},
         h('label', { class: 'check', style: 'flex:1;min-height:40px' }, h('input', { type: 'checkbox', checked: !hideSet.has(id), disabled: id === 'more', 'aria-label': 'Show ' + BAR_TABS.find(([k]) => k === id)[1], onchange: e => toggle(id, e.target.checked) }), BAR_TABS.find(([k]) => k === id)[1]),
         h('button', { class: 'small icon-btn', type: 'button', disabled: i === 0, 'aria-label': 'Move up', onclick: () => move(id, -1) }, '↑'),
@@ -263,17 +385,16 @@ function customCssCard() {
 // any colour, straight from the device's own colour picker (owner, 13 Oct 2026: no preset swatches); Default goes
 // back to the app's navy
 function accentPicker() {
-  const cur = () => cleanAccent(display().accent) || DEFAULT_ACCENT;
-  const wrap = h('div', { class: 'accent-pick' });
-  const pick = c => { applyDisplay(setDisplay({ accent: c === DEFAULT_ACCENT ? null : c })); paint(); };   // (also redoes the Colourful shades)
-  const paint = () => {
-    const c = cur();
-    fill(wrap,
-      h('input', { type: 'color', class: 'accent-input', value: c, 'aria-label': 'Colour', oninput: e => applyAccent(e.target.value), onchange: e => pick(e.target.value) }),
-      c === DEFAULT_ACCENT ? null : h('button', { type: 'button', class: 'small linkish', onclick: () => pick(DEFAULT_ACCENT) }, 'Default colour'));
-  };
-  paint();
-  return wrap;
+  const cur = cleanAccent(display().accent) || DEFAULT_ACCENT;
+  const set = c => { applyDisplay(setDisplay({ accent: c === DEFAULT_ACCENT ? null : c })); hooks.render(); };   // (also redoes the Colourful shades)
+  const known = SWATCHES.some(([, list]) => list.some(([c]) => c === cur));
+  return h('div', { class: 'swatches' },
+    SWATCHES.map(([group, list]) => h('div', { class: 'swatch-row', role: 'group', 'aria-label': group }, h('span', { class: 'swatch-group' }, group),
+      list.map(([c, name]) => h('button', { type: 'button', class: 'swatch', style: `--sw:${c}`, title: name, 'aria-label': name, 'aria-pressed': String(c === cur), onclick: () => set(c) })))),
+    h('div', { class: 'swatch-row' }, h('span', { class: 'swatch-group' }, 'Your own'),
+      h('label', { class: 'swatch custom' + (known ? '' : ' on'), style: known ? '' : `--sw:${cur}`, title: 'Any colour' },
+        h('input', { type: 'color', class: 'accent-input', value: cur, 'aria-label': 'Custom colour', oninput: e => applyAccent(e.target.value), onchange: e => set(e.target.value) })),
+      h('span', { class: 'hint', style: 'margin:0' }, 'Custom…')));
 }
 
 // ---------- Markdown (Logbook: Copy on a case or a day, Share day; the notes export) ----------
@@ -298,9 +419,33 @@ export function renderMarkdownSettings() {
   const latest = [...(S.cases || [])].filter(c => c.date).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0))[0];
   const dayList = latest ? S.cases.filter(c => c.date === latest.date).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)) : SAMPLE;
   const refl = [...(S.reflections || [])].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0] || SAMPLE_REFL;
-  const ctx = { catName, catShort, labels: labelsOn(settings()) };
+  // the preview's reflections and linked notes: yours, or the made-up one on the made-up day; Link and Embed show the
+  // reflection's note as the export and Sync name it
+  const reflsOf = c => { const mine = (S.reflections || []).filter(r => r.caseId === c.id); return mine.length ? mine : c.id === 's1' ? [{ ...SAMPLE_REFL, caseId: 's1' }] : []; };
+  const ctx = { catName, catShort, labels: labelsOn(settings()), reflectionsOf: reflsOf, notesOf: c => (Array.isArray(S.notes) ? S.notes : []).filter(n => n.caseId === c.id) };
+  // the day heading's style (Plain by default); Custom shows the heading's box. The date formats: presets or a pattern,
+  // each with a live example
+  const headBox = area('dayHead', 'Your day heading', 1), oneBox = area('oneCase', 'One case', 3);
+  const headWrap = h('div', { hidden: m.dayHeadStyle !== 'custom' }, lbl('Your heading', headBox, 'For example ## {{date}} or ## [[{{date}}]].'));
+  const headPick = pick('dayHeadStyle', 'Day heading', [['plain', 'Plain (2026-10-10)'], ['heading', 'Heading (# 2026-10-10)'], ['link', 'Link to the day’s note ([[2026-10-10]])'], ['custom', 'Custom…']]);
+  headPick.querySelector('select').addEventListener('change', () => {
+    if (m.dayHeadStyle !== 'custom') { m.dayHead = HEAD_STYLES[m.dayHeadStyle]; const one = cleanMarkdown({ ...m, oneCase: '' }).oneCase; if (!oneTyped) { m.oneCase = one; oneBox.value = one; } }
+    headBox.value = m.dayHead; headWrap.hidden = m.dayHeadStyle !== 'custom'; paint();
+  });
+  let oneTyped = !Object.values(HEAD_STYLES).some(t => m.oneCase === `${t}\n{{initials}}\n{{details}}`);
+  oneBox.addEventListener('input', () => { oneTyped = true; });
+  const patternBox = (k, label) => h('input', { type: 'text', value: m[k] || '', 'aria-label': label, spellcheck: 'false', placeholder: 'ddd D MMM YYYY', style: mono, oninput: e => { m[k] = e.target.value; paint(); } });
+  const datePat = h('div', { hidden: m.dateFormat !== 'custom' }, lbl('Date pattern', patternBox('datePattern', 'Date pattern'), 'YYYY 2026 · YY 26 · MMMM October · MMM Oct · MM 10 · M 10 · DD 05 · D 5 · dddd Saturday · ddd Sat · [text] as typed.'));
+  const filePat = h('div', { hidden: m.fileDate !== 'custom' }, lbl('File date pattern', patternBox('fileDatePattern', 'File date pattern')));
+  const dateEx = h('p', { class: 'hint', style: 'margin:4px 0 0', 'aria-live': 'polite' });
+  const datePick = pick('dateFormat', 'Dates ({{date}})', [['iso', '2026-10-10'], ['compact', '20261010'], ['long', '10 Oct 2026'], ['wlong', 'Sat 10 Oct 2026'], ['dmy', '10/10/2026'], ['custom', 'Custom pattern…']]);
+  const filePick = pick('fileDate', 'File names and link targets', [['same', 'As the dates'], ['iso', '2026-10-10'], ['compact', '20261010'], ['long', '10 Oct 2026'], ['wlong', 'Sat 10 Oct 2026'], ['custom', 'Custom pattern…']]);
+  datePick.querySelector('select').addEventListener('change', () => { datePat.hidden = m.dateFormat !== 'custom'; });
+  filePick.querySelector('select').addEventListener('change', () => { filePat.hidden = m.fileDate !== 'custom'; });
   const paint = () => {
     const f = cleanMarkdown(m);
+    ctx.reflPath = r => reflectionPath(r, f);
+    dateEx.textContent = `10 Oct 2026 is written ${mdDate('2026-10-10', f)}; its day note is named ${fileDate('2026-10-10', f)}.md.`;
     dayOut.textContent = mdDay(dayList[0].date, dayList, f, ctx);
     oneOut.textContent = mdCase(dayList[dayList.length - 1], f, ctx);
     const path = reflectionPath(refl, f);
@@ -325,15 +470,18 @@ export function renderMarkdownSettings() {
       h('h2', {}, 'Markdown'),
       h('p', { class: 'hint help', style: 'margin:0' }, 'One format for Copy and Share on the Logbook tab and for the Markdown export (More → Export / Import). The default copies the date, initials and case, never the tags.'),
       h('h3', { style: 'margin:14px 0 0' }, 'Copy and share'),
-      lbl('Day heading', area('dayHead', 'Day heading', 1), 'For example ## {{date}} or ## [[{{date}}]].'),
+      headPick, h('p', { class: 'hint help', style: 'margin:4px 0 0' }, 'Plain by default. Sync (Settings → Sync) writes a new heading into each synced day the next time it runs; your own edits there stay.'), headWrap,
       lbl('Each case in a day', area('dayCase', 'Each case in a day', 3), 'A blank line goes between cases when each takes more than one line.'),
       fillins(CASE_FILLINS),
       lbl('A day’s notes (More → Notes)', area('dayNotes', 'A day’s notes', 2), 'Follows the cases when the day has notes. {{notes}} is each note (### title, then its text). Or put {{notes}} in the day heading to place them there.'),
+      pick('reflInDay', 'Reflections under their case', [['none', 'None (default)'], ['link', 'Link to the reflection note'], ['embed', 'Embed it (Obsidian ![[…]])'], ['full', 'Full text']]),
+      h('p', { class: 'hint help', style: 'margin:4px 0 0' }, 'Link and Embed point to the reflection’s own note: in the Markdown export, and in Sync where “Also sync reflection notes” is on. Copy, Share and Send to have no such note, so they give the full text.'),
+      pick('notesInDay', 'Linked notes under their case', [['none', 'None (default)'], ['full', 'Full text']]),
       h('div', { class: 'hint', style: 'margin:8px 0 2px' }, latest ? 'Preview (your latest day)' : 'Preview'), dayOut,
-      lbl('One case', area('oneCase', 'One case', 3)),
+      lbl('One case', oneBox),
       h('div', { class: 'hint', style: 'margin:8px 0 2px' }, 'Preview'), oneOut,
       h('h3', { style: 'margin:14px 0 0' }, 'Dates, tags and links'),
-      pick('dateFormat', 'Dates ({{date}})', [['iso', '2026-10-10'], ['long', '10 Oct 2026'], ['dmy', '10/10/2026']]),
+      datePick, datePat, filePick, filePat, dateEx,
       pick('cats', 'Tags ({{categories}})', [['names', 'Names (Lower Segment Caesarean Section)'], ['codes', 'Codes (16)'], ['tags', '#tags (#LSCS)']]),
       pick('links', 'Links between notes', [['wiki', 'Wiki links [[note]] (Obsidian)'], ['md', 'Markdown links [note](note.md)']]),
       // labelled parts (Settings → Advanced logging): "Plan: GA" written as "**Plan:** GA" in {{details}}; off by default
@@ -383,6 +531,18 @@ export function renderLogging() {
         'Off by default. Untick any you don’t want.', 'The surest suggestions are ticked as you type and follow your words. One you untick stays off for that case. Check the ticks before you save: they count towards your targets.'),
       toggle('Autodetect age and gender', st.detectAgeSex !== false, v => save({ detectAgeSex: v }),
         'On by default. Optional for APMES.', 'Turning this off stops age-based Paediatrics and Geriatric suggestions. Choose those tags yourself when needed; explicit words can still suggest them.'),
+      // Detection (owner, 15 Oct 2026): what the box reads as initials. The line under the box shows what was read;
+      // a tap there keeps it as text for that case
+      h('h3', {}, 'Detection'),
+      help('The line under the case box shows what was read (AB = initials, 72M = 72 years · male). Tap one there to keep it as text for that case.'),
+      toggle('Read initials from the start of the case box', st.detectInitials !== false, v => save({ detectInitials: v ? null : false }),
+        'On by default.', 'Off: everything you type stays in the case text; use the Initials box (Advanced logging) if you want initials.'),
+      toggle('Allow one-letter initials', !!st.oneLetterInitials, v => save({ oneLetterInitials: v || null }),
+        'Off by default: one letter needs an age or "/" after it.', 'On: a capital letter on its own is initials (J lap chole). I and A still need an age, "/" or "(" after them, as they are words too.'),
+      h('label', { class: 'field', style: 'margin-top:10px' }, 'Skip these at the start',
+        h('input', { type: 'text', value: cleanSkip(st.skipStarts).join(', '), placeholder: 'e.g. ===, Pt:', maxlength: '200', autocomplete: 'off', 'aria-describedby': 'skip-help',
+          onchange: e => { const list = cleanSkip(e.target.value); e.target.value = list.join(', '); save({ skipStarts: list.length ? list.join(', ') : null }, 'Saved'); } })),
+      h('p', { class: 'hint help', id: 'skip-help' }, 'Separated by commas. Dropped from the start of a case before the initials are read, e.g. "=== AB 45F" saves AB and 45F. Not when there are no initials after them.'),
       h('h3', {}, 'Start a case'), h('p', { class: 'hint' }, 'Device setting · other devices keep their own style.'),
       toggle('Show common tags first', display().compactTags, v => { setDisplay({ compactTags: v }); paintPreview(); },
         'A shortlist from your recent cases.', 'Off by default. All tags stay searchable and can be expanded.'),
@@ -393,7 +553,7 @@ export function renderLogging() {
       pick('After Save', AFTER_SAVE, st.afterSave || 'next', v => save({ afterSave: v === 'next' ? null : v }, 'Saved'),
         '“Save, keep date” keeps the date either way.', 'Keeping the tags helps with a run of the same kind of case.')),
     h('section', { class: 'card' }, preview, h('button', { onclick: async () => {
-      try { await patchLogbook({ settings: { suggestions: true, autoTick: null, detectAgeSex: true, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
+      try { await patchLogbook({ settings: { suggestions: true, autoTick: null, detectAgeSex: true, detectInitials: null, oneLetterInitials: null, skipStarts: null, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
     } }, 'Reset these logging defaults'), h('p', { class: 'hint' }, 'Resets only the choices on this page. Advanced logging settings keep their current values.')),
     advancedLink('loggingadv', 'Advanced logging settings', 'The Case tab, the keyboard, search, dates and undo, tips'));
 }
@@ -414,6 +574,11 @@ export function renderLoggingAdvanced() {
       h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Case tab',
         h('select', { onchange: e => save({ boxLines: Number(e.target.value) }) },
           Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
+      // the height dragged with the grab bar under the box (this device), and Grow as I type (on by default)
+      h('p', { class: 'hint', style: 'margin:6px 0 0' }, 'Dragged height (this device): ', h('b', {}, display().boxHeight ? `${Math.round(display().boxHeight)} px` : 'none'),
+        display().boxHeight ? [' · ', h('button', { type: 'button', class: 'linkish', onclick: () => { setDisplay({ boxHeight: null }); hooks.render(); } }, 'Reset')] : null),
+      toggle('Grow as I type (this device)', display().boxGrow !== false, v => { setDisplay({ boxGrow: v ? null : false }); },
+        'On by default: the box grows with the text, up to two thirds of the screen.', 'Drag the bar under the box to set its starting height; double-tap the bar to reset it.'),
       // a separate Initials box above the case box, where the Case tab starts (device; was "First field for a new case")
       toggle(['Separate initials box (this device)', 'Separate initials box'], display().firstField === 'initials', v => { setDisplay({ firstField: v ? 'initials' : null }); toast('Saved on this device'); },
         'An Initials box above the case box.', 'The Case tab starts there and Enter moves on to the case. Off: type the initials at the start of the case, e.g. “AB 72M lap chole”.'),
@@ -528,65 +693,72 @@ const groupReset = (what, run, question = `Put ${what} back to the profile’s d
   if (!await confirmBox('Reset this group', question, 'Reset')) return;
   await run(); hooks.render(); toast('Back to the defaults');
 } }, 'Reset this group'));
-const sw = (label, on, set, hint) => [h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': label, checked: !!on, onchange: e => set(e.target.checked) }), label), hint ? h('p', { class: 'hint help' }, hint) : null];
+const sw = (label, on, set, hint, attrs = {}) => [h('label', { class: 'check' }, h('input', { type: 'checkbox', role: 'switch', 'aria-label': label, checked: !!on, onchange: e => set(e.target.checked), ...attrs }), label), hint ? h('p', { class: 'hint help' }, hint) : null];
 // a profile switch (profiles.js), saved for the account. These show only with the targets' counts: while that is off,
 // one switched on says so (rather than seeming to do nothing)
 const NEEDS_TARGETS = ['case:still', 'totals', 'year', 'saveToast'];
-const presetSwitch = ([k, label]) => sw(label, shows(k), v => setShown(k, v, partIds()).then(() => hooks.render()),
-  NEEDS_TARGETS.includes(k) && shows(k) && !shows('targets') ? 'Shows only with Counts against the APMES targets on.' : undefined);
+// (data-switch names it; the extras, which the Basic profiles leave out, also carry data-extra)
+const presetSwitch = ([k, label, g]) => sw(label, shows(k), v => setShown(k, v, partIds()).then(() => hooks.render()),
+  NEEDS_TARGETS.includes(k) && shows(k) && !shows('targets') ? 'Shows only with Counts against the APMES targets on.' : undefined,
+  { 'data-switch': k, ...(g === 'extras' ? { 'data-extra': '' } : {}) });
+const extra = k => presetSwitch(SWITCHES.find(x => x[0] === k));
 const switchGroup = g => SWITCHES.filter(x => x[2] === g);
 export function renderShowHide() {
   const st = settings(), d = display();
   const save = patch => patchLogbook({ settings: patch });
   const caseParts = CASE_PARTS.filter(([p]) => p !== 'still');   // (Still needed is with the APMES parts)
   const { hidden } = arrangeTabs(barTabs().map(([id]) => id), d);
+  const extrasReset = keys => resetPatch(settings(), keys);
+  // in the order of the tabs (owner, 15 Oct 2026): Case tab, Logbook, Reflections, Analytics, Header and tabs, Tips and
+  // help, APMES last; the extras sit with the area they belong to (no Extras card)
   return h('div', { class: 'showhide set-page' },
     profileCard(),
-    h('section', { class: 'card' },
-      h('h2', {}, 'Show or hide'),
-      h('p', { class: 'hint help', style: 'margin:0' }, 'Everything you can show or hide, by area. Each group has its own reset, so you can bring one area back without touching the rest. The same switches are on their own pages too.'),
-      ),
-    h('section', { class: 'card', 'data-group': 'extras' },
-      h('h3', { style: 'margin-top:0' }, 'Extras'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Off in the Basic profiles, on in Advanced and Personal.'),
-      switchGroup('extras').map(presetSwitch),
-      groupReset('the extras', () => save(resetPatch(settings(), switchGroup('extras').map(([k]) => k))))),
+    h('h2', { class: 'set-heading' }, 'Show or hide'),
+    h('p', { class: 'hint help', style: 'margin:0 6px 10px' }, 'Everything you can show or hide, by area, in the order of the tabs. Each group has its own reset. The same switches are on their own pages too. Off in the Basic profiles: the Logbook grid, figures and references, and (in Basic: logbook only) the reflections.'),
+    h('section', { class: 'card', 'data-group': 'case' },
+      h('h3', { style: 'margin-top:0' }, 'Case tab'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box, All tags and Save always stay. Still needed is under APMES.'),
+      caseParts.map(([part, label]) => sw(label, caseShown(part), v => setCaseShown(part, v, partIds()).then(() => hooks.render()))),
+      groupReset('every part of the Case tab', () => save(resetPatch(settings(), caseParts.map(([p]) => 'case:' + p))))),
+    h('section', { class: 'card', 'data-group': 'logbook' },
+      h('h3', { style: 'margin-top:0' }, 'Logbook'),
+      extra('grid'),
+      sw('Copy and Reflect buttons on each case (this device)', !d.rowMenu, v => applyDisplay(setDisplay({ rowMenu: v ? null : true })), 'Off: one ⋯ button on each row instead.'),
+      sw('Copy button on each case (this device)', !!d.rowCopy, v => applyDisplay(setDisplay({ rowCopy: v || null })), 'Off by default.'),
+      sw('Copy button for each day (this device)', !!d.dayCopy, v => applyDisplay(setDisplay({ dayCopy: v || null })), 'Off by default: Share sends the whole day.'),
+      groupReset('the grid view and the row and day buttons', () => { applyDisplay(setDisplay({ rowMenu: null, rowCopy: null, dayCopy: null })); return save(extrasReset(['grid'])); })),
+    h('section', { class: 'card', 'data-group': 'reflections' },
+      h('h3', { style: 'margin-top:0' }, 'Reflections'),
+      extra('reflect'),
+      extra('reflExtras'),
+      sw('Formatting buttons (this device)', !!d.reflToolbar, v => applyDisplay(setDisplay({ reflToolbar: v || null })), 'Bold, bullet and numbered lists above each box.'),
+      sw('Show notes under each heading', st.reflNotes !== false, v => save({ reflNotes: v })),
+      sw('Word counts in the list (this device)', !d.hideWords, v => applyDisplay(setDisplay({ hideWords: v ? null : true }))),
+      groupReset('the reflection parts and defaults (no formatting buttons, heading notes and word counts on)', () => { applyDisplay(setDisplay({ reflToolbar: null, hideWords: null })); return save({ ...extrasReset(['reflect', 'reflExtras']), reflNotes: null }); })),
+    h('section', { class: 'card', 'data-group': 'analytics' },
+      h('h3', { style: 'margin-top:0' }, 'Analytics'),
+      extra('analytics'),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'Arrange or hide its cards with Edit on the Analytics page.'),
+      groupReset('Analytics', () => save(extrasReset(['analytics'])))),
+    h('section', { class: 'card', 'data-group': 'bar' },
+      h('h3', { style: 'margin-top:0' }, 'Header and tabs (this device)'),
+      sw('Show the header (the app’s name and your name)', !d.hideHeader, v => applyDisplay(setDisplay({ hideHeader: !v }))),
+      sw('Swipe left or right to change tab', d.swipeTabs !== false, v => applyDisplay(setDisplay({ swipeTabs: v ? null : false }))),
+      barTabs().filter(([id]) => id !== 'more').map(([id, label]) => sw(`${label} on the tab bar`, !hidden.includes(id), v => setTabOnBar(id, v, () => hooks.render()))),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, `Up to ${MAX_BAR} tabs fit, More included. Hidden tabs are first in More. The order is in Display → Advanced, and Edit on More.`),
+      groupReset('the header, swiping and the profile’s tabs (Notes and the More pages go back into More, unless the profile puts them on the bar)', () => { applyDisplay(setDisplay({ hideHeader: null, swipeTabs: null, tabHidden: null, tabOrder: null })); hooks.paintTabs?.(); })),
+    h('section', { class: 'card', 'data-group': 'tips' },
+      h('h3', { style: 'margin-top:0' }, 'Tips and help'),
+      sw('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }).then(() => hooks.render()), 'Explanations around the app, the privacy and photo reminders, and the tips for the tags you pick.'),
+      sw('Show last week’s summary on the Case tab', !!st.weeklyDigest, v => save({ weeklyDigest: v })),
+      groupReset('the tips and the weekly summary', () => save({ hideTips: null, weeklyDigest: null }))),
     h('section', { class: 'card', 'data-group': 'apmes' },
       h('h3', { style: 'margin-top:0' }, 'APMES'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The programme’s parts. Off in the Personal profile, for logging outside APMES. Request an evaluation (in a case’s ⋯ menu and its edit page: a new evaluation request with the case’s date and initials, never its details) is off unless you switch it on.'),
       switchGroup('apmes').map(presetSwitch),
       // (Request an evaluation is opt-in: the reset turns it off, and says so)
       groupReset('the APMES parts', () => save(resetPatch(settings(), switchGroup('apmes').map(([k]) => k))),
-        'Put the APMES parts back to the profile’s defaults? This also turns off Request an evaluation.')),
-    h('section', { class: 'card', 'data-group': 'tips' },
-      h('h3', { style: 'margin-top:0' }, 'Tips and help'),
-      sw('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }).then(() => hooks.render()), 'Explanations around the app, the privacy and photo reminders, and the tips for the tags you pick.'),
-      sw('Show last week’s summary on the Case tab', !!st.weeklyDigest, v => save({ weeklyDigest: v })),
-      groupReset('the tips and the weekly summary', () => save({ hideTips: null, weeklyDigest: null }))),
-    h('section', { class: 'card', 'data-group': 'case' },
-      h('h3', { style: 'margin-top:0' }, 'Case tab'),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box, All tags and Save always stay. Still needed is under APMES.'),
-      caseParts.map(([part, label]) => sw(label, caseShown(part), v => setCaseShown(part, v, partIds()).then(() => hooks.render()))),
-      groupReset('every part of the Case tab', () => save(resetPatch(settings(), caseParts.map(([p]) => 'case:' + p))))),
-    h('section', { class: 'card', 'data-group': 'reflections' },
-      h('h3', { style: 'margin-top:0' }, 'Reflections'),
-      sw('Formatting buttons (this device)', !!d.reflToolbar, v => applyDisplay(setDisplay({ reflToolbar: v || null })), 'Bold, bullet and numbered lists above each box.'),
-      sw('Show notes under each heading', st.reflNotes !== false, v => save({ reflNotes: v })),
-      sw('Word counts in the list (this device)', !d.hideWords, v => applyDisplay(setDisplay({ hideWords: v ? null : true }))),
-      groupReset('the reflection defaults (no formatting buttons, heading notes and word counts on)', () => { applyDisplay(setDisplay({ reflToolbar: null, hideWords: null })); return save({ reflNotes: null }); })),
-    h('section', { class: 'card', 'data-group': 'logbook' },
-      h('h3', { style: 'margin-top:0' }, 'Logbook (this device)'),
-      sw('Copy and Reflect buttons on each case', !d.rowMenu, v => applyDisplay(setDisplay({ rowMenu: v ? null : true })), 'Off: one ⋯ button on each row instead.'),
-      sw('Copy button on each case', !!d.rowCopy, v => applyDisplay(setDisplay({ rowCopy: v || null })), 'Off by default.'),
-      sw('Copy button for each day', !!d.dayCopy, v => applyDisplay(setDisplay({ dayCopy: v || null })), 'Off by default: Share sends the whole day.'),
-      groupReset('the row and day buttons', () => applyDisplay(setDisplay({ rowMenu: null, rowCopy: null, dayCopy: null })))),
-    h('section', { class: 'card', 'data-group': 'bar' },
-      h('h3', { style: 'margin-top:0' }, 'Header and tabs (this device)'),
-      sw('Show the header (the app’s name and your name)', !d.hideHeader, v => applyDisplay(setDisplay({ hideHeader: !v }))),
-      sw('Swipe left or right to change tab', d.swipeTabs !== false, v => applyDisplay(setDisplay({ swipeTabs: v ? null : false }))),
-      barTabs().filter(([id]) => id !== 'more').map(([id, label]) => sw(`${label} on the tab bar`, !hidden.includes(id), v => setTabOnBar(id, v, () => hooks.render()))),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, `Up to ${MAX_BAR} tabs fit, More included. Hidden tabs are first in More. The order is in Display → Advanced.`),
-      groupReset('the header, swiping and the profile’s tabs (Notes and the More pages go back into More, unless the profile puts them on the bar)', () => { applyDisplay(setDisplay({ hideHeader: null, swipeTabs: null, tabHidden: null, tabOrder: null })); hooks.paintTabs?.(); })));
+        'Put the APMES parts back to the profile’s defaults? This also turns off Request an evaluation.')));
 }
 
 export function renderReflectionSettings() {

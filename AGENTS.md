@@ -8,18 +8,27 @@ Static site on GitHub Pages (public repo: no names, patient data or real evaluat
 - `evals/`: APMES workplace-based assessments. Start with `evals/NOTES.md` (decisions, MedHub, forms, operations), then `evals/README.md`.
 - `logbook/`: APMES case logbook. Start with `logbook/NOTES.md` (principles, words, screens, tags, demo, how to test), then `logbook/README.md`.
 - `people/`: APMES People, the one place to keep the resident, faculty and PD lists that logbook and evals share
-  (add a yearly intake, year check, CSV), at `apmes.anawj.com/people/`; admins and PDs only. It reuses evals' code. Start
+  (add a yearly intake, year check, CSV, import from the monthly roster, a read-only rotations view), at `apmes.anawj.com/people/`; admins and PDs only. It reuses evals' code. Start
   with `people/NOTES.md`.
+- `applicants/`: APMES residency applicants feedback, confidential feedback by residents and faculty on residency applicants (a 1-5 score and a
+  comment each), at `apmes.anawj.com/applicants/`; same sign-in as logbook, evals and People. Applicant names are never in the
+  repo (private notes). Start with `applicants/NOTES.md`, then `applicants/PLAN.md`. 
+- `360/`: APMES CCC 360, what the programme coordinators (PCs) collect from residents before a CCC meeting: scholarly projects and the
+  people who should give multisource feedback (names and emails; the PCs email them), at `apmes.anawj.com/360/`; same sign-in as
+  logbook, evals and People. Nominees' contact details are third-party data: deleted a year after a round closes. Start with
+  `360/NOTES.md`, then `360/STATUS.md`.
 - `nuh-roster/`: NUH anaesthesia daily roster (own Firebase project `nuh-roster`), at `nuhroster.anawj.com` (the old `anawj.com/nuh-roster/` redirects). Start with `nuh-roster/NOTES.md`: its department section (grades, postings, roster sheet, notation, HMS monthly rosters, short names) applies to any app dealing with NUH anaesthesia staff.
 - `ntf-roster/`: NTF (Ng Teng Fong) anaesthesia monthly duty roster: calls, PM shifts, leave and requests on one grid,
   rules the owner adds in the app (combination restrictions included), and auto-fill; at `ntfroster.anawj.com`. Start with
   `ntf-roster/NOTES.md` (department codes, data model, how to add a rule type), then `ntf-roster/SPEC.md`.
+- `nuh-junior-monthly/`: NUH junior monthly roster helper: reads the department's monthly Google Sheet (straight from Google, paste or .xlsx),
+  plans postings by the week, fills cardiac (C3) and ICU (R1B) calls with rules the rosterer edits in the app (built on
+  the NTF roster), and gives back only the day cells (written to the sheet after a check that it hasn't changed, with an undo, or pasted); at `nuhjuniormonthly.anawj.com`. NUHS
+  design. Start with `nuh-junior-monthly/NOTES.md`. Real sheets, names and analyses stay in `flamingbeing/life`.
 - `prewarm/`: prewarming study op-day data collection (temperatures every 5 min, export to the study's Excel template); served at `prewarmstudy.anawj.com`. Start with `prewarm/NOTES.md`, then `prewarm/PLAN.md`.
-- `bis-dsa/`: BIS to DSA teaching simulator for anaesthesia residents (one static page, synthetic EEG, no data), at
-  `anaes.anawj.com/bis/`. Start with `bis-dsa/NOTES.md`.
-- `ot-sim/`: anaesthesia operating-theatre simulator for teaching (a general anaesthetic, the vitals monitor and
-  crisis scenarios; one static site, synthetic physiology, no data), at `anaes.anawj.com/ot/`. Start with
-  `ot-sim/NOTES.md`, then `ot-sim/PLAN.md` (the build brief for autonomous sessions).
+- The BIS to DSA and OT simulators moved to the anantf site (`NTF-Anaesthesia/anantf-site`, `bis/` and `ot/`) on 16 Oct 2026,
+  at `anantf.com/bis/` and `anantf.com/ot/`. `anaes.anawj.com/bis/` and `/ot/` (`worker/routes.js`) and `anawj.com/bis-dsa/`
+  and `/ot-sim/` (stub pages) forward there. Work on them in that repo.
 - `hand-babies/`: hand surgery exam crash course for new MOs (one static page, no data), at `hand.anawj.com/babies/`. Start with `hand-babies/NOTES.md`.
 - `hand-log/`: hand surgery DOPS and Mini-CEX log (data on the device only, CSV/JSON export), at `hand.anawj.com/handlog/`. Start with `hand-log/NOTES.md`.
 - `edit/`: the page editor for any page on the site (`edit.anawj.com/<path>` redirects to it). Suggested edits arrive as
@@ -41,14 +50,14 @@ Rules that bite:
 
 - Accounts, settings, costs, the pre-launch checklist and how to hand over: [OPERATIONS.md](OPERATIONS.md). Update
   it when an account, setting or cost changes.
-- A PR that changes any `firestore.rules` deploys live on merge. Sessions may merge it themselves (owner, 14 Oct 2026: rules
-  and data are his biggest headache; he does not want to intervene), carefully: run `tools/test-rules.sh` first, merge only
+- A PR that changes any `firestore.rules` deploys live on merge. Sessions may merge it themselves (owner, 14 Oct 2026),
+  carefully: run `tools/test-rules.sh` first, merge only
   when the Checks are green, confirm the "Deploy Firestore rules" run succeeded, and say in the report which rules changed
   and what they now allow or deny. Never loosen rules on real-data collections (logbook, evals, prewarm, roster) just to
   make a test pass.
 - **Blocked by the cloud environment?** (no Google Cloud sign-in, the owner's real documents, a long test run, a
   secret): hand it to the owner's home-computer session instead of stopping. How and what to send: `OPERATIONS.md`,
-  "The home computer". It changes live projects only with the owner's OK.
+  "The home computer".
 
 - The homepage (`index.html`) only shows whether the server is up or down (owner, Oct 2026). Apps stay unlisted:
   never link them from the homepage, and give each app page `<meta name="robots" content="noindex, nofollow">`
@@ -62,8 +71,8 @@ Rules that bite:
 - `nuh-roster/firestore.rules` (Firebase project `nuh-roster`) and `prewarm/firestore.rules` (project `prewarm-study`) deploy the same way.
   How: `.github/workflows/deploy-firestore-rules.yml` deploys a changed file to its project on merge to main
   (check the "Deploy Firestore rules" run in Actions). It compiles the rules first, so a syntax error fails the run
-  and leaves the live rules as they were. It signs in with the `FIREBASE_SERVICE_ACCOUNT` secret (service account
-  `firebase-rules-deployer@apmes-logbook.iam.gserviceaccount.com`, Firebase Rules Admin on both projects); sessions
+  and leaves the live rules as they were. It signs in with the `FIREBASE_SERVICE_ACCOUNT` secret (the rules-deployer
+  service account, Firebase Rules Admin on each project); sessions
   never need the secret. A manual run (Run workflow) deploys both files over the live rules: ask the owner first.
   A new Firestore-backed app needs a matrix entry and paths filter in the workflow, and the owner grants that
   service account Firebase Rules Admin on the new project.
@@ -85,11 +94,12 @@ Rules that bite:
   an app's own files, write PRs as `#295 (logbook)`.
 
 Before merging, run (GitHub runs these too on every PR, plus the editor, feedback-button and hand browser tests: the
-"Checks" workflow; a red check means don't merge):
+"Checks" workflow; a red check means don't merge). On a PR the feedback-button and hand
+browser tests run only when the PR changes that app (owner, 15 Oct 2026; `.github/workflows/checks.yml`). The merge checklist:
 
 ```
 node tools/check.mjs
-for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs ntf-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do node "$f"; done
+for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs ntf-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs applicants/test/*.test.mjs 360/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do node "$f"; done
 ```
 
 - Logbook changes: `tools/test-logbook.sh` runs all of the above plus the full e2e and every focused browser test
@@ -103,11 +113,12 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - NUH roster changes: run `node nuh-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe on every tab;
   under a minute; also in the Checks workflow).
 - NTF roster changes: run `node ntf-roster/test/e2e.mjs` (Practice in a browser, desktop and phone, axe; also in the
+  Checks workflow), `node ntf-roster/test/tour.e2e.mjs` (Getting started, the tour and practice tasks; also in the
   Checks workflow), `node ntf-roster/test/perf.e2e.mjs` (speed budgets on a slowed phone; also in the Checks workflow)
   and the unit tests in `ntf-roster/test/`.
 - Hand log changes: run `node hand-log/test/e2e.mjs`.
-- OT simulator changes: run `tools/test-ot-sim.sh` (model tests, repo check, browser test; see `ot-sim/NOTES.md`).
-- BIS to DSA changes: run `node bis-dsa/test/e2e.mjs` (it also runs `adv.e2e.mjs` and `sed.e2e.mjs`) and `node bis-dsa/test/engine.check.mjs` (engine tuning, no browser).
+- Applicants changes: run `node applicants/test/model.test.mjs` and `node applicants/test/e2e.mjs`; its rules (in `logbook/firestore.rules`) have `applicants/test/rules.emulator.mjs`, run by `tools/test-rules.sh`.
+- CCC 360 changes: run `node 360/test/model.test.mjs` and `node 360/test/e2e.mjs`; its rules (in `logbook/firestore.rules`) have `360/test/rules.emulator.mjs`, run by `tools/test-rules.sh`.
 - People changes, and evals changes to `cloud.js`, `ui-core.js` or the People panes in `ui-admin.js`: run `node people/test/e2e.mjs`.
 - Page editor changes (`edit/`): run `node edit/test/e2e.mjs` and `node hand-babies/test/e2e.mjs` (it opens the editor).
 - Feedback button or Worker changes (`feedback/`, `worker/`): run `node feedback/test/e2e.mjs` (through the real Worker).
@@ -140,12 +151,20 @@ for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mj
 - **New options:** optional settings, off by default, per device unless they belong to the account; existing
   defaults stay exactly as they look now.
 - **Writing for the owner:** plain words, short; say what changed for residents and what the owner needs to do.
+- **Cloud changes go through firetop** (owner, 16 Oct 2026): live Firebase or Cloudflare changes the cloud sandbox
+  can't make go as a job to the owner's home-computer session ("firetop"), not to the owner. Who it is, how to reach it,
+  what it may do, the job format and what still needs the owner: `ops/firetop.md` in the owner's private repo
+  `flamingbeing/life` (attach it with `add_repo` if this session lacks it; Codex: ask the owner). Never put secrets or
+  patient/resident data in a job. The permission is firetop's, not yours: you still never use the Firebase or
+  Cloudflare tools yourself without the owner's approval (`CLAUDE.md`).
 - **Keep the repo public-safe:** fake data only; never commit secrets, tokens or credentials (the owner commits
   any needed public client IDs themselves).
-  **Private work goes in `flamingbeing/life`** (the owner's private repo; owner, 15 Oct 2026: "many things can be kept
-  private in Life"). Before writing anything here, ask whether it needs to be public for the app to work; if not, and it
-  is sensitive, put it in `life` instead (attach it with `add_repo` if the session lacks it; Codex: ask the owner). That
-  covers:
+  **Private work goes in `flamingbeing/life`** (the owner's private repo, 15 Oct 2026). Claude Code cloud sessions load
+  it at start (`.claude/hooks/session-start.sh` clones it next to this repo; if that fails, attach it with `add_repo`);
+  read its `CLAUDE.md`, `README.md` and `repos/anawj-site.md` before starting. Codex should have it in its environment
+  too (ask the owner if it doesn't). Before writing anything here, ask whether it needs to be public for the app to
+  work; if not, and it is sensitive, put it there instead, and leave at most a short "(details in the owner's private
+  notes)" here. That covers:
   - personal notes: how the owner works through his day, his thoughts, private plans;
   - real-world data and anything worked out from it: copies or extracts of department sheets and rosters, real staff
     names, analyses of real data, findings that name people, research notes on colleagues' workflows;
@@ -175,6 +194,12 @@ preview link (the Workers Builds check or comment on the PR) and give the owner 
 changed screens, e.g. `<preview>/logbook/?demo#notes`. Previews can't sign in (by design): check signed-in
 behaviour with tests or the emulator, and never add preview domains to Firebase or the Google / Dropbox OAuth
 clients. If no preview appears, Cloudflare isn't connected yet: say so and fall back to screenshots.
+
+**Build minutes are limited** (owner, 16 Oct 2026): every push to a branch with a PR starts a Cloudflare build, and the
+free plan has a monthly limit of build minutes shared across the Cloudflare account (PREVIEWS.md). Commit
+as often as you like, but **push once per finished step** (tests passing, ready to look at), not after every small
+commit; don't push just to save work in progress. Pushes that change only notes, status files or tests are skipped by
+the Worker's build watch paths (PREVIEWS.md).
 
 ## Claude Code–Codex handovers
 

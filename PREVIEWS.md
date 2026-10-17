@@ -58,6 +58,18 @@ the real ones: create e.g. `apmes-logbook-staging`, add one fixed preview addres
 authorised domains, and have the apps pick the test config on that host. That needs a small code change in each
 app's `firebase-config.js` and the rules deploy workflow; ask for it when wanted.
 
+## Build minutes
+
+Workers Builds' free plan gives a monthly allowance of build minutes for the whole Cloudflare account (shared with any
+other Workers on it). If they run out, builds and previews stop until the 1st (the live sites keep working), or Workers
+Paid raises the limit. To save minutes:
+
+- **Build watch paths** (owner's click: Workers → anawj-preview → Settings → Build → Build watch paths): include `*`,
+  exclude `*.md`, `**/STATUS.md`, `**/status/**`, `**/test/**`, `.github/**`. A push touching only those files makes no
+  build. (Notes and tests don't change what the preview shows.)
+- **Previews only for PRs:** Settings → Build → Previews Base → build only branches with an open PR, if offered.
+- **Sessions push once per finished step** (AGENTS.md, PR previews).
+
 ## Before-and-after screenshots on PRs
 
 `.github/workflows/pr-screenshots.yml` (`tools/shots.mjs`): on every PR from this repo, the first screen (390 px, demo

@@ -2,7 +2,7 @@
 
 import { BY_CODE, CATEGORIES, DEFAULT_NAMES, yearName, appYear } from './categories.js';
 import { tagSetOf, tagTree, flatTree, userCatNames, tagName as tagNameIn, tagLinks as tagLinksIn } from './tags.js';
-import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicYear, splitInitials, cleanInitials, ID_RE } from './engine.js';
+import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicYear, splitInitials, cleanInitials, ID_RE, setDetection, detectionFrom } from './engine.js';
 import * as cloud from './cloud.js';
 import { reflectionCounts } from './reflections.js';
 import { writes } from './writes.js';
@@ -36,7 +36,14 @@ export const S = {
 // Set by app.js: re-render the current screen, or tell it the case list changed.
 export const hooks = { render() {}, casesChanged() {} };
 
-export const settings = () => ({ suggestions: true, rYear: 1, ...(S.logbook && S.logbook.settings) });
+// (the account's detection settings follow along into engine.js, which reads initials everywhere: the box, pastes,
+// spreadsheets; redone only when the settings object changes)
+let detectFor;
+export const settings = () => {
+  const st = S.logbook && S.logbook.settings;
+  if (st !== detectFor) { detectFor = st; setDetection(detectionFrom(st)); }
+  return { suggestions: true, rYear: 1, ...st };
+};
 // Profiles (settings.mode, the whole account; at the top of Settings → Profile). Each is a preset of switches
 // (profiles.js): picking one shows what it turns on and off, then sets them; any switch can be changed after, and the
 // profile then reads "Custom (based on …)". Basic is the default for everyone (owner, 12 Oct 2026): a simpler app, the
@@ -190,6 +197,7 @@ const ICON_PATHS = {
   search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4',
   share: 'M12 3v12M8 7l4-4 4 4M5 11v9h14v-9',   // a box with an arrow out of it
   filter: 'M4 6h16M7 12h10M10 18h4',
+  trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6',   // a bin
 };
 const svgIcon = (k, cls) => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -547,9 +555,9 @@ export async function updateMany(pairs, { onprogress = savingToast } = {}) {
 // device's older copy back over the other device's change
 export function updatedToast(text, r, again = '') {
   if (!r.kept && !r.failed) return toast(text);
-  const not = [r.kept ? `${r.kept} kept as ${r.kept === 1 ? 'it was' : 'they were'} changed on another device${again ? ` (keep that version in Recent changes, then ${again})` : ''}` : '',
+  const not = [r.kept ? `${r.kept} kept as ${r.kept === 1 ? 'it was' : 'they were'} changed on another device${again ? ` (keep that version in Recover, then ${again})` : ''}` : '',
     r.failed ? `${r.failed} not saved (${r.error?.message || 'error'})` : ''].filter(Boolean).join('; ');
-  toast(`${text}. ${not}`, { action: 'Recent changes', onaction: () => { location.hash = '#recovery'; }, ms: 12000 });
+  toast(`${text}. ${not}`, { action: 'Recover', onaction: () => { location.hash = '#recovery'; }, ms: 12000 });
 }
 
 // New cases only (pasted lists, plans, a backup's missing cases): one blind batch, with no base to check against; a

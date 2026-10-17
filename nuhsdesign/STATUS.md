@@ -11,9 +11,8 @@ Last updated: 2026-10-15 by Claude Code, design session (branch `claude/inspirin
 
 ## Waiting on the owner
 
-- "Kent Ridge Clinical" design system (claude.ai artifact, https://claude.ai/artifact/4DzjjFcDa1FEbScP3CaMwp) is
-  private: share it from its Share menu if other sessions or people should build from it. It holds the website style
-  (`kr-page`) and the app theme taken from the logbook (`kr-app`: grey ground, rounded cards, chips, bottom tab bar,
+- "Kent Ridge Clinical" design system (a private claude.ai artifact; link in the owner's private notes): share it
+  from its Share menu if other sessions or people should build from it. It holds the website style (`kr-page`) and the app theme taken from the logbook (`kr-app`: grey ground, rounded cards, chips, bottom tab bar,
   44px targets), with the same tokens as `tokens.css`.
 
 ## Next (agreed queue)

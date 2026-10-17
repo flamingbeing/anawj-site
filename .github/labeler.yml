@@ -12,21 +12,24 @@ nuh-roster:
 ntf-roster:
   - changed-files:
       - any-glob-to-any-file: 'ntf-roster/**'
+nuh-junior-monthly:
+  - changed-files:
+      - any-glob-to-any-file: 'nuh-junior-monthly/**'
 prewarm:
   - changed-files:
       - any-glob-to-any-file: 'prewarm/**'
-bis-dsa:
-  - changed-files:
-      - any-glob-to-any-file: 'bis-dsa/**'
-ot-sim:
-  - changed-files:
-      - any-glob-to-any-file: 'ot-sim/**'
 hand-babies:
   - changed-files:
       - any-glob-to-any-file: ['hand-babies/**', 'hand/**']
 people:
   - changed-files:
       - any-glob-to-any-file: 'people/**'
+applicants:
+  - changed-files:
+      - any-glob-to-any-file: 'applicants/**'
+ccc-360:
+  - changed-files:
+      - any-glob-to-any-file: '360/**'
 hand-log:
   - changed-files:
       - any-glob-to-any-file: 'hand-log/**'

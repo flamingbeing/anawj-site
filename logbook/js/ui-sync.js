@@ -10,7 +10,7 @@
 
 import { S, h, toast, modal, settings, patchLogbook, okNoIds } from './ui-core.js';
 import { fmtDate } from './engine.js';
-import { cleanSync, cleanTarget, targetReady, targetPath, planDay, fingerprint, changedDays, cleanSyncLedger, markSynced, reconcileSyncState, KIND_NAMES, MAX_TARGETS, DEFAULT_FILE, DRIVE_DIR, DROPBOX_DIR } from './sync-md.js';
+import { cleanSync, cleanTarget, targetReady, targetPath, placePath, reflectionFiles, changedRefls, planDay, fingerprint, changedDays, cleanSyncLedger, markSynced, reconcileSyncState, KIND_NAMES, MAX_TARGETS, DEFAULT_FILE, DRIVE_DIR, DROPBOX_DIR } from './sync-md.js';
 import { mdDay } from './markdown.js';
 import { mdFormat, mdCtx } from './share.js';
 import { notesOn } from './notepad.js';
@@ -104,14 +104,20 @@ async function work(targets, { full = false, a = acct() } = {}) {
   if (drop.length || JSON.stringify(state.places) !== JSON.stringify(readState(a).places)) { writeState(state, a); for (const id of drop) await dropBases(id, a); }
   const { ledger } = state;
   const fmt = mdFormat(), ctx = mdCtx(), texts = new Map();
-  const text = date => {
-    if (!texts.has(date)) texts.set(date, tidy(mdDay(date, [...(days.get(date) || [])].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)), fmt, ctx, notesOn(notes, date))));
-    return texts.get(date);
+  // reflection notes, for the places that sync them too: there, a day's Link and Embed point at them
+  const refls = targets.some(t => t.reflections) ? reflectionFiles(S.reflections || [], fmt) : [];
+  const pathOf = new Map(refls.map(x => [x.id, x.path]));
+  const linked = { ...ctx, reflPath: r => pathOf.get(r.id) || '' };
+  const text = (date, withRefl = false) => {
+    const k = (withRefl ? 'r|' : '') + date;
+    if (!texts.has(k)) texts.set(k, tidy(mdDay(date, [...(days.get(date) || [])].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)), fmt, withRefl ? linked : ctx, notesOn(notes, date))));
+    return texts.get(k);
   };
   const plan = targets.map(t => {
     const fps = {};
-    for (const d of new Set([...days.keys(), ...Object.keys(ledger[t.id] || {})])) if (!t.from || d >= t.from) fps[d] = fingerprint(text(d));
-    return { target: t, days: changedDays(ledger, t.id, fps) };
+    for (const d of new Set([...days.keys(), ...Object.keys(ledger[t.id] || {}).filter(k => ISO.test(k))])) if (!t.from || d >= t.from) fps[d] = fingerprint(text(d, !!t.reflections));
+    const mine = t.reflections ? refls.filter(x => !t.from || !x.date || x.date >= t.from) : [];
+    return { target: t, days: changedDays(ledger, t.id, fps), refls: changedRefls(ledger, t.id, mine, Object.fromEntries(mine.map(x => [x.key, fingerprint(tidy(x.text))]))) };
   });
   return { plan, text };
 }
@@ -124,7 +130,7 @@ export async function daysToSync() {
   const targets = syncTargets();
   if (!targets.length || !S.casesSynced) return null;
   const { plan } = await work(targets);
-  return new Set(plan.flatMap(p => p.days)).size;
+  return new Set(plan.flatMap(p => p.days)).size + new Set(plan.flatMap(p => p.refls.map(x => x.key))).size;
 }
 
 // ---- the run ----
@@ -134,12 +140,13 @@ const remoteFor = (t, a) => (t.kind === 'drive' ? driveRemote(cloudToken('drive'
 const stopped = () => Object.assign(new Error('stopped: signed out'), { auth: true });
 const where = t => (t.kind === 'github' ? `${t.owner}/${t.repo}` : KIND_NAMES[t.kind]);
 
-// one day: read the file, work out the text, write it only if it changed and only over the version read
-// (someone else's write meanwhile: read again and merge, twice at most)
-async function syncDay(t, remote, date, inner, a, g) {
-  const path = targetPath(t, date);
+// one day (or reflection note, key "r:<id>"): read the file, work out the text, write it only if it changed and only
+// over the version read (someone else's write meanwhile: read again and merge, twice at most). A reflection note
+// under a new name starts afresh there (the old file's base doesn't apply; the old file is left as it is).
+async function syncDay(t, remote, date, inner, a, g, file = '') {
+  const path = file ? placePath(t, file) : targetPath(t, date);
   const was = readState(a).ledger[t.id]?.[date];
-  const last = was ? { fp: was.fp, base: await getBase(a, t.id, date) } : null;
+  const last = was && (!file || was.path === file) ? { fp: was.fp, base: await getBase(a, t.id, date) } : null;
   for (let tries = 0; ; tries++) {
     if (g !== gen) throw stopped();
     const cur = await remote.read(path);
@@ -152,7 +159,7 @@ async function syncDay(t, remote, date, inner, a, g) {
     if (g !== gen) throw stopped();   // written, but the device has forgotten this person's sync: keep nothing
     await putBase(a, t.id, date, inner);
     const s = readState(a);
-    writeState({ ...s, ledger: markSynced(s.ledger, t.id, date, fingerprint(inner), rev) }, a);
+    writeState({ ...s, ledger: markSynced(s.ledger, t.id, date, fingerprint(inner), rev, file) }, a);
     return p;
   }
 }
@@ -175,16 +182,16 @@ export async function runSync({ only = '', resumed = false } = {}) {
     await waitLoaded();
     const { plan, text } = await work(targets, { full: true, a });
     if (g !== gen) return;
-    const unsigned = plan.filter(x => x.days.length && x.target.kind !== 'github' && !cloudToken(x.target.kind));
+    const unsigned = plan.filter(x => (x.days.length || x.refls.length) && x.target.kind !== 'github' && !cloudToken(x.target.kind));
     if (unsigned.length && !resumed) {
       running = false;
       return signInFor(unsigned[0].target.kind, { action: 'sync', back: /^#(sync|logbook)$/.test(location.hash) ? location.hash.slice(1) : 'logbook', only });
     }
-    const jobs = plan.flatMap(x => (unsigned.includes(x) ? [] : x.days.map(date => ({ t: x.target, date }))));
+    const jobs = plan.flatMap(x => (unsigned.includes(x) ? [] : [...x.days.map(date => ({ t: x.target, date })), ...x.refls.map(refl => ({ t: x.target, refl }))]));
     const later = unsigned.map(x => x.target.name);
     if (!jobs.length) { toast(later.length ? `${later.join(' and ')}: tap Sync again to sign in` : 'Everything is synced'); return; }
     // asked once for the whole run, not per day
-    if (!(await okNoIds(...new Set(jobs.map(j => text(j.date))))) || g !== gen) return;
+    if (!(await okNoIds(...new Set(jobs.map(j => (j.refl ? j.refl.text : text(j.date, !!j.t.reflections)))))) || g !== gen) return;
     await showRun(jobs, text, { later, only, a, g });
   } catch (err) { toast('Not synced: ' + err.message); }
   finally { running = false; paintButtons(); }
@@ -195,7 +202,11 @@ export async function resumeSync(pending) {
 }
 
 async function showRun(jobs, text, { later = [], only = '', a = acct(), g = gen } = {}) {
-  const status = h('p', { role: 'status', 'aria-live': 'polite', style: 'margin:0 0 8px' }, `Syncing ${jobs.length} day${jobs.length === 1 ? '' : 's'}…`);
+  // "3 days" or "3 days and 2 reflection notes"
+  const nRefl = jobs.filter(j => j.refl).length, nDay = jobs.length - nRefl;
+  const what = [nDay ? `${nDay} day${nDay === 1 ? '' : 's'}` : '', nRefl ? `${nRefl} reflection note${nRefl === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
+  const renamed = jobs.filter(j => j.refl && j.refl.renamed).length;
+  const status = h('p', { role: 'status', 'aria-live': 'polite', style: 'margin:0 0 8px' }, `Syncing ${what}…`);
   const bar = h('progress', { max: String(jobs.length), value: '0', 'aria-label': 'Sync progress', style: 'width:100%' });
   const errs = h('ul', { class: 'sync-errors', style: 'margin:8px 0 0;padding-left:18px' });
   const retry = h('button', { hidden: true, onclick: async () => { await m.close(); runSync({ only }); } }, 'Try again');   // after the dialog's history step is undone
@@ -204,12 +215,12 @@ async function showRun(jobs, text, { later = [], only = '', a = acct(), g = gen 
   let done = 0, failed = 0, merged = 0, clashes = 0;
   const dead = new Map();   // a place whose sign-in or token failed: its other days aren't tried
   const now = Date.now();
-  for (const { t, date } of jobs) {
+  for (const { t, date, refl } of jobs) {
     if (g !== gen) break;   // signed out meanwhile: stop at once
     const remote = dead.has(t.id) ? null : remoteFor(t, a);
     try {
       if (!remote) throw dead.get(t.id);
-      const p = await syncDay(t, remote, date, text(date), a, g);
+      const p = refl ? await syncDay(t, remote, refl.key, tidy(refl.text), a, g, refl.path) : await syncDay(t, remote, date, text(date, !!t.reflections), a, g);
       if (p.merged) merged++;
       clashes += p.conflicts;
     } catch (err) {
@@ -217,17 +228,18 @@ async function showRun(jobs, text, { later = [], only = '', a = acct(), g = gen 
       // a refused sign-in or token, or a rate limit: that place's other days aren't tried, and it's said once
       if (err.auth && dead.has(t.id)) { done++; bar.value = done; continue; }
       if (err.auth) dead.set(t.id, err);
-      errs.append(h('li', {}, `${fmtDate(date)} (${t.name}): ${err.message}`));
+      errs.append(h('li', {}, `${refl ? refl.path : fmtDate(date)} (${t.name}): ${err.message}`));
     }
     done++;
     bar.value = done;
-    status.textContent = `Syncing: ${done} of ${jobs.length} days${failed ? `, ${failed} not synced` : ''}`;
+    status.textContent = `Syncing: ${done} of ${jobs.length}${failed ? `, ${failed} not synced` : ''}`;
   }
   if (g !== gen) { m.close(); return; }
   const s = readState(a);
   for (const t of new Set(jobs.map(j => j.t))) if (!dead.has(t.id)) s.at[t.id] = now;
   writeState(s, a);
-  status.textContent = `Synced ${done - failed} of ${jobs.length} day${jobs.length === 1 ? '' : 's'}` + (failed ? `; ${failed} not synced (below)` : '')
+  status.textContent = (jobs.length === nDay ? `Synced ${done - failed} of ${what}` : `Synced ${done - failed} of ${jobs.length} (${what})`) + (failed ? `; ${failed} not synced (below)` : '')
+    + (renamed ? `. ${renamed} reflection note${renamed === 1 ? '' : 's'} under a new name: the old file${renamed === 1 ? ' is' : 's are'} left as ${renamed === 1 ? 'it was' : 'they were'}` : '')
     + (merged ? `. Your edits kept in ${merged} file${merged === 1 ? '' : 's'}` : '') + (clashes ? `; ${clashes} place${clashes === 1 ? '' : 's'} where both changed are marked <<<<<<< in the file${clashes === 1 ? '' : 's'}` : '') + '.';
   if (later.length) status.textContent += ` ${later.join(' and ')}: tap Sync again to sign in.`;
   retry.hidden = !failed && !later.length;
@@ -238,6 +250,8 @@ async function showRun(jobs, text, { later = [], only = '', a = acct(), g = gen 
 // ---- the Logbook tab's button, and the reminder on open ----
 
 const buttons = new Set();
+// "3 days to sync"; with reflection notes synced somewhere, "3 to sync (days and reflection notes)"
+const toSync = n => (syncTargets().some(t => t.reflections) ? `${n} to sync (days and reflection notes)` : `${n} day${n === 1 ? '' : 's'} to sync`);
 function paintButtons() {
   for (const b of [...buttons]) if (!b.isConnected) buttons.delete(b);
   if (!buttons.size) return;
@@ -245,7 +259,7 @@ function paintButtons() {
     for (const b of buttons) {
       // short on the button (it shares a row with the view switch on a phone), in full for screen readers
       b.querySelector('.lb-sync-l').textContent = n == null ? 'Sync' : n ? `Sync (${n})` : 'Synced';
-      b.title = n ? `${n} day${n === 1 ? '' : 's'} to sync` : 'Sync';
+      b.title = n ? toSync(n) : 'Sync';
       if (n) b.setAttribute('aria-label', `Sync (${n}): ${b.title}`); else b.removeAttribute('aria-label');
     }
   }).catch(() => {});
@@ -268,7 +282,7 @@ export function remindSync() {
     // after any other reminder on screen (the backup one) has gone
     for (let i = 0; i < 60 && document.querySelector('#toast.show'); i++) await new Promise(r => setTimeout(r, 500));
     const n = await daysToSync();
-    if (n) toast(`${n} day${n === 1 ? '' : 's'} to sync`, { action: 'Sync', ms: 15000, onaction: () => runSync() });
+    if (n) toast(toSync(n), { action: 'Sync', ms: 15000, onaction: () => runSync() });
   })().catch(() => {});
 }
 
@@ -300,6 +314,8 @@ export function renderSyncSettings() {
       ghToken(t.id) ? h('button', { class: 'small', onclick: () => { setGhToken(t.id, ''); tokens.delete(t.id); toast('Token forgotten on this device'); draw(); } }, 'Forget token') : null,
     ] : null,
     field(t, 'fileName', 'File name', `One file a day. {date} is the day (2026-10-13); also {year}, {month}, {day}; a / makes folders. Default ${DEFAULT_FILE}.`),
+    h('label', { class: 'check', style: 'margin-top:8px' }, h('input', { type: 'checkbox', checked: !!t.reflections, onchange: e => { t.reflections = e.target.checked; } }), 'Also sync reflection notes'),
+    h('p', { class: 'hint help', style: 'margin:0' }, 'One note per reflection in a Reflections folder beside the day files, named as the Markdown export names them, so Link and Embed (Settings → Markdown) work there. A reflection renamed gets a new file; the old one is left as it is.'),
     h('label', { class: 'field', style: 'margin-top:8px' }, 'Start from',
       h('input', { type: 'date', value: t.from || '', 'aria-label': 'Start from', onchange: e => { t.from = e.target.value; } }),
       h('span', { class: 'hint help' }, 'Only days from this date. Empty: every day.')),

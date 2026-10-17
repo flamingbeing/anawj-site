@@ -284,9 +284,10 @@ try { for (const width of [390, 1280]) {
   if (await p.locator('dialog[open]').count()) await p.keyboard.press('Escape');
   // the dialogs' history steps are done (a step back still on its way would undo the next page's hash)
   await until(p, () => !document.querySelector('dialog[open]') && location.hash === '#logbook', null, { msg: 'the dialogs closed' });
-  // its group's reset says what it does
+  // its group's reset says what it does (a dialog's step back can still land after the hash change: go again until
+  // the Profile page shows; it failed now and then in the full run, 15 Oct 2026)
   await p.goto(base + '?demo#showhide');
-  await p.locator('[data-group="apmes"]').waitFor();
+  await until(p, () => { if (location.hash !== '#showhide') location.hash = '#showhide'; return !!document.querySelector('[data-group="apmes"]'); }, null, { msg: 'the Profile page' });
   await p.locator('[data-group="apmes"]').getByRole('button', { name: 'Reset this group' }).click();
   await p.locator('dialog[open]').getByText(/This also turns off Request an evaluation/).waitFor();
   await p.locator('dialog[open]').getByRole('button', { name: 'Cancel' }).click();

@@ -6,14 +6,20 @@ list, filtered by the app's label, has the rest).
 Each session edits only its own file under `status/` (see **Now**). Update this file when a task finishes, a decision is made, or
 before compacting (`/save-state` in Claude Code, `$save-state` in Codex).
 
-Last updated: 2026-10-15 (07:20 UTC) by Claude Code, Logbook 2 (log2): reliability fixes merged (#583–#589); follow-ups in `status/wip/README.md`.
+Last updated: 2026-10-17 by Claude Code, APMES Logbook (merged log1, log2, log3; `status/apmes-logbook.md`).
 
 ## Now
 
-Each session keeps its own line in `status/<session>.md` (`log1.md`, `log2.md`, `log3.md`, `codex.md`; a new session adds
+Each session keeps its own line in `status/<session>.md` (`apmes-logbook.md`, `codex.md`; a new session adds
 its own file), so sessions never edit the same lines. Read them all before starting; edit only yours.
+- log1, log2 and log3 merged on 17 Oct into one session, APMES Logbook: open queue, decisions and waits in `status/apmes-logbook.md`
+  (no open PRs, nothing half-done).
 
 ## Waiting on the owner
+
+- **log2's checks** (17 Oct): real-phone sign-in (installed app, Firefox for Android); each Send to preset on an iPhone;
+  Themes (Card style, Your themes) and Sync reflection notes on a phone; say go for log2's queue items 0, 0b, 1
+  (`status/apmes-logbook.md`).
 
 - **Don't re-import the old Form workbook from Admin for now** (15 Oct): three verified bugs only bite on a re-import (deleted Form
   cases come back, redated or edited ones double). Fixes are queued in `status/wip/README.md`.
@@ -25,16 +31,12 @@ its own file), so sessions never edit the same lines. Read them all before start
 - **Nightly Totals check:** the owner installed it (15 Oct). Confirm the Script property `LOGBOOK_TOTALS_FIX` is `on` (until then it
   only reports) and that `logbookOutboxTotalsSetup` added the 03:00 trigger. Matters because "Allow response editing" stays ON
   (owner, 14 Oct): the sheet's `onFormSubmit` appends Database rows again for an edited response; the nightly check repairs that.
-- **The CSV for resident 202411** (owner, 15 Oct): Firetop was asked to write a local CSV of her 11 Oct edits (before/after, plain
-  explanation) for the owner to send her; the file holds case text, so it goes through a channel the owner trusts.
 - Optional, to finish the sync check: look at the sheet's Apps Script Executions page for `logbookOutboxRun` (no errors) and log a
-  case while a Form response arrives. The app → sheet sync itself WORKED on 15 Oct 00:45 SGT (resident 202602's two real cases landed
-  in the Case tab with `app:` markers; drift check IN SYNC at 01:34).
-- Weekly drift check runs on Firetop Mondays 08:30 SGT (first 19 Oct) and messages the owner's phone; ask Claude to refresh the
-  private dashboard ("Logbook Sync Check", claude.ai/artifact/TFa1Dvn9b4uA4oAedz5111) from the run's counts.
+  case while a Form response arrives. The app → sheet sync itself worked on 15 Oct (drift check in sync).
+- A weekly drift check runs on the home computer and messages the owner's phone (details in the owner's private notes).
 - **Delete the test "ZZ" case again** (14 Oct): its first delete hit the zombie-delete bug (fixed in #519); after the
   site updates, reload and delete it once more (the old attempt sits as a conflict in Recent changes on that phone).
-- 14 Nov 2026 reminder (scheduled in log2's session): turn the response sheet's "anyone with the link: viewer" off.
+- The response sheet's public link was closed (16 Oct, owner OK): glance once at its Apps Script Executions page (`onFormSubmit`, `logbookOutboxRun`) and say "fine" or the error. Other log3 items: `status/apmes-logbook.md`.
 - **Try the 6-hour build** (13–14 Oct): Settings → Profile → Personal; Logbook day → + Daily note; Settings → Advanced
   logging → Labelled parts; Settings → Sync (GitHub / Drive / Dropbox); Send to. Everything new is off until switched on.
   Notes with text open in Preview (⋯ → Edit to type): say if they should open ready to type instead.
@@ -63,6 +65,10 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Next (agreed queue)
 
+- **From log2, waiting on go** (details in `status/apmes-logbook.md`): 0. the reflection editor's save status follows the
+  save queue live; 0b. sign-in by redirect in the installed app and Firefox for Android; 1. Paeds by age (≤ 16 ticks,
+  > 16 drops every Paeds guess) and pasted lists follow "Tick confident suggestions automatically".
+
 0. **Data-safety bug hunt: first round done and merged (#523), then parked at the owner's request ("come back to
    bugfixing later", 14 Oct).** Left in `logbook/PLAN-go-live-bugfix.md` ("Parked findings"): imports (item 7) and an app
    left open for days (item 9) untested; Firefox random seed 285932884 (a device keeps a stale copy of a case after its edit
@@ -86,6 +92,14 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Recently done
 
+- #487 APMES People (`people/`, shared resident/faculty/PD lists; `people/NOTES.md`). #684 #685 #687 #688 the public/private split: private details moved to the owner's private repo, neutral pointers left, sessions load it at start. #720 the save-state skill covers the split.
+- #686 #689 #690 #691 #692 #694 #696 #698 #715 #717 (log2, 16–17 Oct): Group by and Sort (Filter panel); Markdown day
+  heading styles, date formats, reflections and notes under their case; BMI highlight; Year comparison (Faculty);
+  Card style; Your themes (save, export, import); Sync writes reflection notes (off by default); line search icon;
+  List box grab bar; Notes bin icon on long press.
+- #665–#680 (log2, 15–16 Oct): bulk select and edit (cases, Notes, Reflections), global search, Grid as a
+  spreadsheet, paging, more Send to presets.
+
 - #583 #584 #586 #587 #589 Logbook reliability fixes from the 15 Oct audit: saves after a conflict sync or say so and devices show
   the server's copy; bulk tag/merge/re-import through the queue; backup restore never overwrites newer work; reflection bin deletes
   check the version; deleted Form cases stay deleted (rules `formGone`); fewer doubled edited Form responses; the sheet outbox never
@@ -94,10 +108,10 @@ its own file), so sessions never edit the same lines. Read them all before start
   the 72 rows re-imported on 14 Oct). #571, #574 multidevice harness fixes (real offline under a slow network, partial multi-delete,
   edits that conflict after reconnecting). Reliability hour (15 Oct): 10-area audit, ~25 verified findings, 5 fix branches paused
   (`status/wip/`).
-- #549, #550 Logbook: `/drift-check` skill (asks Firetop to run its read-only comparison of the app and the response sheet);
-  #551 the sheet script's nightly Totals check (report-only until `LOGBOOK_TOTALS_FIX` = on). 14 Oct data work with Firetop,
-  all owner-approved: 72 missing Form rows re-imported (the app and sheet now agree: 16,020 cases, 0 differing Totals cells
-  after the owner's 26iv line in `Categories.gs` and Rebuild Database / Rebuild AY Reports).
+- #549, #550 Logbook: a drift check of the app against the response sheet (run on the home computer; drift check: ask the owner);
+  #551 the sheet script's nightly Totals check (report-only until `LOGBOOK_TOTALS_FIX` = on). 14 Oct data work, all
+  owner-approved: missing Form rows re-imported (the app and sheet then agreed, after the owner's 26iv line in
+  `Categories.gs` and Rebuild Database / Rebuild AY Reports).
 - #546 Logbook: the sheet outbox switched on (`SHEET_OUTBOX_ON = true`): a programme resident's new app case goes to the old Form's
   response sheet within ~5 minutes (Case tab with `app:<id>` in column J, Database, resident report, AY totals). #527 (rules
   `sheetOutbox`, app side, sheet script `form-script/Outbox.gs`, import skips `app:` rows) and #532 (the script holds the sheet's
@@ -134,26 +148,35 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Decisions log
 
+- 2026-10-17: log1, log2 and log3 merge into one session, APMES Logbook, which carries on from the `status/` files.
+- 2026-10-16 (log3): Public/private split (`AGENTS.md`, "Keep the repo public-safe"); git history left as it is on purpose; the shared anantf-site gets only neutral wording; roster example names in tests are made up; the response sheet's public link was closed.
+- 2026-10-17 (log2): Owner merged the three logbook sessions into one, "APMES Logbook"; log2 handed over (`status/apmes-logbook.md`).
+- 2026-10-16 (log2): Owner: "do what you recommend": Card style in Themes, other look settings in Advanced display; Your
+  themes with save / export / import; Sync writes reflection notes (off by default, never deletes); icons never emoji.
+- 2026-10-16 (log2): Markdown day heading default plain; Group by / Sort in the Filter panel so the List looks as before.
+
+- 2026-10-16 (log3): Live Firebase and Cloudflare changes go as jobs to the home-computer session instead of to the owner
+  (`OPERATIONS.md`, "The home computer").
+- 2026-10-16 (log1): Where two sessions built the same thing from different instructions, the newer one on main stands (owner, on
+  Totals: #661's layout and labels win over the older #581, which was closed). Before pushing an older branch over main, check
+  whether main already changed that area, and ask.
+- 2026-10-16 (log1): Cloud sessions install Cloudflare's official Claude Code plugin (#673; anantf-site #133). No deploys or
+  Cloudflare setting changes through it without the owner's OK; Workers deploy only through Workers Builds.
 - 2026-10-15 (log2): Owner: when GitHub's Checks are slow, sessions may run the same checks locally and merge on that (#589 merged
   on the full local logbook suite, rules suite and conflict scenarios; the rules deploy was still confirmed afterwards).
-- 2026-10-15 (log2): Reliability hour with Firetop. Live data checked clean (drift IN SYNC; integrity scan: no duplicates, no
-  live-and-binned cases, no unknown categories). Code audit found real data-loss paths in the save queue, the bin, backup restore, the
+- 2026-10-15 (log2): Reliability hour with Firetop. Live data checked clean. Code audit found real data-loss paths in the save queue, the bin, backup restore, the
   Form inbox, the sheet outbox and the workbook re-import; fixes paused mid-way at the owner's usage limit, saved as a git bundle in
   `status/wip/` with the findings. Residents' blank or mistyped dates are left as they are (theirs).
-- 2026-10-15 (log2): Resident 202411's 11 Oct edits (36 text edits, 2 duplicates deleted) were DELIBERATE; Firetop's earlier restore
-  was reversed from its saved before-state, the two duplicates are in her bin and were removed from the sheet by the owner
-  (Rebuild Database + AY Reports), and the owner also synced the 36 text edits into the sheet. Rule: a change found in the
-  drift check is the resident's until they say otherwise; ask before restoring. App edits and deletes still do not reach the sheet
+- 2026-10-15 (log2): Rule: a change found in the drift check is the resident's until they say otherwise; ask before restoring
+  (a real case taught it; details in the owner's private notes). App edits and deletes still do not reach the sheet
   (next candidate build: app edits/deletes → sheet via the `app:` marker; sheet edits → app is harder, no row ids).
 - 2026-10-14 (log2): Two-way direction (owner): the app is the source of truth AND the Form / response sheet stays trusted, so
   changes in either should reach the other; built so far: drift check, re-import, nightly Totals check; not built: app
   edits/deletes to the sheet, sheet edits/deletes to the app (`logbook/PLAN-app-to-sheet.md`, "Two-way drift"). 26iv "Other
   blocks" stays an APMES category (it is a live Form option), added to the sheet script's CATEGORIES. "Allow response editing"
-  stays ON. Names may appear in chat and on the private dashboard, never in the repo. A resident testing the app changes real
-  data (resident 202411's 38 cases on 11 Oct were restored from the sheet).
+  stays ON. Names may appear in chat, never in the repo. A resident testing the app changes real data.
 - 2026-10-14 (log2): App → sheet sync decided and built: on for every programme resident, new cases only, a few minutes' delay
-  fine, the same bot account as the Form inbox (it also reads/deletes `sheetOutbox`), column J "App marker" with `app:<caseId>`;
-  the response sheet stays "anyone with the link: viewer" until 14 Nov. Dry run on a copy of the sheet showed one case holds the
+  fine, the same bot account as the Form inbox (it also reads/deletes `sheetOutbox`), column J "App marker" with `app:<caseId>`. Dry run on a copy of the sheet showed one case holds the
   sheet's document lock 25–42 s while the Form handler waited only 10 s: the owner raised that wait to 60 s and the script
   holds the lock in pieces. Bug hunt parked at the owner's request; Firetop's findings are in the plan.
 - 2026-10-14 (log2): The old Google Form stays open as a simple way in, no end date; one way only (Form → logbook);

@@ -39,8 +39,8 @@ for (const width of [390, 1280]) {
   // saying 'Saved locally'); Restore my version on the first card then saves the newest copy over the other one.
   const later=await p.evaluate(async()=>{const {updateCase,writes}=await import('./js/ui-core.js');const mine=writes.entries()[0].record;try{await updateCase({...mine,details:'My later edit'},{base:mine});return 'saved';}catch(e){return e.message;}});
   assert.match(later,/changed elsewhere/);
-  await p.evaluate(()=>location.hash='#recovery');await p.getByRole('heading',{name:'Saved versions and sync'}).waitFor();
-  await p.getByRole('button',{name:'Restore my version',exact:true}).nth(1).click();await p.getByRole('button',{name:'Restore',exact:true}).click();
+  await p.evaluate(()=>location.hash='#recovery');await p.locator('.recover-sec[data-sec=attention][open]').waitFor();
+  await p.getByRole('button',{name:'Keep mine',exact:true}).nth(1).click();await p.getByRole('button',{name:'Restore',exact:true}).click();
   await until(p,async()=>{const {cloud,S,writes}=await import('./js/ui-core.js');return (await cloud.listCases(S.user.email)).find(x=>x.id==='offline-proof')?.details==='My later edit'&&writes.status('case','offline-proof')==='synced'&&S.cases.find(x=>x.id==='offline-proof')?.details==='My later edit';});
   assert.equal(await p.evaluate(async()=>(await import('./js/ui-core.js')).writes.entries().filter(x=>x.state==='conflict').length),0);
   // After another conflict, an edit of the copy shown (the other one) syncs, and the toast the save shows next says this
@@ -48,7 +48,7 @@ for (const width of [390, 1280]) {
   await p.evaluate(async()=>{const {cloud,S,updateCase}=await import('./js/ui-core.js');const base=S.cases.find(x=>x.id==='offline-proof');await cloud.saveCase(S.user.email,{...base,details:'Other writer 2'});try{await updateCase({...base,details:'My edit 2'},{base});}catch{}});
   await until(p,async()=>{const {S,writes}=await import('./js/ui-core.js');return writes.status('case','offline-proof')==='conflict'&&S.cases.find(x=>x.id==='offline-proof')?.details==='Other writer 2';});
   await p.evaluate(async()=>{const {S,updateCase,toast}=await import('./js/ui-core.js');const shown=S.cases.find(x=>x.id==='offline-proof');await updateCase({...shown,details:'Fake edit of the other copy'},{base:shown});toast('Case updated');});
-  assert.equal(await p.locator('#toast').textContent(),'Case updated · Your version from this device is kept in Recent changes');
+  assert.equal(await p.locator('#toast').textContent(),'Case updated · Your version from this device is kept in Recover');
   await until(p,async()=>{const {cloud,S,writes}=await import('./js/ui-core.js');return (await cloud.listCases(S.user.email)).find(x=>x.id==='offline-proof')?.details==='Fake edit of the other copy'&&writes.status('case','offline-proof')==='synced';});
   assert.equal(await p.evaluate(async()=>(await import('./js/ui-core.js')).writes.entries().filter(x=>x.state==='conflict').length),0);
   await p.evaluate(()=>location.hash='#log');await p.waitForSelector('textarea.details');
@@ -71,7 +71,7 @@ for (const width of [390, 1280]) {
   await p.waitForTimeout(250);assert.equal(await p.locator('dialog[open]').count(),1);assert.equal(await p.locator('dialog textarea').inputValue(),'Typed during modal save');
   await p.locator('dialog button.primary').click();await p.waitForFunction(()=>!document.querySelector('dialog[open]'));
   // Recovery confirmation must not transfer a previous account's data after an account change.
-  await p.evaluate(()=>location.hash='#recovery');await p.waitForURL(/#recovery$/);await p.getByRole('heading',{name:'Saved versions and sync'}).waitFor();
+  await p.evaluate(()=>location.hash='#recovery');await p.waitForURL(/#recovery$/);await p.locator('.recover-page').waitFor();await p.locator('.recover-sec[data-sec=versions]').evaluate(d=>{d.open=true;});
   await p.getByRole('button',{name:'Restore this version',exact:true}).first().click();await p.waitForSelector('dialog[open]');
   await p.evaluate(async()=>{const {S,writes}=await import('./js/ui-core.js');globalThis.originalUser=S.user;S.user={email:'fake-other@example.com'};await writes.activate(S.user.email);globalThis.leakedWrites=[];writes.configure({backend:async(email,kind,record)=>{leakedWrites.push({email,kind,record});return record;}});});
   await p.getByRole('button',{name:'Restore',exact:true}).click();await p.waitForTimeout(100);assert.equal(await p.evaluate(()=>leakedWrites.length),0);

@@ -20,6 +20,8 @@ const ok = (cond, msg) => { assert.ok(cond, msg); checks++; };
 async function newPage(viewport, tag, extra = {}) {
   const ctx = await b.newContext({ viewport, acceptDownloads: true, reducedMotion: 'reduce', ...extra });   // no fade-ins under axe
   await ctx.route('https://www.gstatic.com/**', r => r.abort()); // no Firebase: the app works without it
+  // the first-time tour (practice opens it once) is tested in tour.e2e.mjs: seen already here
+  await ctx.addInitScript(() => { try { localStorage.setItem('ntf-roster-tour', JSON.stringify({ v: 1, done: true })); } catch (e) { /* ignore */ } });
   const page = await ctx.newPage();
   page.on('pageerror', e => errors.push(`[${tag}] ${e.message}`));
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource.*gstatic/.test(m.text())) errors.push(`[${tag}] console: ${m.text()}`); });

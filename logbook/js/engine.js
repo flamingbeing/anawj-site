@@ -228,20 +228,40 @@ export const ID_RE = /\b[STFGM]\d{7}[A-Z]\b|\b\d{7,}\b/i;
 // anaesthesia" would lose their first word. One capital letter counts the same way ("A 45F …"); a lower-case "a"
 // is the word. No initials -> { initials: '', details }.
 // Line breaks inside the rest are kept.
-export function splitInitials(text, keywords = KEYWORDS) {
-  const s = String(text || '').trim();
+// Detection settings (Settings → Logging → Detection; owner, 15 Oct 2026), the account's, set by the app when its
+// settings change: off (never read initials from the text), skip (starts to drop first: "===", "Pt:"), oneLetter (a
+// single capital letter is initials; I and A still need an age, "/" or "(" after them, being words)
+let DETECT = { off: false, skip: [], oneLetter: false };
+export const cleanSkip = v => (Array.isArray(v) ? v : String(v || '').split(/[\n,]+/)).map(x => String(x || '').trim().slice(0, 20)).filter(Boolean).slice(0, 20);
+export const detectionFrom = st => ({ off: st?.detectInitials === false, skip: cleanSkip(st?.skipStarts), oneLetter: !!st?.oneLetterInitials });
+export const setDetection = o => { DETECT = { ...DETECT, ...o, skip: cleanSkip(o?.skip ?? DETECT.skip) }; };
+// a listed start at the very front, dropped (with the spaces after it); case-insensitive, longest first
+export function skipStart(s, skip = DETECT.skip) {
+  let t = String(s || '').trim();
+  for (let again = true; again;) {
+    again = false;
+    for (const x of [...skip].sort((a, b) => b.length - a.length)) if (t.toLowerCase().startsWith(x.toLowerCase())) { t = t.slice(x.length).trim(); again = !!t; break; }
+  }
+  return t;
+}
+export function splitInitials(text, keywords = KEYWORDS, opts = DETECT) {
+  const raw = String(text || '').trim();
+  if (opts.off) return { initials: '', details: raw };
+  const s = opts.skip && opts.skip.length ? skipStart(raw, opts.skip) : raw;
   // the first run of 1-8 letters, in any case ("ab 45f lap chole" -> AB); stored in capitals
   const m = s.match(/^([A-Za-z]{1,8})(?![A-Za-z0-9])[\s\/,:;.\-]*/);
-  if (!m) return { initials: '', details: s };
+  if (!m) return { initials: '', details: raw };
   const word = m[1], up = word.toUpperCase(), lower = word !== up;
   // a case word ("IJ", "TKR", "lap") is still initials when an age follows: "IJ 60M VATS", "lap 45f …"
   const ageNext = /^\d{1,3}\s?(?:(?:yo|y\/o|yrs?|years?|y|\/12|\/52|m\/o|mo|d\/o)\s?[MF]?|[MF])(?![A-Za-z])/i.test(s.slice(m[0].length));
-  if ((up.length > 4 || up.length === 1) && !ageNext && !/^\s*\//.test(s.slice(word.length))) return { initials: '', details: s };
-  if (up.length === 1 && lower) return { initials: '', details: s };
+  const after = s.slice(word.length), marked = /^\s*\//.test(after) || (up.length === 1 && opts.oneLetter && /^\s*\(/.test(after));
+  const single = up.length === 1 && opts.oneLetter && !lower && !['I', 'A'].includes(up) && /^\s/.test(after);
+  if ((up.length > 4 || up.length === 1) && !ageNext && !marked && !single) return { initials: '', details: raw };
+  if (up.length === 1 && lower) return { initials: '', details: raw };
   const caseWord = NOT_INITIALS.has(up) || (keywords && keywords[word.toLowerCase()]) || (lower && STOP_WORDS.has(word.toLowerCase()));
-  if (caseWord && !ageNext) return { initials: '', details: s };
+  if (caseWord && !ageNext) return { initials: '', details: raw };
   // lower case: a 4-letter word ("circ", "knee") needs an age after it to count as initials
-  if (lower && up.length === 4 && !ageNext) return { initials: '', details: s };
+  if (lower && up.length === 4 && !ageNext) return { initials: '', details: raw };
   return { initials: up, details: s.slice(m[0].length).trim() };
 }
 
@@ -308,15 +328,19 @@ export function splitAge(details) {
   const s = String(details || '');
   const compound = s.match(/^\s*(\d{1,3}m\d{1,2}w[MF]?)(?![A-Za-z])[\s,;:\-]*/i);
   const m = compound || s.match(AGE_SEX);
-  return m ? { age: m[1].replace(/\s+/g, ''), rest: s.slice(m[0].length).trim() } : { age: '', rest: s.trim() };
+  // no one is over 120 years: "150M …" is a number, not an age (15 Oct 2026)
+  if (!m || (!compound && overAge(m[1]))) return { age: '', rest: s.trim() };
+  return { age: m[1].replace(/\s+/g, ''), rest: s.slice(m[0].length).trim() };
 }
+export const MAX_AGE = 120;
+const overAge = age => { const x = String(age || '').replace(/\s+/g, '').match(/^(\d+)(yo|y\/o|yrs?|years?|y)?[mf]?$/i); return !!x && Number(x[1]) > MAX_AGE; };
 
 // Human-readable preview only; the original shorthand stays in the case text.
 export function humanAge(age) {
   const compound = String(age || '').match(/^(\d{1,3})m(\d{1,2})w([mf])?$/i);
   if (compound) return Number(compound[1]) + ' month' + (Number(compound[1]) === 1 ? '' : 's') + ' ' + Number(compound[2]) + ' week' + (Number(compound[2]) === 1 ? '' : 's') + (compound[3] ? ' · ' + (compound[3].toLowerCase() === 'm' ? 'male' : 'female') : '');
   const m = String(age || '').match(/^(\d{1,3})(mo|m\/o|\/12|\/52|d\/o|yo|y\/o|yrs?|years?|y)?([mf])?$/i);
-  if (!m) return String(age || '');
+  if (!m || overAge(age)) return String(age || '');
   const n = Number(m[1]), unit = (m[2] || '').toLowerCase();
   const name = ['mo', 'm/o', '/12'].includes(unit) ? 'month' : unit === '/52' ? 'week' : unit === 'd/o' ? 'day' : 'year';
   return n + ' ' + name + (n === 1 ? '' : 's') + (m[3] ? ' · ' + (m[3].toLowerCase() === 'm' ? 'male' : 'female') : '');

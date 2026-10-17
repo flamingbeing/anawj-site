@@ -4,17 +4,18 @@
 
 import { replaceShow, legacyShow, tabsAfter } from './profiles.js';
 import { appVersion, versionLabel, freshCopy } from './app-version.js';
-import { S, hooks, h, toast, basicHides, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow, watchMyReflections } from './ui-core.js';
+import { S, hooks, h, toast, basicHides, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow, watchMyReflections, resetters } from './ui-core.js';
 import { renderLog, focusLog, logCasesChanged, clearDrafts } from './ui-log.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, IPHONE_APP, setPageLabel, START_TABS, arrangeTabs } from './display.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, IPHONE_APP, setPageLabel, START_TABS, arrangeTabs, setTabOnBar, barTabs, MAX_BAR } from './display.js';
+import { gripDrag, moveIn } from './drag-list.js';
 import { createNavigation } from './navigation.js';
 import { renderNotes, leaveNotes, openDayNote, renderNoteSettings } from './ui-notepad.js';
 import { fromQuery, keepShared, readInbox } from './share-in.js';
-import { purgeExpired, openBin } from './bin.js';
-import { profile } from './ui-core.js';
+import { purgeExpired } from './bin.js';
+import { profile, ic } from './ui-core.js';
 import { deviceOn, barAtBottom } from './device-presets.js';
 import { notesChanged } from './ui-notepad.js';
-import { privacyCard, creditsCard, signOutCard } from './more-cards.js';
+import { finePrint, signOutCard } from './more-cards.js';
 import { wipeSyncDevice } from './sync-forget.js';
 
 // ---------- pages that load on first use ----------
@@ -28,7 +29,7 @@ const MODS = {
   sync: () => import('./ui-sync.js'), settingsFile: () => import('./settings-file.js'), account: () => import('./ui-account.js'),
   admin: () => import('./ui-admin.js'), recovery: () => import('./ui-recovery.js'), notesExport: () => import('./ui-notes.js'),
   cloudSave: () => import('./cloud-save.js'), backup: () => import('./backup.js'), shareIn: () => import('./ui-share-in.js'),
-  parts: () => import('./ui-parts.js'), feedback: () => import('./ui-feedback.js'),
+  parts: () => import('./ui-parts.js'), feedback: () => import('./ui-feedback.js'), search: () => import('./ui-search.js'),
 };
 const mod = {}, loading = {};   // name → the module once loaded; → its promise while loading
 function need(name) {
@@ -84,6 +85,7 @@ const ICONS = {
   admin: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4M12 15v2',   // a lock: admins only
   recovery: 'M3 11a9 9 0 1 1 3 8M3 4v7h7M12 7v5l3 2',
   data: 'M12 3v12M7 10l5 5 5-5M5 21h14',
+  themes: 'M12 3a9 9 0 1 0 0 18c1.1 0 1.5-.8 1.5-1.5 0-1-.8-1.4-.8-2.3 0-.9.7-1.4 1.6-1.4H17a4 4 0 0 0 4-4c0-4.4-4-7.8-9-7.8zM7.5 12h.01M9.5 8h.01M14.5 8h.01',   // a palette
   display: 'M3 5h18v12H3zM8 21h8M12 17v4',
   access: 'M12 5.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5 8l7 1.5L19 8M12 9.5V14M12 14l-3 7M12 14l3 7',   // a figure, arms out
   logging: 'M12 5v14M5 12h14',
@@ -130,11 +132,14 @@ const TABS = [
   { id: 'points', label: 'Learning points', render: page(['parts'], m => m.parts.renderPoints()), hidden: true, under: 'logbook', unlisted: true },
   { id: 'account', bar: true, label: 'Account', render: page(['account', 'settings'], m => m.account.renderAccount()), hidden: true, under: 'more', desc: 'Your name and portfolio details (Section 1); delete account' },
   { id: 'settings', bar: true, label: 'Settings', render: page(['settings', 'send', 'sync', 'settingsFile'], () => renderSettingsMenu()), hidden: true, under: 'more', desc: 'Profile, look, logging, reflections, notes and sharing, data' },
-  { id: 'recovery', bar: true, short: 'Recover', label: 'Recent changes / Recover drafts', render: page(['recovery'], m => m.recovery.renderRecovery()), hidden: true, under: 'more', desc: 'Retry sync, recover unfinished drafts and restore recent versions on this device' },
+  { id: 'recovery', bar: true, short: 'Recover', label: 'Recover', render: page(['recovery'], m => m.recovery.renderRecovery()), hidden: true, under: 'more', desc: 'Changes waiting to sync, recently deleted, unfinished drafts and earlier versions' },
   { id: 'data', bar: true, short: 'Export', label: 'Export / Import', render: page(['logbook', 'notesExport', 'cloudSave', 'backup'], () => renderDataPage()), hidden: true, under: 'more', desc: 'Export the portfolio (Word); import reflections from Word; backup file, Excel and Markdown export' },
+  // Search (log2 9e): the magnifier in the header, or / on a computer
+  { id: 'search', label: 'Search', render: page(['search'], m => m.search.renderSearch()), hidden: true, unlisted: true },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
-  { id: 'display', label: 'Display', render: page(['settings'], m => m.settings.renderDisplay()), hidden: true, under: 'settings', unlisted: true, desc: 'Light or dark, colour, compact, borders; fonts and more under Advanced' },
+  { id: 'themes', label: 'Themes', render: page(['settings'], m => m.settings.renderThemes()), hidden: true, under: 'settings', unlisted: true, desc: 'Ready-made looks, colour, light or dark, the top band' },
+  { id: 'display', label: 'Display', render: page(['settings'], m => m.settings.renderDisplay()), hidden: true, under: 'settings', unlisted: true, desc: 'Compact mode, the screen it opens on; more under Advanced' },
   { id: 'access', label: 'Accessibility', render: page(['settings'], m => m.settings.renderAccessibility()), hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion, swipe gestures' },
   { id: 'displayadv', label: 'Advanced display', render: page(['settings'], m => m.settings.renderDisplayAdvanced()), hidden: true, under: 'display', unlisted: true, desc: 'The header and tab bar, Logbook rows, fonts, custom CSS' },
   { id: 'loggingadv', label: 'Advanced logging', render: page(['settings'], m => m.settings.renderLoggingAdvanced()), hidden: true, under: 'logging', unlisted: true, desc: 'Case tab parts, labelled parts and a case template, the keyboard, search, the week, undo, tips' },
@@ -175,15 +180,66 @@ function renderMore() {
   const hidden = arrangeTabs(barCandidates(), display()).hidden.filter(id => !TABS.find(t => t.id === id).hidden)
     .sort((a, b) => rank(a) - rank(b));
   const descOf = t => (t.id === 'progress' && facultyMode() ? 'Who’s behind in each residency year' : t.desc || 'Hidden from the tab bar');
+  // two groups (owner, 15 Oct 2026): the pages under More's own title (hidden tabs first, Settings last), then
+  // "Account and help"; Install and Sign out; privacy and credits as fine print; the app version
+  const HELP = ['account', 'feedback', 'feedbackinbox', 'admin'];
+  const row = (t, desc) => menuItem(t.id, t.moreLabel || t.label, desc);
+  const firstTabs = byMoreOrder([...hidden.map(id => TABS.find(t => t.id === id)).filter(t => !HELP.includes(t.id)),
+    ...items.filter(t => !HELP.includes(t.id) && t.id !== 'settings'), ...items.filter(t => t.id === 'settings')]);
+  if (moreEdit) return h('div', {}, moreEditCard(firstTabs));
+  const first = firstTabs.map(t => row(t, hidden.includes(t.id) ? descOf(t) : t.desc));
+  const help = HELP.map(id => visibleTabs().find(t => t.id === id) || (hidden.includes(id) ? TABS.find(t => t.id === id) : null)).filter(Boolean);
   return h('div', {},
-    h('section', { class: 'card more-list' }, h('h2', {}, 'More'),
-      h('ul', {}, hidden.map(id => TABS.find(t => t.id === id)).map(t => menuItem(t.id, t.moreLabel || t.label, descOf(t))), items.map(t => menuItem(t.id, t.moreLabel || t.label, t.desc)))),
-    privacyCard(),
-    creditsCard(),
+    h('section', { class: 'card more-list' }, h('div', { class: 'more-head' }, h('h2', {}, 'More'),
+      h('button', { type: 'button', class: 'small', onclick: () => { moreEdit = true; render(); } }, 'Edit')), h('ul', {}, first)),
+    help.length ? h('section', { class: 'card more-list more-help' }, h('h2', {}, 'Account and help'), h('ul', {}, help.map(t => row(t, t.desc)))) : null,
     installCard(),
     signOutCard(),
+    finePrint(),
     versionLine());
 }
+
+// More's Edit mode (owner, 15 Oct 2026; per device): the tab bar and the More list, each to drag or move with the
+// arrows; a row goes on the bar or comes off it (a full bar asks which tab it replaces: setTabOnBar). More's own order
+// is display().moreOrder (pages it doesn't name keep their default place).
+let moreEdit = false;
+resetters.push(() => { moreEdit = false; });
+const byMoreOrder = tabs => {
+  const order = Array.isArray(display().moreOrder) ? display().moreOrder : [];
+  const at = (t, i) => (order.includes(t.id) ? order.indexOf(t.id) : order.length + i);
+  return tabs.map((t, i) => [t, at(t, i)]).sort((a, b) => a[1] - b[1]).map(([t]) => t);
+};
+function moreEditCard(moreTabs) {
+  const label = id => (BAR_TABS_LABEL(id));
+  const all = barTabs().map(([k]) => k), { sorted, shown } = arrangeTabs(all, display());
+  const onBar = shown.filter(id => id !== 'more');
+  const barIds = new Set(all);
+  const setOrder = ids => { const rest = sorted.filter(x => !ids.includes(x)); applyDisplay(setDisplay({ tabOrder: [...ids, ...rest] })); hooks.paintTabs?.(); render(); };
+  const setMore = ids => { applyDisplay(setDisplay({ moreOrder: ids })); render(); };
+  const barList = h('ul', { class: 'an-edit-list', role: 'list' });
+  const moreList = h('ul', { class: 'an-edit-list', role: 'list' });
+  const arrows = (list, ids, i, set, name) => [
+    h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${name} up`, disabled: i === 0, onclick: () => set(moveIn(ids, i, i - 1)) }, '↑'),
+    h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Move ${name} down`, disabled: i === ids.length - 1, onclick: () => set(moveIn(ids, i, i + 1)) }, '↓')];
+  const grip = (list, ids, set) => h('span', { class: 'an-grip', 'aria-hidden': 'true', title: 'Drag to move', onpointerdown: e => gripDrag(e, list, (from, to) => set(moveIn(ids, from, to))) }, '⠿');
+  barList.append(...onBar.map((id, i) => h('li', { 'data-tab': id }, grip(barList, onBar, setOrder), h('span', { class: 'an-edit-name' }, label(id)),
+    ...arrows(barList, onBar, i, setOrder, label(id)),
+    h('button', { type: 'button', class: 'small', 'aria-label': `Take ${label(id)} off the bar`, onclick: () => setTabOnBar(id, false, render) }, 'Take off'))));
+  const ids = moreTabs.map(t => t.id);
+  moreList.append(...moreTabs.map((t, i) => h('li', { 'data-tab': t.id }, grip(moreList, ids, setMore), h('span', { class: 'an-edit-name' }, t.moreLabel || t.label),
+    ...arrows(moreList, ids, i, setMore, t.moreLabel || t.label),
+    barIds.has(t.id) ? h('button', { type: 'button', class: 'small', 'aria-label': `Put ${t.moreLabel || t.label} on the bar`, onclick: () => setTabOnBar(t.id, true, render) }, 'Pin') : null)));
+  return h('section', { class: 'card an-edit more-edit' },
+    h('h2', {}, 'Arrange More and the tab bar'),
+    h('p', { class: 'hint help' }, `Drag by ⠿ or use the arrows. Pin puts a page on the tab bar (it holds ${MAX_BAR}); Take off puts it back in More. This device only.`),
+    h('h3', {}, 'On the tab bar'), barList, h('p', { class: 'hint', style: 'margin:0 0 8px' }, 'More stays last.'),
+    h('h3', {}, 'In More'), moreList,
+    h('div', { class: 'bar', style: 'margin:12px 0 0' },
+      h('button', { type: 'button', class: 'linkish', onclick: () => { applyDisplay(setDisplay({ moreOrder: null, tabOrder: null, tabHidden: null })); hooks.paintTabs?.(); render(); } }, 'Reset'),
+      h('span', { style: 'flex:1' }),
+      h('button', { type: 'button', class: 'primary', onclick: () => { moreEdit = false; render(); } }, 'Done')));
+}
+const BAR_TABS_LABEL = id => (t => (t ? t.short || t.label : id))(TABS.find(t => t.id === id));
 
 // "Install the app" (More): Android and desktop Chrome/Edge offer their own install prompt, which we
 // keep from beforeinstallprompt; iPhone/iPad Safari has none, so it gets the Share → Add to Home Screen
@@ -219,7 +275,7 @@ function installCard() {
 // Search in Settings (owner): the options of every settings page and its Advanced page, read from the pages
 // themselves (each is drawn once, off screen, the first time someone types), so the index never goes stale.
 // A result opens its page and scrolls to the option, which flashes.
-const SEARCH_PAGES = ['showhide', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'tags', 'reflset', 'notesset', 'sharefmt', 'sendto', 'sync', 'account'];
+const SEARCH_PAGES = ['showhide', 'themes', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'tags', 'reflset', 'notesset', 'sharefmt', 'sendto', 'sync', 'account'];
 const SEARCH_MODS = ['settings', 'send', 'sync', 'account'];   // the modules those pages are drawn from
 let settingsIndex = null, findAfterRender = '';
 const optionText = n => {
@@ -244,11 +300,11 @@ function buildSettingsIndex() {
     }
   }
   // the Settings page's own cards (Settings file, Connect Claude: their buttons too) and its Recycle bin
-  for (const card of [settingsFileCard(), connectClaudeCard()]) {
+  for (const card of [settingsFileCard(), connectClaudeCard(), resetAllCard()]) {
     const text = card.querySelector('h2').textContent.trim();
     out.push({ id: 'settings', page: 'Settings', text, hint: [...card.querySelectorAll('button, a, label'), ...card.querySelectorAll('p')].map(x => x.textContent.trim()).join(' · ').slice(0, 160) });
   }
-  out.push({ id: 'bin', page: 'Settings', text: 'Recycle bin', hint: 'Deleted cases, reflections and notes, kept for 30 days', open: openBin });
+  out.push({ id: 'recovery', page: 'More', text: 'Recycle bin', hint: 'Recover → Recently deleted: cases, reflections and notes, kept for 30 days' });
   return out;
 }
 const searchSettings = (index, q) => {
@@ -303,11 +359,10 @@ function settingsSearch() {
 // Logging, Reflections, Notes and sharing, Data, Advanced. Search finds any option on any page.
 const SETTINGS_GROUPS = [
   ['Profile', ['showhide']],
-  ['Look', ['display', 'access']],
+  ['Look', ['themes', 'display', 'access']],
   ['Logging', ['logging', 'tags']],
   ['Reflections', ['reflset']],
   ['Notes and sharing', ['notesset', 'sharefmt', 'sendto', 'sync']],
-  ['Data', ['bin']],
   ['Advanced', ['displayadv', 'loggingadv']],
 ];
 // the groups, then any Settings page none of them names (so a new page is never left out of the menu)
@@ -318,14 +373,14 @@ function settingsGroups() {
 }
 function renderSettingsMenu() {
   if (lastRendered !== 'settings') { settingsIndex = null; settingsQuery = ''; }   // drawn again on the first search of this visit
-  const item = id => (id === 'bin' ? menuItem('bin', 'Recycle bin', 'Deleted cases and reflections, kept for 30 days', () => openBin())
-    : (t => menuItem(t.id, t.label, t.desc))(TABS.find(t => t.id === id)));
+  const item = id => (t => menuItem(t.id, t.label, t.desc))(TABS.find(t => t.id === id));
   return h('div', {},
     settingsSearch(),
     h('section', { class: 'card more-list settings-menu' }, h('h2', {}, 'Settings'),
       settingsGroups().map(([name, ids]) => [h('h3', {}, name), h('ul', {}, ids.map(item))])),
     settingsFileCard(),
-    connectClaudeCard());
+    connectClaudeCard(),
+    resetAllCard());
 }
 
 // at the very bottom of More (owner, 15 Oct 2026; was Settings): which app version this device runs, and a way to fetch the latest when it seems stuck on an old
@@ -354,14 +409,15 @@ function connectClaudeCard() {
 
 // Settings export / import: preferences, tags, shorthand, tag groups, formats as one small file
 // (settings-file.js). Never cases, reflections or portfolio details.
+function exportSettings() {
+  // this device's display settings travel in the file (in place of any old ones in the account)
+  const dev = Object.fromEntries(DISPLAY_KEYS.filter(k => !/^customCss/.test(k)).map(k => [k, display()[k]]).filter(([, v]) => v != null));   // custom CSS never goes in a file to share
+  const plain = Object.fromEntries(Object.entries((S.logbook && S.logbook.settings) || {}).filter(([k]) => !DISPLAY_KEYS.includes(k)));
+  const f = mod.settingsFile.settingsFile({ ...S.logbook, settings: { ...plain, ...dev } }, { theme: cachedTheme() });
+  download(`logbook-settings-${todayISO()}.json`, new Blob([JSON.stringify(f, null, 2)], { type: 'application/json' }));
+}
 function settingsFileCard() {
-  const exportIt = () => {
-    // this device's display settings travel in the file (in place of any old ones in the account)
-    const dev = Object.fromEntries(DISPLAY_KEYS.filter(k => !/^customCss/.test(k)).map(k => [k, display()[k]]).filter(([, v]) => v != null));   // custom CSS never goes in a file to share
-    const plain = Object.fromEntries(Object.entries((S.logbook && S.logbook.settings) || {}).filter(([k]) => !DISPLAY_KEYS.includes(k)));
-    const f = mod.settingsFile.settingsFile({ ...S.logbook, settings: { ...plain, ...dev } }, { theme: cachedTheme() });
-    download(`logbook-settings-${todayISO()}.json`, new Blob([JSON.stringify(f, null, 2)], { type: 'application/json' }));
-  };
+  const exportIt = () => exportSettings();
   const importIt = async file => {
     const text = await file.text();
     // a file of this browser's choices from the old address (anawj.com/logbook): look, text size, tab layout, drafts
@@ -405,6 +461,45 @@ function settingsFileCard() {
     h('div', { class: 'bar', style: 'margin-bottom:0' },
       h('button', { onclick: exportIt }, 'Export settings'),
       fileButton('Import settings…', '.json,application/json', importIt)));
+}
+
+// Reset all settings (owner, 15 Oct 2026): this device's look and layout, and optionally the account's preferences
+// (settings-file.js resetAccountPatch: your year, profile, saved searches, places and tags stay unless asked). Never
+// cases, reflections, notes or drafts. Asks first, can save a settings file first, and Undo in the toast.
+let resetScope = 'device';
+function resetAllCard() {
+  const tagsBox = h('input', { type: 'checkbox', id: 'reset-tags' });
+  const fileBox = h('input', { type: 'checkbox', id: 'reset-file', checked: true });
+  const tagsRow = h('label', { class: 'check', hidden: resetScope !== 'account' }, tagsBox, 'Also reset my tags and shorthand');
+  const scope = h('fieldset', { class: 'pick' }, h('legend', {}, 'What to reset'),
+    [['device', 'This device only (look, layout, text size)'], ['account', 'This device and my account (logging, formats and the rest)']].map(([v, t]) =>
+      h('label', { class: 'pick-opt' }, h('input', { type: 'radio', name: 'reset-scope', value: v, checked: resetScope === v, onchange: () => { resetScope = v; tagsRow.hidden = v !== 'account'; } }), t)));
+  const go = async () => {
+    const acct = resetScope === 'account', tags = acct && tagsBox.checked;
+    const what = acct ? 'Every setting on this device and in your account goes back to how the app starts' + (tags ? ', your tags and shorthand too' : '; your tags and shorthand stay') : 'Every setting on this device (look, layout, text size) goes back to how the app starts; your account’s settings stay';
+    if (!(await confirmBox('Reset all settings', `${what}. Your year, profile, saved searches and places to send and sync to stay. Cases, reflections, notes and drafts are never touched. Undo is in the message after.`, 'Reset', true))) return;
+    if (fileBox.checked) { try { exportSettings(); } catch (err) { return toast('Could not save the settings file: ' + err.message); } }
+    const beforeDev = { ...display() }, beforeMode = cachedTheme(), beforeAcct = { ...((S.logbook && S.logbook.settings) || {}) };
+    const patch = acct ? mod.settingsFile.resetAccountPatch(beforeAcct, { tags }) : {};
+    applyTheme('light');
+    applyDisplay(setDisplay(Object.fromEntries(DISPLAY_KEYS.map(k => [k, null]))));
+    applyCustomCss();
+    if (Object.keys(patch).length) await patchLogbook({ settings: patch });
+    hooks.paintTabs?.(); render();
+    toast('All settings reset', { action: 'Undo', onaction: async () => {
+      applyTheme(beforeMode);
+      applyDisplay(setDisplay(Object.fromEntries(DISPLAY_KEYS.map(k => [k, beforeDev[k] ?? null]))));
+      applyCustomCss();
+      if (Object.keys(patch).length) await patchLogbook({ settings: Object.fromEntries(Object.keys(patch).map(k => [k, beforeAcct[k] ?? null])) });
+      hooks.paintTabs?.(); render(); toast('Settings put back');
+    } });
+  };
+  return h('section', { class: 'card danger-zone reset-all' },
+    h('h2', {}, 'Reset all settings'),
+    h('p', { class: 'hint help' }, 'Start again from how the app looks and works on a new phone. Cases, reflections, notes and drafts are never touched.'),
+    scope, tagsRow,
+    h('label', { class: 'check' }, fileBox, 'Save a settings file first (a backup you can import)'),
+    h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { class: 'danger', onclick: go }, 'Reset all settings…')));
 }
 
 // The Word upload for reflections (its module loads on first use); when done, on to Reflections
@@ -815,7 +910,7 @@ document.addEventListener('touchend', async e => {
 // its counts in place; other screens re-render when nothing is being edited (pendingRender: declared above render()).
 // Settings pages that show no case data: drawing them again would only throw away what is half filled in there (a
 // sync place being added, a search being typed)
-const CASE_FREE = new Set(['settings', 'showhide', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'sendto', 'sync']);
+const CASE_FREE = new Set(['settings', 'showhide', 'themes', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'sendto', 'sync']);
 hooks.casesChanged = () => {
   paintWho();
   if (S.tab === 'log') return logCasesChanged();
@@ -843,6 +938,16 @@ function flushRender() {
 
 // The header is always one line (title left, name right), so it never changes height between
 // loading, signed out and signed in. Demo / offline show as a small tag beside the name.
+// Search: on every tab (log2 9e), a line magnifier in the theme's colours (not an emoji; owner, 16 Oct 2026);
+// / opens it on a computer when you're not typing
+const searchBtn = () => h('button', { type: 'button', class: 'who-search', title: 'Search cases, reflections and notes (/)', 'aria-label': 'Search',
+  onclick: () => go('search') }, ic('search'));
+addEventListener('keydown', e => {
+  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || !S.user || e.defaultPrevented) return;
+  const t = e.target;
+  if (t && (t.closest?.('input, textarea, select, [contenteditable="true"], dialog[open]'))) return;
+  e.preventDefault(); go('search');
+});
 function paintWho() {
   const flags = [cloud.demo ? 'demo' : '', navigator.onLine ? '' : 'offline'].filter(Boolean).join(' · ');
   // the demo is a small badge in the header (tap for Reset / Leave), so the app looks as it does for real
@@ -859,7 +964,7 @@ function paintWho() {
   document.documentElement.classList.toggle('who-alert', !S.user || !navigator.onLine || !!S.pending);
   if (!S.user) { fill(whoEl, flag); return; }
   document.body.dataset.cases = String(S.cases.length);   // not shown; read by tests
-  fill(whoEl, sync, flag, h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
+  fill(whoEl, sync, flag, searchBtn(), h('span', { class: 'email', title: S.user.email }, S.user.name || S.user.email));
 }
 hooks.writesChanged = () => { paintWho(); if (S.tab === 'recovery') render(); };
 window.addEventListener('online', paintWho);
@@ -1196,7 +1301,7 @@ addEventListener('keydown', e => {
   e.preventDefault();   // instead of the browser's own zoom, so the setting and the screen agree
   const v = stepZoom(dir);
   toast(`Zoom ${Math.round(v * 100)}%`, { ms: 1200 });
-  if (S.tab === 'display') render();
+  if (S.tab === 'display' || S.tab === 'themes') render();
 });
 if (cachedCompact()) document.body.classList.add('compact');   // first paint; corrected once the logbook loads
 paintWho();

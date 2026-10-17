@@ -63,6 +63,14 @@ export function createStore({ demo = false, fallback } = {}) {
     });
   }
 
+  // Getting started ticks (settings.onboarding: { codes, rules, shared, hidden, done }) are about the person, not the
+  // roster: undo and redo keep the newer ticks instead of taking them back with the edit.
+  function withMarks(next, cur) {
+    const a = next.settings && next.settings.onboarding, b = cur.settings && cur.settings.onboarding;
+    if (!b || JSON.stringify(a) === JSON.stringify(b)) return next;
+    return { ...next, settings: { ...next.settings, onboarding: { ...(a || {}), ...b } } };
+  }
+
   function notify(label, source) {
     for (const fn of subs) {
       try { fn(state, { label, source }); } catch (e) { console.error(e); }
@@ -90,6 +98,17 @@ export function createStore({ demo = false, fallback } = {}) {
       return true;
     },
 
+    // A Getting started tick or "hide the checklist" (merged into settings.onboarding): saved, backed up and shared
+    // like any change, but not an undo step (it isn't an edit of the roster). Subscribers get source 'mark'.
+    mark(patch, label = 'Getting started') {
+      const ob = (state.settings && state.settings.onboarding) || {};
+      if (Object.entries(patch).every(([k, v]) => ob[k] === v)) return false;
+      state = { ...state, settings: { ...state.settings, onboarding: { ...ob, ...patch } } };
+      store.save();
+      notify(label, 'mark');
+      return true;
+    },
+
     replace(next, label = 'Replace') {
       const migrated = safeMigrate(structuredClone(next));
       if (!migrated) throw new Error('This roster is damaged: it could not be read.');
@@ -105,7 +124,7 @@ export function createStore({ demo = false, fallback } = {}) {
       const step = undo.pop();
       if (!step) return null;
       redo.push({ label: step.label, state });
-      state = step.state;
+      state = withMarks(step.state, state);
       store.save();
       notify(step.label, 'undo');
       return step.label;
@@ -115,7 +134,7 @@ export function createStore({ demo = false, fallback } = {}) {
       const step = redo.pop();
       if (!step) return null;
       undo.push({ label: step.label, state });
-      state = step.state;
+      state = withMarks(step.state, state);
       store.save();
       notify(step.label, 'redo');
       return step.label;
