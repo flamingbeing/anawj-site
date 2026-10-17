@@ -27,7 +27,10 @@ The CCC 360 app is built and merged: residents' half (#752) and the coordinators
 - 2026-10-17: People changes handed to the People session (their #754 is merged); the 360 session built the resident app and the coordinators' view.
 - 2026-10-17: the 60-day nominee clean-up runs when staff open the app (no scheduled job); a round with no close time is never purged by guesswork.
 
+## Recently done
 
+- #748 CCC 360: rules and emulator tests for rounds, projects, nominees and PCs.
+- #751 People: roles kept in the app (`access/`), PCs with Admin staff's powers, faculty ticks (rules).
 - #752 CCC 360: the resident app (projects and feedback nominees).
 - #754 People: Access tab (roles, access log, paste people, tick core and CCC) (People session).
 - #755 CCC 360: the coordinators' view (rounds, who has sent, marks, email links, CSV, 60-day clean-up).
