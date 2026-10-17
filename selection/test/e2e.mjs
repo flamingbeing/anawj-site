@@ -72,6 +72,7 @@ assert.ok(await page.getByRole('radio', { name: /5\s*Best fit/ }).isDisabled());
 
 // 4. A score with no comment is flagged on the review screen, but doesn't block sending
 await page.getByRole('button', { name: /Casey ›/ }).click();
+await page.getByText('Applicant 3 of 6').waitFor();
 await page.getByRole('radio', { name: /2\s*Below par/ }).check({ force: true });
 await page.goBack(); await page.goBack(); await page.goBack();
 await page.goto(BASE + '360/?demo#review');
