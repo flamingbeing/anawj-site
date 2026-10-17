@@ -42,6 +42,15 @@ missing was one obvious screen to keep them, and an easy way to add the yearly b
 - No rules change: everything here was already allowed for admins and PDs (`logbook/firestore.rules`).
 - No service worker (an online admin tool). `anawj.com/people/` redirects to `apmes.anawj.com/people/`.
 
+## Who runs permissions (owner, 17 Oct 2026)
+
+The People session (this one) is the **orchestrator for permissions and manpower across the APMES family of apps**
+(People, logbook, evals, CCC 360): who holds which role (owner, Admin staff, PC, PD), the access log, and who is on the
+faculty, core and CCC lists. It also helps supplement manpower for the roster apps (NUH Junior Monthly, NTF roster, NUH
+roster) where People can supply it (e.g. rotations, grades, people lists). Other sessions send it requests (role changes,
+new lists, rules for who may see what); it **accepts them autonomously** and does the work on its own branch, but a
+rules change still follows the repo rules (tests, green Checks) and a handover PR still waits for the owner.
+
 ## Roles (`access/`; rules in `logbook/firestore.rules`, tests `people/test/rules.emulator.mjs`)
 
 Owner, 17 Oct 2026: roles are edited in the app, not the console or firetop. `access/{google-email}` = `{ email, name, roles, updatedAt,
