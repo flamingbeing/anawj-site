@@ -2,7 +2,7 @@
 
 Short and current. Lasting rules go in `NOTES.md`. Update with `/save-state`.
 
-Last updated: 2026-10-14 by Claude Code, Prewarming Webapp.
+Last updated: 2026-10-17 by Claude Code, Prewarming Webapp.
 
 ## Now
 
@@ -31,6 +31,8 @@ edit the same lines. Read them all before starting; edit only yours.
 3. Export across hospitals for admins; a members' view of who entered what.
 
 ## Recently done
+
+- #521–#535, #594 (15 Oct): grey carried-over temperatures and BP/HR/BIS (stopped on save, owner checked); two-column sub-page layout on phones; app version starts with the date (`prewarm-<date>-<hash>`); done shortcuts change colour; PACU Mark complete button bigger; Day 1/2 now POD1/POD2; "no breaking changes" rule (NOTES.md). Nothing half-done; restyle is on hold.
 
 - #512, #513, #514, #515, #517, #518, #520 and the off-protocol note PR (14 Oct): red sync chip and error words by place; PACU `updateDoc`; restore works every time; repeating alerts; export NA past the warming, local-date file name, all-or-nothing install; done shortcuts show a tick; pad moves to the next box; POD1/POD2 due on the list and in Still to fill; patient search; Ready for a case? card; `RUNBOOK.md`; `io_dev` note field.
 
