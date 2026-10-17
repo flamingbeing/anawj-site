@@ -92,6 +92,7 @@ its own file), so sessions never edit the same lines. Read them all before start
 
 ## Recently done
 
+- #760 (17 Oct): log1, log2 and log3 merged into one session, APMES Logbook; one status file, `status/apmes-logbook.md`. Idle; the open queue (items 0, 0b, 1) waits for the owner's go.
 - #487 APMES People (`people/`, shared resident/faculty/PD lists; `people/NOTES.md`). #684 #685 #687 #688 the public/private split: private details moved to the owner's private repo, neutral pointers left, sessions load it at start. #720 the save-state skill covers the split.
 - #686 #689 #690 #691 #692 #694 #696 #698 #715 #717 (log2, 16–17 Oct): Group by and Sort (Filter panel); Markdown day
   heading styles, date formats, reflections and notes under their case; BMI highlight; Year comparison (Faculty);
