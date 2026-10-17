@@ -21,6 +21,8 @@ export const DEMO_USERS = {
   resident: { email: 'resident@example.com', name: 'Demo Resident', uid: 'demo-resident' },
   assessor: { email: 'faculty@example.com', name: 'Dr Demo Faculty', uid: 'demo-faculty' },
   admin: { email: 'admin@example.com', name: 'Demo Admin', uid: 'demo-admin' },
+  staff: { email: 'staff@example.com', name: 'Demo Admin Staff', uid: 'demo-staff' },
+  pdonly: { email: 'pd@example.com', name: 'Dr Demo PD', uid: 'demo-pdonly' },
 };
 export const EMAIL_LINK = false;
 
@@ -34,7 +36,13 @@ function storage() {
   return null;
 }
 function blank() {
+  const who = u => ({ email: u.email, name: u.name });
+  // the demo admin is also the owner; "staff" (Admin staff only) and "pdonly" (a PD only) are there to try the other roles
   return { admins: { [DEMO_USERS.admin.email]: { name: DEMO_USERS.admin.name } }, pds: { [DEMO_USERS.admin.email]: { name: DEMO_USERS.admin.name } },
+    owners: { [DEMO_USERS.admin.email]: { name: DEMO_USERS.admin.name } },
+    access: { [DEMO_USERS.staff.email]: { ...who(DEMO_USERS.staff), roles: ['admin'], updatedAt: Date.now() - 5 * 86400000, updatedBy: DEMO_USERS.admin.email },
+      [DEMO_USERS.pdonly.email]: { ...who(DEMO_USERS.pdonly), roles: ['pd'], updatedAt: Date.now() - 5 * 86400000, updatedBy: DEMO_USERS.admin.email } },
+    accessLog: [],
     residents: {}, faculty: {}, applications: {}, evaluations: {} };
 }
 function load() {
@@ -56,7 +64,7 @@ function save(s) {
 function param() {
   try { return typeof location !== 'undefined' ? new URLSearchParams(location.search).get('demo') : null; } catch { return null; }
 }
-const ROLE_ALIASES = { '': 'resident', resident: 'resident', reset: 'resident', assessor: 'assessor', faculty: 'assessor', admin: 'admin', pd: 'admin' };
+const ROLE_ALIASES = { '': 'resident', resident: 'resident', reset: 'resident', assessor: 'assessor', faculty: 'assessor', admin: 'admin', pd: 'admin', staff: 'staff', pdonly: 'pdonly' };
 let roleNow = ROLE_ALIASES[param() ?? ''] || 'resident';
 let signedOut = false;        // per tab
 
@@ -223,8 +231,13 @@ function denied(why) {
   return e;
 }
 const me = () => { const u = currentUser(); if (!u) throw denied('signed out'); return u.email; };
-const isAdmin = s => !!s.admins[me()];
-const isPD = s => !!s.pds[me()];
+// roles kept in the app (access/) count like the older lists; a PC has Admin staff's powers
+const rolesOf = (s, e) => (s.access && s.access[e] && s.access[e].roles) || [];
+const isAdmin = s => !!s.admins[me()] || rolesOf(s, me()).some(r => r === 'admin' || r === 'pc');
+const isPD = s => !!s.pds[me()] || rolesOf(s, me()).includes('pd');
+const adminEmail = (s, e) => !!s.admins[e] || rolesOf(s, e).some(r => r === 'admin' || r === 'pc');
+const pdEmail = (s, e) => !!s.pds[e] || rolesOf(s, e).includes('pd');
+const isOwnerNow = s => !!(s.owners && s.owners[me()]) || rolesOf(s, me()).includes('owner');
 const activeFaculty = (s, e) => s.faculty[e] && s.faculty[e].status === 'ACTIVE';
 const changed = (a, b) => [...new Set([...Object.keys(a), ...Object.keys(b)])].filter(k => JSON.stringify(a[k]) !== JSON.stringify(b[k]));
 const only = (keys, allowed) => keys.every(k => allowed.includes(k));
@@ -297,12 +310,14 @@ export async function getRoles(email) {
   const resident = Object.values(s.residents).filter(r => r.email === email)
     .sort((a, b) => (b.status === 'ACTIVE') - (a.status === 'ACTIVE'))[0] || null;
   const application = u ? Object.values(s.applications).find(a => a.uid === u.uid) || null : null;
-  return plain({ admin: !!s.admins[email], pd: !!s.pds[email], resident, faculty: s.faculty[email] || null, application });
+  const roles = rolesOf(s, email);
+  return plain({ admin: !!s.admins[email] || roles.includes('admin') || roles.includes('pc'), pd: !!s.pds[email] || roles.includes('pd'),
+    owner: !!(s.owners && s.owners[email]) || roles.includes('owner'), pc: roles.includes('pc'), resident, faculty: s.faculty[email] || null, application });
 }
 
 export async function listFaculty() {
   const s = load(), e = me();
-  if (!(s.admins[e] || s.pds[e] || s.faculty[e] || Object.values(s.residents).some(r => r.email === e))) throw denied('residents, faculty, PDs and admins only');
+  if (!(adminEmail(s, e) || pdEmail(s, e) || s.faculty[e] || Object.values(s.residents).some(r => r.email === e))) throw denied('residents, faculty, PDs and admins only');
   return Object.values(load().faculty).map(plain).sort((a, b) => String(a.name).localeCompare(String(b.name)));
 }
 export async function saveFaculty(f) {
@@ -347,6 +362,45 @@ export async function removePD(email) {
   const s = load();
   if (!isAdmin(s)) throw denied('admins only');
   delete s.pds[lc(email)]; save(s);
+}
+
+// ---- access (People › Access): the same checks as access/ and accessLog/ in the rules ----
+
+export async function listAccess() {
+  const s = load();
+  if (!isAdmin(s) && !isPD(s) && !isOwnerNow(s)) throw denied('admins, PDs and owners only');
+  return Object.entries(s.access || {}).map(([email, d]) => plain({ ...d, email })).sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email)));
+}
+function accessAllowed(s, e, newRoles) {
+  const owner = isOwnerNow(s), self = e === me(), had = rolesOf(s, e).includes('owner');
+  if (owner) { if (self && !(newRoles || []).includes('owner')) throw denied('you can’t drop your own Owner role'); return; }
+  if (!isAdmin(s)) throw denied('owners, Admin staff and programme coordinators only');
+  if (self) throw denied('ask another admin to change your own roles');
+  if (had || (newRoles || []).includes('owner')) throw denied('only an owner changes an Owner');
+}
+export async function saveAccess({ email, name, roles, change } = {}) {
+  const s = load();
+  const e = lc(email);
+  if (!e.includes('@')) throw new Error('email missing');
+  const list = [...new Set(roles || [])];
+  if (list.some(r => !['owner', 'admin', 'pc', 'pd'].includes(r))) throw new Error('unknown role');
+  accessAllowed(s, e, list);
+  (s.access || (s.access = {}))[e] = { email: e, name: String(name ?? '').slice(0, 200), roles: list, updatedAt: Date.now(), updatedBy: me() };
+  (s.accessLog || (s.accessLog = [])).push({ by: me(), to: e, change: String(change || 'changed').slice(0, 300), at: Date.now() });
+  save(s);
+}
+export async function removeAccess(email, change) {
+  const s = load();
+  const e = lc(email);
+  if (isOwnerNow(s) ? e === me() : (!isAdmin(s) || e === me() || rolesOf(s, e).includes('owner'))) throw denied('not allowed');
+  delete (s.access || {})[e];
+  (s.accessLog || (s.accessLog = [])).push({ by: me(), to: e, change: String(change || 'removed').slice(0, 300), at: Date.now() });
+  save(s);
+}
+export async function listAccessLog(n = 50) {
+  const s = load();
+  if (!isAdmin(s) && !isOwnerNow(s)) throw denied('admins and owners only');
+  return plain([...(s.accessLog || [])].sort((a, b) => b.at - a.at).slice(0, n));
 }
 
 export async function applyForRole({ role, name, note } = {}) {
@@ -428,7 +482,7 @@ export async function getEvaluation(id) {
   if (!d) return null;
   const e = currentUser()?.email;
   if (!e) return null;
-  if (d.residentEmail === e || (d.assessorEmail === e && d.status !== 'draft') || s.admins[e] || s.pds[e]) return plain(d);
+  if (d.residentEmail === e || (d.assessorEmail === e && d.status !== 'draft') || adminEmail(s, e) || pdEmail(s, e)) return plain(d);
   return null;
 }
 
@@ -453,6 +507,6 @@ function watch(filter, cb) {
 export function watchMine(email, cb) { email = lc(email); return watch(d => d.residentEmail === email, cb); }
 export function watchAssigned(email, cb) { email = lc(email); return watch(d => d.assessorEmail === email && d.status !== 'draft', cb); }
 export function watchAll(cb) {
-  const ok = () => { const e = currentUser()?.email; const s = load(); return !!(e && (s.admins[e] || s.pds[e])); };
+  const ok = () => { const e = currentUser()?.email; const s = load(); return !!(e && (adminEmail(s, e) || pdEmail(s, e))); };
   return watch(() => ok(), cb);
 }
