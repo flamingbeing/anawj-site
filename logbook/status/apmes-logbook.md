@@ -1,7 +1,35 @@
-# Now: Claude Code, Logbook 2 (log2)
+# Now: Claude Code, APMES Logbook (session_016HpHN2kgnP6mwgTMoZ6yCN)
 
-**Handed over 17 Oct 2026 to the merged session "APMES Logbook" (session_016HpHN2kgnP6mwgTMoZ6yCN).** log2 is
-archived after this; the new session carries on from this file. Branch was `ccr-afac5e7a-99esax`.
+**One session for the logbook** (owner, 17 Oct 2026): log1, log2 and log3 merged into this one. Their handovers are folded in
+below; their files are gone (history in git). Branch `claude/clever-gates-pm6sas` (reset to `origin/main` at each start; after a
+squash-merge the old history is already in main). Public-safe: private details are in the owner's private repo
+(`flamingbeing/life`, its `README.md` maps what to read; attach with `add_repo`). Idle until the owner says go on the queue.
+
+### Folded in from log1 and log3
+- **log1 (merged):** #543 Totals "Total tags" row and All tags / Towards minimums switch; #548 header keeps its height; #566 app
+  version and Get the latest version; #673 and anantf-site#133 Cloudflare plugin in cloud sessions (no deploys or Cloudflare
+  settings changes without the owner's OK). #581 closed, superseded by #661 (Totals on the bar in every profile; Faculty / PCs
+  Totals · Admin · More): don't revive it (owner, 16 Oct). The version link still reads "Get the latest version" and fetches
+  `index.html`; AGENTS.md says "Not updating? Get the latest version" and `sw.js`: small fix, not yet done.
+- **log1 waits on the owner:** try the 6-hour build features (Personal profile, daily note, labelled parts, Sync, Send to);
+  whether notes with text should open ready to type instead of Preview; whether a new reflection should keep reusing its draft
+  slot. Ideas not built: images/files in notes; searching an external vault; "this day in earlier years"
+  (`PLAN-personal-log.md`); 4,000-character case summary (needs a rules change).
+- **log3 (merged):** Codex, axe, previews, Firebase plugin setup (#164–#188), Notes review fixes (#181), APMES People (#487),
+  the public/private split (#684–#688, #720). Rules from the owner are in `AGENTS.md` (public-safe, live Firebase/Cloudflare
+  changes go to firetop as jobs). Keep People healthy: after touching `logbook/firestore.rules` roles or the evals files People
+  imports, run `node people/test/e2e.mjs` and `tools/test-rules.sh`. People ideas only if asked (`people/NOTES.md`).
+- **log3 waits on the owner:** glance once at the response sheet's Apps Script Executions page (`onFormSubmit`,
+  `logbookOutboxRun`) and say "fine" or the error; add the private notes repo to Codex's environment; tick it when starting an
+  anantf-site session; private-repo housekeeping; decide whether the pacemaker-magnet locations leave the published MO guide.
+- **Role rules (#751, 17 Oct):** `access/{email}` roles (owner, admin, pc, pd); a PC counts as `isAdmin()`; rules are near the
+  1000-expression limit: run `tools/test-rules.sh` after changing `isAdmin()`, `isPD()`, `isAppOwner()` or evaluation rules.
+- **Stop-time "N unpushed commits" after a squash-merge:** only already-merged history; reset the branch to `origin/main` and
+  push (own branch only).
+- **Gotchas:** merge a PR with the full 40-character `expectedHeadSha`; People's e2e waits 300 ms before axe.
+- Firetop (home computer) offered to take Firebase/Cloudflare change jobs; the owner has since put the rule in AGENTS.md.
+
+## From log2
 
 ### Open work
 - **No open PRs. Nothing unpushed or half-done.** Everything below is merged on main (last code PR #717).
