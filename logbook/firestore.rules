@@ -114,6 +114,10 @@ service cloud.firestore {
     match /residents/{rid} {
       allow read: if isAdmin() || isPD();
       allow get, list: if signedIn() && resource.data.email == me();
+      // Any resident may read the ACTIVE residents (names and emails), so colleagues can be picked and found (owner, 17 Oct 2026:
+      // "residents should be able to see each others emails and see the list of residents"). People on leave, graduated or
+      // attrited stay hidden, and a list query must ask for status == 'ACTIVE'. Writes stay with admins and PDs.
+      allow get, list: if resource.data.status == 'ACTIVE' && cccResident();
       // PDs may add residents and edit their name, status and year (the evals people lists), but never
       // overwrite an entry or move it to another email (that email is what grants the logbook's
       // programme access); only admins do that, and only admins delete

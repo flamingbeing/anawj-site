@@ -92,7 +92,8 @@ await t('admins list by user', assertFails(getDocs(collection(a, 'admins'))));
 await t('self add admin', assertFails(setDoc(doc(a, 'admins', A), { name: 'x' })));
 await t('my resident query', assertSucceeds(getDocs(query(collection(a, 'residents'), where('email', '==', A)))));
 await t('all residents by user', assertFails(getDocs(collection(a, 'residents'))));
-await t('other resident get', assertFails(getDoc(doc(a, 'residents', 'R2'))));
+// since 17 Oct 2026 (owner) a resident may read the ACTIVE residents; R2 here is active. Left-out statuses stay hidden (360/test/rules.emulator.mjs).
+await t('other active resident get', assertSucceeds(getDoc(doc(a, 'residents', 'R2'))));
 await t('own resident get', assertSucceeds(getDoc(doc(a, 'residents', 'R1'))));
 await t('user edit resident', assertFails(setDoc(doc(a, 'residents', 'R1'), { rid: 'R1', name: 'A', email: A, status: 'ACTIVE', intake: 2024, rYear: 5 })));
 await t('admin list residents', assertSucceeds(getDocs(collection(adm, 'residents'))));

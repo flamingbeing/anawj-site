@@ -2,7 +2,7 @@
 // Rules: logbook/firestore.rules. Run from the repo root:  tools/test-rules.sh   (or, with the emulator on port 8085,
 //   npx firebase emulators:exec --only firestore --project demo-logbook "node 360/test/rules.emulator.mjs")
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, getDocs, collection, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, getDocs, collection, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import fs from 'node:fs';
 
 const env = await initializeTestEnvironment({
@@ -25,6 +25,7 @@ await env.withSecurityRulesDisabled(async ctx => {
   await setDoc(doc(db, 'residents', 'R2'), { rid: 'R2', name: 'Bob', email: RES2, status: 'ACTIVE', intake: 2024 });
   await setDoc(doc(db, 'members', RES), { rid: 'R1' });
   await setDoc(doc(db, 'members', RES2), { rid: 'R2' });
+  await setDoc(doc(db, 'residents', 'R3'), { rid: 'R3', name: 'Carol', email: 'carol@example.com', status: 'ON LEAVE', intake: 2023 });
   await setDoc(doc(db, 'faculty', FAC), { email: FAC, name: 'Dr Fac', status: 'ACTIVE', updatedAt: 1 });
   await setDoc(doc(db, 'ccc', 'r1'), round());
   await setDoc(doc(db, 'ccc', 'old'), round({ round: 'old', status: 'closed' }));
@@ -108,6 +109,21 @@ await t('admin staff writes marks', assertSucceeds(setDoc(doc(adm, 'ccc', 'r1', 
 await t('faculty cannot write marks', assertFails(setDoc(doc(fac, 'ccc', 'r1', 'review', RES), rev(RES))));
 await t('marks take no extra fields', assertFails(setDoc(doc(pc, 'ccc', 'r1', 'review', RES), rev(RES, { x: 1 }))));
 await t('pc clears marks', assertSucceeds(deleteDoc(doc(pc, 'ccc', 'r1', 'review', RES))));
+
+// ---- residents can see each other (owner, 17 Oct 2026) ----
+const active = c => query(collection(c, 'residents'), where('status', '==', 'ACTIVE'));
+await t('a resident lists the active residents', assertSucceeds(getDocs(active(res))));
+await t('a resident reads another active resident', assertSucceeds(getDoc(doc(res, 'residents', 'R2'))));
+await t('a resident cannot list every resident (the query must ask for ACTIVE)', assertFails(getDocs(collection(res, 'residents'))));
+await t('a resident cannot read someone on leave', assertFails(getDoc(doc(res, 'residents', 'R3'))));
+await t('a resident cannot list people on leave', assertFails(getDocs(query(collection(res, 'residents'), where('status', '==', 'ON LEAVE')))));
+await t('a resident cannot change another resident', assertFails(setDoc(doc(res, 'residents', 'R2'), { rid: 'R2', name: 'Hacked', email: RES2, status: 'ACTIVE', intake: 2024 })));
+await t('a resident cannot add a resident', assertFails(setDoc(doc(res, 'residents', 'R9'), { rid: 'R9', name: 'New', email: 'new@example.com', status: 'ACTIVE', intake: 2024 })));
+await t('a resident cannot delete a resident', assertFails(deleteDoc(doc(res, 'residents', 'R2'))));
+await t('faculty cannot list the residents', assertFails(getDocs(active(fac))));
+await t('a stranger cannot list the residents', assertFails(getDocs(active(str))));
+await t('signed out cannot list the residents', assertFails(getDocs(active(anon))));
+await t('an admin still lists every resident', assertSucceeds(getDocs(collection(adm, 'residents'))));
 
 await env.cleanup();
 console.log(fail ? `ccc rules: ${fail} of ${n} checks failed` : `ccc rules: ${n} checks passed`);

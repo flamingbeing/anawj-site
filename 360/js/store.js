@@ -119,7 +119,7 @@ export async function deleteNominees(round, email) {
   await b.commit();
 }
 
-// Delete the nominees of every round that closed more than 60 days ago. Runs when staff open the app. Returns how many
+// Delete the nominees of every round that closed more than a year ago. Runs when staff open the app. Returns how many
 // nominee lists were deleted (0 mostly). Projects are kept.
 export async function purgeExpired(rounds, now = Date.now()) {
   let n = 0;

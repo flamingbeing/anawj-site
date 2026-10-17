@@ -80,7 +80,9 @@ assert.equal(await page.getByLabel('Senior doctor email').inputValue(), 'dr.hana
 await page.locator('[data-add=allied]').click();
 await page.getByLabel('Allied health name').fill('Nurse Example');
 await page.locator('[data-add=peer]').click();
-await page.getByLabel('Peer name').fill('Peer One');
+await page.getByLabel('Peer name').fill('aiden');
+await page.getByRole('button', { name: 'Aiden Tan' }).click();
+assert.equal(await page.getByLabel('Peer email').inputValue(), 'aiden.tan@example.com', 'the peer picker fills the email from the resident list');
 await page.locator('[data-add=peer]').click();
 await page.getByLabel('Peer name').nth(1).fill('Peer Two');
 assert.equal(await page.locator('[data-add=peer]').isDisabled(), true, 'two peers at most');
@@ -208,7 +210,7 @@ await page.getByText(/Nominees' contact details are deleted on /).waitFor();
 assert.equal((await store()).rounds.demo.status, 'closed');
 assert.ok((await store()).rounds.demo.closedAt > 0);
 await page.getByRole('button', { name: 'Reopen' }).click();
-await page.getByText(/deleted 60 days after you close the round/).waitFor();
+await page.getByText(/deleted a year after you close the round/).waitFor();
 assert.equal((await store()).rounds.demo.closedAt, undefined, 'reopening clears the close time');
 await page.getByRole('button', { name: 'Edit', exact: true }).click();
 await page.getByLabel('Name').fill('CCC round, renamed');
@@ -239,22 +241,22 @@ await page.getByRole('button', { name: 'Delete nominees now' }).click();
 await page.getByRole('button', { name: 'Delete', exact: true }).click();
 await page.waitForFunction(() => Object.keys(JSON.parse(localStorage.getItem('ccc-demo-store')).msf).length === 0);
 
-// 15. The 60-day clean-up: a round closed 61 days ago loses its nominees when staff open the app; projects stay
+// 15. The one-year clean-up: a round closed 366 days ago loses its nominees when staff open the app; projects stay
 await page.evaluate(() => localStorage.removeItem('ccc-demo-store'));
 await page.goto(BASE + '360/?demo=admin');
 await page.getByRole('heading', { name: 'Rounds' }).waitFor();
-await setStore(() => { d.rounds.demo.status = 'closed'; d.rounds.demo.closedAt = Date.now() - 61 * 86400000; });
+await setStore(() => { d.rounds.demo.status = 'closed'; d.rounds.demo.closedAt = Date.now() - 366 * 86400000; });
 await page.reload();
-await page.getByText(/Deleted 2 nominee lists from rounds closed more than 60 days ago/).waitFor();
+await page.getByText(/Deleted 2 nominee lists from rounds closed more than a year ago/).waitFor();
 st = await store();
 assert.deepEqual(Object.keys(st.msf), [], 'old nominees are gone');
 assert.equal(Object.keys(st.entries).length, 2, 'projects are kept');
 await page.evaluate(() => localStorage.removeItem('ccc-demo-store'));
 await page.goto(BASE + '360/?demo=admin');
-await setStore(() => { d.rounds.demo.status = 'closed'; d.rounds.demo.closedAt = Date.now() - 59 * 86400000; });
+await setStore(() => { d.rounds.demo.status = 'closed'; d.rounds.demo.closedAt = Date.now() - 364 * 86400000; });
 await page.reload();
 await page.getByRole('heading', { name: 'Rounds' }).waitFor();
-assert.equal(Object.keys((await store()).msf).length, 2, 'a round closed 59 days ago keeps its nominees');
+assert.equal(Object.keys((await store()).msf).length, 2, 'a round closed 364 days ago keeps its nominees');
 
 // 16. A resident does not see the coordinators' view, even by typing the address
 await page.evaluate(() => localStorage.removeItem('ccc-demo-store'));
