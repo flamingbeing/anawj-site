@@ -4,7 +4,7 @@ Short and current: what is happening now, what waits on the owner, what is next,
 Lasting rules and lessons go in `NOTES.md`. Each session edits only its own file under `status/` (see **Now**).
 Update this file when a task finishes, a decision is made, or before compacting (`/save-state`).
 
-Last updated: 2026-10-15 by Claude Code (NTF Roster build session, branch `claude/practical-pasteur-ff2uqp`).
+Last updated: 2026-10-17 by Claude Code (NTF Roster build session, branch `claude/practical-pasteur-ff2uqp`).
 
 ## The request (owner, 15 Oct 2026)
 
@@ -17,12 +17,15 @@ he shared hold real names: read in a session scratchpad only, **never committed*
 Each session keeps its own line in `status/<session>.md` (`build.md` so far). Read them all before starting; edit
 only yours.
 
-The first version is built and integrated (all modules wired, unit, browser and emulator tests green); not yet
-merged or live.
+Live at `ntfroster.anawj.com` (custom domain added by firetop, 16 Oct; `/` and `/?demo` checked, 200). No open PR.
+Nothing half-done. One unconfirmed report: the owner said on import that the current calls did not import and his
+October was empty (then said a later message was "wrong chat", so it may not be about this app). If it is: reproduce
+with a made-up October sheet in the department layout (`js/io.js`, `test/io.test.mjs`), check how call cells and the
+`x` after calls are read.
 
 ## Waiting on the owner
 
-- Try the practice department (`?demo`) on a phone and a laptop once the PR preview is up.
+- Try the practice department (`ntfroster.anawj.com/?demo`) on a phone and a laptop.
 - Confirm the numbers the default rules guess: 2 juniors and 1 senior on call each night, 1 PM shift each weekday,
   at most 7 calls a month (juniors), 1 PHD on public holidays, at least 3 days between calls.
 - Confirm the code meanings marked as guesses: OTC, W, Creg; and say what HC, NS, AH, JR (as a cell code) and "(B)"
@@ -31,18 +34,19 @@ merged or live.
   `js/firebase-config.js`, add `ntfroster.anawj.com` to Authentication › Authorised domains, add yourself as the first
   admin, grant the rules deployer Firebase Rules Admin, then add the matrix entry to
   `.github/workflows/deploy-firestore-rules.yml`. PDPA and hospital policy before real names go to Google Cloud.
-- After merge: Cloudflare custom domain `ntfroster.anawj.com` on the `anawj-preview` Worker (`SUBDOMAINS.md`).
 
 ## Next (agreed queue)
 
-1. Open the PR (`NTF roster: first version`), check the preview, merge once the Checks are green.
-2. The owner's answers above: adjust the default rules and codes (they are data; new installs and the demo pick them
+1. The owner's answers above: adjust the default rules and codes (they are data; new installs and the demo pick them
    up, existing rosters change in the Rules tab).
-3. Import a real month (in the owner's browser only) and tune Auto-fill against it.
-4. Known limits in `NOTES.md` if they bite (cell editor length, month-switch redraw time).
+2. Import a real month (in the owner's browser only) and tune Auto-fill against it.
+3. Known limits in `NOTES.md` if they bite (cell editor length, month-switch redraw time).
 
 ## Recently done
 
+- 2026-10-16: custom domain `ntfroster.anawj.com` live (firetop, from the owner's pasted job); routes in `worker/routes.js`.
+- 2026-10-15: #580 first version, #605 NTF design and speed, #606 back to the NUHS look (speed kept), #610 first-time
+  walkthrough (all merged).
 - 2026-10-15: first-time walkthrough (owner: "can you make a walkthrough for first time user?"), in the NUHS look:
   Getting started checklist on your own roster (six steps that tick themselves), a 10-stop interface tour (practice
   opens it once; "?" Help and More › Show the walkthrough replay it), three "Try it yourself" practice tasks, and the
