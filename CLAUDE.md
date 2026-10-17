@@ -37,5 +37,5 @@ settings through the plugin without the owner's OK.
 ## context-nudge mod
 
 Cloud sessions also install `tools/context-nudge` (a small Claude Code mod, via `.claude/hooks/session-start.sh`).
-It shows a reminder above the prompt when the context passes 50% and 75%: run `/save-state`, then `/compact`. It
+It shows a reminder above the prompt when the context passes 10% and 15%: run `/save-state`, then `/compact`. It
 only reminds; never compact for the owner without them asking.

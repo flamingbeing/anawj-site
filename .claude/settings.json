@@ -84,8 +84,7 @@
       "Read(./evals/js/forms.js)",
       "Read(./logbook/js/demo-seed.js)",
       "Read(./logbook/js/keywords.js)",
-      "Read(./prewarm/js/headers.js)",
-      "Read(./logbook/ideas/brainstorm-2026-10-13.md)"
+      "Read(./prewarm/js/headers.js)"
     ]
   },
   "hooks": {

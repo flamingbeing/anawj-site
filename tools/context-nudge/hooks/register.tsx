@@ -1,6 +1,7 @@
 import type { Register } from 'claude-code'
 
-const STEPS = [75, 50]
+// Percent of the window, highest first. On a 1M window this is 150k and 100k tokens.
+const STEPS = [15, 10]
 
 const stepFor = (percent: number | null | undefined) =>
   STEPS.find(s => (percent ?? 0) >= s) ?? 0
