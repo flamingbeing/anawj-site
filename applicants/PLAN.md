@@ -1,4 +1,4 @@
-# Selection 360: plan
+# Applicants app: plan
 
 Built 17 Oct 2026 in one hour from the owner's request: clone the Google Form, make a web app from it, for the same residents
 as the other APMES apps, in the NUHS design, with room to join them later.

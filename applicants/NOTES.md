@@ -1,8 +1,8 @@
-# APMES Selection 360
+# APMES Applicants (residency applicant feedback)
 
 Residents and faculty give confidential feedback on residency applicants: a 1 to 5 suitability score and a comment for each,
 as in the department's Google Form it replaces ("360 feedback on residency applicants"; owner, 17 Oct 2026). At
-`apmes.anawj.com/360/` (folder `selection/`; owner, 17 Oct 2026) (`?demo` for made-up applicants). Plan and what comes next: `PLAN.md`.
+`apmes.anawj.com/applicants/` (folder `applicants/`; moved from `/360/` on 17 Oct 2026, because the owner's CCC 360 collection form is a different app and takes `/360/`) (`?demo` for made-up applicants). Plan and what comes next: `PLAN.md`.
 
 ## Rules
 
@@ -15,7 +15,7 @@ as in the department's Google Form it replaces ("360 feedback on residency appli
 - **Shared store (stage 2, 17 Oct 2026)** in the logbook project: `selection/{cycle}` (the round: title, applicants, open or
   closed), `selection/{cycle}/responses/{email}` (one response per person, written only by them while the round is open,
   read by them, PDs and the committee) and `selectionCommittee/{email}` (kept by admins and PDs). Rules:
-  `logbook/firestore.rules` "Selection 360", tested by `selection/test/rules.emulator.mjs` (`tools/test-rules.sh`). Admins
+  `logbook/firestore.rules` "Selection 360" (the Firestore collections keep the names `selection`, `selection/{cycle}/responses` and `selectionCommittee`; renaming them would mean a live rules change for no gain), tested by `applicants/test/rules.emulator.mjs` (`tools/test-rules.sh`). Admins
   do not read responses unless they are PDs or on the committee; an admin can add themselves to the committee, which
   leaves a visible entry. Respondents can't delete a response; PDs can.
 - A round has two homes: **published** (shared store; everyone sees it on opening the app, answers go to the store) or
@@ -41,5 +41,5 @@ as in the department's Google Form it replaces ("360 feedback on residency appli
 - **Send, link/device rounds** (stage 1) is a `no-cors` POST to the Form's `formResponse` address. The browser can't read the reply, so "sent"
   means handed over; the committee checks the response sheet. Never tested against a live Form from a session (no test
   answers go into the real sheet): the first real send needs a look in the sheet.
-- Tests: `node selection/test/model.test.mjs`, `node selection/test/e2e.mjs` (phone size, demo, axe on each screen, the link
+- Tests: `node applicants/test/model.test.mjs`, `node applicants/test/e2e.mjs` (phone size, demo, axe on each screen, the link
   round trip, CSV).

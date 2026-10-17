@@ -1,4 +1,4 @@
-// APMES Selection 360: the logic, free of page code so test/model.test.mjs can run it in Node.
+// APMES Applicants: the logic, free of page code so test/model.test.mjs can run it in Node.
 // A "round" is one selection exercise (e.g. the 2027 intake): a title, the applicants to rate and, optionally, where
 // the answers go (a Google Form). Real applicant names are never in this repo: the admin pastes them in the app and
 // shares the round as a private link (the round travels in the part of the link after #, which servers never see).

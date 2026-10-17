@@ -1,4 +1,4 @@
-// Selection 360's shared store: the round, each respondent's response and the committee list.
+// The applicants app's shared store: the round, each respondent's response and the committee list.
 // Live: Firestore in the logbook project (rules: logbook/firestore.rules, "Selection 360"):
 //   selection/{cycle}                       { cycle, title, status: 'open'|'closed', applicants: [{ id, name }], updatedAt }
 //   selection/{cycle}/responses/{email}     { email, name, answers: { [applicantId]: { score, comment, na } }, updatedAt }

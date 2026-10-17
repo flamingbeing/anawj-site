@@ -1,6 +1,6 @@
-// Firestore rules checks for Selection 360 (selection/, selectionCommittee/) against the local emulator, fake accounts only.
+// Firestore rules checks for the applicants app (collections selection/ and selectionCommittee/) against the local emulator, fake accounts only.
 // Rules: logbook/firestore.rules. Run from the repo root:  tools/test-rules.sh   (or, with the emulator on port 8085,
-//   npx firebase emulators:exec --only firestore --project demo-logbook "node selection/test/rules.emulator.mjs")
+//   npx firebase emulators:exec --only firestore --project demo-logbook "node applicants/test/rules.emulator.mjs")
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
 import { doc, getDoc, setDoc, getDocs, collection, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import fs from 'node:fs';

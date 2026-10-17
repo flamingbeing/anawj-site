@@ -1,6 +1,6 @@
-// Browser test of Selection 360 in demo mode at phone size, with an axe accessibility check on each screen.
+// Browser test of Applicants in demo mode at phone size, with an axe accessibility check on each screen.
 // Run from the repo root (no server needed: files are served from this checkout by route):
-//   node selection/test/e2e.mjs            SHOTS=<dir> also saves phone screenshots
+//   node applicants/test/e2e.mjs            SHOTS=<dir> also saves phone screenshots
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,8 +18,8 @@ const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceSc
 const posted = [];
 await ctx.route(/^https:\/\/apmes\.anawj\.com\//, async route => {
   const u = new URL(route.request().url());
-  let rel = decodeURIComponent(u.pathname).replace(/^\//, '').replace(/^360\//, 'selection/');
-  if (!/^(selection|people|evals|logbook|nuhsdesign)\//.test(rel)) return route.fulfill({ status: 404, body: 'not found' });
+  let rel = decodeURIComponent(u.pathname).replace(/^\//, '');
+  if (!/^(applicants|people|evals|logbook|nuhsdesign)\//.test(rel)) return route.fulfill({ status: 404, body: 'not found' });
   if (rel.endsWith('/')) rel += 'index.html';
   const f = path.join(root, rel);
   if (!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) return route.fulfill({ status: 404, body: 'not found' });
@@ -45,7 +45,7 @@ const axe = async (label, pg = page) => {
 const shot = async name => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, name + '.png'), fullPage: true }); } };
 
 // 1. A resident opens the demo round
-await page.goto(BASE + '360/?demo=reset');
+await page.goto(BASE + 'applicants/?demo=reset');
 await page.getByRole('button', { name: /Alex Demo/ }).waitFor();
 assert.equal(await page.locator('.e-list .e-row').count(), 6);
 assert.match(await page.textContent('main'), /Confidential/);
@@ -75,7 +75,7 @@ await page.getByRole('button', { name: /Casey ›/ }).click();
 await page.getByText('Applicant 3 of 6').waitFor();
 await page.getByRole('radio', { name: /2\s*Below par/ }).check({ force: true });
 await page.goBack(); await page.goBack(); await page.goBack();
-await page.goto(BASE + '360/?demo#review');
+await page.goto(BASE + 'applicants/?demo#review');
 await page.getByText('Worth a second look').waitFor();
 assert.match(await page.textContent('main'), /Casey Example.*has a score but no comment/);
 assert.match(await page.textContent('main'), /1 scored with a comment/);
@@ -86,7 +86,7 @@ await page.getByRole('button', { name: 'Send', exact: true }).click();
 await page.getByText('Sent. Thank you.').waitFor();
 assert.equal(posted.length, 0, 'the demo never posts to the form');
 await axe('done'); await shot('4-done');
-await page.goto(BASE + '360/?demo#');
+await page.goto(BASE + 'applicants/?demo#');
 await page.getByText(/· sent/).waitFor();
 
 // 6. The admin sees the result and can download it
@@ -109,18 +109,18 @@ await page.fill('#su-names', '1. Zoë Tan\n2. Lee Wei\nZoë Tan');
 await page.fill('#su-title', 'Test round');
 await page.getByRole('button', { name: 'Make a private link' }).click();
 const link = await page.locator('textarea[aria-label="Private link"]').inputValue();
-assert.match(link, /360\/#r=/);
+assert.match(link, /applicants\/#r=/);
 await axe('setup'); await shot('6-setup');
 const other = await ctx.newPage();
 other.on('pageerror', e => errors.push(String(e)));
-await other.goto(link.replace(/^[^#]*360\//, BASE + '360/?demo=resident') );
+await other.goto(link.replace(/^[^#]*applicants\//, BASE + 'applicants/?demo=resident') );
 await other.getByRole('button', { name: /Zoë Tan/ }).waitFor();
 assert.equal(await other.locator('.e-list .e-row').count(), 2, 'repeated names are dropped');
 assert.match(await other.textContent('main'), /Test round/);
 await other.close();
 
 // 8. The shared store: an admin publishes the round and adds a committee member; a resident answers; the PD reads it
-await page.goto(BASE + '360/?demo=admin#setup');
+await page.goto(BASE + 'applicants/?demo=admin#setup');
 await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('sel-demo')) localStorage.removeItem(k); });
 await page.reload();
 await page.fill('#su-names', 'Pat One\nPat Two');
@@ -133,7 +133,7 @@ await page.fill('#cm-email', 'cm@example.com'); await page.fill('#cm-name', 'Cm 
 await page.getByRole('button', { name: 'Add', exact: true }).click();
 await page.getByText('Cm Member').waitFor();
 await axe('setup shared'); await shot('7-setup-shared');
-await page.goto(BASE + '360/?demo=resident#');
+await page.goto(BASE + 'applicants/?demo=resident#');
 await page.getByRole('button', { name: /Pat One/ }).waitFor();
 assert.match(await page.textContent('main'), /Shared round/);
 assert.equal(await page.getByRole('tab', { name: 'Results' }).count(), 0, 'a resident has no Results tab');
@@ -141,24 +141,24 @@ await page.getByRole('button', { name: /Pat One/ }).click();
 await page.getByRole('radio', { name: /5\s*Best fit/ }).check({ force: true });
 await page.fill('#sl-comment', 'Led the handover well.');
 await page.waitForTimeout(450);
-await page.goto(BASE + '360/?demo=resident#review');
+await page.goto(BASE + 'applicants/?demo=resident#review');
 await page.getByText(/Nobody else can read them/).waitFor();
 await page.getByRole('button', { name: 'Send', exact: true }).click();
 await page.getByText('Sent. Thank you.').waitFor();
-await page.goto(BASE + '360/?demo=resident#results');
+await page.goto(BASE + 'applicants/?demo=resident#results');
 assert.equal(await page.getByText('Mean').count(), 0, 'a resident cannot open Results');
-await page.goto(BASE + '360/?demo=admin#results');
+await page.goto(BASE + 'applicants/?demo=admin#results');
 await page.getByText(/Shared round \(open\): 1 response/).waitFor();
 assert.match(await page.textContent('main'), /Led the handover well\..*Demo Resident/);
 await axe('results shared'); await shot('8-results-shared');
 // close it: the resident can no longer send
-await page.goto(BASE + '360/?demo=admin#setup');
+await page.goto(BASE + 'applicants/?demo=admin#setup');
 await page.getByRole('button', { name: 'Close the round' }).click();
 await page.getByText('Published (closed)').waitFor();
-await page.goto(BASE + '360/?demo=resident#review');
+await page.goto(BASE + 'applicants/?demo=resident#review');
 await page.getByText(/round is closed/).first().waitFor();
 assert.ok(await page.getByRole('button', { name: /^Send/ }).isDisabled());
 
 assert.deepEqual(errors, []);
 await b.close();
-console.log('selection e2e: passed');
+console.log('applicants e2e: passed');

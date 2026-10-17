@@ -1,5 +1,5 @@
 #!/bin/bash
-# Firestore rules tests for logbook/firestore.rules (logbook, evals and selection suites), prewarm/firestore.rules, nuh-roster/firestore.rules, ntf-roster/firestore.rules and nuh-junior-monthly/firestore.rules in the local emulator, with fake
+# Firestore rules tests for logbook/firestore.rules (logbook, evals and applicants suites), prewarm/firestore.rules, nuh-roster/firestore.rules, ntf-roster/firestore.rules and nuh-junior-monthly/firestore.rules in the local emulator, with fake
 # accounts and the demo project "demo-logbook": nothing reaches the live Firebase projects and no sign-in is needed.
 # Needs Java and, once per machine, the test tools (the cloud environment's setup script installs them there):
 #   npm install --prefix ~/.cache/anawj-rules firebase-tools@13 @firebase/rules-unit-testing firebase
@@ -16,7 +16,7 @@ if [ ! -e node_modules ]; then ln -s "$TOOLS/node_modules" node_modules; made_li
 cfg="$(mktemp -d)/firebase.json"
 echo '{ "firestore": { "rules": "logbook/firestore.rules" }, "emulators": { "firestore": { "port": 8085, "host": "127.0.0.1" }, "ui": { "enabled": false } } }' > "$cfg"
 "$TOOLS/node_modules/.bin/firebase" emulators:exec --config "$cfg" --only firestore --project demo-logbook \
-  "node evals/test/rules.emulator.mjs && node selection/test/rules.emulator.mjs && cd logbook && node test/rules.emulator.mjs" 2>&1 | grep -E 'checks passed|^FAIL|^Error:' ; rc=${PIPESTATUS[0]}
+  "node evals/test/rules.emulator.mjs && node applicants/test/rules.emulator.mjs && cd logbook && node test/rules.emulator.mjs" 2>&1 | grep -E 'checks passed|^FAIL|^Error:' ; rc=${PIPESTATUS[0]}
 # prewarming study rules: own rules file and demo project
 cfg2="$(mktemp -d)/firebase.json"
 echo '{ "firestore": { "rules": "prewarm/firestore.rules" }, "emulators": { "firestore": { "port": 8085, "host": "127.0.0.1" }, "ui": { "enabled": false } } }' > "$cfg2"
