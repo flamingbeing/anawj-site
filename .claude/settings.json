@@ -64,6 +64,7 @@
       "mcp__claude-code-remote__unsubscribe_pr_activity",
       "mcp__claude-code-remote__send_later",
       "Skill(save-state)",
+      "Skill(quick-save)",
       "Edit(.claude/settings.json)",
       "Write(.claude/settings.json)"
     ],
