@@ -84,3 +84,8 @@ after any change to them: a first version broke the evals decline and reassign c
 - **CSV safety:** every cell that starts with `=`, `+`, `-`, `@` or a tab gets a leading apostrophe (`csvCell`); all resident text is put on
   the page as text only. Tested with hostile names.
 - **Not built:** a reminder email, the resident's view of the coordinators' marks (deliberately never shown), and a custom email text.
+
+## Lessons
+
+- `tools/test-rules.sh` writes `firebase-debug.log`, `firestore-debug.log` and a `node_modules` link into the repo while it runs and removes them at the end. Do not `git add -A` while it is still running (it happened once and needed a clean-up commit).
+- A rules change that widens who can read a collection must update the old test that asserted the narrower rule on purpose, and say so in the PR (#757 did).

@@ -1,6 +1,6 @@
 # APMES CCC 360 status
 
-Last updated: 2026-10-17 by Claude Code (360).
+Last updated: 2026-10-17 by Claude Code (360), after #757.
 
 ## Now
 
@@ -18,14 +18,14 @@ The CCC 360 app is built and merged: residents' half (#752) and the coordinators
 1. After the first real round: look at what the coordinators actually do with the lists and adjust (the email text, the CSV columns, reminders).
 2. Optional: a reminder to residents who have not sent (a `mailto:` to the unsent list), and a custom email text kept in the app.
 3. Retire `owners/`, `admins/`, `pds/` after a quiet week (a planned job, see `people/NOTES.md`; the rules read both for now).
-4. Done 17 Oct 2026: residents may read the ACTIVE residents, and the peer picker uses it.
 
 ## Decisions
 
 - 2026-10-17: see `NOTES.md` (rounds, fields, review, retention; no "copy last round's nominees"; roles in the app, PC = Admin staff powers; faculty stays `faculty`; keep the apmes-logbook project; Google sign-in email versus NUHS work email).
 - 2026-10-17: owner approved the access rules ("approve the access rules as described"); firetop copied the lists.
 - 2026-10-17: People changes handed to the People session (their #754 is merged); the 360 session built the resident app and the coordinators' view.
-- 2026-10-17: the nominee clean-up (one year after a round closes; owner changed it from 60 days) runs when staff open the app (no scheduled job); a round with no close time is never purged by guesswork.
+- 2026-10-17: the nominee clean-up (one year after a round closes; owner changed it from 60 days because CCC meetings may be delayed) runs when staff open the app (no scheduled job); a round with no close time is never purged by guesswork.
+- 2026-10-17: owner decided residents may see each other's names and emails: any resident can read the ACTIVE residents (rules, #757, deployed); people on leave, graduated or attrited stay hidden. The peer picker uses it.
 
 ## Recently done
 
@@ -34,3 +34,5 @@ The CCC 360 app is built and merged: residents' half (#752) and the coordinators
 - #752 CCC 360: the resident app (projects and feedback nominees).
 - #754 People: Access tab (roles, access log, paste people, tick core and CCC) (People session).
 - #755 CCC 360: the coordinators' view (rounds, who has sent, marks, email links, CSV, nominee clean-up).
+- #756 CCC 360: status after the resident app and the coordinators' view (docs only).
+- #757 CCC 360: residents can see the active residents (rules), nominees kept a year, peer picker.
