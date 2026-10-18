@@ -88,10 +88,11 @@ assert.deepEqual(resolve('hand.anawj.com', '/__/auth/handler'), { notFound: true
 assert.deepEqual(resolve('apmes.anawj.com', '/apmes/guidebook/dops-expectations.md'), { file: 'apmes/guidebook/dops-expectations.md' });
 assert.deepEqual(resolve('apmes.anawj.com', '/apmes/originals/x'), { notFound: true });
 
-// beta-apmes.anawj.com: the same apps (beta branch, test Firebase project); no sign-in helper pages yet, nothing else
+// beta-apmes.anawj.com: the same apps (beta branch, test Firebase project) and its own sign-in config, nothing else
 assert.deepEqual(resolve('beta-apmes.anawj.com', '/logbook/js/app.js'), { file: 'logbook/js/app.js' });
 assert.deepEqual(resolve('beta-apmes.anawj.com', '/evals/'), { file: 'evals/' });
-assert.deepEqual(resolve('beta-apmes.anawj.com', '/__/firebase/init.json'), { notFound: true });
+assert.deepEqual(resolve('beta-apmes.anawj.com', '/__/firebase/init.json'), { file: 'apmes-auth-beta/firebase/init.json' });
+assert.deepEqual(resolve('beta-apmes.anawj.com', '/__/auth/handler'), { file: '__/auth/handler' });
 assert.deepEqual(resolve('beta-apmes.anawj.com', '/prewarm/'), { notFound: true });
 
 // the table lists only folders that exist in the repo

@@ -61,18 +61,18 @@ the logbook or evals can be tried for real before it reaches `apmes.anawj.com` (
 - **What it serves:** the `beta` branch, through a second Worker, `anawj-beta` (`wrangler.jsonc`, `env.beta`), with its
   own Workers Builds: production branch `beta`, deploy command `npx wrangler deploy --env beta`. The folders are the
   same as apmes (`beta-apmes.anawj.com` in `worker/routes.js`).
-- **Which data:** `logbook/js/firebase-config.js` and `evals/js/firebase-config.js` pick the test project (`TEST`) on
-  any `beta-` host, so the code tried on beta is the code that goes live, unchanged. While `TEST` is empty, sync and
-  sign-in stay off on beta (local data only).
+- **Which data:** `logbook/js/firebase-config.js` and `evals/js/firebase-config.js` pick the test project
+  `apmes-logbook-beta` (`TEST`) on any `beta-` host, so the code tried on beta is the code that goes live, unchanged.
+  Its sign-in helper pages are served from beta-apmes.anawj.com (`apmes-auth-beta/firebase/init.json`). It is on the
+  free plan: no backups, test data only.
 - **Trying a PR:** point `beta` at the PR's branch (`git push --force origin <branch>:beta`); `beta` is disposable,
   nothing ever merges from it. Wait for the anawj-beta build, then send the owner the beta link.
 - **Merging:** PRs that change the logbook or evals wait for the owner's "ship it" after he has tried them on beta
   (AGENTS.md, "Before merging"), once beta is set up.
 - **Firestore rules:** test the rules with the emulator as before; deploy them to the test project before live.
 
-Still to set up (once): the test Firebase project (Google sign-in on; `beta-apmes.anawj.com` in its authorised
-domains and on its OAuth client, with its own `/__/auth/` helper pages and `init.json`), its config in `TEST`, and the
-`anawj-beta` Worker with its Workers Builds.
+Still to set up (once): Google sign-in on the test project, with `beta-apmes.anawj.com` in its authorised domains and
+`https://beta-apmes.anawj.com/__/auth/handler` on its OAuth client, and the `anawj-beta` Worker with its Workers Builds.
 
 ## Build minutes
 

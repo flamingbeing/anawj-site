@@ -14,7 +14,14 @@ const LIVE = {
 };
 
 // Beta (PREVIEWS.md, "Beta"): on beta- hosts (beta-apmes.anawj.com) the same code uses the test project instead, so
-// trying a change never touches real data. Empty until the test project exists: sync stays off there until then.
-const TEST = {};
+// trying a change never touches real data. Test project apmes-logbook-beta; sign-in helper pages on beta-apmes.anawj.com.
+const TEST = {
+  apiKey: 'AIzaSyAuepjR9mVnMEXvYT2YGaFvIUvBmw27LuM',
+  authDomain: 'beta-apmes.anawj.com',
+  projectId: 'apmes-logbook-beta',
+  storageBucket: 'apmes-logbook-beta.firebasestorage.app',
+  messagingSenderId: '751045551225',
+  appId: '1:751045551225:web:ba64643db0bae5bb9aa0a8',
+};
 const BETA = /^beta-/.test(globalThis.location?.hostname || '');
 export const FIREBASE_CONFIG = BETA ? TEST : LIVE;
