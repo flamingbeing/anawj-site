@@ -101,7 +101,8 @@ export async function whenSynced() {
 
 // ---- sign-in ----
 
-const asUser = u => (u ? { email: lc(u.email), name: u.displayName || u.email, uid: u.uid } : null);
+// A guest (applicants' passcode sign-in, a custom token) has no email: it is keyed as guest-<uid>, and flagged so apps can treat it as no one in particular.
+const asUser = u => (!u ? null : u.email ? { email: lc(u.email), name: u.displayName || u.email, uid: u.uid } : { email: 'guest-' + u.uid, name: 'Guest', uid: u.uid, guest: true });
 
 export async function watchUser(cb) {
   if (demo) return D.watchUser(cb);
@@ -126,6 +127,13 @@ export async function signIn(hint) {
     if (!REDIRECT_CODES.includes(e?.code)) throw e;
     await A.signInWithRedirect(auth, provider);
   }
+}
+
+// Sign in with a custom token (the applicants' guest passcode; worker/guest.js issues it).
+export async function signInWithToken(token) {
+  if (demo) return D.signIn();
+  const { auth, A } = await sdk();
+  await A.signInWithCustomToken(auth, token);
 }
 
 // Signing out also wipes this device's offline copy (a shared ward PC keeps nothing).

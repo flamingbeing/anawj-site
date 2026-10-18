@@ -107,6 +107,38 @@ await t('photo at the size limit', assertSucceeds(setDoc(doc(pd, 'selection', 'c
 await t('pd removes a photo', assertSucceeds(deleteDoc(doc(pd, 'selection', 'c1', 'photos', 'a3'))));
 await t('resident cannot remove a photo', assertFails(deleteDoc(doc(res, 'selection', 'c1', 'photos', 'a1'))));
 
+// ---- guests (passcode sign-in: custom token, claim guest, no email) ----
+const guestCtx = uid => env.authenticatedContext(uid, { guest: true }).firestore();
+const g1 = guestCtx('g1'), g2 = guestCtx('g2');
+await env.withSecurityRulesDisabled(async ctx => {
+  await setDoc(doc(ctx.firestore(), 'selection', 'c1', 'photos', 'a1'), { jpeg: 'AAAA', updatedAt: 1 });
+  await setDoc(doc(ctx.firestore(), 'selection', 'c1', 'responses', 'alice@example.com'), resp('alice@example.com', { updatedAt: 1 }));
+  await setDoc(doc(ctx.firestore(), 'members', 'someone@example.com'), { rid: 'R9' });
+  await setDoc(doc(ctx.firestore(), 'residents', 'R9'), { rid: 'R9', name: 'Private', email: 'someone@example.com' });
+});
+await t('guest reads a round', assertSucceeds(getDoc(doc(g1, 'selection', 'c1'))));
+await t('guest lists rounds', assertSucceeds(getDocs(collection(g1, 'selection'))));
+await t('guest reads photos', assertSucceeds(getDoc(doc(g1, 'selection', 'c1', 'photos', 'a1'))));
+await t('guest sends their own response', assertSucceeds(setDoc(doc(g1, 'selection', 'c1', 'responses', 'guest-g1'), resp('guest-g1', { name: 'Anonymous' }))));
+await t('guest changes their own response', assertSucceeds(setDoc(doc(g1, 'selection', 'c1', 'responses', 'guest-g1'), resp('guest-g1'))));
+await t('guest reads their own response', assertSucceeds(getDoc(doc(g1, 'selection', 'c1', 'responses', 'guest-g1'))));
+await t('guest cannot read another guest', assertFails(getDoc(doc(g2, 'selection', 'c1', 'responses', 'guest-g1'))));
+await t('guest cannot write as another guest', assertFails(setDoc(doc(g2, 'selection', 'c1', 'responses', 'guest-g1'), resp('guest-g1'))));
+await t('guest cannot write as a resident', assertFails(setDoc(doc(g1, 'selection', 'c1', 'responses', RES), resp(RES))));
+await t('guest cannot read responses', assertFails(getDocs(collection(g1, 'selection', 'c1', 'responses'))));
+await t('guest cannot read a resident response', assertFails(getDoc(doc(g1, 'selection', 'c1', 'responses', RES))));
+await t('guest cannot answer a closed round', assertFails(setDoc(doc(g1, 'selection', 'old', 'responses', 'guest-g1'), resp('guest-g1'))));
+await t('guest cannot create a round', assertFails(setDoc(doc(g1, 'selection', 'c9'), round({ cycle: 'c9' }))));
+await t('guest cannot change a round', assertFails(setDoc(doc(g1, 'selection', 'c1'), round({ title: 'Mine' }))));
+await t('guest cannot add a photo', assertFails(setDoc(doc(g1, 'selection', 'c1', 'photos', 'a2'), { jpeg: 'AAAA', updatedAt: 1 })));
+await t('guest cannot read the committee list', assertFails(getDocs(collection(g1, 'selectionCommittee'))));
+await t('guest cannot read residents', assertFails(getDocs(collection(g1, 'residents'))));
+await t('guest cannot read a resident', assertFails(getDoc(doc(g1, 'residents', 'R9'))));
+await t('guest cannot read members', assertFails(getDoc(doc(g1, 'members', 'someone@example.com'))));
+await t('guest cannot read faculty', assertFails(getDoc(doc(g1, 'faculty', FAC))));
+await t('guest cannot write an admin', assertFails(setDoc(doc(g1, 'admins', 'guest-g1'), { name: 'x' })));
+await t('a token claiming guest but with an email is no guest', assertFails(getDoc(doc(env.authenticatedContext('x', { guest: true, email: 'x@example.com' }).firestore(), 'selection', 'c1'))));
+
 await env.cleanup();
 console.log(fail ? `selection rules: ${fail} of ${n} checks failed` : `selection rules: ${n} checks passed`);
 process.exit(fail ? 1 : 0);

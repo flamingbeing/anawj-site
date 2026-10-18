@@ -71,7 +71,8 @@ async function loadMine() {
 }
 const saveMine = () => put(K.ans(round.cycle, S.user.email), { a: answers, sent });
 const isStaff = () => !!(S.roles.admin || S.roles.pd);
-const mayAnswer = () => isStaff() || !!S.roles.resident || (!!S.roles.faculty && S.roles.faculty.status !== 'INACTIVE');
+const isGuest = () => !!S.user?.guest;
+const mayAnswer = () => isGuest() || isStaff() || !!S.roles.resident || (!!S.roles.faculty && S.roles.faculty.status !== 'INACTIVE');
 const subs = () => (round && !round.shared ? get(K.subs(round.cycle), []) : []);
 const canResults = () => !!S.roles.pd || isCom;
 const isOpen = () => !round?.shared || round.status === 'open';
@@ -99,14 +100,15 @@ function header(title, { back = false } = {}) {
 function account() {
   const role = S.roles.admin ? 'Admin' : S.roles.pd ? 'Programme director' : S.roles.resident ? 'Resident' : S.roles.faculty ? 'Faculty' : '';
   const kids = [
-    h('p', {}, S.user.name, h('br'), h('span', { class: 'e-small' }, S.user.email)),
-    h('p', { class: 'e-small' }, role ? role + ' · ' : '', 'the same sign-in as the logbook and evals.'),
+    isGuest() ? h('p', {}, 'Guest', h('br'), h('span', { class: 'e-small' }, 'Signed in with the passcode: you can send feedback, nothing else.'))
+      : h('p', {}, S.user.name, h('br'), h('span', { class: 'e-small' }, S.user.email)),
+    isGuest() ? null : h('p', { class: 'e-small' }, role ? role + ' · ' : '', 'the same sign-in as the logbook and evals.'),
   ];
   if (cloud.demo) kids.push(h('label', { class: 'e-label' }, 'Demo role', h('select', { class: 'e-select', onchange: e => { cloud.setDemoRole(e.target.value); location.reload(); } },
     ['resident', 'assessor', 'admin'].map(r => h('option', { value: r, selected: cloud.demoRole() === r }, { resident: 'Resident', assessor: 'Faculty', admin: 'Admin' }[r])))));
   const m = modal('Account', [
     ...kids,
-    h('p', { class: 'e-small' }, h('a', { href: '../logbook/' }, 'Logbook'), ' · ', h('a', { href: '../evals/' }, 'Evals'), isStaff() ? [' · ', h('a', { href: '../people/' }, 'People')] : null),
+    isGuest() ? null : h('p', { class: 'e-small' }, h('a', { href: '../logbook/' }, 'Logbook'), ' · ', h('a', { href: '../evals/' }, 'Evals'), isStaff() ? [' · ', h('a', { href: '../people/' }, 'People')] : null),
     h('div', { class: 'e-actions' },
       round ? h('button', { class: 'a-btn a-btn--tinted e-btn-quiet', type: 'button', onclick: async () => {
         if (!await confirmBox('Clear my answers?', 'This removes your scores and comments from this device. If you haven’t sent them, they’re gone.', 'Clear', true)) return;
@@ -229,11 +231,11 @@ function reviewScreen() {
   const p = progress(round, answers);
   const w = warnings(round, answers);
   const open = isOpen();
-  const nameIn = h('input', { class: 'e-input', id: 'sl-name', autocomplete: 'name', value: S.user.name || '', maxlength: 120 });
+  const nameIn = h('input', { class: 'e-input', id: 'sl-name', autocomplete: 'name', value: isGuest() ? '' : S.user.name || '', placeholder: isGuest() ? 'Optional: leave blank to stay anonymous' : '', maxlength: 120 });
   const status = h('p', { class: 'e-small', 'aria-live': 'polite' });
   const send = h('button', { class: 'a-btn e-go', type: 'button', disabled: !open }, sent ? 'Send again' : 'Send');
   send.onclick = async () => {
-    const who = nameIn.value.trim() || S.user.email;
+    const who = nameIn.value.trim() || (isGuest() ? 'Anonymous' : S.user.email);
     if (sent && !await confirmBox('Send again?', round.shared ? 'This replaces what you sent before.' : 'You already sent these. The committee will get a second copy.', 'Send again')) return;
     if (p.done + p.partial === 0 && !await confirmBox('Nothing to send', 'You haven’t answered about anyone. Send anyway?', 'Send anyway')) return;
     send.disabled = true; status.textContent = 'Sending…';
@@ -247,7 +249,7 @@ function reviewScreen() {
       go('#done');
     } catch (e) { status.textContent = 'Couldn’t send: ' + errText(e) + ' Your answers are safe on this device; try again, or copy them under “Other ways”.'; send.disabled = false; }
   };
-  const text = () => answersText(round, nameIn.value.trim() || S.user.name, answers);
+  const text = () => answersText(round, nameIn.value.trim() || (isGuest() ? 'Anonymous' : S.user.name), answers);
   fill(app, h('div', { class: 'sl-col sl-apply' },
     h('section', { class: 'e-card' },
       h('h2', { class: 'e-h2', style: 'margin-top:0' }, `${p.finished} of ${p.total} answered`),
@@ -258,7 +260,7 @@ function reviewScreen() {
       h('label', { class: 'e-label', for: 'sl-name' }, 'Your name, as the committee will see it'),
       nameIn,
       !open ? h('p', { class: 'e-warn-note' }, 'This round is closed, so answers can’t be sent any more.') : null,
-      h('p', { class: 'e-hint' }, round.shared ? 'Your answers go to the selection committee and the programme directors, who see who said what. Nobody else can read them.' : round.form ? 'Your answers go to the selection committee’s form. Nothing else is kept online.' : 'This round isn’t published, so “Send” keeps your answers on this device and shows them to the committee here.'),
+      h('p', { class: 'e-hint' }, round.shared && isGuest() ? 'Your answers go to the selection committee and the programme directors. Add your name only if you want them to know who said it.' : round.shared ? 'Your answers go to the selection committee and the programme directors, who see who said what. Nobody else can read them.' : round.form ? 'Your answers go to the selection committee’s form. Nothing else is kept online.' : 'This round isn’t published, so “Send” keeps your answers on this device and shows them to the committee here.'),
       status,
       h('details', { class: 'sl-more' }, h('summary', {}, 'Other ways to keep your answers'),
         h('div', { class: 'e-actions' },
@@ -531,12 +533,30 @@ function signInScreen() {
     h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'APMES Applicants'),
     h('p', {}, 'Confidential feedback on residency applicants, for residents and faculty. Sign in with the account you use for the logbook and evals.'),
     h('button', { class: 'a-btn', type: 'button', onclick: async () => { try { await cloud.signIn(); } catch (e) { toast('Sign-in failed. ' + errText(e)); } } }, 'Sign in with Google'),
+    cloud.demo ? null : guestBox(),
     cloud.demo ? h('p', { class: 'e-small' }, 'Demo: made-up applicants, kept only in this browser.') : null));
+}
+
+// Guest passcode: for people without an APMES account. The Worker (worker/guest.js) checks the passcode and hands back a sign-in that
+// can read the round and send its own answers, nothing else (rules: isGuest()).
+function guestBox() {
+  const code = h('input', { class: 'e-input', id: 'gp', type: 'password', autocomplete: 'off', 'aria-label': 'Passcode', placeholder: 'Passcode' });
+  const go2 = h('button', { class: 'a-btn a-btn--tinted', type: 'submit' }, 'Continue as guest');
+  return h('form', { style: 'margin-top:16px', onsubmit: async e => {
+    e.preventDefault(); if (!code.value.trim()) return; go2.disabled = true;
+    try {
+      const res = await fetch('/api/guest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ passcode: code.value.trim() }) });
+      const b = await res.json().catch(() => ({}));
+      if (!res.ok || !b.token) throw new Error(res.status === 401 ? 'That passcode isn’t right.' : res.status === 429 ? 'Too many tries. Wait a minute.' : b.error || 'Couldn’t sign in.');
+      await cloud.signInWithToken(b.token);
+    } catch (err) { toast(errText(err)); go2.disabled = false; }
+  } }, h('p', { class: 'e-small', style: 'margin:0 0 6px' }, 'No APMES account? Use the passcode you were given. You can send feedback, and your name is optional.'), code, h('div', { class: 'e-actions' }, go2));
 }
 
 cloud.watchUser(async u => {
   S.user = u;
   if (!u) { S.roles = { admin: false, pd: false }; signInScreen(); return; }
+  if (u.guest) { S.roles = { admin: false, pd: false }; isCom = false; await loadRound(); await loadMine(); render(); return; }
   try { S.roles = await cloud.getRoles(u.email); } catch (e) { S.roles = { admin: false, pd: false }; toast('Couldn’t check your access. ' + errText(e)); }
   await loadRound(); await loadMine();
   try { isCom = await store.isCommittee(u.email); } catch { isCom = false; }
