@@ -866,7 +866,7 @@ function renderStaffView(role) {
     .sort(bySeniority);
   const count = state.staff.filter(p => p.role === role).length;
   const row = p => h('tr', {},
-    h('td', {}, h('b', { style: staffColour(p) ? `color:#${COLOUR_ARGB[staffColour(p)].slice(2)}` : '' }, p.name)),
+    h('td', {}, h('b', { style: staffColour(p) ? `color:${SCREEN_COLOUR[staffColour(p)] || '#' + COLOUR_ARGB[staffColour(p)].slice(2)}` : '' }, p.name)),
     h('td', {}, (p.aliases || []).join(', ')),
     h('td', {}, p.grade),
     !senior && h('td', { class: 'seen' }, COLOURS.find(c => c[0] === staffColour(p))[1]),
@@ -2344,7 +2344,7 @@ function shortOf(part) {
 }
 // On screen the sheet's bright green (Baby MO) is darkened so it reads on white (2.9:1 → 5:1); the sheet itself,
 // the .xlsx, PDF and image keep the department's colours.
-const SCREEN_COLOUR = { green: '#00803a' };
+const SCREEN_COLOUR = { green: '#00803a', red: '#c00000' };
 const colourStyle = part => { const k = colourOf(part), c = COLOUR_ARGB[k]; return c ? `color:${SCREEN_COLOUR[k] || '#' + c.slice(2)}` : ''; };
 
 // Add a person to a cell from the staff list (unknown names offer to add them to the staff list).
