@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
-<title>APMES Applicants</title>
+<title>NUHS Residency Applications</title>
 <meta name="description" content="Confidential feedback on residency applicants, for APMES residents and faculty.">
 <meta name="theme-color" content="#f9f9fb">
 <link rel="icon" type="image/png" sizes="32x32" href="../evals/icons/favicon-32.png">
@@ -58,8 +58,6 @@
   .sl-chip { min-height: 44px; padding: 8px 14px; border-radius: 22px; border: 1.5px solid var(--a-tint); background: transparent; color: var(--a-tint); font: inherit; font-size: var(--a-text-sm); font-weight: 600; cursor: pointer; }
   .sl-chip[aria-pressed="true"] { background: var(--a-tint); color: #fff; }
   .sl-chip:focus-visible { outline: 3px solid var(--a-focus); outline-offset: 2px; }
-  .sl-cmts { display: grid; gap: 8px; }
-  .sl-cmts + .a-btn { margin-top: 8px; }
   .sl-saved { font-size: var(--a-text-xs); color: var(--a-ink-2); min-width: 3em; text-align: center; }
   .sl-fixed { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--a-surface); border-top: .5px solid var(--a-sep); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
   .sl-fixed__in { max-width: 720px; margin: 0 auto; display: flex; align-items: center; gap: 10px; }
@@ -94,6 +92,10 @@
   .sl-comments { margin: 8px 0 0; padding-left: 18px; font-size: var(--a-text-sm); }
   .sl-comments li { margin: 0 0 6px; white-space: pre-wrap; }
   .sl-who { color: var(--a-ink-2); }
+  .sl-namebtn { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 4px 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+  .sl-namebtn:focus-visible { outline: 3px solid var(--a-focus); outline-offset: 2px; }
+  .sl-cnt { margin-left: auto; color: var(--a-tint); font-size: var(--a-text-xs); white-space: nowrap; }
+  .e-table tbody tr[hidden] { display: none; }
   .sl-comments a { text-decoration: underline; }
   .sl-code { width: 100%; min-height: 6.5em; font: 12px/1.4 ui-monospace, monospace; }
 </style>
@@ -104,7 +106,7 @@
   <div class="a-bar-row">
     <button type="button" id="back" class="a-bar-btn e-appbar__back" aria-label="Back" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span aria-hidden="true">Back</span></button>
     <div class="e-appbar__titles">
-      <h1 id="title" class="a-bar-title e-appbar__title">APMES Applicants</h1>
+      <h1 id="title" class="a-bar-title e-appbar__title">NUHS Residency Applications</h1>
       <p id="sub" class="e-appbar__sub" hidden></p>
     </div>
     <div id="me" class="e-appbar__right"></div>
