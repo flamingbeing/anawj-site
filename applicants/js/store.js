@@ -48,7 +48,7 @@ function seedDemo(d) {
 export function resetDemo() { try { localStorage.removeItem(DEMO_KEY); for (const k of Object.keys(localStorage)) if (k.startsWith('sel-demo-')) localStorage.removeItem(k); } catch {} }
 
 const toRound = (id, d) => {
-  const r = cleanRound({ cycle: id, title: d.title, applicants: d.applicants, questions: d.questions });
+  const r = cleanRound({ cycle: id, title: d.title, applicants: d.applicants, questions: d.questions, form: d.form, mirror: d.mirror });
   return r ? { ...r, cycle: id, shared: true, status: d.status === 'closed' ? 'closed' : 'open', updatedAt: Number(d.updatedAt) || 0 } : null;
 };
 const byNewest = (a, b) => b.updatedAt - a.updatedAt;
@@ -63,7 +63,8 @@ export const openRound = async () => (await listRounds()).find(r => r.status ===
 
 export async function saveRound(round, status = 'open') {
   const cycle = String(round.cycle || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 20) || String(new Date().getFullYear());
-  const doc = { cycle, title: round.title, status, applicants: round.applicants.map(a => ({ id: a.id, name: a.name })), questions: round.questions, updatedAt: Date.now() };
+  const doc = { cycle, title: round.title, status, applicants: round.applicants.map(a => (a.entry ? { id: a.id, name: a.name, entry: a.entry } : { id: a.id, name: a.name })), questions: round.questions, updatedAt: Date.now() };
+  if (round.form) { doc.form = round.form; doc.mirror = !!round.mirror; }
   if (cloud.demo) { const d = demoDb(); d.rounds[cycle] = doc; demoWrite(d); return toRound(cycle, doc); }
   const { db, F, queued } = await cloud.firestore();
   await queued(F.setDoc(F.doc(db, 'selection', cycle), doc));

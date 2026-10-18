@@ -760,12 +760,14 @@ service cloud.firestore {
       }
     }
     function validSelRound(cycle, d) {
-      return d.keys().hasOnly(['cycle', 'title', 'status', 'applicants', 'questions', 'updatedAt'])
+      return d.keys().hasOnly(['cycle', 'title', 'status', 'applicants', 'questions', 'form', 'mirror', 'updatedAt'])
         && d.cycle == cycle
         && d.title is string && d.title.size() > 0 && d.title.size() <= 200
         && d.status in ['open', 'closed']
         && d.applicants is list && d.applicants.size() >= 1 && d.applicants.size() <= 200
         && (!('questions' in d) || (d.questions is list && d.questions.size() >= 1 && d.questions.size() <= 10))
+        && (!('mirror' in d) || d.mirror is bool)
+        && (!('form' in d) || (d.form is map && d.form.keys().hasOnly(['id', 'nameEntry']) && d.form.id is string && d.form.id.size() <= 80 && d.form.nameEntry is int))
         && optNumber(d, 'updatedAt');
     }
     function validSelPhoto(d) {
