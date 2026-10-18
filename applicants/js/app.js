@@ -188,10 +188,23 @@ function applicantScreen(id) {
         h('div', { class: 'sl-scores' }, SCALE.map(v => h('label', {}, h('input', { type: 'radio', name, value: v, checked: r[q.id] === v, onchange: () => { r[q.id] = v; r.na = false; save(); } }), h('b', {}, String(v))))),
         q.low || q.high ? h('div', { class: 'sl-ends', 'aria-hidden': 'true' }, h('span', {}, '1 ' + (q.low || '')), h('span', {}, (q.high || '') + ' 5')) : null);
     }
-    const ta = h('textarea', { class: 'e-textarea sl-ta', id: 'q-' + q.id, rows: 3, maxlength: 5000, disabled: !open, placeholder: q.hint || '',
-      oninput: debounce(() => { if (ta.value.trim()) { r[q.id] = ta.value; r.na = false; } else delete r[q.id]; save(); }, 300) });
-    ta.value = typeof r[q.id] === 'string' ? r[q.id] : '';
-    return h('div', { class: 'sl-q' }, h('label', { class: 'sl-q__label', for: 'q-' + q.id }, q.label, q.required ? h('span', { class: 'sl-req' }, ' required') : h('span', { class: 'sl-opt' }, ' optional')), ta);
+    // One box per comment; the saved answer is the comments joined by new lines (so the Form shows each on its own line).
+    const wrap = h('div', { class: 'sl-cmts' });
+    const boxes = [];
+    const commit = () => {
+      const lines = boxes.map(b => b.value.replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean);
+      if (lines.length) { r[q.id] = lines.join('\n'); r.na = false; } else delete r[q.id];
+      save();
+    };
+    const addBox = (value = '', focus = false) => {
+      const ta = h('textarea', { class: 'e-textarea sl-ta', id: boxes.length ? undefined : 'q-' + q.id, rows: 2, maxlength: 1000, disabled: !open, 'aria-label': `${q.label}, comment ${boxes.length + 1}`,
+        placeholder: boxes.length ? 'Another comment' : (q.hint || ''), oninput: debounce(commit, 300) });
+      ta.value = value; boxes.push(ta); wrap.append(ta); if (focus) ta.focus();
+    };
+    const have = typeof r[q.id] === 'string' ? r[q.id].split(/\r?\n/).map(x => x.trim()).filter(Boolean) : [];
+    (have.length ? have : ['']).forEach(v => addBox(v));
+    const more = h('button', { type: 'button', class: 'a-btn a-btn--tinted a-btn--sm', disabled: !open, onclick: () => { if (boxes.length < 10) addBox('', true); } }, '+ Add another comment');
+    return h('div', { class: 'sl-q' }, h('label', { class: 'sl-q__label', for: 'q-' + q.id }, q.label, q.required ? h('span', { class: 'sl-req' }, ' required') : h('span', { class: 'sl-opt' }, ' optional')), wrap, more);
   });
 
   fill(app, h('div', { class: 'sl-col sl-apply' },
@@ -204,7 +217,8 @@ function applicantScreen(id) {
         h('div', { class: 'sl-who-text' }, h('h2', { class: 'sl-name' }, a.name), stat, naBtn)),
       r.na ? h('p', { class: 'e-small sl-skipped' }, 'Skipped: nothing more to answer for this applicant.') : h('div', { class: 'sl-qs' }, blocks)),
     h('div', { class: 'sl-fixed' }, h('div', { class: 'sl-fixed__in' },
-      prev ? h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => go('#a/' + prev.id), 'aria-label': 'Previous applicant' }, '‹ Back') : h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => go('#') }, 'All'),
+      prev ? h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => go('#a/' + prev.id), 'aria-label': 'Previous applicant' }, '‹ Back') : null,
+      h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => go('#') }, 'All'),
       saved,
       h('button', { class: 'a-btn e-go', type: 'button', onclick: goNext }, next ? 'Next ›' : 'Review')))));
   window.scrollTo(0, 0);
@@ -251,7 +265,8 @@ function reviewScreen() {
           h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(text()); toast('Copied'); } catch { toast('Couldn’t copy. Use Download.'); } } }, 'Copy'),
           h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => download(`feedback-${round.cycle}.txt`, new Blob([text()], { type: 'text/plain' })) }, 'Download')))),
     h('div', { class: 'sl-fixed' }, h('div', { class: 'sl-fixed__in' },
-      h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => { const x = nextUnanswered(round, answers, -1); go(x ? '#a/' + x.id : '#'); } }, w.length ? 'Fix' : 'All'), send))));
+      h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => { const x = nextUnanswered(round, answers, -1); go(x ? '#a/' + x.id : '#'); } }, w.length ? 'Fix' : 'All'),
+      w.length ? h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => go('#') }, 'All') : null, send))));
   window.scrollTo(0, 0);
 }
 
