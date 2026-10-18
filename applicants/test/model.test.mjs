@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {
   parseNames, cleanRound, cleanQuestions, encodeRound, decodeRound, readRoundText, cleanAnswers, statusOf, progress, nextUnanswered, warnings, formBody, formUrl, canMirror,
-  summary, resultsCSV, answersText, demoRound, demoPhoto, blank, photoSrc, matchPhotoFile, scaleQuestions, DEFAULT_QUESTIONS, MAX_QUESTIONS,
+  summary, resultsCSV, answersText, demoRound, demoPhoto, blank, photoSrc, matchPhotoFile, scaleQuestions, DEFAULT_QUESTIONS, MAX_QUESTIONS, newPasscode, codeProblem, CODE_ROLES,
 } from '../js/model.js';
 
 let n = 0;
@@ -146,4 +146,20 @@ t('mirror is kept only for a wired round with the standard two questions', () =>
   const custom = cleanRound({ ...wired, mirror: true, questions: [{ id: 'teamwork', type: 'scale', label: 'T' }] });
   assert.equal(custom.mirror, undefined);
   assert.equal(canMirror(cleanRound({ ...wired })), true);
+});
+
+t('a new passcode is readable, without look-alikes, and different each time', () => {
+  assert.equal(newPasscode(new Uint8Array(12)), 'aaaa-aaaa-aaaa');
+  const seen = new Set();
+  for (let i = 0; i < 200; i++) { const c = newPasscode(); assert.match(c, /^[a-hjkmnp-z2-9]{4}-[a-hjkmnp-z2-9]{4}-[a-hjkmnp-z2-9]{4}$/); seen.add(c); }
+  assert.ok(seen.size > 190);
+  assert.deepEqual(CODE_ROLES.map(r => r.id), ['guest', 'setup', 'committee']);
+});
+t('a passcode must be 6 to 100 characters and differ from the other roles (ignoring case and spaces)', () => {
+  assert.equal(codeProblem('guest', 'maple-tree-42'), '');
+  assert.match(codeProblem('guest', ' abc12 '), /at least 6/);
+  assert.match(codeProblem('guest', 'x'.repeat(101)), /at most 100/);
+  assert.match(codeProblem('guest', ' Quiet-River-7 ', { committee: 'quiet-river-7', setup: 'other-code-9' }), /already the committee passcode/);
+  assert.equal(codeProblem('guest', 'quiet-river-7', { guest: 'quiet-river-7' }), '', 'keeping its own is fine');
+  assert.equal(codeProblem('setup', 'fresh-code-1', { guest: undefined, committee: '' }), '');
 });

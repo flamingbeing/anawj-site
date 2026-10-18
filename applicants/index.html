@@ -25,6 +25,15 @@
 <script src="../nuhsdesign/app.js" defer></script>
 <style>
   .sl-col { max-width: 720px; margin: 0 auto; }
+  .sl-lockbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px; background: var(--a-surface-2); font-size: var(--a-text-sm); color: var(--a-ink-2); }
+  .sl-lock { display: block; }
+  .sl-code-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+  .sl-code-head--row { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
+  .sl-codebox { padding: 12px 0; border-top: .5px solid var(--a-sep); }
+  .sl-codebox:first-child { border-top: 0; padding-top: 0; }
+  .sl-codeline { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .sl-codeval { font: 16px/1.4 ui-monospace, monospace; word-break: break-all; }
+  .sl-codein { font-family: ui-monospace, monospace; }
   .sl-intro p { margin: 0 0 8px; }
   .sl-conf { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--a-surface-2); font-size: var(--a-text-sm); color: var(--a-ink-2); }
   .sl-bar { height: 6px; border-radius: 3px; background: var(--a-surface-2); overflow: hidden; margin: 10px 0 4px; }

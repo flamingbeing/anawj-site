@@ -9,6 +9,7 @@ import { S, h, fill, toast, cloud, modal, confirmBox, download, empty, applyThem
 import {
   INTRO, SCALE, SUGGESTED_COMMENTS, DEFAULT_QUESTIONS, MAX_QUESTIONS, parseNames, cleanRound, cleanQuestions, encodeRound, readRoundText, cleanAnswers, blank, statusOf,
   progress, nextUnanswered, warnings, formBody, formUrl, answersText, summary, resultsCSV, demoRound, matchPhotoFile, photoSrc, canMirror, scaleQuestions, hasAnswer,
+  CODE_ROLES, newPasscode, codeProblem,
 } from './model.js';
 import * as store from './store.js';
 import { passportJpeg } from './photo.js';
@@ -410,7 +411,21 @@ function setupScreen() {
     h('label', { class: 'sl-chk', style: 'display:flex;gap:8px;margin-top:12px' },
       h('input', { type: 'checkbox', id: 'su-mirror', checked: mirror, onchange: e => { mirror = e.target.checked; } }), ' Also send every answer to the Google Form'),
     h('p', { class: 'e-hint', style: 'margin-top:4px' }, 'The Form stays the source of truth; the app keeps its own copy as a backup. Works only with the standard two questions. Someone who sends again adds another row in the Form (the app keeps just their latest). Save changes to apply.')) : null;
-  fill(app, h('div', { class: 'e-stack sl-col' },
+  // The page opens locked: every field and button is disabled until "Unlock to edit", so a stray tap or keystroke changes nothing.
+  // Any save redraws the page, which locks it again. The passcodes card keeps Show working while locked (viewing changes nothing).
+  const lockBar = h('div', { class: 'sl-lockbar', role: 'group', 'aria-label': 'Editing lock' });
+  const locks = [];
+  let idle = null;
+  const arm = () => { clearTimeout(idle); idle = setTimeout(() => setLocked(true), 5 * 60e3); };   // locks again after 5 minutes without use
+  const setLocked = locked => {
+    clearTimeout(idle); if (!locked) arm();
+    locks.forEach(f => { f.disabled = locked; });
+    fill(lockBar,
+      h('span', { class: 'sl-lockbar__msg' }, h('span', { 'aria-hidden': 'true' }, locked ? '🔒 ' : '🔓 '), locked ? 'Locked: nothing here can change by accident.' : 'Unlocked. It locks again after 5 minutes without use, or when the round is saved.'),
+      h('button', { class: locked ? 'a-btn' : 'a-btn a-btn--tinted', type: 'button', id: 'su-lock', onclick: () => setLocked(!locked) }, locked ? 'Unlock to edit' : 'Lock'));
+  };
+  const lockable = (...kids) => { const f = h('fieldset', { class: 'e-fieldset sl-lock', disabled: true }, ...kids); locks.push(f); return f; };
+  const body = lockable(h('div', { class: 'e-stack' },
     h('section', { class: 'e-card' },
       h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'The round'),
       h('label', { class: 'e-label', for: 'su-title' }, 'Title'), titleIn,
@@ -447,6 +462,10 @@ function setupScreen() {
         if (!await confirmBox('Remove the round?', 'This removes the round and the answers kept on this device. The Google Form’s responses aren’t touched.', 'Remove', true)) return;
         [K.round, K.ans(round.cycle, S.user.email), K.subs(round.cycle)].forEach(del); round = null; answers = {}; sent = null; go('#');
       } }, 'Remove the round from this device')) : null));
+  const page = h('div', { class: 'e-stack sl-col' }, lockBar, body, S.roles.admin || S.roles.pd ? passcodeCard(lockable) : null);
+  for (const ev of ['input', 'click']) page.addEventListener(ev, () => { if (!locks[0].disabled) arm(); });
+  fill(app, page);
+  setLocked(true);
 }
 
 // who may set the round up: Admin staff, PDs and owners always can (People › Access); this card adds or removes the app-only
@@ -512,6 +531,50 @@ function committeeCard() {
     h('div', { class: 'e-actions' }, h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: async () => {
       try { await store.saveCommittee({ email: email.value, name: name.value }); email.value = ''; name.value = ''; draw(); } catch (e) { toast(errText(e)); }
     } }, 'Add')));
+}
+
+// the three sign-in passcodes (Admin staff and PDs): a guest sends feedback, Set up opens this page, Committee reads the Results.
+// A passcode set here replaces the Worker secret of the same role; a role with none set here still uses its secret (not shown).
+function passcodeCard(lockable) {
+  let codes = {}, shown = false, editing = null, loaded = false, failed = '';
+  const box = h('div', {});
+  const draw = () => {
+    if (failed) { fill(box, h('p', { class: 'e-alert' }, failed)); return; }
+    if (!loaded) { fill(box, h('p', { class: 'e-loading' }, 'Loading…')); return; }
+    fill(box, CODE_ROLES.map(r => {
+      const code = codes[r.id];
+      const others = Object.fromEntries(Object.entries(codes).filter(([k]) => k !== r.id));
+      const head = h('div', { class: 'sl-code-head' }, h('strong', {}, r.label + ' passcode'), h('span', { class: 'e-small' }, r.what));
+      if (editing === r.id) {
+        const input = h('input', { class: 'e-input sl-codein', id: 'pc-' + r.id, autocomplete: 'off', spellcheck: 'false', value: newPasscode(), maxlength: 100, 'aria-label': `New ${r.label.toLowerCase()} passcode` });
+        return h('form', { class: 'sl-codebox', onsubmit: async ev => {
+          ev.preventDefault();
+          const next = input.value.trim(), bad = codeProblem(r.id, next, others);
+          if (bad) { toast(bad); return; }
+          if (!await confirmBox(`Change the ${r.label.toLowerCase()} passcode?`, 'The old one stops working for new sign-ins at once. People already signed in stay in until they sign out.', 'Change')) return;
+          try { await store.saveCode(r.id, next); codes[r.id] = next; editing = null; shown = true; draw(); toast(`${r.label} passcode changed`); } catch (e) { toast('Couldn’t change it. ' + errText(e)); }
+        } }, head,
+          h('label', { class: 'e-label', for: input.id }, 'New passcode (change it if you like; capitals don’t matter)'), input,
+          h('div', { class: 'e-actions' },
+            h('button', { class: 'a-btn', type: 'submit' }, 'Save'),
+            h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => { input.value = newPasscode(); input.focus(); } }, 'Suggest another'),
+            h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => { editing = null; draw(); } }, 'Cancel')));
+      }
+      return h('div', { class: 'sl-codebox' }, head,
+        code
+          ? h('div', { class: 'sl-codeline' }, h('code', { class: 'sl-codeval', 'data-role': r.id }, shown ? code : '•'.repeat(Math.min(code.length, 14))),
+            h('button', { class: 'a-btn a-btn--tinted a-btn--sm', type: 'button', 'aria-label': `Copy the ${r.label.toLowerCase()} passcode`, onclick: async () => { try { await navigator.clipboard.writeText(code); toast('Copied'); } catch { toast('Show it, then select and copy.'); } } }, 'Copy'))
+          : h('p', { class: 'e-small', style: 'margin:4px 0' }, 'Not set here yet: the one saved in Cloudflare is in use, and can’t be shown. Set a new one to take over.'),
+        h('div', { class: 'e-actions' }, h('button', { class: 'a-btn a-btn--tinted a-btn--sm', type: 'button', id: 'pc-change-' + r.id, onclick: () => { editing = r.id; draw(); } }, code ? 'Change' : 'Set a passcode here')));
+    }));
+  };
+  store.listCodes().then(c => { codes = c; loaded = true; draw(); }, e => { failed = 'Couldn’t load the passcodes. ' + errText(e); draw(); });
+  draw();
+  const showBtn = h('button', { class: 'a-btn a-btn--tinted a-btn--sm', type: 'button', id: 'pc-show', 'aria-pressed': 'false', onclick: () => { shown = !shown; showBtn.textContent = shown ? 'Hide' : 'Show'; showBtn.setAttribute('aria-pressed', String(shown)); draw(); } }, 'Show');
+  return h('section', { class: 'e-card' },
+    h('div', { class: 'sl-code-head sl-code-head--row' }, h('h2', { class: 'e-h2', style: 'margin:0' }, 'Sign-in passcodes'), showBtn),
+    h('p', { class: 'e-small' }, 'For people without an APMES account. Anyone holding a passcode has that role, so share them like keys. Admin staff and programme directors see and change them here.'),
+    lockable(box));
 }
 
 async function resultsScreen() {

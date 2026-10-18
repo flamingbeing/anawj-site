@@ -1,5 +1,6 @@
 #!/bin/bash
-# Change a sign-in passcode of the applicants app (worker/guest.js): guest, setup or committee.
+# Set the Cloudflare secret behind a sign-in passcode of the applicants app (worker/guest.js): guest, setup or committee. This is the fallback:
+# a passcode set on the app's Set up page (Sign-in passcodes) replaces it, so normally change them there.
 # Run on the owner's own computer (it signs in to Cloudflare through wrangler; sessions never run it):
 #   tools/set-passcode.sh                 asks which one, then shows a new random passcode to confirm
 #   tools/set-passcode.sh committee       skips the question
