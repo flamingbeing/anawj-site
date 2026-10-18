@@ -183,6 +183,7 @@ export async function getRoles(email) {
     pd: !!pd?.exists() || roles.includes('pd'),
     owner: !!own?.exists() || roles.includes('owner'),
     pc: roles.includes('pc'),
+    selection: roles.includes('selection'),
     resident: residents[0] || null,
     faculty: fac?.exists() ? fac.data() : null,
     application: app?.exists() ? app.data() : null,
