@@ -21,13 +21,13 @@ export async function sameSecret(a, b) {
   return d === 0;
 }
 
-export async function customToken(env, uid, now = Math.floor(Date.now() / 1000)) {
+export async function customToken(env, uid, now = Math.floor(Date.now() / 1000), role = 'guest') {
   // the base64 between the BEGIN and END lines, however the secret was pasted (real or escaped new lines)
   const m = env.GUEST_SA_KEY.match(/-----BEGIN[^-]*-----([\s\S]*?)-----END/);
   const pem = (m ? m[1] : env.GUEST_SA_KEY).replace(/\\+[nrt]/g, '').replace(/[^A-Za-z0-9+/=]/g, '');
   const key = await crypto.subtle.importKey('pkcs8', Uint8Array.from(atob(pem), c => c.charCodeAt(0)), { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
   const head = text64(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const body = text64(JSON.stringify({ iss: env.GUEST_SA_EMAIL, sub: env.GUEST_SA_EMAIL, aud: AUD, iat: now, exp: now + 3600, uid, claims: { guest: true } }));
+  const body = text64(JSON.stringify({ iss: env.GUEST_SA_EMAIL, sub: env.GUEST_SA_EMAIL, aud: AUD, iat: now, exp: now + 3600, uid, claims: { guest: true, role } }));
   const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(`${head}.${body}`));
   return `${head}.${body}.${b64url(sig)}`;
 }
@@ -44,9 +44,14 @@ export async function handleGuest(request, env) {
   }
   let b;
   try { b = await request.json(); } catch { return json({ error: 'Not JSON.' }, 400); }
-  const given = typeof b?.passcode === 'string' ? b.passcode.trim().slice(0, 100) : '';
-  if (!given || !(await sameSecret(given.toLowerCase(), String(env.GUEST_PASSCODE).trim().toLowerCase()))) return json({ error: 'Wrong passcode.' }, 401);
+  const given = (typeof b?.passcode === 'string' ? b.passcode.trim().slice(0, 100) : '').toLowerCase();
+  // three passcodes, three roles: guests send feedback; SETUP_PASSCODE opens Set up; COMMITTEE_PASSCODE reads the results. The last two are optional secrets.
+  let role = null;
+  if (given) for (const [r, secret] of [['guest', env.GUEST_PASSCODE], ['setup', env.SETUP_PASSCODE], ['committee', env.COMMITTEE_PASSCODE]]) {
+    if (secret && String(secret).trim() && await sameSecret(given, String(secret).trim().toLowerCase()) && !role) role = r;
+  }
+  if (!role) return json({ error: 'Wrong passcode.' }, 401);
   const uid = 'g' + Array.from(crypto.getRandomValues(new Uint8Array(12)), x => x.toString(16).padStart(2, '0')).join('');
-  try { return json({ token: await customToken(env, uid) }); }
+  try { return json({ token: await customToken(env, uid, undefined, role), role }); }
   catch (e) { console.error('guest token failed', e?.name, e?.message); return json({ error: 'Couldn’t sign in (' + (e?.name || 'error') + ': ' + String(e?.message || '').slice(0, 120) + ').' }, 500); }
 }

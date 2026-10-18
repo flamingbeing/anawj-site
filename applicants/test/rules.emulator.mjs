@@ -154,6 +154,29 @@ await t('set-up role is not an admin elsewhere', assertFails(getDocs(collection(
 await t('admin gives the set-up role', assertSucceeds(setDoc(doc(adm, 'access', 'new@example.com'), { email: 'new@example.com', name: 'New', roles: ['selection'], updatedAt: serverTimestamp(), updatedBy: ADMIN })));
 await t('a stranger has no set-up powers', assertFails(setDoc(doc(str, 'selection', 'c7'), round({ cycle: 'c7' }))));
 
+// ---- set-up and committee passcodes (custom token claims guest + role, no email) ----
+const code = (uid, role) => env.authenticatedContext(uid, { guest: true, role }).firestore();
+const su = code('s1', 'setup'), cm = code('c1', 'committee'), oldGuest = guestCtx('g9');
+await t('set-up code reads a round', assertSucceeds(getDoc(doc(su, 'selection', 'c1'))));
+await t('set-up code creates a round', assertSucceeds(setDoc(doc(su, 'selection', 'c8'), round({ cycle: 'c8' }))));
+await t('set-up code adds a photo', assertSucceeds(setDoc(doc(su, 'selection', 'c1', 'photos', 'a1'), { jpeg: 'AAAA', updatedAt: 1 })));
+await t('set-up code cannot read responses', assertFails(getDocs(collection(su, 'selection', 'c1', 'responses'))));
+await t('set-up code cannot send a response', assertFails(setDoc(doc(su, 'selection', 'c1', 'responses', 'guest-s1'), resp('guest-s1'))));
+await t('set-up code cannot touch the committee list', assertFails(setDoc(doc(su, 'selectionCommittee', 'guest-s1'), { name: 'x' })));
+await t('set-up code cannot grant roles', assertFails(setDoc(doc(su, 'access', 'x@example.com'), { email: 'x@example.com', name: 'X', roles: ['admin'], updatedAt: serverTimestamp(), updatedBy: 'x' })));
+await t('set-up code cannot read residents', assertFails(getDocs(collection(su, 'residents'))));
+await t('committee code reads a round and photos', assertSucceeds(getDoc(doc(cm, 'selection', 'c1'))));
+await t('committee code reads photos', assertSucceeds(getDoc(doc(cm, 'selection', 'c1', 'photos', 'a1'))));
+await t('committee code reads every response', assertSucceeds(getDocs(collection(cm, 'selection', 'c1', 'responses'))));
+await t('committee code cannot send a response', assertFails(setDoc(doc(cm, 'selection', 'c1', 'responses', 'guest-c1'), resp('guest-c1'))));
+await t('committee code cannot change a round', assertFails(setDoc(doc(cm, 'selection', 'c1'), round({ title: 'Mine' }))));
+await t('committee code cannot add a photo', assertFails(setDoc(doc(cm, 'selection', 'c1', 'photos', 'a2'), { jpeg: 'AAAA', updatedAt: 1 })));
+await t('committee code cannot delete a response', assertFails(deleteDoc(doc(cm, 'selection', 'c1', 'responses', RES))));
+await t('committee code cannot read residents', assertFails(getDocs(collection(cm, 'residents'))));
+await t('committee code cannot list the committee', assertFails(getDocs(collection(cm, 'selectionCommittee'))));
+await t('a guest still cannot read responses', assertFails(getDocs(collection(oldGuest, 'selection', 'c1', 'responses'))));
+await t('a token with an unknown role is nothing', assertFails(getDoc(doc(code('z1', 'boss'), 'selection', 'c1'))));
+await t('a role claim with an email is no passcode account', assertFails(getDocs(collection(env.authenticatedContext('q', { guest: true, role: 'committee', email: 'q@example.com' }).firestore(), 'selection', 'c1', 'responses'))));
 await env.cleanup();
 console.log(fail ? `selection rules: ${fail} of ${n} checks failed` : `selection rules: ${n} checks passed`);
 process.exit(fail ? 1 : 0);

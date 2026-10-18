@@ -726,15 +726,25 @@ service cloud.firestore {
     // a guest: signed in by the applicants app's passcode (worker/guest.js), a custom token with claim guest and no email. It can read a
     // round and its photos and write its own response (document guest-<uid>), nothing else: signedIn() needs a verified email, so every
     // other rule in this file turns a guest away.
-    function isGuest() {
+    function isPasscode() {
       return request.auth != null && request.auth.token.guest == true && !('email' in request.auth.token);
+    }
+    // role claim: guest (sends feedback), setup (sets a round up), committee (reads the responses). Tokens issued before roles existed have none: guests.
+    function isGuest() {
+      return isPasscode() && (!('role' in request.auth.token) || request.auth.token.role == 'guest');
+    }
+    function isSetupCode() {
+      return isPasscode() && request.auth.token.get('role', '') == 'setup';
+    }
+    function isCommitteeCode() {
+      return isPasscode() && request.auth.token.get('role', '') == 'committee';
     }
     // who sets a round up: Admin staff, PDs, and people given the Applicants set-up role (access/, edited on the app's Set up page or in People)
     function selStaff() {
-      return isAdmin() || isPD() || (signedIn() && hasAccess(['selection']));
+      return isAdmin() || isPD() || isSetupCode() || (signedIn() && hasAccess(['selection']));
     }
     function selMayAnswer() {
-      return isGuest() || selStaff()
+      return isGuest() || isCommitteeCode() || selStaff()
         || (signedIn() && exists(/databases/$(database)/documents/faculty/$(me())))
         || (signedIn() && exists(/databases/$(database)/documents/members/$(me()))
             && isResident(get(/databases/$(database)/documents/members/$(me())).data.rid));
@@ -762,7 +772,7 @@ service cloud.firestore {
       }
       match /responses/{email} {
         allow get: if isOwner(email) || (isGuest() && email == 'guest-' + request.auth.uid);
-        allow read: if isPD() || selCommittee();
+        allow read: if isPD() || selCommittee() || isCommitteeCode();
         allow create, update: if ((isOwner(email) && email == email.lower()) || (isGuest() && email == 'guest-' + request.auth.uid)) && selMayAnswer()
           && get(/databases/$(database)/documents/selection/$(cycle)).data.status == 'open'
           && validSelResponse(email, request.resource.data);

@@ -71,8 +71,11 @@ async function loadMine() {
 }
 const saveMine = () => put(K.ans(round.cycle, S.user.email), { a: answers, sent });
 const isStaff = () => !!(S.roles.admin || S.roles.pd || S.roles.selection);
-const isGuest = () => !!S.user?.guest;
-const mayAnswer = () => isGuest() || isStaff() || !!S.roles.resident || (!!S.roles.faculty && S.roles.faculty.status !== 'INACTIVE');
+// a passcode sign-in (no email): 'guest' sends feedback, 'setup' sets the round up, 'committee' reads the results
+const codeRole = () => (S.user?.guest ? S.user.role || 'guest' : null);
+const isGuest = () => codeRole() === 'guest';
+const canAnswer = () => !codeRole() || isGuest();
+const mayAnswer = () => !!codeRole() || isStaff() || !!S.roles.resident || (!!S.roles.faculty && S.roles.faculty.status !== 'INACTIVE');
 const subs = () => (round && !round.shared ? get(K.subs(round.cycle), []) : []);
 const canResults = () => !!S.roles.pd || isCom;
 const isOpen = () => !round?.shared || round.status === 'open';
@@ -81,9 +84,11 @@ const isOpen = () => !round?.shared || round.status === 'open';
 
 const route = () => {
   const [a, b] = location.hash.replace(/^#\/?/, '').split('/');
-  if (a === 'a' && round?.applicants.some(x => x.id === b)) return { name: 'a', id: b };
-  if (['review', 'done'].includes(a)) return { name: a };
+  if (canAnswer() && a === 'a' && round?.applicants.some(x => x.id === b)) return { name: 'a', id: b };
+  if (canAnswer() && ['review', 'done'].includes(a)) return { name: a };
   if ((a === 'setup' && isStaff()) || (a === 'results' && canResults())) return { name: a };
+  // a set-up or committee passcode doesn't answer: it opens its own page
+  if (!canAnswer()) return { name: canResults() ? 'results' : 'setup' };
   return { name: 'home' };
 };
 const go = hash => { location.hash = hash; };
@@ -544,7 +549,7 @@ async function resultsScreen() {
 
 let seq = 0;
 const tabs = cur => (isStaff() || canResults())
-  ? segment([['home', 'Feedback', true], ['results', 'Results', canResults()], ['setup', 'Set up', isStaff()]].filter(t => t[2]).map(([id, label]) => ({ id, label })), cur, id => go(id === 'home' ? '#' : '#' + id)) : null;
+  ? segment([['home', 'Feedback', canAnswer()], ['results', 'Results', canResults()], ['setup', 'Set up', isStaff()]].filter(t => t[2]).map(([id, label]) => ({ id, label })), cur, id => go(id === 'home' ? '#' : '#' + id)) : null;
 async function render() {
   const n = ++seq;
   if (!S.user) return;
@@ -597,7 +602,7 @@ function guestBox() {
 cloud.watchUser(async u => {
   S.user = u;
   if (!u) { S.roles = { admin: false, pd: false }; signInScreen(); return; }
-  if (u.guest) { S.roles = { admin: false, pd: false }; isCom = false; await loadRound(); await loadMine(); render(); return; }
+  if (u.guest) { S.roles = { admin: false, pd: false, selection: u.role === 'setup' }; isCom = u.role === 'committee'; await loadRound(); await loadMine(); render(); return; }
   try { S.roles = await cloud.getRoles(u.email); } catch (e) { S.roles = { admin: false, pd: false }; toast('Couldn’t check your access. ' + errText(e)); }
   await loadRound(); await loadMine();
   try { isCom = await store.isCommittee(u.email); } catch { isCom = false; }
