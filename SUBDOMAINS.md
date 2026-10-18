@@ -24,6 +24,7 @@ notes; every step is done.
 | `apmes.anawj.com/people/` | `people/` | The people lists logbook and evals share (admins and PDs; 13 Oct 2026). |
 | `apmes.anawj.com/applicants/` | `applicants/` | Confidential feedback on residency applicants, by the same residents and faculty (17 Oct 2026). |
 | `apmes.anawj.com/360/` | `360/` | CCC 360: scholarly projects and multisource feedback nominees, collected from residents for the programme coordinators before a CCC meeting (17 Oct 2026). |
+| `beta-apmes.anawj.com/…` | same as apmes | Beta: the `beta` branch on the test Firebase project, for trying a change signed in before it goes live (PREVIEWS.md, "Beta"; 18 Oct 2026). |
 | `anawj.com/privacy/` | `privacy/` | Stays: the Google sign-in consent screen points here. |
 | `anawj.com/prewarm-update/` | `prewarm-update/` | Stays until no phone runs the old prewarm worker, then becomes a redirect. |
 | `anawj.com/edit/` (decided in step 5) | `edit/` | Stays on `anawj.com`: see "The page editor" below. |

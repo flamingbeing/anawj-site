@@ -57,6 +57,8 @@ Hosts: [SUBDOMAINS.md](SUBDOMAINS.md). Security: [OPERATIONS.md](OPERATIONS.md).
 
 GitHub runs these on every PR ("Checks"; red means don't merge). Merge your own PRs once they pass, by the number the
 PR creation returned (never a guess), and report with the link. Handover PRs wait for the owner's approval.
+Once beta is set up (PREVIEWS.md, "Beta"), PRs that change the logbook or evals wait too: point `beta` at the
+branch, send the owner the beta link, and merge on his "ship it". Docs-only PRs still merge themselves.
 
 ```
 node tools/check.mjs
