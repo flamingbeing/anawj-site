@@ -111,7 +111,7 @@ await page.getByRole('tab', { name: 'Results' }).waitFor();
 await page.getByRole('tab', { name: 'Results' }).click();
 await page.getByText(/5 responses/).waitFor();
 assert.match(await page.textContent('main'), /4\.5 \(4\)/, 'Alex Demo: 5, 4, 5 and 4');
-assert.match(await page.textContent("main"), /Calm during a difficult airway[sS]*Good with nurses[sS]*Demo Resident/);
+assert.match(await page.textContent("main"), /Calm during a difficult airway[\s\S]*Good with nurses[\s\S]*Demo Resident/);
 await axe('results'); await shot('5-results');
 const dl = page.waitForEvent('download');
 await page.getByRole('button', { name: 'Download CSV' }).click();
