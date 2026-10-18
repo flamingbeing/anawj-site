@@ -29,7 +29,7 @@ const MODS = {
   sync: () => import('./ui-sync.js'), settingsFile: () => import('./settings-file.js'), account: () => import('./ui-account.js'),
   admin: () => import('./ui-admin.js'), recovery: () => import('./ui-recovery.js'), notesExport: () => import('./ui-notes.js'),
   cloudSave: () => import('./cloud-save.js'), backup: () => import('./backup.js'), shareIn: () => import('./ui-share-in.js'),
-  parts: () => import('./ui-parts.js'), feedback: () => import('./ui-feedback.js'), search: () => import('./ui-search.js'),
+  parts: () => import('./ui-parts.js'), feedback: () => import('./ui-feedback.js'), formview: () => import('./ui-formview.js'), search: () => import('./ui-search.js'),
 };
 const mod = {}, loading = {};   // name → the module once loaded; → its promise while loading
 function need(name) {
@@ -99,6 +99,7 @@ const ICONS = {
   notes: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5',
   notesset: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5',
   feedback: 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5',   // a speech bubble
+  formview: 'M6 3h12v18H6zM9 8h6M9 12h6M9 16h3',   // a form sheet
   feedbackinbox: 'M3 13l3-8h12l3 8v6H3zM3 13h5l1 2h6l1-2h5',   // an in-tray
   more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
 };
@@ -157,6 +158,7 @@ const TABS = [
   { id: 'export', label: 'Export portfolio', render: page(['reflect'], m => m.reflect.renderExportPage()), hidden: true, under: 'data', unlisted: true },
   { id: 'choose', label: 'Export portfolio', render: page(['reflect'], m => m.reflect.renderChoosePage()), hidden: true, under: 'export', unlisted: true },
   // private feedback to the programme owner (never a public GitHub issue); the owner reads it in Feedback (owner: true)
+  { id: 'formview', label: 'Form view', render: page(['formview'], m => m.formview.renderFormView()), hidden: true, under: 'more', desc: 'The old Google Form’s layout; cases save straight into your logbook' },
   { id: 'feedback', label: 'Send feedback', render: page(['feedback'], m => m.feedback.renderFeedbackSend()), hidden: true, under: 'more', desc: 'A problem or an idea: only the programme owner reads it' },
   { id: 'feedbackinbox', label: 'Feedback', render: page(['feedback'], m => m.feedback.renderFeedbackInbox()), owner: true, hidden: true, under: 'more', desc: 'App owner only: feedback sent by residents' },
   // admins open it from More
