@@ -70,7 +70,7 @@ async function loadMine() {
   }
 }
 const saveMine = () => put(K.ans(round.cycle, S.user.email), { a: answers, sent });
-const isStaff = () => !!(S.roles.admin || S.roles.pd);
+const isStaff = () => !!(S.roles.admin || S.roles.pd || S.roles.selection);
 const isGuest = () => !!S.user?.guest;
 const mayAnswer = () => isGuest() || isStaff() || !!S.roles.resident || (!!S.roles.faculty && S.roles.faculty.status !== 'INACTIVE');
 const subs = () => (round && !round.shared ? get(K.subs(round.cycle), []) : []);
@@ -423,7 +423,8 @@ function setupScreen() {
             h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: () => { if (save()) toast('Saved on this device'); } }, 'Save on this device only')],
         h('button', { class: 'a-btn a-btn--tinted', type: 'button', onclick: link }, 'Make a private link')), out),
     h('section', { class: 'e-card' }, h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'Photos'), photoBox),
-    committeeCard(),
+    accessCard(),
+    S.roles.admin || S.roles.pd ? committeeCard() : null,
     h('section', { class: 'e-card' },
       h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'Already have a round?'),
       h('p', { class: 'e-small' }, 'Paste a link or the round file (it may also connect the round to the committee’s Google Form).'),
@@ -438,6 +439,46 @@ function setupScreen() {
         if (!await confirmBox('Remove the round?', 'This removes the round and the answers kept on this device. The Google Form’s responses aren’t touched.', 'Remove', true)) return;
         [K.round, K.ans(round.cycle, S.user.email), K.subs(round.cycle)].forEach(del); round = null; answers = {}; sent = null; go('#');
       } }, 'Remove the round from this device')) : null));
+}
+
+// who may set the round up: Admin staff, PDs and owners always can (People › Access); this card adds or removes the app-only
+// "Applicants set-up" role (access/{email}.roles includes 'selection'), which opens this page and nothing else.
+function accessCard() {
+  const box = h('div', {});
+  const canEdit = !!(S.roles.admin || S.roles.owner);
+  const email = h('input', { class: 'e-input', id: 'ac-email', type: 'email', autocomplete: 'off', placeholder: 'name@example.com', 'aria-label': 'Email of the person to add' });
+  const name = h('input', { class: 'e-input', id: 'ac-name', autocomplete: 'off', placeholder: 'Name', 'aria-label': 'Name of the person to add' });
+  let list = [];
+  const draw = async () => {
+    try { list = await cloud.listAccess(); } catch (e) { fill(box, h('p', { class: 'e-alert' }, 'Couldn’t load the list. ' + errText(e))); return; }
+    const setup = list.filter(x => (x.roles || []).includes('selection'));
+    const always = list.filter(x => (x.roles || []).some(r => ['owner', 'admin', 'pc', 'pd'].includes(r)));
+    fill(box,
+      h('p', { class: 'e-small', style: 'margin-top:0' }, 'Owners, Admin staff and programme directors can always open this page' + (always.length ? ' (' + always.map(x => x.name || x.email).join(', ') + ')' : '') + '. Change them in People › Access.'),
+      setup.length ? h('div', { class: 'e-list' }, setup.map(m => h('div', { class: 'e-row e-row--static' },
+        h('span', { class: 'e-row__body' }, h('span', { class: 'e-row__title' }, m.name || m.email), m.name ? h('span', { class: 'e-row__meta' }, m.email) : null),
+        canEdit ? h('button', { class: 'a-btn a-btn--tinted a-btn--sm', type: 'button', 'aria-label': 'Remove ' + (m.name || m.email), onclick: async () => {
+          if (!await confirmBox('Remove ' + (m.name || m.email) + '?', 'They can no longer open this page.', 'Remove', true)) return;
+          try {
+            const left = (m.roles || []).filter(r => r !== 'selection');
+            if (left.length) await cloud.saveAccess({ email: m.email, name: m.name, roles: left, change: 'Applicants set-up removed' });
+            else await cloud.removeAccess(m.email, 'removed (was Applicants set-up)');
+            draw();
+          } catch (e) { toast('Couldn’t remove. ' + errText(e)); }
+        } }, 'Remove') : null))) : h('p', { class: 'e-small' }, 'Nobody has only the Applicants set-up role yet.'),
+      canEdit ? h('form', { class: 'e-stack', style: 'margin-top:12px', onsubmit: async ev => {
+        ev.preventDefault();
+        const em = email.value.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { toast('Enter a valid email.'); return; }
+        try {
+          const had = list.find(x => x.email === em);
+          await cloud.saveAccess({ email: em, name: name.value.trim() || had?.name || '', roles: [...new Set([...(had?.roles || []), 'selection'])], change: 'Applicants set-up added' });
+          email.value = ''; name.value = ''; draw();
+        } catch (e) { toast('Couldn’t add. ' + errText(e)); }
+      } }, email, name, h('div', { class: 'e-actions' }, h('button', { class: 'a-btn a-btn--tinted a-btn--sm', type: 'submit' }, 'Add'))) : h('p', { class: 'e-small' }, 'Only owners and Admin staff add or remove people here.'));
+  };
+  draw();
+  return h('section', { class: 'e-card' }, h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'Who can set up the round'), box);
 }
 
 // who may read the responses besides the PDs: kept by admins and PDs

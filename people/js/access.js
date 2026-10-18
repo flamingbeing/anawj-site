@@ -2,7 +2,7 @@
 // (unit tests in test/access.test.mjs). The rules that enforce this are in logbook/firestore.rules ("access/"); `mayChange`
 // mirrors them so the screen can say no before the server does.
 
-export const ROLES = [['owner', 'Owner'], ['admin', 'Admin staff'], ['pc', 'Programme coordinator'], ['pd', 'Programme director']];
+export const ROLES = [['owner', 'Owner'], ['admin', 'Admin staff'], ['pc', 'Programme coordinator'], ['pd', 'Programme director'], ['selection', 'Applicants set-up']];
 const LABEL = Object.fromEntries(ROLES);
 export const roleLabel = r => LABEL[r] || r;
 export const cleanRoles = list => { const s = new Set(Array.isArray(list) ? list : []); return ROLES.map(([k]) => k).filter(k => s.has(k)); };

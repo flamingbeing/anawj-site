@@ -70,7 +70,7 @@ service cloud.firestore {
       return d.keys().hasOnly(['email', 'name', 'roles', 'updatedAt', 'updatedBy'])
         && d.email == email
         && optString(d, 'name', 200)
-        && d.roles is list && d.roles.size() <= 4 && d.roles.hasOnly(['owner', 'admin', 'pc', 'pd'])
+        && d.roles is list && d.roles.size() <= 5 && d.roles.hasOnly(['owner', 'admin', 'pc', 'pd', 'selection'])
         && d.updatedAt == request.time && d.updatedBy == me();
     }
     match /accessLog/{id} {
@@ -729,8 +729,12 @@ service cloud.firestore {
     function isGuest() {
       return request.auth != null && request.auth.token.guest == true && !('email' in request.auth.token);
     }
+    // who sets a round up: Admin staff, PDs, and people given the Applicants set-up role (access/, edited on the app's Set up page or in People)
+    function selStaff() {
+      return isAdmin() || isPD() || (signedIn() && hasAccess(['selection']));
+    }
     function selMayAnswer() {
-      return isGuest() || isAdmin() || isPD()
+      return isGuest() || selStaff()
         || (signedIn() && exists(/databases/$(database)/documents/faculty/$(me())))
         || (signedIn() && exists(/databases/$(database)/documents/members/$(me()))
             && isResident(get(/databases/$(database)/documents/members/$(me())).data.rid));
@@ -748,13 +752,13 @@ service cloud.firestore {
     }
     match /selection/{cycle} {
       allow read: if selMayAnswer();
-      allow create, update: if (isAdmin() || isPD()) && cycle.size() <= 20 && validSelRound(cycle, request.resource.data);
+      allow create, update: if selStaff() && cycle.size() <= 20 && validSelRound(cycle, request.resource.data);
       allow delete: if isAdmin() || isPD();
       // applicants' passport photos (a few KB of base64 JPEG each): everyone who may answer reads; admins and PDs keep them
       match /photos/{aid} {
         allow read: if selMayAnswer();
-        allow create, update: if (isAdmin() || isPD()) && aid.size() <= 20 && validSelPhoto(request.resource.data);
-        allow delete: if isAdmin() || isPD();
+        allow create, update: if selStaff() && aid.size() <= 20 && validSelPhoto(request.resource.data);
+        allow delete: if selStaff();
       }
       match /responses/{email} {
         allow get: if isOwner(email) || (isGuest() && email == 'guest-' + request.auth.uid);

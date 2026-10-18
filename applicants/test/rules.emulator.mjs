@@ -139,6 +139,21 @@ await t('guest cannot read faculty', assertFails(getDoc(doc(g1, 'faculty', FAC))
 await t('guest cannot write an admin', assertFails(setDoc(doc(g1, 'admins', 'guest-g1'), { name: 'x' })));
 await t('a token claiming guest but with an email is no guest', assertFails(getDoc(doc(env.authenticatedContext('x', { guest: true, email: 'x@example.com' }).firestore(), 'selection', 'c1'))));
 
+// ---- the Applicants set-up role (access/{email}.roles includes 'selection') ----
+const SEL = 'setup.only@example.com';
+await env.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), 'access', SEL), { email: SEL, name: 'Set-up Only', roles: ['selection'], updatedAt: 1, updatedBy: ADMIN }); });
+const sel = as(SEL);
+await t('set-up role reads a round', assertSucceeds(getDoc(doc(sel, 'selection', 'c1'))));
+await t('set-up role creates a round', assertSucceeds(setDoc(doc(sel, 'selection', 'c6'), round({ cycle: 'c6' }))));
+await t('set-up role adds a photo', assertSucceeds(setDoc(doc(sel, 'selection', 'c1', 'photos', 'a1'), { jpeg: 'AAAA', updatedAt: 1 })));
+await t('set-up role cannot read responses', assertFails(getDocs(collection(sel, 'selection', 'c1', 'responses'))));
+await t('set-up role cannot join the committee', assertFails(setDoc(doc(sel, 'selectionCommittee', SEL), { name: 'Me' })));
+await t('set-up role cannot list the committee', assertFails(getDocs(collection(sel, 'selectionCommittee'))));
+await t('set-up role cannot grant roles', assertFails(setDoc(doc(sel, 'access', 'x@example.com'), { email: 'x@example.com', name: 'X', roles: ['admin'], updatedAt: serverTimestamp(), updatedBy: SEL })));
+await t('set-up role is not an admin elsewhere', assertFails(getDocs(collection(sel, 'admins'))));
+await t('admin gives the set-up role', assertSucceeds(setDoc(doc(adm, 'access', 'new@example.com'), { email: 'new@example.com', name: 'New', roles: ['selection'], updatedAt: serverTimestamp(), updatedBy: ADMIN })));
+await t('a stranger has no set-up powers', assertFails(setDoc(doc(str, 'selection', 'c7'), round({ cycle: 'c7' }))));
+
 await env.cleanup();
 console.log(fail ? `selection rules: ${fail} of ${n} checks failed` : `selection rules: ${n} checks passed`);
 process.exit(fail ? 1 : 0);
