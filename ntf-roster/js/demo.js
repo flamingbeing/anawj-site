@@ -60,9 +60,9 @@ const PEOPLE = {
   srp: ['Clara Selvam', 'Dinesh Kumar'],
   rp: ['Elaine Foo', 'Farid Ismail', 'Gabriel Wong'],
   jr: ['Chen Hui Min', 'Ishaan Rao', 'Jasmine Lee', 'Kelvin Phua', 'Lakshmi Iyer', 'Marcus Heng', 'Nur Izzati',
-    'Oscar Lim', 'Tan Pei Shan'],
+    'Oscar Lim', 'Pei Wen Lim'],
   locum: ['Ravi Shankar', 'Samantha Cole'],
-  mo: ['Timothy Chong', 'Umairah Salleh', 'Vanessa Kaur', 'Ong Wei Jie', 'Lau Xin Yi', 'Yusuf Hamid', 'Zoe Mitchell',
+  mo: ['Tobias Ranjit', 'Umairah Salleh', 'Vanessa Kaur', 'Ong Wei Jie', 'Lau Xin Yi', 'Yusuf Hamid', 'Zoe Mitchell',
     'Arjun Pillai', 'Bryan Tham', 'Cheryl Soh', 'Darren Neo', 'Esther Lum', 'Fikri Osman', 'Gwen Yap', 'Hafiz Jamal',
     'Ivy Chia', 'Joel Sng', 'Kavitha Das', "Liam O'Brien", 'Mei Ling Kwek'],
 };

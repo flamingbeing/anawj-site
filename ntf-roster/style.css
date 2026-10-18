@@ -1,5 +1,5 @@
 /* NTF Roster: app shell, roster grid, cell editor, day view, sheets and toasts.
-   NUHS tokens (../nuhsdesign/tokens.css), Open Sans, navy. Light theme only. Phone layout at <= 720 px.
+   NUHS tokens (css/tokens.css), Open Sans, navy. Light theme only. Phone layout at <= 720 px.
    Rule screens add css/rules.css on top of this file. */
 
 :root {

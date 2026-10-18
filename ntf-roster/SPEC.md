@@ -12,7 +12,7 @@ Public repo: never commit real names, rosters or leave. Demo and tests use made-
 - Folder `ntf-roster/`, served at `https://ntfroster.anawj.com/` (own subdomain: it saves data). Static, no build step,
   vanilla ES modules, no framework. Every page has `<meta name="robots" content="noindex, nofollow">`.
 - Works on phone (390 px) and laptop. Phone: bottom tab bar, bottom sheets. Laptop: top tabs, side panels, popovers.
-- Design: NUHS tokens (`<link rel="stylesheet" href="../nuhsdesign/tokens.css">`), Open Sans, navy `#002f6c`; the top
+- Design: NUHS tokens (`<link rel="stylesheet" href="css/tokens.css">`), Open Sans, navy `#002f6c`; the top
   band is four equal quarters orange `#e57200`, red `#e4002b`, blue `#178fd7`, navy `#002f6c`. Focus rings navy
   (`--n-focus`). Light theme. Quality bar: QGenda / Amion / Lightning Bolt / RosterLab / Deputy (colour-coded duty
   chips, sticky grid, request layer, live rule checks, fairness counts, one-click auto-fill with preview).
