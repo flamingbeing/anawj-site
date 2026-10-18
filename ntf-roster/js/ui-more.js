@@ -4,6 +4,8 @@
 // and the two app-version lines at the very end.
 import * as M from './model.js';
 import * as io from './io.js';
+import * as R from './rotations.js';
+import { pullFromPeople } from './people-pull.js';
 import { SG_HOLIDAYS } from './demo.js';
 
 const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'person';
@@ -40,6 +42,13 @@ export function mount(el, app) {
   const importSec = section('more-import', 'Import the department sheet',
     'The monthly "ALL STAFF LEAVE REQUEST" Excel file (.xlsx). You see what was found before anything changes.',
     h('div', { class: 'more-row' }, fileButton('Choose Excel file', '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', onImportFile, 'upload', 'btn btn-primary')));
+
+  // ---------- Rotations from APMES People ----------
+  const rotSec = section('more-rot', 'Rotations from APMES People',
+    'Where each person is posted or away this month, from the department rotation sheet in APMES People. You link the names there and tap Send; you see what would change here before anything does.',
+    h('div', { class: 'more-row' },
+      iconBtn('Pull rotations from APMES People…', () => pullFromPeople(app, reviewRotations), 'upload', 'btn btn-primary'),
+      btn('Paste rotations…', pasteRotations)));
 
   async function onImportFile(file) {
     const closeReading = app.toast('Reading the sheet…', { ms: 10000 });
@@ -135,6 +144,47 @@ export function mount(el, app) {
           if (first !== app.month) app.setMonth(first);
         } },
       ],
+    });
+  }
+
+  function pasteRotations() {
+    const ta = h('textarea', { class: 'rot-paste', rows: 8, spellcheck: 'false', 'aria-label': 'Rotations text from APMES People', placeholder: 'Name\t2026-10-05\t2026-10-12 …' });
+    app.sheet({
+      title: 'Paste rotations',
+      body: h('div', null, h('p', { class: 'more-p' }, 'The text People sends: a "Name" row of Mondays, then one row per person. You see what would change before anything does.'), ta),
+      actions: [{ label: 'Cancel' }, { label: 'Review', primary: true, fn: () => reviewRotations(ta.value) }],
+    });
+  }
+
+  function reviewRotations(text) {
+    const parsed = R.parseRotations(text);
+    if (!parsed.rows.length) { app.toast('That is not the rotations text: it needs a "Name" row of Mondays, then one row per person.', { kind: 'error', ms: 7000 }); return; }
+    const plan = R.planRotations(parsed, store.get(), app.month);
+    const plural = (n, a, b) => `${n} ${n === 1 ? a : b}`;
+    const body = h('div', { class: 'imp' });
+    body.append(h('p', { class: 'more-p' }, `For ${M.fmtMonth(app.month)}. Postings at other hospitals and leave are added as codes on weekdays (not public holidays) where the person has no leave or away code yet. Shifts stay. Applying is one step: Undo puts everything back.`));
+    const counts = Object.entries(plan.byCode).map(([c, n]) => `${c} ${n}`).join(', ');
+    body.append(h('p', { class: 'more-p' }, plan.fills.length
+      ? `${plural(plan.fills.length, 'cell', 'cells')} for ${plural(plan.people, 'person', 'people')}: ${counts}.`
+      : 'Nothing to add for this month.'));
+    const notes = [];
+    if (plan.posted) notes.push(`${plural(plan.posted, 'person is', 'people are')} posted at NTF this month (nothing to mark).`);
+    if (plan.busy) notes.push(`${plural(plan.busy, 'day was', 'days were')} left alone: the person already has leave or an away code.`);
+    if (plan.unmatched.length) notes.push(`Not in this roster, skipped: ${plan.unmatched.join(', ')}.`);
+    if (plan.ignored) notes.push(`${plural(plan.ignored, 'week was', 'weeks were')} skipped: a word this version does not know.`);
+    if (plan.newCodes.length) notes.push(`New codes will be added as "away" (rename or recolour them under People, Duty codes): ${plan.newCodes.join(', ')}.`);
+    if (notes.length) body.append(h('div', { class: 'warn-box', role: 'note' }, notes.map(n => h('div', null, n))));
+    app.sheet({
+      title: 'Rotations from APMES People',
+      body,
+      actions: plan.fills.length ? [
+        { label: 'Cancel' },
+        { label: 'Apply', primary: true, fn: () => {
+          let sum = null;
+          store.commit('Rotations from APMES People', draft => { sum = R.applyRotations(draft, plan); });
+          app.toast(`Added ${plural(sum.cells, 'cell', 'cells')}${sum.codesAdded.length ? ` and ${plural(sum.codesAdded.length, 'new code', 'new codes')}` : ''}`, { action: { label: 'Undo', fn: () => store.undo() }, ms: 8000 });
+        } },
+      ] : [{ label: 'Close' }],
     });
   }
 
@@ -359,7 +409,7 @@ export function mount(el, app) {
     if (out instanceof Node && !out.parentNode) foot.append(out);
   }).catch(() => { /* version helper not there yet: show nothing */ });
 
-  root.append(importSec, exportSec, backupSec, settingsSec, teamSec, helpSec, startSec, foot);
+  root.append(importSec, rotSec, exportSec, backupSec, settingsSec, teamSec, helpSec, startSec, foot);
 
   return {
     update(state) {

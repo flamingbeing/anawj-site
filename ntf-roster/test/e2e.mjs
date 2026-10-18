@@ -247,6 +247,36 @@ const afterImport = cellsOf(await stored(page), M0);
 ok(JSON.stringify(afterImport) === JSON.stringify(beforeImport), 'export then import gives the same cells');
 ok(/Import/.test(await page.evaluate(() => window.ntfApp.store.undoLabel())), 'the import is one undo step');
 
+// rotations from APMES People: the roster opens People (the real app, served next to it), the user links a name and taps Send,
+// and the review shows what would change before anything does
+{
+  await page.evaluate(() => window.ntfApp.setMonth('2027-03'));
+  await page.waitForTimeout(150);
+  const rosterName = (await page.evaluate(() => window.ntfApp.store.get().staff))[0].name;
+  const [pp] = await Promise.all([page.context().waitForEvent('page'), page.click('button:has-text("Pull rotations from APMES People")')]);
+  pp.on('pageerror', e => errors.push('[People pull] ' + e.message));
+  ok(/\/people\/\?demo&pull=ntf#rotations$/.test(pp.url()), 'the pull opens People in NTF pull mode');
+  await pp.getByRole('button', { name: 'Use a made-up sample' }).click();
+  await pp.locator('#rt-pullcard').waitFor();
+  ok(/Postings for NTF Roster/.test(await pp.textContent('#rt-pullcard')), 'People knows who is asking');
+  await pp.getByLabel('Roster name for Kim Placeholder').selectOption(rosterName);
+  const before = JSON.stringify((await stored(page, 'ntf-roster-demo')).cells);
+  await pp.locator('#rt-send').click();
+  await page.waitForSelector('.sheet .imp', { timeout: 10000 });
+  ok(/March 2027/.test(await page.textContent('.sheet')) && /cells? for 1 person: NUH \d+/.test(await page.textContent('.sheet')), 'the review says what would change for March 2027');
+  ok(JSON.stringify((await stored(page, 'ntf-roster-demo')).cells) === before, 'nothing changes before Apply');
+  await axe(page, 'rotations review');
+  await page.click('.sheet-foot .btn-primary:has-text("Apply")');
+  await page.waitForTimeout(300);
+  const st = await stored(page, 'ntf-roster-demo');
+  const sid = st.staff[0].id;
+  ok(st.cells['2027-03-02'] && st.cells['2027-03-02'][sid] && st.cells['2027-03-02'][sid].a.includes('NUH'), 'the posting is on the roster (NUH on a March weekday)');
+  ok(!(st.cells['2027-03-06'] && st.cells['2027-03-06'][sid] && st.cells['2027-03-06'][sid].a.includes('NUH')), 'not on a Saturday');
+  ok(/Rotations/.test(await page.evaluate(() => window.ntfApp.store.undoLabel())), 'applying is one undo step');
+  await page.evaluate(m => window.ntfApp.setMonth(m), M0);
+  await page.waitForTimeout(150);
+}
+
 const [bk] = await Promise.all([page.waitForEvent('download'), page.click('button:has-text("Download backup")')]);
 const bkPath = path.join(TMP, 'backup.json');
 await bk.saveAs(bkPath);

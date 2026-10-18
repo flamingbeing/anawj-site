@@ -191,6 +191,19 @@ Apply is one undo step. Export writes the same layout (one sheet per month, whol
 counts, legend); exporting and re-importing gives the same cells (the browser test checks it). ExcelJS is loaded
 only when Excel is used.
 
+## Rotations from APMES People (`js/rotations.js`, `js/people-pull.js`)
+
+More › Pull rotations from APMES People… opens People (`people/?pull=ntf#rotations`, the real app on the same host in tests
+and previews). People says hello, this app answers `ntf-pull-info` (its names, the Mondays of the month's weeks, the month);
+the user links sheet names to roster names there once and taps Send, and the text lands in a review (More › Paste rotations…
+takes the same text by hand). One word per person per week: `NTF` (posted here: nothing to mark), `NUH`, `KKH`, `TTSH`,
+`OTH` (posted at another hospital) and the leave codes `AL`, `ML`, `NPL`, `NS` (national service; from SAF on the sheet).
+Only the month on screen, weekdays, not public holidays, from the person's start date, and not where the person already has
+a leave or away code (the department sheet wins); shifts stay. Codes the roster lacks (`KKH`, `TTSH`, `OTH`, `NS`) are added as
+kind "other" on Apply. Apply is one undo step. People leaves out exam weeks and OG1/OG2 (owner, 18 Oct 2026). Both ends check
+the origin; the roster never reads APMES data itself. Tests: `test/rotations.test.mjs`, `test/e2e.mjs` (the pull through
+the real People app).
+
 ## Storage, practice and team sharing
 
 - Local first: everything lives in this browser until team sharing is switched on; Backup (JSON) moves it.
