@@ -24,5 +24,17 @@
   // the passcodes changed on the applicants app's Set up page are read from Firestore (worker/guest.js); both values are public
   // (the web API key is restricted by address, access is by the rules)
   "vars": { "FIREBASE_API_KEY": "AIzaSyDRC7COpi86H0K6oe98XZ8m1sQWJUkP63E", "FIREBASE_PROJECT": "apmes-logbook" },
-  "ratelimits": [{ "name": "GUEST_LIMIT", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }]
+  "ratelimits": [{ "name": "GUEST_LIMIT", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }],
+  // Beta (PREVIEWS.md, "Beta"): a second Worker, anawj-beta, deployed from the beta branch by its own Workers Builds
+  // (deploy command `npx wrangler deploy --env beta`). It serves beta-apmes.anawj.com only; the apps there use the
+  // test Firebase project. No vars: the guest sign-in answers on apmes.anawj.com only (vars and ratelimits are not
+  // inherited, so they are listed here).
+  "env": {
+    "beta": {
+      "name": "anawj-beta",
+      "routes": [{ "pattern": "beta-apmes.anawj.com", "custom_domain": true }],
+      "vars": {},
+      "ratelimits": [{ "name": "GUEST_LIMIT", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }]
+    }
+  }
 }
