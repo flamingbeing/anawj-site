@@ -1,4 +1,4 @@
-// APMES Applicants: residents and faculty give confidential feedback on residency applicants (a 1-5 suitability score
+// NUHS Residency Applications: residents and faculty give confidential feedback on residency applicants (a 1-5 suitability score
 // and a comment each). It reuses evals' sign-in and people lists (../../evals/js/), so the people who can answer are the
 // ones already in People; what is new is here and in model.js.
 // Stage 1 (PLAN.md): the round (title + applicants) lives on the device and travels as a private link; answers are saved on
@@ -95,7 +95,7 @@ const go = hash => { location.hash = hash; };
 
 function header(title, { back = false } = {}) {
   titleEl.textContent = title;
-  document.title = title === 'APMES Applicants' ? title : `${title} · APMES Applicants`;
+  document.title = title === 'NUHS Residency Applications' ? title : `${title} · NUHS Residency Applications`;
   subEl.textContent = 'Demo'; subEl.hidden = !cloud.demo;
   backEl.hidden = !back;
   backEl.onclick = () => { history.length > 1 && route().name !== 'home' ? history.back() : go('#'); };
@@ -195,38 +195,26 @@ function applicantScreen(id) {
         h('div', { class: 'sl-scores' }, SCALE.map(v => h('label', {}, h('input', { type: 'radio', name, value: v, checked: r[q.id] === v, onchange: () => { r[q.id] = v; r.na = false; save(); } }), h('b', {}, String(v))))),
         q.low || q.high ? h('div', { class: 'sl-ends', 'aria-hidden': 'true' }, h('span', {}, '1 ' + (q.low || '')), h('span', {}, (q.high || '') + ' 5')) : null);
     }
-    // One box per comment; the saved answer is the comments joined by new lines (so the Form shows each on its own line).
-    const wrap = h('div', { class: 'sl-cmts' });
-    const boxes = [];
+    // One box for all of a person's comments (older answers with several lines still show, one per line).
+    const ta = h('textarea', { class: 'e-textarea sl-ta', id: 'q-' + q.id, rows: 4, maxlength: 2000, disabled: !open, placeholder: q.hint || '', oninput: () => { debounceCommit(); sync(); } });
+    ta.value = typeof r[q.id] === 'string' ? r[q.id] : '';
     const commit = () => {
-      const lines = boxes.map(b => b.value.replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean);
-      if (lines.length) { r[q.id] = lines.join('\n'); r.na = false; } else delete r[q.id];
+      const v = ta.value.trim();
+      if (v) { r[q.id] = v; r.na = false; } else delete r[q.id];
       save();
     };
     const debounceCommit = debounce(commit, 300);
-    const addBox = (value = '', focus = false) => {
-      const ta = h('textarea', { class: 'e-textarea sl-ta', id: boxes.length ? undefined : 'q-' + q.id, rows: 2, maxlength: 1000, disabled: !open, 'aria-label': `${q.label}, comment ${boxes.length + 1}`,
-        placeholder: boxes.length ? 'Another comment' : (q.hint || ''), oninput: () => { debounceCommit(); sync(); } });
-      ta.value = value; boxes.push(ta); wrap.append(ta); if (focus) ta.focus();
-    };
-    const have = typeof r[q.id] === 'string' ? r[q.id].split(/\r?\n/).map(x => x.trim()).filter(Boolean) : [];
-    (have.length ? have : ['']).forEach(v => addBox(v));
-    const more = h('button', { type: 'button', class: 'a-btn a-btn--tinted a-btn--sm', disabled: !open, onclick: () => { if (boxes.length < 10) addBox('', true); } }, '+ Add another comment');
-    // Tap a suggestion to add it to the last box (comma-separated); tap again to take it out. Still free text: they can edit after.
+    // Tap a suggestion to add it to the box (comma-separated); tap again to take it out. Still free text: they can edit after.
     const hasWord = (text, w) => new RegExp('(^|[^\\p{L}])' + w + '($|[^\\p{L}])', 'iu').test(text);
-    const chips = SUGGESTED_COMMENTS.map(w => {
-      const b = h('button', { type: 'button', class: 'sl-chip', disabled: !open, 'aria-pressed': 'false', onclick: () => {
-        const on = boxes.find(x => hasWord(x.value, w));
-        if (on) on.value = on.value.replace(new RegExp('(^|(?<=[^\\p{L}]))' + w + '(?=$|[^\\p{L}])', 'iu'), '').replace(/\s*,(\s*,)+/g, ',').replace(/\s+,/g, ',').replace(/\s{2,}/g, ' ').replace(/^[,\s]+|[,\s]+$/g, '');
-        else { const t = boxes[boxes.length - 1]; t.value = t.value.trim() ? t.value.trim().replace(/[,.]$/, '') + ', ' + w : w; }
-        commit(); sync();
-      } }, w);
-      return b;
-    });
-    const sync = () => chips.forEach(b => b.setAttribute('aria-pressed', String(boxes.some(x => hasWord(x.value, b.textContent)))));
+    const chips = SUGGESTED_COMMENTS.map(w => h('button', { type: 'button', class: 'sl-chip', disabled: !open, 'aria-pressed': 'false', onclick: () => {
+      if (hasWord(ta.value, w)) ta.value = ta.value.replace(new RegExp('(^|(?<=[^\\p{L}]))' + w + '(?=$|[^\\p{L}])', 'iu'), '').replace(/\s*,(\s*,)+/g, ',').replace(/\s+,/g, ',').replace(/[ \t]{2,}/g, ' ').replace(/^[,\s]+|[,\s]+$/g, '');
+      else ta.value = ta.value.trim() ? ta.value.trim().replace(/[,.]$/, '') + ', ' + w : w;
+      commit(); sync();
+    } }, w));
+    const sync = () => chips.forEach(b => b.setAttribute('aria-pressed', String(hasWord(ta.value, b.textContent))));
     sync();
     return h('div', { class: 'sl-q' }, h('label', { class: 'sl-q__label', for: 'q-' + q.id }, q.label, q.required ? h('span', { class: 'sl-req' }, ' required') : h('span', { class: 'sl-opt' }, ' optional')),
-      open ? h('div', { class: 'sl-chips', role: 'group', 'aria-label': 'Suggested comments, tap to add' }, chips) : null, wrap, more);
+      ta, open ? h('div', { class: 'sl-chips', style: 'margin:8px 0 0', role: 'group', 'aria-label': 'Suggested comments, tap to add' }, chips) : null);
   });
 
   fill(app, h('div', { class: 'sl-col sl-apply' },
@@ -547,13 +535,21 @@ async function resultsScreen() {
     h('div', { class: 'e-note' }, round.shared
       ? `${round.title} (${round.status}): ${list.length} ${list.length === 1 ? 'response' : 'responses'}. Only PDs and the committee see this screen.`
       : `${list.length} ${list.length === 1 ? 'response was' : 'responses were'} sent from this device. Answers sent to the Google Form are in its response sheet; publish the round to see everyone’s here.`),
+    h('p', { class: 'e-small' }, 'Tap a name to read their comments.'),
     h('div', { class: 'e-table-wrap', tabindex: '0', role: 'region', 'aria-label': 'Scores by applicant' }, h('table', { class: 'e-table' },
       h('thead', {}, h('tr', {}, [h('th', { scope: 'col' }, 'Applicant'), ...sq.map(q => h('th', { scope: 'col' }, sq.length === 1 ? 'Mean (n)' : q.label + ' (mean, n)')), h('th', { scope: 'col' }, 'Answered'), h('th', { scope: 'col' }, 'Skipped')])),
-      h('tbody', {}, sum.map(s => h('tr', {}, h('th', { scope: 'row' }, h('span', { class: 'sl-rowname' }, faceOf(ap(s.id), 'sl-photo--sm'), s.name)),
-        ...s.scales.map(sc => h('td', { class: 'sl-mean' }, sc.mean == null ? '–' : `${sc.mean.toFixed(1)} (${sc.n})`)),
-        h('td', {}, String(s.answered)), h('td', {}, String(s.skipped))))))),
-    sum.filter(s => s.comments.length).map(s => h('section', { class: 'e-card' }, h('h2', { class: 'e-h3', style: 'margin-top:0' }, s.name),
-      h('ul', { class: 'sl-comments' }, s.comments.map(c => h('li', {}, many ? h('em', {}, c.q + ': ') : null, c.text, ' ', h('span', { class: 'sl-who' }, '· ' + c.by)))))),
+      sum.map(s => {
+        const box = h('td', { colspan: String(sq.length + 3) }, s.comments.length
+          ? h('ul', { class: 'sl-comments' }, s.comments.map(c => h('li', {}, many ? h('em', {}, c.q + ': ') : null, c.text, ' ', h('span', { class: 'sl-who' }, '· ' + c.by))))
+          : h('p', { class: 'e-small', style: 'margin:0' }, 'No comments yet.'));
+        const row = h('tr', {}, box); row.hidden = true;
+        const btn = h('button', { type: 'button', class: 'sl-namebtn', 'aria-expanded': 'false', onclick: () => {
+          const open = row.hidden; row.hidden = !open; btn.setAttribute('aria-expanded', String(open));
+        } }, faceOf(ap(s.id), 'sl-photo--sm'), h('span', {}, s.name), h('span', { class: 'sl-cnt' }, s.comments.length ? s.comments.length + (s.comments.length === 1 ? ' comment ▾' : ' comments ▾') : ''));
+        return h('tbody', {}, h('tr', {}, h('th', { scope: 'row' }, btn),
+          ...s.scales.map(sc => h('td', { class: 'sl-mean' }, sc.mean == null ? '–' : sc.mean.toFixed(1) + ' (' + sc.n + ')')),
+          h('td', {}, String(s.answered)), h('td', {}, String(s.skipped))), row);
+      }))),
     list.length ? h('section', { class: 'e-card' }, h('h2', { class: 'e-h3', style: 'margin-top:0' }, 'Who has answered'),
       h('p', { class: 'e-small' }, list.map(s => s.name).sort((a, b) => a.localeCompare(b)).join(', '))) : null,
     h('div', { class: 'e-actions' }, h('button', { class: 'a-btn', type: 'button', disabled: !list.length, onclick: () => download(`results-${round.cycle}.csv`, new Blob([resultsCSV(round, list)], { type: 'text/csv' })) }, 'Download CSV'))));
@@ -569,7 +565,7 @@ async function render() {
   const n = ++seq;
   if (!S.user) return;
   if (!mayAnswer()) {
-    header('APMES Applicants');
+    header('NUHS Residency Applications');
     fill(app, empty('For residents and faculty', `${S.user.email} isn’t on the resident or faculty list yet. Ask to be added, or apply for access in evals.`, h('a', { class: 'a-btn', href: '../evals/' }, 'Open evals')));
     return;
   }
@@ -579,7 +575,7 @@ async function render() {
   if (r.name === 'a') return applicantScreen(r.id);
   if (r.name === 'review' && round) return reviewScreen();
   if (r.name === 'done') return doneScreen();
-  header(r.name === 'setup' ? 'Set up the round' : r.name === 'results' ? 'Results' : round ? round.title : 'APMES Applicants');
+  header(r.name === 'setup' ? 'Set up the round' : r.name === 'results' ? 'Results' : round ? round.title : 'NUHS Residency Applications');
   backEl.hidden = true;
   const body = r.name === 'setup' ? (setupScreen(), null) : r.name === 'results' ? (resultsScreen(), null) : homeScreen();
   if (body) fill(app, h('div', { class: 'e-stack sl-col' }, staffBar, body));
@@ -589,9 +585,9 @@ async function render() {
 window.addEventListener('hashchange', () => render());
 
 function signInScreen() {
-  header('APMES Applicants');
+  header('NUHS Residency Applications');
   fill(app, h('section', { class: 'e-card', style: 'max-width:520px;margin:0 auto' },
-    h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'APMES Applicants'),
+    h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'NUHS Residency Applications'),
     h('p', {}, 'Confidential feedback on residency applicants, for residents and faculty. Sign in with the account you use for the logbook and evals.'),
     h('button', { class: 'a-btn', type: 'button', onclick: async () => { try { await cloud.signIn(); } catch (e) { toast('Sign-in failed. ' + errText(e)); } } }, 'Sign in with Google'),
     cloud.demo ? null : guestBox(),
