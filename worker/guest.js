@@ -45,5 +45,6 @@ export async function handleGuest(request, env) {
   const given = typeof b?.passcode === 'string' ? b.passcode.trim().slice(0, 100) : '';
   if (!given || !(await sameSecret(given.toLowerCase(), String(env.GUEST_PASSCODE).trim().toLowerCase()))) return json({ error: 'Wrong passcode.' }, 401);
   const uid = 'g' + Array.from(crypto.getRandomValues(new Uint8Array(12)), x => x.toString(16).padStart(2, '0')).join('');
-  return json({ token: await customToken(env, uid) });
+  try { return json({ token: await customToken(env, uid) }); }
+  catch (e) { console.error('guest token failed', e?.name, e?.message); return json({ error: 'Couldn’t sign in (' + (e?.name || 'error') + ': ' + String(e?.message || '').slice(0, 120) + ').' }, 500); }
 }
