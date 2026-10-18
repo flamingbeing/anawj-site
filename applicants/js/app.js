@@ -7,7 +7,7 @@
 
 import { S, h, fill, toast, cloud, modal, confirmBox, download, empty, applyTheme, errText, avatar, initials, debounce, row, segment } from '../../evals/js/ui-core.js';
 import {
-  INTRO, SCALE, DEFAULT_QUESTIONS, MAX_QUESTIONS, parseNames, cleanRound, cleanQuestions, encodeRound, readRoundText, cleanAnswers, blank, statusOf,
+  INTRO, SCALE, SUGGESTED_COMMENTS, DEFAULT_QUESTIONS, MAX_QUESTIONS, parseNames, cleanRound, cleanQuestions, encodeRound, readRoundText, cleanAnswers, blank, statusOf,
   progress, nextUnanswered, warnings, formBody, formUrl, answersText, summary, resultsCSV, demoRound, matchPhotoFile, photoSrc, canMirror, scaleQuestions, hasAnswer,
 } from './model.js';
 import * as store from './store.js';
@@ -203,15 +203,30 @@ function applicantScreen(id) {
       if (lines.length) { r[q.id] = lines.join('\n'); r.na = false; } else delete r[q.id];
       save();
     };
+    const debounceCommit = debounce(commit, 300);
     const addBox = (value = '', focus = false) => {
       const ta = h('textarea', { class: 'e-textarea sl-ta', id: boxes.length ? undefined : 'q-' + q.id, rows: 2, maxlength: 1000, disabled: !open, 'aria-label': `${q.label}, comment ${boxes.length + 1}`,
-        placeholder: boxes.length ? 'Another comment' : (q.hint || ''), oninput: debounce(commit, 300) });
+        placeholder: boxes.length ? 'Another comment' : (q.hint || ''), oninput: () => { debounceCommit(); sync(); } });
       ta.value = value; boxes.push(ta); wrap.append(ta); if (focus) ta.focus();
     };
     const have = typeof r[q.id] === 'string' ? r[q.id].split(/\r?\n/).map(x => x.trim()).filter(Boolean) : [];
     (have.length ? have : ['']).forEach(v => addBox(v));
     const more = h('button', { type: 'button', class: 'a-btn a-btn--tinted a-btn--sm', disabled: !open, onclick: () => { if (boxes.length < 10) addBox('', true); } }, '+ Add another comment');
-    return h('div', { class: 'sl-q' }, h('label', { class: 'sl-q__label', for: 'q-' + q.id }, q.label, q.required ? h('span', { class: 'sl-req' }, ' required') : h('span', { class: 'sl-opt' }, ' optional')), wrap, more);
+    // Tap a suggestion to add it to the last box (comma-separated); tap again to take it out. Still free text: they can edit after.
+    const hasWord = (text, w) => new RegExp('(^|[^\\p{L}])' + w + '($|[^\\p{L}])', 'iu').test(text);
+    const chips = SUGGESTED_COMMENTS.map(w => {
+      const b = h('button', { type: 'button', class: 'sl-chip', disabled: !open, 'aria-pressed': 'false', onclick: () => {
+        const on = boxes.find(x => hasWord(x.value, w));
+        if (on) on.value = on.value.replace(new RegExp('(^|(?<=[^\\p{L}]))' + w + '(?=$|[^\\p{L}])', 'iu'), '').replace(/\s*,(\s*,)+/g, ',').replace(/\s+,/g, ',').replace(/\s{2,}/g, ' ').replace(/^[,\s]+|[,\s]+$/g, '');
+        else { const t = boxes[boxes.length - 1]; t.value = t.value.trim() ? t.value.trim().replace(/[,.]$/, '') + ', ' + w : w; }
+        commit(); sync();
+      } }, w);
+      return b;
+    });
+    const sync = () => chips.forEach(b => b.setAttribute('aria-pressed', String(boxes.some(x => hasWord(x.value, b.textContent)))));
+    sync();
+    return h('div', { class: 'sl-q' }, h('label', { class: 'sl-q__label', for: 'q-' + q.id }, q.label, q.required ? h('span', { class: 'sl-req' }, ' required') : h('span', { class: 'sl-opt' }, ' optional')),
+      open ? h('div', { class: 'sl-chips', role: 'group', 'aria-label': 'Suggested comments, tap to add' }, chips) : null, wrap, more);
   });
 
   fill(app, h('div', { class: 'sl-col sl-apply' },
