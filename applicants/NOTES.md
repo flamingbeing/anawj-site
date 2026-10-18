@@ -69,3 +69,4 @@ as in the department's Google Form it replaces ("360 feedback on residency appli
 - **A published round beats a link round** in `loadRound`; to test the link path in the browser test, seed `sel-demo-store` as `{"seeded":true}`
   (the demo otherwise seeds a published round).
 - Preview links serve folders by name (`<preview>/applicants/?demo`); only the production worker maps addresses (`worker/routes.js`).
+- **Mirror to the Form** (published rounds, optional): `round.mirror` (Set up checkbox, only when the round is wired to a Form and has the standard two questions, `canMirror`). Send then posts to the Form (`no-cors`, source of truth) and saves to the shared store (backup); one failing doesn't lose the answer. A second send adds another Form row (the Form can't update one). Stored on `selection/{cycle}` as `form` + `mirror`.
