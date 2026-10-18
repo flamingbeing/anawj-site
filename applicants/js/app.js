@@ -8,7 +8,7 @@
 import { S, h, fill, toast, cloud, modal, confirmBox, download, empty, applyTheme, errText, avatar, initials, debounce, row, segment } from '../../evals/js/ui-core.js';
 import {
   INTRO, SCALE, DEFAULT_QUESTIONS, MAX_QUESTIONS, parseNames, cleanRound, cleanQuestions, encodeRound, readRoundText, cleanAnswers, blank, statusOf,
-  progress, nextUnanswered, warnings, formBody, formUrl, answersText, summary, resultsCSV, demoRound, matchPhotoFile, photoSrc, scaleQuestions, hasAnswer,
+  progress, nextUnanswered, warnings, formBody, formUrl, answersText, summary, resultsCSV, demoRound, matchPhotoFile, photoSrc, canMirror, scaleQuestions, hasAnswer,
 } from './model.js';
 import * as store from './store.js';
 import { passportJpeg } from './photo.js';
@@ -226,7 +226,7 @@ function reviewScreen() {
     try {
       const via = await deliver(who);
       sent = { at: Date.now(), via }; saveMine();
-      if (via !== 'store') {
+      if (via === 'device' || via === 'form') {
         const list = subs().filter(s => s.by !== S.user.email); list.push({ by: S.user.email, name: who, at: sent.at, answers });
         put(K.subs(round.cycle), list);
       }
@@ -258,17 +258,28 @@ function reviewScreen() {
 // Delivery: a published round goes to the shared store. A link round posts to the Google Form when it is wired to one (the reply
 // can't be read from another site, so "sent" means the browser handed it over); otherwise it stays on this device.
 async function deliver(who) {
-  if (round.shared) { await store.sendResponse(round, S.user, who, answers); return 'store'; }
+  if (round.shared) {
+    // Mirror on: the Google Form (source of truth) and the shared store (backup) both get it; one failing doesn't lose the answer.
+    if (round.mirror && canMirror(round) && !cloud.demo) {
+      const [f, b] = await Promise.allSettled([postToForm(who), store.sendResponse(round, S.user, who, answers)]);
+      if (f.status === 'rejected' && b.status === 'rejected') throw b.reason;
+      return f.status === 'rejected' ? 'store' : b.status === 'rejected' ? 'form' : 'both';
+    }
+    await store.sendResponse(round, S.user, who, answers); return 'store';
+  }
   if (cloud.demo || !round.form) return 'device';
+  await postToForm(who);
+  return 'form';
+}
+async function postToForm(who) {
   if (!navigator.onLine) throw new Error('No signal.');
   await fetch(formUrl(round), { method: 'POST', mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer', body: formBody(round, who, answers) });
-  return 'form';
 }
 
 function doneScreen() {
   header('Thank you');
   fill(app, h('div', { class: 'e-stack sl-col' }, empty('Sent. Thank you.',
-    sent?.via === 'store' || sent?.via === 'form' ? 'Your feedback went to the selection committee. You can come back and change it, then send again.' : 'Your feedback is saved on this device for the committee.',
+    sent?.via !== 'device' ? 'Your feedback went to the selection committee. You can come back and change it, then send again.' : 'Your feedback is saved on this device for the committee.',
     h('div', { class: 'e-actions' }, h('button', { class: 'a-btn', type: 'button', onclick: () => go('#') }, 'Back to the list')))));
 }
 
@@ -283,6 +294,7 @@ function setupScreen() {
   const wired = round?.shared ? `Published (${round.status}): residents and faculty see it as soon as they open the app.` : round?.form ? 'Connected to a Google Form.' : 'Not published: answers stay on each person’s device, or go to the Google Form if the round is connected to one.';
   const out = h('div', {});
   let qs = cleanQuestions(round?.questions).map(q => ({ ...q }));   // the questions as edited on this screen
+  let mirror = !!round?.mirror;
   const build = () => {
     const apps = parseNames(names.value);
     if (!apps.length) { toast('Add at least one name.'); return null; }
@@ -290,7 +302,7 @@ function setupScreen() {
     const old = new Map((round?.applicants || []).map(a => [a.name.toLowerCase(), a]));
     const merged = apps.map(a => old.get(a.name.toLowerCase()) || a);
     const used = new Set(); merged.forEach((a, i) => { if (used.has(a.id)) a.id = 'n' + (i + 1); used.add(a.id); });
-    const next = cleanRound({ title: titleIn.value, cycle: cycleIn.value || 'round', applicants: merged, questions: qs, form: round?.form });
+    const next = cleanRound({ title: titleIn.value, cycle: cycleIn.value || 'round', applicants: merged, questions: qs, form: round?.form, mirror });
     if (!next) { toast('That round isn’t valid.'); return null; }
     return next;
   };
@@ -369,6 +381,10 @@ function setupScreen() {
   }
   drawPhotos();
 
+  const mirrorBox = round?.form ? h('div', {},
+    h('label', { class: 'sl-chk', style: 'display:flex;gap:8px;margin-top:12px' },
+      h('input', { type: 'checkbox', id: 'su-mirror', checked: mirror, onchange: e => { mirror = e.target.checked; } }), ' Also send every answer to the Google Form'),
+    h('p', { class: 'e-hint', style: 'margin-top:4px' }, 'The Form stays the source of truth; the app keeps its own copy as a backup. Works only with the standard two questions. Someone who sends again adds another row in the Form (the app keeps just their latest). Save changes to apply.')) : null;
   fill(app, h('div', { class: 'e-stack sl-col' },
     h('section', { class: 'e-card' },
       h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'The round'),
@@ -378,7 +394,7 @@ function setupScreen() {
       h('p', { class: 'e-hint' }, wired + ' Names are never in the app’s code. Don’t rename people once answers are coming in: a changed name counts as a new applicant.'),
       h('h3', { class: 'e-h3', style: 'margin:16px 0 4px' }, 'Questions asked about each applicant'),
       h('p', { class: 'e-hint', style: 'margin-top:0' }, 'Up to ' + MAX_QUESTIONS + '. Changing the wording is safe any time; removing a question hides its earlier answers.'),
-      qBox,
+      qBox, mirrorBox,
       h('div', { class: 'e-actions' },
         h('button', { class: 'a-btn a-btn--tinted a-btn--sm', type: 'button', disabled: qs.length >= MAX_QUESTIONS, onclick: () => { qs.push({ id: 'q' + (Date.now() % 100000), type: 'text', label: 'New question', required: false }); drawQs(); } }, 'Add a question'),
         h('button', { class: 'a-btn a-btn--tinted a-btn--sm', type: 'button', onclick: () => { qs = DEFAULT_QUESTIONS.map(q => ({ ...q })); drawQs(); } }, 'Back to the standard two')),

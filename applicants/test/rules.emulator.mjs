@@ -41,6 +41,8 @@ await t('stranger cannot read a round', assertFails(getDoc(doc(str, 'selection',
 await t('signed out cannot read a round', assertFails(getDoc(doc(anon, 'selection', 'c1'))));
 await t('pd creates a round', assertSucceeds(setDoc(doc(pd, 'selection', 'c2'), round({ cycle: 'c2' }))));
 await t('admin updates a round', assertSucceeds(setDoc(doc(adm, 'selection', 'c2'), round({ cycle: 'c2', status: 'closed' }))));
+await t('pd saves a round wired to a form with mirror on', assertSucceeds(setDoc(doc(pd, 'selection', 'c4'), round({ cycle: 'c4', form: { id: 'f'.repeat(30), nameEntry: 7 }, mirror: true }))));
+await t('a malformed form or mirror is refused', assertFails(setDoc(doc(pd, 'selection', 'c5'), round({ cycle: 'c5', form: { id: 'f'.repeat(30), nameEntry: 7, extra: 1 }, mirror: 'yes' }))));
 await t('resident cannot create a round', assertFails(setDoc(doc(res, 'selection', 'c3'), round({ cycle: 'c3' }))));
 await t('faculty cannot change a round', assertFails(setDoc(doc(fac, 'selection', 'c1'), round({ title: 'Mine' }))));
 await t('round id must match', assertFails(setDoc(doc(pd, 'selection', 'c4'), round({ cycle: 'other' }))));

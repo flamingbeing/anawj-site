@@ -75,8 +75,14 @@ export function cleanRound(r) {
   const out = { v: 2, title: str(r.title, 200) || 'Applicant feedback', cycle: str(r.cycle, 20) || 'round', applicants, questions: cleanQuestions(r.questions) };
   const f = r.form;
   if (f && /^[A-Za-z0-9_-]{20,80}$/.test(f.id || '') && num(f.nameEntry) && applicants.every(a => a.entry)) out.form = { id: f.id, nameEntry: f.nameEntry };
+  if (r.mirror === true && canMirror(out)) out.mirror = true;
   return out;
 }
+
+// Mirror (published rounds): each answer is also posted to the Google Form, which stays the source of truth; the shared store is the
+// backup. Only for a round wired to a form whose questions are the standard two (the form has exactly those fields per applicant).
+export const canMirror = round => !!round?.form && Array.isArray(round.questions) && round.questions.length === 2
+  && round.questions[0].id === 'score' && round.questions[0].type === 'scale' && round.questions[1].id === 'comment' && round.questions[1].type === 'text';
 
 // A round as text in a link: base64url of the JSON (names may be non-ASCII).
 export function encodeRound(round) {

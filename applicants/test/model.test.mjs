@@ -1,7 +1,7 @@
 // Unit tests for applicants/js/model.js. Run: node applicants/test/model.test.mjs
 import assert from 'node:assert/strict';
 import {
-  parseNames, cleanRound, cleanQuestions, encodeRound, decodeRound, readRoundText, cleanAnswers, statusOf, progress, nextUnanswered, warnings, formBody, formUrl,
+  parseNames, cleanRound, cleanQuestions, encodeRound, decodeRound, readRoundText, cleanAnswers, statusOf, progress, nextUnanswered, warnings, formBody, formUrl, canMirror,
   summary, resultsCSV, answersText, demoRound, demoPhoto, blank, photoSrc, matchPhotoFile, scaleQuestions, DEFAULT_QUESTIONS, MAX_QUESTIONS,
 } from '../js/model.js';
 
@@ -137,3 +137,13 @@ t('demo round has made-up names, photos and the standard questions', () => {
   assert.deepEqual(d.questions.map(q => q.id), DEFAULT_QUESTIONS.map(q => q.id));
 });
 console.log(`applicants model: ${n} groups passed`);
+
+t('mirror is kept only for a wired round with the standard two questions', () => {
+  const wired = { applicants: [{ id: 'a1', name: 'X', entry: { score: 1, comment: 2 } }], form: { id: 'a'.repeat(30), nameEntry: 5 } };
+  assert.equal(cleanRound({ ...wired, mirror: true }).mirror, true);
+  assert.equal(cleanRound({ ...wired }).mirror, undefined);
+  assert.equal(cleanRound({ applicants: [{ id: 'a1', name: 'X' }], mirror: true }).mirror, undefined);
+  const custom = cleanRound({ ...wired, mirror: true, questions: [{ id: 'teamwork', type: 'scale', label: 'T' }] });
+  assert.equal(custom.mirror, undefined);
+  assert.equal(canMirror(cleanRound({ ...wired })), true);
+});
