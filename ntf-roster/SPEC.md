@@ -36,6 +36,7 @@ Public repo: never commit real names, rosters or leave. Demo and tests use made-
 | `js/ui-check.js` | problems list by rule, fairness table, coverage table | B |
 | `js/io.js`, `vendor/exceljs.min.js` | Excel import/export (department sheet layout), JSON backup, ICS, CSV | D |
 | `js/demo.js` | made-up department and months | D |
+| `js/rotations.js`, `js/people-pull.js` | rotations from APMES People: read the text, plan and apply (pure), and the pull from People | D |
 | `js/ui-more.js` | Import/Export/Backup, Settings (dept name, public holidays), app version lines, team panel slot | D |
 | `test/io.test.mjs` | node test of the Excel parser on a generated sheet with fake names | D |
 | `js/cloud.js`, `js/firebase-config.js`, `firestore.rules`, `test/rules.emulator.mjs`, `js/ui-team.js` | team sync | E |

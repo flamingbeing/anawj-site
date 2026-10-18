@@ -762,6 +762,7 @@ body[data-tab="people"] .ctx-row { display: none; }   /* the month and Auto-fill
 .imp-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
 .imp-tag.new { background: #e7f5ec; color: #1b6b35; }
 .imp-tag.match { background: #e8eef7; color: #002f6c; }
+.rot-paste { width: 100%; box-sizing: border-box; font: 13px/1.4 ui-monospace, Menlo, monospace; padding: 8px; border: 1px solid #c9d1dd; border-radius: 6px; }
 .imp-codes { display: grid; gap: 6px; }
 .imp-code { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .imp-code code { font-weight: 700; min-width: 54px; }
