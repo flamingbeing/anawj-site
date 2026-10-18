@@ -177,6 +177,34 @@ await t('committee code cannot list the committee', assertFails(getDocs(collecti
 await t('a guest still cannot read responses', assertFails(getDocs(collection(oldGuest, 'selection', 'c1', 'responses'))));
 await t('a token with an unknown role is nothing', assertFails(getDoc(doc(code('z1', 'boss'), 'selection', 'c1'))));
 await t('a role claim with an email is no passcode account', assertFails(getDocs(collection(env.authenticatedContext('q', { guest: true, role: 'committee', email: 'q@example.com' }).firestore(), 'selection', 'c1', 'responses'))));
+// ---- the three passcodes, kept in selectionCodes/{role} (changed on the Set up page; the Worker reads them with its service sign-in) ----
+const reader = env.authenticatedContext('codes-reader', { codesReader: true }).firestore();
+const codeDoc = (c = 'maple-tree-42') => ({ code: c, updatedAt: 1 });
+await t('admin sets a passcode', assertSucceeds(setDoc(doc(adm, 'selectionCodes', 'guest'), codeDoc())));
+await t('pd sets a passcode', assertSucceeds(setDoc(doc(pd, 'selectionCodes', 'committee'), codeDoc('quiet-river-7'))));
+await t('admin sets the setup passcode', assertSucceeds(setDoc(doc(adm, 'selectionCodes', 'setup'), codeDoc('lantern-9-glow'))));
+await t('admin reads a passcode', assertSucceeds(getDoc(doc(adm, 'selectionCodes', 'guest'))));
+await t('pd reads every passcode', assertSucceeds(getDocs(collection(pd, 'selectionCodes'))));
+await t('the Worker service sign-in reads a passcode', assertSucceeds(getDoc(doc(reader, 'selectionCodes', 'guest'))));
+await t('the Worker service sign-in lists passcodes', assertSucceeds(getDocs(collection(reader, 'selectionCodes'))));
+await t('the Worker service sign-in cannot write one', assertFails(setDoc(doc(reader, 'selectionCodes', 'guest'), codeDoc('other-code-1'))));
+await t('the Worker service sign-in cannot read rounds', assertFails(getDoc(doc(reader, 'selection', 'c1'))));
+await t('the Worker service sign-in cannot read residents', assertFails(getDocs(collection(reader, 'residents'))));
+await t('a claim with an email is no service sign-in', assertFails(getDoc(doc(env.authenticatedContext('x', { codesReader: true, email: 'x@example.com' }).firestore(), 'selectionCodes', 'guest'))));
+for (const [who, db] of [['resident', res], ['faculty', fac], ['committee member', com], ['stranger', str], ['signed-out visitor', anon], ['guest', g1], ['set-up code', su], ['committee code', cm]]) {
+  await t(`${who} cannot read a passcode`, assertFails(getDoc(doc(db, 'selectionCodes', 'guest'))));
+  await t(`${who} cannot list passcodes`, assertFails(getDocs(collection(db, 'selectionCodes'))));
+  await t(`${who} cannot set a passcode`, assertFails(setDoc(doc(db, 'selectionCodes', 'guest'), codeDoc('sneaky-code-1'))));
+  await t(`${who} cannot clear a passcode`, assertFails(deleteDoc(doc(db, 'selectionCodes', 'guest'))));
+}
+await t('a passcode needs at least 6 characters', assertFails(setDoc(doc(adm, 'selectionCodes', 'guest'), codeDoc('abc12'))));
+await t('a passcode is at most 100 characters', assertFails(setDoc(doc(adm, 'selectionCodes', 'guest'), codeDoc('a'.repeat(101)))));
+await t('a passcode of exactly 100 characters is fine', assertSucceeds(setDoc(doc(adm, 'selectionCodes', 'guest'), codeDoc('a'.repeat(100)))));
+await t('a passcode must be a string', assertFails(setDoc(doc(adm, 'selectionCodes', 'guest'), { code: 123456, updatedAt: 1 })));
+await t('a passcode takes no extra fields', assertFails(setDoc(doc(adm, 'selectionCodes', 'guest'), { ...codeDoc(), role: 'admin' })));
+await t('only the three roles have a passcode', assertFails(setDoc(doc(adm, 'selectionCodes', 'admin'), codeDoc())));
+await t('admin clears a passcode', assertSucceeds(deleteDoc(doc(adm, 'selectionCodes', 'setup'))));
+await t('pd clears a passcode', assertSucceeds(deleteDoc(doc(pd, 'selectionCodes', 'committee'))));
 await env.cleanup();
 console.log(fail ? `selection rules: ${fail} of ${n} checks failed` : `selection rules: ${n} checks passed`);
 process.exit(fail ? 1 : 0);

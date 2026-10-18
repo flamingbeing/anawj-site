@@ -4,6 +4,7 @@
 //   selection/{cycle}/photos/{applicantId}  { jpeg: base64 JPEG (passport shaped, a few KB), updatedAt }
 //   selection/{cycle}/responses/{email}     { email, name, answers: { [applicantId]: { na, [questionId]: value } }, updatedAt }
 //   selectionCommittee/{email}              { name }
+//   selectionCodes/{role}                   { code, updatedAt }  role: guest, setup or committee; read by admins, PDs and the Worker (worker/guest.js)
 // With ?demo: the same calls against this browser's localStorage, seeded with made-up applicants, photos and answers, so
 // every screen can be tried (the demo role switch is in the account sheet).
 
@@ -16,7 +17,7 @@ const demoRead = () => { try { return JSON.parse(localStorage.getItem(DEMO_KEY))
 const demoWrite = d => { try { localStorage.setItem(DEMO_KEY, JSON.stringify(d)); } catch {} };
 function demoDb() {
   const d = demoRead();
-  d.rounds ||= {}; d.responses ||= {}; d.committee ||= {}; d.photos ||= {};
+  d.rounds ||= {}; d.responses ||= {}; d.committee ||= {}; d.photos ||= {}; d.codes ||= {};
   if (!d.seeded) { seedDemo(d); demoWrite(d); }
   return d;
 }
@@ -152,4 +153,20 @@ export async function removeCommittee(email) {
   if (cloud.demo) { const d = demoDb(); delete d.committee[email]; demoWrite(d); return; }
   const { db, F, queued } = await cloud.firestore();
   await queued(F.deleteDoc(F.doc(db, 'selectionCommittee', email)));
+}
+
+// the three sign-in passcodes the Worker accepts, set on the Set up page (admins and PDs); a role with none here uses the Worker's own secret
+export async function listCodes() {
+  if (cloud.demo) return { ...demoDb().codes };
+  const { db, F } = await cloud.firestore();
+  const out = {};
+  for (const d of (await F.getDocs(F.collection(db, 'selectionCodes'))).docs) if (typeof d.data().code === 'string') out[d.id] = d.data().code;
+  return out;
+}
+export async function saveCode(role, code) {
+  code = String(code || '').trim();
+  if (!['guest', 'setup', 'committee'].includes(role)) throw new Error('Unknown passcode.');
+  if (cloud.demo) { const d = demoDb(); d.codes[role] = code; demoWrite(d); return; }
+  const { db, F, queued } = await cloud.firestore();
+  await queued(F.setDoc(F.doc(db, 'selectionCodes', role), { code, updatedAt: Date.now() }));
 }

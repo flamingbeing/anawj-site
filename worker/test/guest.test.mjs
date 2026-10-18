@@ -1,6 +1,6 @@
 // Guest passcode sign-in (worker/guest.js): the passcode check, the signed custom token, the limits. Run: node worker/test/guest.test.mjs
 import assert from 'node:assert/strict';
-import { handleGuest, customToken, sameSecret } from '../guest.js';
+import { handleGuest, customToken, sameSecret, storedCodes, clearCodesCache } from '../guest.js';
 import worker from '../sites.js';
 
 const { privateKey, publicKey } = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
@@ -74,4 +74,66 @@ await t('an unset optional passcode is never a way in', async () => {
   for (const p of ['', 'undefined', 'null']) assert.equal((await handleGuest(req({ passcode: p }), env)).status, 401);
   assert.equal((await handleGuest(req({ passcode: 'x' }), { ...env, SETUP_PASSCODE: '   ' })).status, 401);
 });
+// ---- passcodes changed on the Set up page (kept in Firestore, read with a service sign-in) ----
+const realFetch = globalThis.fetch;
+const storeEnv = { ...env, FIREBASE_API_KEY: 'key123', FIREBASE_PROJECT: 'proj-x', SETUP_PASSCODE: 'Build It' };
+const doc = (role, code) => ({ name: `projects/proj-x/databases/(default)/documents/selectionCodes/${role}`, fields: { code: { stringValue: code } } });
+function fakeStore(docs, { signInStatus = 200, readStatus = 200 } = {}) {
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push({ url: String(url), init });
+    if (String(url).startsWith('https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken')) return signInStatus === 200 ? new Response(JSON.stringify({ idToken: 'ID-TOKEN' })) : new Response('{}', { status: signInStatus });
+    if (String(url).startsWith('https://firestore.googleapis.com/')) return readStatus === 200 ? new Response(JSON.stringify({ documents: docs })) : new Response('{}', { status: readStatus });
+    throw new Error('unexpected fetch ' + url);
+  };
+  clearCodesCache();
+  return calls;
+}
+const roleOf = async (p, e = storeEnv) => { const r = await handleGuest(req({ passcode: p }), e); return r.status === 200 ? (await r.json()).role : r.status; };
+try {
+  await t('a passcode set on the Set up page replaces the Worker secret of that role', async () => {
+    const calls = fakeStore([doc('guest', 'New Guest Code')]);
+    assert.equal(await roleOf('new guest code'), 'guest');
+    assert.equal(await roleOf('open sesame'), 401, 'the old guest secret no longer works');
+    assert.equal(await roleOf('build it'), 'setup', 'a role with no stored passcode keeps its secret');
+    // the read is a service sign-in with the public key and the site as referrer, then a rules-checked read with the resulting ID token
+    const [si, rd] = calls;
+    assert.match(si.url, /signInWithCustomToken\?key=key123$/); assert.equal(si.init.headers.Referer, 'https://apmes.anawj.com/');
+    const tok = JSON.parse(Buffer.from(JSON.parse(si.init.body).token.split('.')[1], 'base64url'));
+    assert.deepEqual(tok.claims, { codesReader: true }); assert.equal(tok.uid, 'codes-reader');
+    assert.equal(rd.url, 'https://firestore.googleapis.com/v1/projects/proj-x/databases/(default)/documents/selectionCodes?pageSize=10');
+    assert.equal(rd.init.headers.Authorization, 'Bearer ID-TOKEN');
+    assert.equal(calls.length, 2, 'three tries share one read (cached for a few seconds)');
+  });
+  await t('all three can come from the store, matched without case or spaces', async () => {
+    fakeStore([doc('guest', 'Alpha-One'), doc('setup', 'Bravo-Two'), doc('committee', 'Charlie-Three')]);
+    assert.equal(await roleOf(' ALPHA-one '), 'guest'); assert.equal(await roleOf('bravo-two'), 'setup'); assert.equal(await roleOf('charlie-three'), 'committee');
+    assert.equal(await roleOf('build it'), 401, 'the setup secret is replaced too');
+  });
+  await t('a blank or unknown stored document is ignored', async () => {
+    fakeStore([doc('guest', '   '), doc('admin', 'Hack Me'), { name: 'x/selectionCodes/setup', fields: {} }]);
+    assert.equal(await roleOf('open sesame'), 'guest'); assert.equal(await roleOf('hack me'), 401); assert.equal(await roleOf('build it'), 'setup');
+  });
+  await t('if the store cannot be read, the Worker secrets still work', async () => {
+    for (const opts of [{ signInStatus: 403 }, { readStatus: 500 }]) {
+      fakeStore([doc('guest', 'New Guest Code')], opts);
+      assert.equal(await roleOf('open sesame'), 'guest'); assert.equal(await roleOf('new guest code'), 401);
+    }
+    globalThis.fetch = async () => { throw new Error('offline'); }; clearCodesCache();
+    assert.equal(await roleOf('open sesame'), 'guest');
+  });
+  await t('without the two public settings the store is never called', async () => {
+    const calls = fakeStore([doc('guest', 'New Guest Code')]);
+    assert.equal(await roleOf('open sesame', env), 'guest'); assert.equal(await roleOf('new guest code', env), 401);
+    assert.equal(await storedCodes(env), null); assert.equal(calls.length, 0);
+  });
+  await t('the read is cached for a few seconds, then taken again', async () => {
+    const calls = fakeStore([doc('guest', 'First Code')]);
+    assert.equal((await storedCodes(storeEnv, 1000)).guest, 'First Code');
+    assert.equal((await storedCodes(storeEnv, 1000 + 14000)).guest, 'First Code');
+    assert.equal(calls.length, 2, 'one sign-in and one read serve both');
+    globalThis.fetch = async (url) => String(url).includes('identitytoolkit') ? new Response(JSON.stringify({ idToken: 'T' })) : new Response(JSON.stringify({ documents: [doc('guest', 'Second Code')] }));
+    assert.equal((await storedCodes(storeEnv, 1000 + 16000)).guest, 'Second Code');
+  });
+} finally { globalThis.fetch = realFetch; clearCodesCache(); }
 console.log(`guest sign-in: ${n} groups passed`);

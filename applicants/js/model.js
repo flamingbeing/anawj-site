@@ -260,3 +260,26 @@ export function demoPhoto(i) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 270"><rect width="210" height="270" fill="${bg}"/><path d="M20 270c4-52 38-72 85-72s81 20 85 72z" fill="${shirt}"/><rect x="88" y="150" width="34" height="50" rx="12" fill="${skin}"/><ellipse cx="105" cy="108" rx="40" ry="50" fill="${skin}"/></svg>`;
   return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
 }
+
+// ---- the three sign-in passcodes (Set up page; worker/guest.js checks them) ----
+export const CODE_ROLES = [
+  { id: 'guest', label: 'Guest', what: 'Sends feedback. For people without an APMES account.' },
+  { id: 'setup', label: 'Set up', what: 'Opens Set up: the round, photos and questions.' },
+  { id: 'committee', label: 'Committee', what: 'Reads the Results: every response and who said what.' },
+];
+export const CODE_MIN = 6, CODE_MAX = 100;
+// a readable random passcode like "k7mq-x4ph-9d2t": no look-alikes (0/o, 1/l/i); `bytes` is injectable for tests
+export function newPasscode(bytes = globalThis.crypto.getRandomValues(new Uint8Array(12))) {
+  const A = 'abcdefghjkmnpqrstuvwxyz23456789';
+  const c = Array.from(bytes, b => A[b % A.length]).join('');
+  return `${c.slice(0, 4)}-${c.slice(4, 8)}-${c.slice(8, 12)}`;
+}
+// why a passcode can't be used for `role`, or '' when it can. `others` is { role: code } for the other roles that have one stored.
+// Passcodes ignore capitals and surrounding spaces (worker/guest.js), so two roles can't share one: the Worker would pick the first.
+export function codeProblem(role, code, others = {}) {
+  const c = String(code || '').trim().toLowerCase();
+  if (c.length < CODE_MIN) return `Use at least ${CODE_MIN} characters.`;
+  if (c.length > CODE_MAX) return `Use at most ${CODE_MAX} characters.`;
+  for (const [r, o] of Object.entries(others)) if (r !== role && o && String(o).trim().toLowerCase() === c) return `That is already the ${CODE_ROLES.find(x => x.id === r)?.label.toLowerCase() || r} passcode. Each one must be different.`;
+  return '';
+}

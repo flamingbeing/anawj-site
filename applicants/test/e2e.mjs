@@ -121,6 +121,16 @@ assert.match(csv, /Casey Example,Demo Resident,[^,]+,\(did not work with them\)|
 
 // 7. Set up: photos from a file, photos by file name, and editing the questions
 await page.getByRole('tab', { name: 'Set up' }).click();
+// the page opens locked: fields and buttons are disabled, so nothing changes by accident; Show on the passcodes still works
+await page.getByText(/Locked: nothing here can change/).waitFor();
+assert.ok(await page.locator('#su-title').isDisabled(), 'the title is locked');
+assert.ok(await page.getByRole('button', { name: 'Save changes' }).isDisabled(), 'Save is locked');
+assert.ok(await page.locator('#pc-change-guest').isDisabled(), 'Change passcode is locked');
+assert.ok(await page.locator('#pc-show').isEnabled(), 'Show stays available');
+await axe('setup locked'); await shot('5-setup-locked');
+await page.getByRole('button', { name: 'Unlock to edit' }).click();
+await page.getByText(/Unlocked\./).waitFor();
+assert.ok(await page.locator('#su-title').isEnabled(), 'unlocked');
 const png = Buffer.from(await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 600; c.height = 500; const x = c.getContext('2d'); x.fillStyle = '#3a8'; x.fillRect(0, 0, 600, 500); x.fillStyle = '#fc9'; x.beginPath(); x.arc(300, 200, 90, 0, 7); x.fill(); return c.toDataURL('image/png').split(',')[1]; }), 'base64');
 const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('button', { name: 'Change photo for Alex Demo' }).click()]);
 await chooser.setFiles({ name: 'whatever.png', mimeType: 'image/png', buffer: png });
@@ -142,6 +152,8 @@ await page.getByRole('button', { name: 'Remove question 2' }).click();   // drop
 await axe('setup shared'); await shot('6-setup-shared');
 await page.getByRole('button', { name: 'Save changes' }).click();
 await page.getByText('Saved and published').waitFor();
+await page.getByText(/Locked: nothing here can change/).waitFor();   // saving the round locks the page again
+assert.ok(await page.locator('#su-title').isDisabled());
 await page.goto(BASE + 'applicants/?demo=resident#a/a1');
 await page.getByText('Teamwork on the ward').waitFor();
 assert.equal(await page.locator('textarea.sl-ta').count(), 0, 'the comment box was removed');
@@ -151,15 +163,48 @@ await axe('custom questions'); await shot('7-custom-questions');
 
 // 8. Close the round: nothing more can be sent
 await page.goto(BASE + 'applicants/?demo=admin#setup');
+await page.getByRole('button', { name: 'Unlock to edit' }).click();
 await page.getByRole('button', { name: 'Close the round' }).click();
 await page.getByText('Saved and published').or(page.getByText('Closed')).first().waitFor();
 await page.goto(BASE + 'applicants/?demo=resident#review');
 await page.getByText(/round is closed/).first().waitFor();
 assert.ok(await page.getByRole('button', { name: /^Send/ }).isDisabled());
 
+// 8b. Passcodes: admin staff and PDs see and change them on Set up; a role not set here says the Cloudflare one is in use
+await page.goto(BASE + 'applicants/?demo=admin#setup');
+await page.locator('#pc-show').waitFor();
+assert.match(await page.textContent('main'), /Not set here yet: the one saved in Cloudflare is in use/);
+await page.getByRole('button', { name: 'Unlock to edit' }).click();
+await page.locator('#pc-change-guest').click();
+const suggested = await page.inputValue('#pc-guest');
+assert.match(suggested, /^[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}$/, 'a random passcode is suggested');
+await page.fill('#pc-guest', 'abc');
+await page.getByRole('button', { name: 'Save', exact: true }).click();
+await page.getByText('Use at least 6 characters.').waitFor();
+await page.fill('#pc-guest', 'Maple Tree 42');
+await page.getByRole('button', { name: 'Save', exact: true }).click();
+await page.getByRole('button', { name: 'Change', exact: true }).last().click();   // the confirmation dialog
+await page.getByText('Guest passcode changed').waitFor();
+assert.equal((await page.evaluate(() => JSON.parse(localStorage.getItem('sel-demo-store')).codes.guest)), 'Maple Tree 42');
+assert.match(await page.textContent('[data-role="guest"]'), /Maple Tree 42/, 'shown after saving');
+await page.locator('#pc-show').click();
+assert.doesNotMatch(await page.textContent('[data-role="guest"]'), /Maple/, 'Hide masks it again');
+await page.locator('#pc-show').click();
+// the committee passcode can't repeat the guest one (the Worker would pick the first match)
+await page.locator('#pc-change-committee').click();
+await page.fill('#pc-committee', ' maple tree 42 ');
+await page.getByRole('button', { name: 'Save', exact: true }).click();
+await page.getByText(/already the guest passcode/).waitFor();
+await axe('setup passcodes'); await shot('5b-passcodes');
+// a resident never sees the card
+await page.goto(BASE + 'applicants/?demo=resident');
+await page.getByRole('button', { name: /Alex Demo/ }).waitFor();
+assert.equal(await page.getByRole('tab', { name: 'Set up' }).count(), 0);
+
 // 9. A round that isn't published (a private link): names with a repeat, opened as someone else
 await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('sel-demo')) localStorage.removeItem(k); localStorage.setItem('sel-demo-store', JSON.stringify({ seeded: true })); });
 await page.goto(BASE + 'applicants/?demo=admin#setup');
+await page.getByRole('button', { name: 'Unlock to edit' }).click();
 await page.fill('#su-names', '1. Zoë Tan\n2. Lee Wei\nZoë Tan');
 await page.fill('#su-title', 'Test round');
 await page.getByRole('button', { name: 'Make a private link' }).click();

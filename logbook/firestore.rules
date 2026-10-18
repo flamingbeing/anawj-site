@@ -760,6 +760,20 @@ service cloud.firestore {
         && optString(request.resource.data, 'name', 200);
       allow delete: if isAdmin() || isPD();
     }
+    // the three passcodes (guest, setup, committee), changed on the app's Set up page: selectionCodes/{role} { code, updatedAt }.
+    // Admin staff and PDs read, set and clear them (a cleared one falls back to the Worker secret of the same name). The Worker
+    // (worker/guest.js) reads them with a service sign-in that carries claim codesReader and no email; nobody else, guests included.
+    function isCodesReader() {
+      return request.auth != null && request.auth.token.get('codesReader', false) == true && !('email' in request.auth.token);
+    }
+    match /selectionCodes/{role} {
+      allow read: if isAdmin() || isPD() || isCodesReader();
+      allow create, update: if (isAdmin() || isPD()) && role in ['guest', 'setup', 'committee']
+        && request.resource.data.keys().hasOnly(['code', 'updatedAt'])
+        && request.resource.data.code is string && request.resource.data.code.size() >= 6 && request.resource.data.code.size() <= 100
+        && optNumber(request.resource.data, 'updatedAt');
+      allow delete: if isAdmin() || isPD();
+    }
     match /selection/{cycle} {
       allow read: if selMayAnswer();
       allow create, update: if selStaff() && cycle.size() <= 20 && validSelRound(cycle, request.resource.data);
