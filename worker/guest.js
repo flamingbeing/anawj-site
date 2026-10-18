@@ -22,7 +22,9 @@ export async function sameSecret(a, b) {
 }
 
 export async function customToken(env, uid, now = Math.floor(Date.now() / 1000)) {
-  const pem = env.GUEST_SA_KEY.replace(/\n/g, '\n').replace(/-----[^-]+-----/g, '').replace(/\s+/g, '');
+  // the base64 between the BEGIN and END lines, however the secret was pasted (real or escaped new lines)
+  const m = env.GUEST_SA_KEY.match(/-----BEGIN[^-]*-----([\s\S]*?)-----END/);
+  const pem = (m ? m[1] : env.GUEST_SA_KEY).replace(/\\+[nrt]/g, '').replace(/[^A-Za-z0-9+/=]/g, '');
   const key = await crypto.subtle.importKey('pkcs8', Uint8Array.from(atob(pem), c => c.charCodeAt(0)), { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
   const head = text64(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
   const body = text64(JSON.stringify({ iss: env.GUEST_SA_EMAIL, sub: env.GUEST_SA_EMAIL, aud: AUD, iat: now, exp: now + 3600, uid, claims: { guest: true } }));

@@ -54,4 +54,12 @@ await t('only apmes.anawj.com/api/guest reaches it', async () => {
   const other = await worker.fetch(new Request('https://nuhroster.anawj.com/api/guest', { method: 'POST', body: '{}' }), { ...env, ASSETS });
   assert.equal(other.status, 405);
 });
+
+await t('the key may be stored with real or escaped new lines', async () => {
+  for (const key of [pem, pem.replace(/\n/g, '\n'), pem.replace(/\n/g, '\r\n'), pem.trim()]) {
+    const tok = await customToken({ ...env, GUEST_SA_KEY: key }, 'gx', 1000);
+    const [h, b, s] = tok.split('.');
+    assert.ok(await crypto.subtle.verify('RSASSA-PKCS1-v1_5', publicKey, Buffer.from(s, 'base64url'), new TextEncoder().encode(h + '.' + b)));
+  }
+});
 console.log(`guest sign-in: ${n} groups passed`);
