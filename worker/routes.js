@@ -27,8 +27,8 @@ export const SITES = {
   'apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/people/': 'people/', '/applicants/': 'applicants/', '/360/': '360/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth/firebase/' } },
   // The beta copy of apmes (PREVIEWS.md, "Beta"): served by the anawj-beta Worker from the beta branch. Same folders,
   // but the apps pick the test Firebase project on beta- hosts (firebase-config.js), so nothing here touches live data.
-  // No /__/ sign-in helper pages until the test project exists; they will get their own init.json.
-  'beta-apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/people/': 'people/', '/applicants/': 'applicants/', '/360/': '360/', '/apmes/guidebook/': 'apmes/guidebook/' } },
+  // Its sign-in helper pages use their own init.json (apmes-auth-beta/: the test project apmes-logbook-beta).
+  'beta-apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/people/': 'people/', '/applicants/': 'applicants/', '/360/': '360/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth-beta/firebase/' } },
 };
 
 // The one folder every host serves as it is: the shared design files (styles only, no data), so a subdomain's apps can
