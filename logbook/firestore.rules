@@ -723,8 +723,14 @@ service cloud.firestore {
     // selection/{cycle}/responses/{email}, while the round is open, and reads only that. PDs and the committee
     // (selectionCommittee/{email}, kept by admins and PDs) read every response. Admins do not read responses unless
     // they are PDs or on the committee (owner, 17 Oct 2026: "committee and PDs").
+    // a guest: signed in by the applicants app's passcode (worker/guest.js), a custom token with claim guest and no email. It can read a
+    // round and its photos and write its own response (document guest-<uid>), nothing else: signedIn() needs a verified email, so every
+    // other rule in this file turns a guest away.
+    function isGuest() {
+      return request.auth != null && request.auth.token.guest == true && !('email' in request.auth.token);
+    }
     function selMayAnswer() {
-      return isAdmin() || isPD()
+      return isGuest() || isAdmin() || isPD()
         || (signedIn() && exists(/databases/$(database)/documents/faculty/$(me())))
         || (signedIn() && exists(/databases/$(database)/documents/members/$(me()))
             && isResident(get(/databases/$(database)/documents/members/$(me())).data.rid));
@@ -751,9 +757,9 @@ service cloud.firestore {
         allow delete: if isAdmin() || isPD();
       }
       match /responses/{email} {
-        allow get: if isOwner(email);
+        allow get: if isOwner(email) || (isGuest() && email == 'guest-' + request.auth.uid);
         allow read: if isPD() || selCommittee();
-        allow create, update: if isOwner(email) && email == email.lower() && selMayAnswer()
+        allow create, update: if ((isOwner(email) && email == email.lower()) || (isGuest() && email == 'guest-' + request.auth.uid)) && selMayAnswer()
           && get(/databases/$(database)/documents/selection/$(cycle)).data.status == 'open'
           && validSelResponse(email, request.resource.data);
         allow delete: if isPD();

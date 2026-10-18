@@ -19,5 +19,7 @@
   // variables set in the Cloudflare dashboard survive each deploy (Ask Claude's settings; edit/NOTES.md). Secrets always do.
   "keep_vars": true,
   // required by `wrangler preview` (Worker Previews), even when empty: previews use the same settings
-  "previews": {}
+  "previews": {},
+  // the guest passcode sign-in (worker/guest.js): at most 10 tries a minute per address
+  "ratelimits": [{ "name": "GUEST_LIMIT", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }]
 }
