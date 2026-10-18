@@ -7,6 +7,8 @@
 export const MAX_APPLICANTS = 200;
 export const MAX_QUESTIONS = 8;
 export const SCALE = [1, 2, 3, 4, 5];
+// Tap-to-add words under every comment box. Single words only (the toggle matches whole words); edit this list to change them.
+export const SUGGESTED_COMMENTS = ['hardworking', 'conscientious', 'teachable', 'reliable', 'team player', 'good communicator', 'proactive', 'calm', 'humble', 'motivated', 'punctual', 'needs supervision'];
 export const INTRO = [
   'The selection exercise is starting soon. We would really appreciate your honest feedback on the applicants below. As successful applicants will form part of our family, we would like to gather insights and understanding of our applicants based on your interactions.',
   'Please give each applicant an overall suitability score from 1 (unsuitable) to 5 (best fit), and, where you can, comments with specific examples. If you haven’t worked with someone, one tap skips them.',

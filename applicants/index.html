@@ -54,6 +54,10 @@
   .sl-scores label:has(input:focus-visible) { outline: 3px solid var(--a-focus); outline-offset: 2px; }
   .sl-ends { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: var(--a-text-xs); color: var(--a-ink-2); }
   .sl-ta { min-height: 56px; }
+  .sl-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+  .sl-chip { min-height: 44px; padding: 8px 14px; border-radius: 22px; border: 1.5px solid var(--a-tint); background: transparent; color: var(--a-tint); font: inherit; font-size: var(--a-text-sm); font-weight: 600; cursor: pointer; }
+  .sl-chip[aria-pressed="true"] { background: var(--a-tint); color: #fff; }
+  .sl-chip:focus-visible { outline: 3px solid var(--a-focus); outline-offset: 2px; }
   .sl-cmts { display: grid; gap: 8px; }
   .sl-cmts + .a-btn { margin-top: 8px; }
   .sl-saved { font-size: var(--a-text-xs); color: var(--a-ink-2); min-width: 3em; text-align: center; }
