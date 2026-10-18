@@ -146,6 +146,12 @@ answers "Ask Claude is not set up yet: the Worker has no …" (naming what's mis
 the live addresses answering. It keeps one issue titled `Proof-read: …` up to date and closes it when a run finds
 nothing. Fix its list in one PR ("Site: proof-read fixes"). Run it any time with `node tools/proofread.mjs`.
 
+## AI proof-read (routine)
+
+A fortnightly routine reads the owner's private notes and the repos and reports to the owner's private notes, never as an
+issue or PR here. It is read-only. Details are in the owner's private notes. Nothing from it uses the titles `Proof-read:`
+or `Page edits:`: the mechanical workflow and the page-edits workflow own those.
+
 ## Daily check (routine)
 
 A daily routine drafts one never-merged PR for new `Page edits:` issues (details in the owner's private notes). Sessions handling page edits by hand should check for an open routine PR first, so the same issue isn't done twice. It never applies clinical content or more than wording, typo and layout fixes from anyone but the owner.
