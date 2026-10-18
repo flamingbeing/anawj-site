@@ -20,7 +20,7 @@ await t('the right passcode (any case) gets a token signed for Firebase', async 
     const c = JSON.parse(Buffer.from(b, 'base64url'));
     assert.equal(c.iss, env.GUEST_SA_EMAIL); assert.equal(c.sub, env.GUEST_SA_EMAIL);
     assert.equal(c.aud, 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit');
-    assert.match(c.uid, /^g[0-9a-f]{24}$/); assert.deepEqual(c.claims, { guest: true });
+    assert.match(c.uid, /^g[0-9a-f]{24}$/); assert.deepEqual(c.claims, { guest: true, role: 'guest' });
     assert.ok(c.exp - c.iat <= 3600);
     assert.ok(await crypto.subtle.verify('RSASSA-PKCS1-v1_5', publicKey, Buffer.from(s, 'base64url'), new TextEncoder().encode(h + '.' + b)));
   }
@@ -61,5 +61,17 @@ await t('the key may be stored with real or escaped new lines', async () => {
     const [h, b, s] = tok.split('.');
     assert.ok(await crypto.subtle.verify('RSASSA-PKCS1-v1_5', publicKey, Buffer.from(s, 'base64url'), new TextEncoder().encode(h + '.' + b)));
   }
+});
+await t('the set-up and committee passcodes give their own roles', async () => {
+  const e2 = { ...env, SETUP_PASSCODE: 'Build It', COMMITTEE_PASSCODE: 'Read It' };
+  const claims = async p => { const r = await handleGuest(req({ passcode: p }), e2); assert.equal(r.status, 200); const j = await r.json(); return { j, c: JSON.parse(Buffer.from(j.token.split('.')[1], 'base64url')) }; };
+  assert.deepEqual((await claims('open sesame')).c.claims, { guest: true, role: 'guest' });
+  const s = await claims(' build it '); assert.deepEqual(s.c.claims, { guest: true, role: 'setup' }); assert.equal(s.j.role, 'setup');
+  const c = await claims('READ IT'); assert.deepEqual(c.c.claims, { guest: true, role: 'committee' }); assert.equal(c.j.role, 'committee');
+  assert.equal((await handleGuest(req({ passcode: 'nope' }), e2)).status, 401);
+});
+await t('an unset optional passcode is never a way in', async () => {
+  for (const p of ['', 'undefined', 'null']) assert.equal((await handleGuest(req({ passcode: p }), env)).status, 401);
+  assert.equal((await handleGuest(req({ passcode: 'x' }), { ...env, SETUP_PASSCODE: '   ' })).status, 401);
 });
 console.log(`guest sign-in: ${n} groups passed`);

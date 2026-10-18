@@ -102,7 +102,14 @@ export async function whenSynced() {
 // ---- sign-in ----
 
 // A guest (applicants' passcode sign-in, a custom token) has no email: it is keyed as guest-<uid>, and flagged so apps can treat it as no one in particular.
-const asUser = u => (!u ? null : u.email ? { email: lc(u.email), name: u.displayName || u.email, uid: u.uid } : { email: 'guest-' + u.uid, name: 'Guest', uid: u.uid, guest: true });
+// role: 'guest' (sends feedback), 'setup' (sets the round up) or 'committee' (reads the results), from the token's claim; older tokens have none, so 'guest'.
+const asUser = async u => {
+  if (!u) return null;
+  if (u.email) return { email: lc(u.email), name: u.displayName || u.email, uid: u.uid };
+  let role = 'guest';
+  try { const r = (await u.getIdTokenResult()).claims.role; if (r === 'setup' || r === 'committee') role = r; } catch {}
+  return { email: 'guest-' + u.uid, name: 'Guest', uid: u.uid, guest: true, role };
+};
 
 export async function watchUser(cb) {
   if (demo) return D.watchUser(cb);
@@ -110,7 +117,7 @@ export async function watchUser(cb) {
   const { auth, A } = await sdk();
   // finishes a redirect sign-in (the fallback below) when the page loads again
   A.getRedirectResult(auth).catch(e => console.warn('Redirect sign-in failed', e));
-  A.onAuthStateChanged(auth, u => cb(asUser(u)));
+  A.onAuthStateChanged(auth, async u => cb(await asUser(u)));
 }
 
 // Popup first; redirect when popups are blocked or unsupported (e.g. some home-screen apps).
