@@ -11,7 +11,7 @@ Last updated: 2026-10-17.
 - 16 Oct: the **BIS to DSA and OT simulators moved to anantf.com** (`/bis/`, `/ot/`; NTF-Anaesthesia/anantf-site #130,
   with their own Checks). `anaes.anawj.com/bis/`, `/ot/` and `anawj.com/bis-dsa/`, `/ot-sim/` forward there.
 - #489, #555, #557, #558: **Ask Claude** at `ask.anawj.com` (owner only, behind Cloudflare Access; a request becomes a
-  `Page edits:` issue that the instant workflow drafts); weekly AI proof-read routine; the page-edits workflow says on
+  `Page edits:` issue that the instant workflow drafts); AI proof-read routine (fortnightly); the page-edits workflow says on
   the issue or PR when it fails.
 - #435–#454: feedback follow-ups: Share with a QR code (editor and button), compare a preview with how it is now,
   fixes from a review (live-app privacy, iPhone picking, PR match), app version in problem reports; **Checks** on every
