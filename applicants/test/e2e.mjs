@@ -58,6 +58,8 @@ await page.getByText(/1 of 8/).waitFor();
 assert.equal(await page.locator('img.sl-photo--lg').count(), 1);
 await page.getByRole('radio', { name: '4' }).check({ force: true });
 await page.fill('#q-comment', 'Calm during a difficult airway; asked for help early.');
+await page.getByRole('button', { name: '+ Add another comment' }).click();
+await page.locator('textarea.sl-ta').nth(1).fill('Good with nurses.');
 await page.waitForTimeout(450);
 await axe('applicant'); await shot('2-applicant');
 const KEY = 'sel-demo-ans-demo-resident@example.com';
