@@ -40,3 +40,9 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
 - **Two panes** on the Case tab at >= 840px wide and >= 500px tall (tablets, unfolded foldables, computers; not
   landscape phones): `.log-card.panes` grid, left = date, case box, quick picks, Still needed, Save; right = all tags
   (sticky, own scroll). On phones `.lp-left` / `.lp-right` are display: contents, so the order is unchanged.
+- **Form view** (More → Form view, `#formview`, `ui-formview.js`): the old APMES Case Numbers Google Form's layout for residents
+  moving to the logbook: Resident (the signed-in resident, read only), Date, Initials and case details, the 46 categories as
+  checkboxes (all required, as in the Form), then "Your response has been recorded" with **Edit your response** (the form
+  filled from the case; saving updates the same case) and Submit another response. It saves through `createCase` /
+  `updateCase` (the Case tab's path: same ID-number and double-entry questions, sync, sheet outbox), source `app`. Nothing
+  goes through the Form inbox, so there is nothing to pick up, clear or drift-check. Test: `test/e2e/formview.mjs`.

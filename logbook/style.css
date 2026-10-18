@@ -1770,3 +1770,15 @@ ul.cases li.lb-planned a { display: block; padding: 8px 4px; }
 .my-themes .my-theme { display: flex; align-items: stretch; gap: 6px; }
 .my-themes .my-theme .theme-row { flex: 1; min-width: 0; }
 .my-themes .bar input[type=text] { flex: 1; min-width: 0; }
+
+/* Form view: the old Google Form's layout (ui-formview.js) */
+.fv-card h2 { margin-top: 0; }
+.fv-q { border: 1px solid var(--line); border-radius: calc(10px * var(--round, 1)); padding: 12px; margin: 0 0 10px; min-width: 0; }
+.fv-t { display: block; font-weight: 600; padding: 0; margin-bottom: 8px; }
+.fv-req { color: var(--err); }
+.fv-q input[type=date], .fv-q input[type=text] { width: 100%; box-sizing: border-box; }
+.fv-resident { color: var(--muted); }
+.fv-opt { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; cursor: pointer; }
+.fv-opt input { margin-top: 3px; flex: none; }
+.fv-problem { color: var(--err); margin: 8px 0 0; font-size: .9em; }
+.fv-links a { color: var(--accent); }
