@@ -3,7 +3,7 @@
 // is uploaded or saved (it is gone when the page closes). Reading lives in rotations.js.
 
 import { h, fill, toast, modal, empty } from '../../evals/js/ui-core.js';
-import { CODE_KEY, INSTITUTIONS, splitCode, parseBlockSheet, readable, manpower, unknownCodes, history, sampleRows, suggestLinks, exportRotations } from './rotations.js';
+import { CODE_KEY, INSTITUTIONS, splitCode, parseBlockSheet, readable, manpower, unknownCodes, history, sampleRows, suggestLinks, exportRotations, exportPlacements } from './rotations.js';
 import { nameScore } from './batch.js';
 
 // What is loaded stays while People is open (switching tabs doesn't lose it).
@@ -26,22 +26,28 @@ function loadExcelJS() {
 // The roster app opens People with ?pull=rotations. We say hello to the tab that opened us, it answers with its staff names,
 // the posting codes it accepts and the weeks it shows, and the user checks the links and taps Send. Nothing goes before that.
 const JM_ORIGIN = 'https://nuhjuniormonthly.anawj.com';
+const NTF_ORIGIN = 'https://ntfroster.anawj.com';
+// The two roster apps that can ask, by their ?pull= value. Each is trusted only at its own address, and keeps its own name links.
+const PULL_APPS = {
+  rotations: { label: 'NUH Junior Monthly', hello: 'nuhjm-pull-info', linksKey: 'people-rot-links-v1', origin: JM_ORIGIN },
+  ntf: { label: 'NTF Roster', hello: 'ntf-pull-info', linksKey: 'people-rot-links-ntf-v1', origin: NTF_ORIGIN },
+};
+const PULL_APP = PULL_APPS[new URLSearchParams(location.search).get('pull')] || null;
 const PULL = { info: null, sent: false, provisional: false, elective: false };
 const pullOpener = () => { try { return window.opener && !window.opener.closed ? window.opener : null; } catch (e) { return null; } };
-const pullOrigins = () => [...new Set([JM_ORIGIN, location.origin])];
-const wantsPull = new URLSearchParams(location.search).get('pull') === 'rotations';
+const pullOrigins = () => [...new Set([PULL_APP ? PULL_APP.origin : JM_ORIGIN, location.origin])];
 let onPullInfo = null;
 function sayHello() {
   const op = pullOpener();
   if (!op) return;
   for (const o of pullOrigins()) { try { op.postMessage({ type: 'people-pull-hello' }, o); } catch (e) { /* not that origin */ } }
 }
-if (wantsPull) {
+if (PULL_APP) {
   window.addEventListener('message', e => {
     if (!pullOrigins().includes(e.origin) || e.source !== pullOpener()) return;
     const d = e.data;
-    if (!d || d.type !== 'nuhjm-pull-info' || !Array.isArray(d.names) || !Array.isArray(d.codes)) return;
-    PULL.info = { names: d.names.map(String).slice(0, 500), codes: d.codes.map(String).slice(0, 100), from: String(d.from || ''), to: String(d.to || ''), month: String(d.month || '') };
+    if (!d || d.type !== PULL_APP.hello || !Array.isArray(d.names) || (PULL_APP === PULL_APPS.rotations && !Array.isArray(d.codes))) return;
+    PULL.info = { names: d.names.map(String).slice(0, 500), codes: (Array.isArray(d.codes) ? d.codes : []).map(String).slice(0, 100), from: String(d.from || ''), to: String(d.to || ''), month: String(d.month || '') };
     PULL.sent = false;
     if (onPullInfo) onPullInfo();
   });
@@ -49,7 +55,7 @@ if (wantsPull) {
 }
 
 // Who on the sheet is who in the roster, chosen by hand once and kept in this browser (names only; '' = not in the roster).
-const LINKS_KEY = 'people-rot-links-v1';
+const LINKS_KEY = PULL_APP ? PULL_APP.linksKey : 'people-rot-links-v1';
 const loadLinks = () => { try { const o = JSON.parse(localStorage.getItem(LINKS_KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } };
 const saveLinks = o => { try { localStorage.setItem(LINKS_KEY, JSON.stringify(o)); } catch (e) { /* private mode: it just isn't kept */ } };
 
@@ -145,20 +151,21 @@ export function rotationsScreen({ demo = false } = {}) {
 
   function drawPull() {
     if (!PULL.info) {
-      if (wantsPull) { sayHello(); fill(pullBox, h('section', { class: 'e-card' }, h('p', { class: 'e-small', role: 'status' }, pullOpener()
-        ? 'Waiting for NUH Junior Monthly to say what it needs…' : 'NUH Junior Monthly asked for postings, but this tab can’t reach it (it was opened another way). Open People from Postings › Pull from APMES People… in that app.'))); }
+      if (PULL_APP) { sayHello(); fill(pullBox, h('section', { class: 'e-card' }, h('p', { class: 'e-small', role: 'status' }, pullOpener()
+        ? `Waiting for ${PULL_APP.label} to say what it needs…` : `${PULL_APP.label} asked for postings, but this tab can’t reach it (it was opened another way). Open People from ${PULL_APP === PULL_APPS.ntf ? 'More › Pull rotations from APMES People…' : 'Postings › Pull from APMES People…'} in that app.`))); }
       else fill(pullBox);
       return;
     }
     const info = PULL.info;
-    if (!R.tabs.length) { fill(pullBox, h('section', { class: 'e-card' }, h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'Postings for NUH Junior Monthly'),
+    if (!R.tabs.length) { fill(pullBox, h('section', { class: 'e-card' }, h('h2', { class: 'e-h2', style: 'margin-top:0' }, `Postings for ${PULL_APP.label}`),
       h('p', { class: 'e-small' }, `It asked for ${info.from} to ${info.to}. Open the rotation sheet above, then check who is who and send.`))); return; }
     const parsed = R.tabs[Math.min(R.cur, R.tabs.length - 1)].parsed;
     const links = loadLinks();
     const everyone = parsed.sections.flatMap(s => s.people);
     const suggested = suggestLinks(everyone, info.names, nameScore);
-    const opts = { accepted: info.codes, from: info.from, to: info.to, links, suggested, provisional: PULL.provisional, elective: PULL.elective };
-    const out = exportRotations(parsed, opts);
+    const ntf = PULL_APP === PULL_APPS.ntf;
+    const out = ntf ? exportPlacements(parsed, { from: info.from, to: info.to, links, suggested })
+      : exportRotations(parsed, { accepted: info.codes, from: info.from, to: info.to, links, suggested, provisional: PULL.provisional, elective: PULL.elective });
     const rowsToLink = [...out.people.map(p => ({ ...p, cells: p.cells })), ...out.unlinked];
     const sel = person => {
       const cur = Object.prototype.hasOwnProperty.call(links, person.key) ? links[person.key] : suggested.get(person.key) || '';
@@ -174,26 +181,27 @@ export function rotationsScreen({ demo = false } = {}) {
     };
     const send = () => {
       const op = pullOpener();
-      if (!op) { toast('This tab lost NUH Junior Monthly. Open People again from Postings in that app.'); return; }
+      if (!op) { toast(`This tab lost ${PULL_APP.label}. Open People again from that app.`); return; }
       for (const o of pullOrigins()) { try { op.postMessage({ type: 'people-rotations', text: out.text }, o); } catch (e) { /* not that origin */ } }
       PULL.sent = true;
       try { op.focus(); } catch (e) { /* the browser decides */ }
       drawPull();
     };
     fill(pullBox, h('section', { class: 'e-card', id: 'rt-pullcard' },
-      h('h2', { class: 'e-h2', style: 'margin-top:0' }, 'Postings for NUH Junior Monthly'),
-      h('p', { class: 'e-small' }, `It asked for ICU, cardiac and OG float postings, ${info.from} to ${info.to}. Only those go over, with the roster’s own names; nothing is sent until you tap Send. Choose who each sheet name is once: it is remembered in this browser.`),
-      h('div', { class: 'rt-opts' },
+      h('h2', { class: 'e-h2', style: 'margin-top:0' }, `Postings for ${PULL_APP.label}`),
+      h('p', { class: 'e-small' }, ntf ? `It asked for where each person is posted or away, week by week, ${info.from} to ${info.to}: the hospital, or leave or an exam week. Only that goes over, with the roster’s own names; nothing is sent until you tap Send. Choose who each sheet name is once: it is remembered in this browser.`
+        : `It asked for ICU, cardiac and OG float postings, ${info.from} to ${info.to}. Only those go over, with the roster’s own names; nothing is sent until you tap Send. Choose who each sheet name is once: it is remembered in this browser.`),
+      ntf ? null : h('div', { class: 'rt-opts' },
         h('label', { class: 'e-small' }, h('input', { type: 'checkbox', id: 'rt-kiv', checked: PULL.provisional, onchange: e => { PULL.provisional = e.target.checked; drawPull(); } }), ' Include provisional (KIV)'),
         h('label', { class: 'e-small' }, h('input', { type: 'checkbox', id: 'rt-el', checked: PULL.elective, onchange: e => { PULL.elective = e.target.checked; drawPull(); } }), ' Include electives (-E)')),
       rowsToLink.length ? h('div', { class: 'rt-scroll', tabindex: '0', role: 'region', 'aria-label': 'Who is who' }, h('table', { class: 'rt-table' },
         h('thead', {}, h('tr', {}, h('th', { class: 'rt-name', scope: 'col' }, 'On the sheet'), h('th', { scope: 'col' }, 'Weeks'), h('th', { scope: 'col' }, 'In the roster'))),
         h('tbody', {}, rowsToLink.map(p => h('tr', {}, h('th', { class: 'rt-name', scope: 'row' }, p.name, p.origin ? h('span', { class: 'rt-origin' }, p.origin) : null), h('td', { class: 'rt-n' }, p.cells), h('td', {}, sel(p)))))))
-        : h('p', { class: 'e-small' }, 'No ICU, cardiac or OG float postings in those weeks on this tab.'),
+        : h('p', { class: 'e-small' }, ntf ? 'No postings or leave in those weeks on this tab.' : 'No ICU, cardiac or OG float postings in those weeks on this tab.'),
       out.unlinked.length ? h('p', { class: 'e-hint' }, `${plural(out.unlinked.length, 'person has', 'people have')} no roster name yet and will not be sent.`) : null,
       h('div', { class: 'e-actions e-actions--start' },
-        h('button', { class: 'a-btn', type: 'button', id: 'rt-send', disabled: !out.people.length, onclick: send }, `Send ${plural(out.people.length, 'person', 'people')} to NUH Junior Monthly`)),
-      PULL.sent ? h('p', { class: 'e-small', role: 'status' }, 'Sent. Switch back to NUH Junior Monthly: the postings are in its Paste rotations box, ready to Apply.') : null));
+        h('button', { class: 'a-btn', type: 'button', id: 'rt-send', disabled: !out.people.length, onclick: send }, `Send ${plural(out.people.length, 'person', 'people')} to ${PULL_APP.label}`)),
+      PULL.sent ? h('p', { class: 'e-small', role: 'status' }, `Sent. Switch back to ${PULL_APP.label}: the postings are in its Paste rotations box, ready to Apply.`) : null));
   }
 
   function draw() {

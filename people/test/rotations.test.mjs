@@ -1,6 +1,6 @@
 // Plain node checks for people/js/rotations.js (the block rotation sheet reader). Made-up names only.
 import assert from 'node:assert/strict';
-import { CODE_KEY, splitCode, weekColumns, parseBlockSheet, readable, manpower, unknownCodes, history, nameKey, weekMonday, sampleRows, CRITICAL, suggestLinks, exportRotations } from '../js/rotations.js';
+import { CODE_KEY, splitCode, weekColumns, parseBlockSheet, readable, manpower, unknownCodes, history, nameKey, weekMonday, sampleRows, CRITICAL, suggestLinks, exportRotations, placementOf, exportPlacements } from '../js/rotations.js';
 
 let n = 0;
 const t = (name, fn) => { try { fn(); n++; } catch (e) { console.error('✗ ' + name); throw e; } };
@@ -124,6 +124,33 @@ t('hand-off: unlinked people, a date range and the codes the roster accepts', ()
   const e = exportRotations(p, { accepted: ['icu'], links: { [nameKey('Sam Sample')]: 'Sam' } });   // codes match in any capitals
   assert.ok(e.text.includes('Sam\t'));
   assert.ok(CRITICAL.includes('OGDF'));
+});
+
+t('NTF hand-off: one word per week from the code key', () => {
+  const w = c => placementOf(c);
+  assert.deepEqual(['NTFGH-JR', 'NTF ICU', 'NTFGH-RA'].map(w), ['NTF', 'NTF', 'NTF']);
+  assert.deepEqual(['ICU', 'GC', 'Neu', 'RA'].map(w), ['NUH', 'NUH', 'NUH', 'NUH']);
+  assert.deepEqual([w('KKH'), w('TTSH NICU'), w('AH-AMB')], ['KKH', 'TTSH', 'OTH']);
+  assert.deepEqual([w('AL'), w('ML'), w('NPL'), w('SAF'), w('ML/ NPL')], ['AL', 'ML', 'NPL', 'NS', 'ML']);
+  assert.deepEqual([w('Part A'), w('Part C')], ['EL', 'EL']);
+  assert.equal(w('Prep'), 'NUH');                       // exam preparation is still a NUH posting
+  assert.deepEqual([w('KIV ICU'), w('KIV AL'), w('Liver-E'), w('Elective'), w('ED'), w('TTSH'), w('Mystery'), w(''), w(null)], ['', '', '', '', '', '', '', '', '']);
+  assert.equal(w('NTFGH/ ICU'), 'NTF');                  // two codes: the first decides
+});
+
+t('NTF hand-off: names, date range and unlinked people', () => {
+  const p = parseBlockSheet(sampleRows());
+  const links = { [nameKey('Kim Placeholder')]: 'Kim P' };
+  const r = exportPlacements(p, { links, from: '2027-01-04', to: '2027-01-25' });
+  assert.deepEqual(r.weeks, ['2027-01-04', '2027-01-11', '2027-01-18', '2027-01-25']);
+  const rows = r.text.trim().split('\n').map(l => l.split('\t'));
+  assert.deepEqual(rows[0], ['Name', ...r.weeks]);
+  const kim = rows.find(x => x[0] === 'Kim P');
+  assert.ok(kim && kim.length === 5 && kim.slice(1).every(c => c === 'NUH'));
+  assert.ok(r.unlinked.length > 0);                       // the others have no roster name yet
+  assert.equal(r.text.includes('Placeholder'), false);    // the sheet name never goes over, only the roster's
+  const none = exportPlacements(p, { links: Object.fromEntries(p.sections.flatMap(s => s.people).map(x => [x.key, ''])) });
+  assert.equal(none.text, '');
 });
 
 t('hand-off: suggestions need exactly one best roster name', () => {

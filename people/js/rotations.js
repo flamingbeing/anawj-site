@@ -317,6 +317,13 @@ export function exportRotations(parsed, { accepted = CRITICAL, from = '', to = '
     const part = sc.parts.find(p => ok.has(unkiv(p)) && (elective || !p.elective));
     return part ? unkiv(part) : '';
   };
+  const { people, unlinked } = linkPeople(parsed, cols, pick, links, suggested);
+  return { text: handOverText(cols, people), weeks: cols.map(c => c.monday), people, unlinked };
+}
+
+// Shared by both hand-overs: for each sheet person, what pick() makes of each week; people with nothing in range are left out,
+// the rest go to `people` (with the roster's name) or `unlinked` (no roster name yet).
+function linkPeople(parsed, cols, pick, links, suggested) {
   const people = [], unlinked = [];
   for (const s of parsed.sections) for (const p of s.people) {
     const codes = cols.map(c => pick(p.codes[c.i]));
@@ -327,7 +334,34 @@ export function exportRotations(parsed, { accepted = CRITICAL, from = '', to = '
     const name = decided ? links[p.key] : suggested.get(p.key) || '';
     if (name) people.push({ name: p.name, key: p.key, rosterName: name, codes, cells }); else unlinked.push({ name: p.name, key: p.key, origin: p.origin, cells });
   }
+  return { people, unlinked };
+}
+const handOverText = (cols, people) => {
   const clean = t => String(t).replace(/[\t\r\n]+/g, ' ').trim();
-  const text = people.length ? [['Name', ...cols.map(c => c.monday)].join('\t'), ...people.map(p => [clean(p.rosterName), ...p.codes].join('\t'))].join('\n') + '\n' : '';
-  return { text, weeks: cols.map(c => c.monday), people, unlinked };
+  return people.length ? [['Name', ...cols.map(c => c.monday)].join('\t'), ...people.map(p => [clean(p.rosterName), ...p.codes].join('\t'))].join('\n') + '\n' : '';
+};
+
+// The hand-over for the NTF roster (owner, 18 Oct 2026): where each person is posted each week, whatever the posting, rather
+// than a list of accepted codes. One word per week, worked out from the code key:
+//   NTF, NUH, KKH, TTSH, OTH   the week's posting is at that hospital (OTH: another hospital)
+//   AL, ML, NPL, NS            leave, as on the sheet (SAF, national service, is NS in the NTF roster)
+//   EL                         an exam week away from work (Part A, B or C)
+// Left out: provisional (KIV) cells, electives, tags (ED, GS...), cells not at a hospital, codes not in the key. For a cell with
+// two codes ("Neu/ Paed") the first one decides.
+export function placementOf(raw) {
+  const sc = splitCode(raw);
+  if (!sc || sc.provisional) return '';
+  const part = sc.parts[0];
+  if (!part.known || part.elective) return '';
+  const [inst, type] = part.known;
+  if (type === 'leave') { const c = part.code.split(/\s*\/\s*/)[0]; return c === 'SAF' ? 'NS' : c; }
+  if (type === 'exam') return inst === 'none' ? 'EL' : placeOf(inst);
+  return type === 'post' ? placeOf(inst) : '';
+}
+const placeOf = inst => (inst === 'other' ? 'OTH' : inst === 'none' ? '' : inst);
+
+export function exportPlacements(parsed, { from = '', to = '9999-12-31', links = {}, suggested = new Map() } = {}) {
+  const cols = parsed.weeks.map((w, i) => ({ i, monday: weekMonday(w.start) })).filter(c => c.monday >= from && c.monday <= to);
+  const { people, unlinked } = linkPeople(parsed, cols, placementOf, links, suggested);
+  return { text: handOverText(cols, people), weeks: cols.map(c => c.monday), people, unlinked };
 }

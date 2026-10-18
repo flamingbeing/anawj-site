@@ -256,6 +256,44 @@ await axe('rotations'); await shot('6-rotations');
   await page.evaluate(() => localStorage.removeItem('people-rot-links-v1'));
 }
 
+// 6e. Pull for the NTF roster: a stand-in page at its address (the roster's own side is a separate change) opens People,
+// answers hello with its names and the month, and gets one word per week once the user links a name and taps Send
+{
+  await ctx.route('https://ntfroster.anawj.com/stub', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>stand-in</title>' }));
+  const stub = await ctx.newPage();
+  stub.on('pageerror', e => errors.push('NTF stand-in: ' + e));
+  await stub.goto('https://ntfroster.anawj.com/stub');
+  await stub.evaluate(() => {
+    window.got = null;
+    window.addEventListener('message', e => {
+      if (e.data && e.data.type === 'people-pull-hello') e.source.postMessage({ type: 'ntf-pull-info', names: ['Roster Kim', 'Roster Pat'], from: '2027-03-01', to: '2027-03-29', month: '2027-03' }, e.origin);
+      else if (e.data && e.data.type === 'people-rotations') window.got = e.data.text;
+    });
+  });
+  const [pp] = await Promise.all([ctx.waitForEvent('page'), stub.evaluate(() => window.open('https://apmes.anawj.com/people/?demo&pull=ntf#rotations', 'apmes-pull'))]);
+  pp.on('pageerror', e => errors.push('People (NTF pull): ' + e));
+  await pp.getByRole('button', { name: 'Use a made-up sample' }).click();
+  await pp.locator('#rt-pullcard').waitFor();
+  assert.match(await pp.textContent('#rt-pullcard'), /Postings for NTF Roster/);
+  assert.equal(await pp.locator('#rt-kiv').count(), 0, 'the KIV and elective choices are for the monthly roster only');
+  assert.equal(await pp.locator('#rt-send').isDisabled(), true, 'nobody is linked yet: nothing to send');
+  await pp.getByLabel('Roster name for Kim Placeholder').selectOption('Roster Kim');
+  await pp.getByRole('button', { name: /^Send 1 person to NTF Roster$/ }).waitFor();
+  assert.equal(await stub.evaluate(() => window.got), null, 'nothing arrives before Send');
+  await axe('rotations pull for NTF', pp);
+  await pp.locator('#rt-send').click();
+  await stub.waitForFunction(() => !!window.got);
+  const text = await stub.evaluate(() => window.got);
+  assert.match(text, /^Name\t2027-03-01\t2027-03-08\t/);
+  assert.match(text, /\nRoster Kim\t[A-Z]/);
+  assert.doesNotMatch(text, /Placeholder/, 'the sheet name does not go over');
+  const links = await page.evaluate(() => JSON.parse(localStorage.getItem('people-rot-links-ntf-v1') || '{}'));
+  assert.equal(links.kimplaceholder, 'Roster Kim');
+  assert.deepEqual(JSON.parse(await page.evaluate(() => localStorage.getItem('people-rot-links-v1') || '{}')), {}, 'the monthly roster\'s links are kept apart');
+  await pp.close(); await stub.close();
+  await page.evaluate(() => localStorage.removeItem('people-rot-links-ntf-v1'));
+}
+
 // 7. PDs: the admin adds one
 await page.goto(BASE + 'people/?demo=admin#pds');
 await page.getByRole('button', { name: 'Add PD' }).click();
