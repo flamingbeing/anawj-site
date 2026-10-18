@@ -345,17 +345,18 @@ const handOverText = (cols, people) => {
 // than a list of accepted codes. One word per week, worked out from the code key:
 //   NTF, NUH, KKH, TTSH, OTH   the week's posting is at that hospital (OTH: another hospital)
 //   AL, ML, NPL, NS            leave, as on the sheet (SAF, national service, is NS in the NTF roster)
-//   EL                         an exam week away from work (Part A, B or C)
-// Left out: provisional (KIV) cells, electives, tags (ED, GS...), cells not at a hospital, codes not in the key. For a cell with
+// Left out: exam weeks (Part A, B, C; owner, 18 Oct 2026), the obstetric OT postings OG1 and OG2 (no use in the monthly rosters,
+// for now), provisional (KIV) cells, electives, tags (ED, GS...), cells not at a hospital, codes not in the key. For a cell with
 // two codes ("Neu/ Paed") the first one decides.
+const NOT_SENT = new Set(['OG1', 'OG2']);
 export function placementOf(raw) {
   const sc = splitCode(raw);
   if (!sc || sc.provisional) return '';
   const part = sc.parts[0];
-  if (!part.known || part.elective) return '';
+  if (!part.known || part.elective || NOT_SENT.has(part.code)) return '';
   const [inst, type] = part.known;
   if (type === 'leave') { const c = part.code.split(/\s*\/\s*/)[0]; return c === 'SAF' ? 'NS' : c; }
-  if (type === 'exam') return inst === 'none' ? 'EL' : placeOf(inst);
+  if (type === 'exam') return inst === 'none' ? '' : placeOf(inst);   // Prep still means a NUH posting; the exams themselves are not sent
   return type === 'post' ? placeOf(inst) : '';
 }
 const placeOf = inst => (inst === 'other' ? 'OTH' : inst === 'none' ? '' : inst);

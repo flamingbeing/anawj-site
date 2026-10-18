@@ -132,7 +132,8 @@ t('NTF hand-off: one word per week from the code key', () => {
   assert.deepEqual(['ICU', 'GC', 'Neu', 'RA'].map(w), ['NUH', 'NUH', 'NUH', 'NUH']);
   assert.deepEqual([w('KKH'), w('TTSH NICU'), w('AH-AMB')], ['KKH', 'TTSH', 'OTH']);
   assert.deepEqual([w('AL'), w('ML'), w('NPL'), w('SAF'), w('ML/ NPL')], ['AL', 'ML', 'NPL', 'NS', 'ML']);
-  assert.deepEqual([w('Part A'), w('Part C')], ['EL', 'EL']);
+  assert.deepEqual([w('Part A'), w('Part B'), w('Part C'), w('Part B/ ICU')], ['', '', '', '']);   // exam weeks are not sent (owner, 18 Oct)
+  assert.deepEqual([w('OG1'), w('OG2'), w('OGDF'), w('OGNF1')], ['', '', 'NUH', 'NUH']);        // OG1 and OG2 are of no use to the monthly rosters
   assert.equal(w('Prep'), 'NUH');                       // exam preparation is still a NUH posting
   assert.deepEqual([w('KIV ICU'), w('KIV AL'), w('Liver-E'), w('Elective'), w('ED'), w('TTSH'), w('Mystery'), w(''), w(null)], ['', '', '', '', '', '', '', '', '']);
   assert.equal(w('NTFGH/ ICU'), 'NTF');                  // two codes: the first decides

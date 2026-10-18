@@ -98,8 +98,9 @@ week grid, a person's weeks per posting across the year tabs, and people per pos
   Both ends check the origin (the other app's address, or their own on previews and tests). Test: `people/test/e2e.mjs` 6d.
 - **Hand-off to the NTF roster** (same pattern, `?pull=ntf`, hello answered with `ntf-pull-info`: names, first and last Monday,
   month): sends where each person is each week instead of a code list (`exportPlacements`, `placementOf`): `NTF`, `NUH`, `KKH`,
-  `TTSH`, `OTH` (another hospital) for a posting, `AL`/`ML`/`NPL`/`NS` for leave (SAF is `NS`), `EL` for Part A, B or C. KIV
-  cells, electives, tags and cells outside a hospital are left out; for a two-code cell the first decides. Each app is trusted
+  `TTSH`, `OTH` (another hospital) for a posting, `AL`/`ML`/`NPL`/`NS` for leave (SAF is `NS`). Left out: exam weeks (Part A, B,
+  C; owner, 18 Oct), OG1 and OG2 (no use in the monthly rosters, for now; `NOT_SENT`), KIV cells, electives, tags and cells
+  outside a hospital. For a two-code cell the first decides; Prep still counts as a NUH posting. Each app is trusted
   only at its own address and has its own saved links (`people-rot-links-ntf-v1`). The NTF roster's end (ask, paste, apply)
   is a separate change. Test: `people/test/e2e.mjs` 6e.
 
