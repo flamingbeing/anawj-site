@@ -109,13 +109,12 @@ const themeSwatch = t => {
     h('span', { class: 'theme-card-in' }, h('i', { class: 'theme-dot' }), h('i', { class: 'theme-line' })));
 };
 function pickTheme(t) {
-  const before = display(), beforeMode = cachedTheme();
+  const before = display();
   const patch = themePatch(t, before);
-  if (t.mode) { applyTheme(t.mode); patch.themeMode = true; } else if (before.themeMode) { applyTheme('light'); patch.themeMode = null; }
+  patch.themeMode = null;   // a theme never changes Light or dark
   applyDisplay(setDisplay(patch));
   hooks.render();
   toast(`Theme: ${t.name}`, { action: 'Undo', onaction: () => {
-    applyTheme(beforeMode);
     applyDisplay(setDisplay(Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode'].map(k => [k, before[k] ?? null]))));
     hooks.render();
   } });
@@ -211,10 +210,9 @@ function myThemesCard(st, custom) {
     catch (err) { toast(err.message); }
   };
   const use = t => {
-    const before = display(), beforeMode = cachedTheme();
-    if (t.mode) applyTheme(t.mode);
+    const before = display();
     applyDisplay(setDisplay(minePatch(t))); hooks.render();
-    toast(`Theme: ${t.name}`, { action: 'Undo', onaction: () => { applyTheme(beforeMode); applyDisplay(setDisplay(Object.fromEntries([...THEME_KEYS, 'theme'].map(k => [k, before[k] ?? null])))); hooks.render(); } });
+    toast(`Theme: ${t.name}`, { action: 'Undo', onaction: () => { applyDisplay(setDisplay(Object.fromEntries([...THEME_KEYS, 'theme'].map(k => [k, before[k] ?? null])))); hooks.render(); } });
   };
   const drop = t => {
     const before = display().myThemes;
