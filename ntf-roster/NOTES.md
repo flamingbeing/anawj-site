@@ -231,6 +231,17 @@ the real People app).
 - Installable and offline (`sw.js`, `manifest.webmanifest`); More ends with the app version and "Get the latest
   version" (AGENTS.md).
 
+## Month lock and header (19 Oct 2026)
+
+- Month lock as in NUH junior monthly: a month is locked when `months[m].status` is `published` (shared through the
+  month document). `store.commit` refuses any change to a locked month's days (`onLocked` shows why); the padlock beside
+  Today toggles it, and the roster shows a slim "is locked, Unlock to edit" line. Every month with days in it locks when
+  the app opens and when it closes (`lockAll`, `ensureLocked`); an empty month is left open so a new roster can start.
+  Excel import and Rotations from People pass `{ unlock: true }`: they unlock the months they fill, in the same undo
+  step. Never in practice.
+- Header: one line on phones (name, cloud, undo, redo, help; then month, Today, padlock, Fill). The main button reads
+  "Fill" with no icon; it hides in a locked month.
+
 ## Junior pool (19 Oct 2026)
 
 The junior roster is run by a different person from the senior one, from the same department sheet. One state, two pools.

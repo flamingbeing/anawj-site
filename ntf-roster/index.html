@@ -30,6 +30,7 @@
     </a>
     <nav class="tabs" id="tabs" aria-label="Sections"></nav>
     <div class="top-tools">
+      <button type="button" class="btn btn-ghost btn-sm" id="cloudbtn" hidden data-tour="cloud"></button>
       <button type="button" class="icon-btn" id="undo" aria-label="Undo" title="Undo (Ctrl+Z)" disabled></button>
       <button type="button" class="icon-btn" id="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled></button>
       <button type="button" class="icon-btn" id="help" aria-label="Help" title="Help: the tour, practice tasks, keyboard shortcuts" data-tour="help" data-tour-return="help"></button>
@@ -41,12 +42,12 @@
       <h1 class="month-title" id="month" aria-live="polite"></h1>
       <button type="button" class="icon-btn" id="nextm" aria-label="Next month" title="Next month (])"></button>
       <button type="button" class="btn btn-ghost btn-sm" id="today">Today</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="lockm" aria-pressed="false" title="Lock this month so nothing in it can be changed by accident">Lock</button>
     </div>
     <div class="pool-sw" id="poolsw" role="group" aria-label="Whose roster" data-tour="pool"></div>
     <div class="ctx-tools">
       <a class="problems" id="problems" href="#check" aria-label="Problems" data-tour="problems"></a>
-      <button type="button" class="btn btn-ghost btn-sm" id="cloudbtn" hidden data-tour="cloud"></button>
-      <button type="button" class="btn btn-primary" id="autofill" aria-label="Auto-fill" title="Auto-fill this month from the rules" data-tour="autofill"></button>
+      <button type="button" class="btn btn-primary" id="autofill" title="Fill this month from the rules" data-tour="autofill"></button>
     </div>
   </div>
 </header>

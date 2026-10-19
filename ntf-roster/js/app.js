@@ -126,6 +126,7 @@ function monthFromParams(p) { return validMonth(p.m) ? p.m : validDay(p.d) ? p.d
 function setMonth(m) {
   if (!validMonth(m) || m === app.month) return;
   app.month = m;
+  app.store.ensureLocked(m);
   evalCache = null;
   try { localStorage.setItem('ntf-roster-ui-month', JSON.stringify({ m, at: M.iso(new Date()) })); } catch (e) { /* ignore */ }
   // keep the month in the link, so a reload or a relaunch of the installed app comes back to it
@@ -304,7 +305,7 @@ function renderNav() {
   $('#help').innerHTML = icon('help');
   $('#prevm').innerHTML = icon('left');
   $('#nextm').innerHTML = icon('right');
-  $('#autofill').innerHTML = `${icon('spark')}<span class="lbl">Auto-fill</span>`;
+  $('#autofill').innerHTML = '<span class="lbl">Fill</span>';
 }
 
 function markTabs() {
@@ -351,6 +352,11 @@ function renderHeader() {
   const longM = M.fmtMonth(app.month);   // 'October 2026'; phones show 'Oct 2026'
   setHTML($('#month'), `<span class="m-long">${esc(longM)}</span><span class="m-short" aria-hidden="true">${esc(longM.slice(0, 3) + ' ' + app.month.slice(0, 4))}</span>`);
   $('#today').title = 'Go to today (' + M.fmtDay(M.iso(new Date())) + ')';
+  const lk = $('#lockm'), isLocked = M.isMonthLocked(state, app.month);
+  setHTML(lk, `${icon('lock')}<span class="lk-t">${isLocked ? 'Locked' : 'Lock'}</span>`);
+  lk.setAttribute('aria-pressed', String(isLocked));
+  lk.title = isLocked ? `${longM} is locked: nothing in it can change. Press to unlock.` : `Lock ${longM} so nothing in it can be changed by accident`;
+  document.body.classList.toggle('month-locked', isLocked);
   const u = $('#undo'), r = $('#redo');
   u.disabled = !app.store.canUndo();
   r.disabled = !app.store.canRedo();
@@ -367,7 +373,7 @@ function renderHeader() {
   // nothing to check or fill before there are staff (a fresh install): no green "No problems", no Auto-fill
   p.hidden = !hasStaff;
   $('#autofill').disabled = !hasStaff;
-  $('#autofill').title = hasStaff ? 'Auto-fill this month from the rules' : 'Add staff first (People)';
+  $('#autofill').title = hasStaff ? 'Fill this month from the rules' : 'Add staff first (People)';
   const nFailed = (ev.failed || []).length;
   const bad = ev.hard || ev.error;
   p.className = 'problems ' + (bad ? 'has-hard' : 'is-ok');
@@ -425,7 +431,7 @@ async function doRoute() {
   const { tab, params, key } = parseHash();
   app.params = params;
   const pm = monthFromParams(params);
-  if (pm && pm !== app.month) { app.month = pm; evalCache = null; }
+  if (pm && pm !== app.month) { app.month = pm; app.store.ensureLocked(pm); evalCache = null; }
   const sameTab = tab === current.tab && current.view;
   app.tab = tab;
   renderHeader();
@@ -649,14 +655,17 @@ function goToday() {
 
 function doUndo() {
   const label = app.store.undo();
+  app.store.ensureLocked(app.month);
   if (label) toast(`Undone: ${label}`, { action: { label: 'Redo', fn: doRedo }, ms: 3000 });
 }
 function doRedo() {
   const label = app.store.redo();
+  app.store.ensureLocked(app.month);
   if (label) toast(`Redone: ${label}`, { ms: 2500 });
 }
 
 async function openAutofill() {
+  if (M.isMonthLocked(app.store.get(), app.month)) { toast(`${M.fmtMonth(app.month)} is locked. Unlock it (the padlock at the top) to use Fill.`, { kind: 'warn', ms: 7000 }); return; }
   try {
     const mod = await import('./ui-roster.js');
     mod.openAutofill(app);
@@ -711,12 +720,17 @@ async function start() {
     const cloudMod = await import('./cloud.js');
     if (cloudMod.enabled && !demo) CS = await import('./cloudstate.js');
   } catch (e) { console.warn('cloud.js not loaded; no cloud button', e); }
+  app.store.onLocked = months => toast(`${M.fmtMonth(months[0])} is locked, so nothing was changed. Press the padlock at the top to unlock it first.`, { kind: 'warn', ms: 7000 });
   if (app.store.damaged) showDamaged();
   if (demo) document.title = 'NTF Roster (practice)';
 
   // Month on screen: the hash (?m=), else this month.
   const hp = parseHash().params;
   app.month = monthFromParams(hp) || thisMonth();
+  app.store.lockAll();
+  // closing the app locks everything again (a reopened phone app may not reload the page, so this also runs as it goes away)
+  window.addEventListener('pagehide', () => { try { app.store.lockAll(); } catch (e) { /* closing anyway */ } });
+  app.store.ensureLocked(app.month);
 
   renderNav();
   renderDemoBar();
@@ -728,6 +742,12 @@ async function start() {
   $('#prevm').addEventListener('click', () => setMonth(M.addMonths(app.month, -1)));
   $('#nextm').addEventListener('click', () => setMonth(M.addMonths(app.month, 1)));
   $('#today').addEventListener('click', goToday);
+  // unlocking asks nothing: the toast offers Undo, which locks it again
+  $('#lockm').addEventListener('click', () => {
+    const st = app.store.get(), m = app.month, locked = M.isMonthLocked(st, m);
+    app.store.commit(`${locked ? 'Unlock' : 'Lock'} ${M.fmtMonth(m)}`, draft => { M.setMonthLocked(draft, m, !locked); });
+    toast(locked ? `${M.fmtMonth(m)} is unlocked.` : `${M.fmtMonth(m)} is locked: nothing in it can change until you unlock it.`, { kind: 'ok', ms: 4000, action: locked ? { label: 'Lock again', fn: () => app.store.undo() } : undefined });
+  });
   $('#poolsw').addEventListener('click', e => {
     const b = e.target.closest('[data-pool]');
     if (!b || !app.store) return;

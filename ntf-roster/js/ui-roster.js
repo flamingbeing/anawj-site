@@ -176,11 +176,12 @@ export function mount(el, app) {
 
   const paintBar = h('div', { class: 'r-paintbar', hidden: true, role: 'group', 'aria-label': 'Paint with code' });
   const banner = h('div', { class: 'r-banner', hidden: true });
+  const lockNote = h('div', { class: 'lock-note', role: 'note', hidden: true });
   const body = h('div', { class: 'r-body', 'data-tour': 'grid' });
   const scroll = h('div', { class: 'r-scroll', tabindex: '-1' });
   const styleEl = h('style');
   body.append(scroll);
-  root.append(styleEl, tb, paintBar, banner, body);
+  root.append(styleEl, tb, paintBar, lockNote, banner, body);
   const personHost = h('div', { class: 'person-host', hidden: true });
   root.append(personHost);
 
@@ -627,6 +628,17 @@ export function mount(el, app) {
   }
 
   function renderBanner(state, c) {
+    // a locked month says so here, with the way out (the padlock in the header does the same)
+    const locked = M.isMonthLocked(state, app.month);
+    lockNote.hidden = !locked;
+    if (locked && lockNote.dataset.m !== app.month) {
+      lockNote.dataset.m = app.month;
+      lockNote.textContent = '';
+      lockNote.title = 'Nothing in a locked month can change, so it cannot be edited by accident.';
+      lockNote.setAttribute('aria-description', lockNote.title);
+      lockNote.append(h('span', { class: 'ln-t' }, `${M.fmtMonth(app.month)} is locked`, h('span', { class: 'ln-more' }, ': nothing in it can change, so it cannot be edited by accident.')),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => document.getElementById('lockm').click() }, 'Unlock to edit'));
+    }
     // Offer auto-fill in the roster itself when nothing in this month was auto-filled or entered yet.
     let any = false;
     for (const d of c.days) {
@@ -636,13 +648,13 @@ export function mount(el, app) {
       if (any) break;
     }
     // (not while Getting started is showing: its next step says the same)
-    banner.hidden = any || !(state.staff || []).length || !!document.querySelector('.guide-slot:not([hidden]) .gs');
+    banner.hidden = locked || any || !(state.staff || []).length || !!document.querySelector('.guide-slot:not([hidden]) .gs');
     if (banner.hidden) return;
     banner.innerHTML = '';
     banner.append(
       h('span', { class: 'rb-ic', html: icon('spark') }),
-      h('span', { class: 'rb-text' }, h('strong', null, `No calls or shifts in ${M.fmtMonth(app.month)} yet. `), 'Enter leave and requests first, then let Auto-fill draft the calls and PM shifts around them.'),
-      h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => openAutofill(app) }, 'Auto-fill this month'));
+      h('span', { class: 'rb-text' }, h('strong', null, `No calls or shifts in ${M.fmtMonth(app.month)} yet. `), 'Enter leave and requests first, then let Fill draft the calls and PM shifts around them.'),
+      h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => openAutofill(app) }, 'Fill this month'));
   }
 
   // Bring a day's column into view (only scrolls when it is hidden behind the name column or off the right edge).

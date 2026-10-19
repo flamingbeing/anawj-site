@@ -303,4 +303,28 @@ function pool() {
   ok(threw, 'needs one pool');
 }
 
+// ---------- locking a month (as in NUH junior monthly) ----------
+{
+  const mem = {};
+  globalThis.localStorage = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: k => { delete mem[k]; } };
+  const { createStore } = await import('../js/store.js');
+  const base = M.defaultState();
+  base.staff = [{ id: 'z1', name: 'Z', group: base.groups[0].id, tags: [] }];
+  const store = createStore({ demo: false, fallback: () => structuredClone(base) });
+  ok(store.ensureLocked(MONTH) === false && !M.isMonthLocked(store.get(), MONTH), 'an empty month is not locked (a new roster can start)');
+  store.commit('leave', d => { M.setCell(d, '2026-11-03', 'z1', { a: ['AL'] }); });
+  ok(store.lockAll() === true && M.isMonthLocked(store.get(), MONTH), 'a month with days in it is locked when the app opens');
+  let told = null; store.onLocked = m => { told = m; };
+  ok(store.commit('edit', d => { M.setCell(d, '2026-11-04', 'z1', { a: ['AL'] }); }) === false && told && told[0] === MONTH, 'a change to a locked month is refused');
+  ok(store.commit('next month', d => { M.setCell(d, '2026-12-04', 'z1', { a: ['AL'] }); }) === true, 'another month can still change');
+  ok(store.commit('import', d => { M.setCell(d, '2026-11-05', 'z1', { a: ['AL'] }); }, { unlock: true }) === true && !M.isMonthLocked(store.get(), MONTH) && store.unlocked[0] === MONTH, 'an import unlocks the months it fills');
+  store.undo();
+  ok(M.isMonthLocked(store.get(), MONTH) && !M.getCell(store.get(), '2026-11-05', 'z1'), 'undo puts the import and the lock back');
+  store.commit('unlock', d => { M.setMonthLocked(d, MONTH, false); });
+  ok(store.ensureLocked(MONTH) === false && !M.isMonthLocked(store.get(), MONTH), 'a month someone unlocked stays open this visit');
+  ok(store.lockAll() === true && M.isMonthLocked(store.get(), MONTH) && M.isMonthLocked(store.get(), '2026-12'), 'closing locks it again, and the month without an entry');
+  const demo = createStore({ demo: true, fallback: () => structuredClone(store.get()) });
+  ok(demo.lockAll() === false, 'practice is never locked');
+}
+
 console.log(`junior pool tests: ${n} checks passed`);
