@@ -280,6 +280,17 @@ try {
   await axe('intra-op'); await shot('intraop');
   await page.goBack();
 
+  // Share subject and Share to PACU at the bottom of the case, each its own page (demo mode: not available)
+  await page.click('.caseshare a[href$="/share"]');
+  await page.waitForSelector('.paculink');
+  assert.match(await page.textContent('main'), /Share subject[\s\S]*Not available in demo mode/);
+  await axe('share subject');
+  await page.goBack(); await page.waitForSelector('.caseshare');
+  await page.click('.caseshare a[href$="/pacushare"]');
+  await page.waitForFunction(() => /pacushare$/.test(location.hash) && document.querySelector('.paculink'));
+  assert.match(await page.textContent('main'), /PACU nurse link[\s\S]*Not available in demo mode/);
+  await page.goBack(); await page.waitForSelector('.caseshare');
+
   // PACU: NuDESC total
   await page.click('.links a[href$="/form/pacu"]');
   // sub-screens keep the running timer and the sync status in the top bar
