@@ -368,7 +368,7 @@ export function mount(el, app) {
     import('./ui-team.js').then(mod => {
       teamSlot.innerHTML = '';
       if (typeof mod.mountTeam !== 'function') throw new Error('no mountTeam');
-      teamView = mod.mountTeam(teamSlot, app) || null;
+      teamView = mod.mountTeam(teamSlot, app, { onChange: app.refreshCloud }) || null;
     }).catch(() => {
       teamSlot.innerHTML = '';
       teamSlot.append(h('p', { class: 'more-p' }, 'Team sharing is not set up yet. Until then this roster lives in this browser only: download a backup now and then.'));

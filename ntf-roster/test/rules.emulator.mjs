@@ -83,13 +83,15 @@ await t('a month with no status, note or publishedAt', assertSucceeds(setDoc(doc
 await t('viewer cannot save a month', assertFails(setDoc(doc(view, 'months', '2026-12'), month('2026-12', VIEWER))));
 await t('mistyped role cannot save a month', assertFails(setDoc(doc(odd, 'months', '2026-12'), month('2026-12', ODD))));
 await t("month save under someone else's name", assertFails(setDoc(doc(ros, 'months', '2026-12'), month('2026-12', ADMIN))));
+await t('the days as one JSON string', assertSucceeds(setDoc(doc(ros, 'months', '2027-02'), month('2027-02', ROSTERER, { cells: JSON.stringify({ '2027-02-03': { s1: { a: ['C'] } } }) }))));
+await t('a JSON string too long', assertFails(setDoc(doc(ros, 'months', '2027-03'), month('2027-03', ROSTERER, { cells: 'x'.repeat(900001) }))));
 await t('month save with no updatedBy', assertFails(setDoc(doc(ros, 'months', '2026-12'), { month: '2026-12', cells: {} })));
 await t('month field must match the document', assertFails(setDoc(doc(ros, 'months', '2026-12'), month('2026-11', ROSTERER))));
 await t('document id must be a month', assertFails(setDoc(doc(ros, 'months', 'hello'), month('hello', ROSTERER))));
 await t('a day is not a month', assertFails(setDoc(doc(ros, 'months', '2026-12-01'), month('2026-12-01', ROSTERER))));
 await t('month 13 is not a month', assertFails(setDoc(doc(ros, 'months', '2026-13'), month('2026-13', ROSTERER))));
 await t('unknown status', assertFails(setDoc(doc(ros, 'months', '2026-12'), month('2026-12', ROSTERER, { status: 'final' }))));
-await t('cells must be a map', assertFails(setDoc(doc(ros, 'months', '2026-12'), month('2026-12', ROSTERER, { cells: [] }))));
+await t('cells must be a map or a JSON string, not a list', assertFails(setDoc(doc(ros, 'months', '2026-12'), month('2026-12', ROSTERER, { cells: [] }))));
 await t('month save with an unknown field', assertFails(setDoc(doc(ros, 'months', '2026-12'), month('2026-12', ROSTERER, { staff: [] }))));
 await t('rosterer cannot delete a month', assertFails(deleteDoc(doc(ros, 'months', '2026-12'))));
 await t('admin deletes a month', assertSucceeds(deleteDoc(doc(adm, 'months', '2027-01'))));
@@ -97,6 +99,7 @@ await t('admin deletes a month', assertSucceeds(deleteDoc(doc(adm, 'months', '20
 // a month's saved copies
 const mver = (m, email, extra = {}) => ({ month: m, cells: {}, status: 'draft', publishedAt: '', note: '', savedAt: 3, savedBy: by(email), ...extra });
 await t('rosterer adds a month version', assertSucceeds(addDoc(collection(ros, 'months', '2026-11', 'versions'), mver('2026-11', ROSTERER))));
+await t('a version with the days as a JSON string', assertSucceeds(addDoc(collection(ros, 'months', '2026-11', 'versions'), mver('2026-11', ROSTERER, { cells: '{}' }))));
 await t("month version under someone else's name", assertFails(addDoc(collection(ros, 'months', '2026-11', 'versions'), mver('2026-11', ADMIN))));
 await t('viewer cannot add a month version', assertFails(addDoc(collection(view, 'months', '2026-11', 'versions'), mver('2026-11', VIEWER))));
 await t('month version for another month', assertFails(addDoc(collection(ros, 'months', '2026-11', 'versions'), mver('2026-10', ROSTERER))));

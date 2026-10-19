@@ -263,4 +263,44 @@ function pool() {
   eq(M.getCell(s, '2026-11-02', 'jun').auto, ['C'], 'the junior gets the new call');
 }
 
+// ---------- someone else saved first: merge keeps my pool, takes theirs for the rest ----------
+{
+  const base = M.defaultState();
+  const sg = base.groups.find(g => g.kind !== 'junior').id, jg = base.groups.find(g => g.kind === 'junior').id;
+  base.staff = [{ id: 'sen', name: 'Sen', group: sg, tags: [] }, { id: 'jun', name: 'Jun', group: jg, tags: ['mo1'] }];
+  base.rules = [
+    { id: 'r-all', type: 'cover', name: 'Everyone', hard: true, enabled: true, who: {} },
+    { id: 'r-jun', type: 'maxCount', name: 'Juniors only', hard: true, enabled: true, who: { staff: ['jun'] } },
+    { id: 'r-sen', type: 'maxCount', name: 'Seniors only', hard: true, enabled: true, who: { staff: ['sen'] } },
+  ];
+  const mine = structuredClone(base), theirs = structuredClone(base);
+  mine.settings.pool = 'junior';
+  mine.staff.push({ id: 'jun2', name: 'Jun Two', group: jg, tags: ['mo2'] });
+  mine.rules.find(r => r.id === 'r-jun').name = 'Juniors, my edit';
+  mine.rules.find(r => r.id === 'r-sen').name = 'Seniors, my stale copy';
+  mine.aps = { base: { jun: 1 } };
+  M.setCell(mine, '2026-11-02', 'jun', { a: ['C'] });
+  M.setCell(mine, '2026-11-02', 'sen', { a: ['P'] });      // stale: they changed the senior's day
+  theirs.staff[0] = { ...theirs.staff[0], name: 'Sen Renamed' };
+  theirs.rules.find(r => r.id === 'r-sen').name = 'Seniors, their edit';
+  theirs.rules.find(r => r.id === 'r-jun').name = 'Juniors, their stale copy';
+  theirs.settings.pool = 'senior';
+  M.setCell(theirs, '2026-11-02', 'sen', { a: ['C'] });
+  M.setCell(theirs, '2026-11-02', 'jun', { a: ['P'] });
+  const team = cloud.pickTeam(theirs);
+  const docs = [{ month: '2026-11', ...cloud.pickMonth(theirs, '2026-11').meta, cells: JSON.stringify(cloud.pickMonth(theirs, '2026-11').cells) }];
+  const out = J.mergeByPool(mine, team, docs, 'junior', M.poolOf, cloud.cellsFromDoc);
+  eq(out.staff.map(p => p.id).sort(), ['jun', 'jun2', 'sen'], 'my new junior is added, their senior kept');
+  eq(out.staff.find(p => p.id === 'sen').name, 'Sen Renamed', "their senior's edit kept");
+  eq(out.rules.find(r => r.id === 'r-jun').name, 'Juniors, my edit', 'my junior rule kept');
+  eq(out.rules.find(r => r.id === 'r-sen').name, 'Seniors, their edit', 'their senior rule kept');
+  ok(out.rules.some(r => r.id === 'r-all'), 'shared rule kept');
+  eq(out.settings.pool, 'junior', 'my pool view stays');
+  eq(out.aps, mine.aps, 'my pain service tally (junior pool)');
+  eq(M.getCell(out, '2026-11-02', 'jun').a, ['C'], "my junior's shift");
+  eq(M.getCell(out, '2026-11-02', 'sen').a, ['C'], "their senior's shift");
+  let threw = false; try { J.mergeByPool(mine, team, docs, 'all', M.poolOf); } catch { threw = true; }
+  ok(threw, 'needs one pool');
+}
+
 console.log(`junior pool tests: ${n} checks passed`);
