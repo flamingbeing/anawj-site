@@ -14,7 +14,7 @@ const PAGES = ['log', 'logbook', 'reflect', 'progress', 'notes', 'more', 'caselo
 const LAZY = ['ui-settings', 'ui-reflect', 'ui-logbook', 'ui-progress', 'ui-admin', 'ui-caselogs', 'ui-account', 'ui-sync', 'ui-send', 'portfolio', 'cloud-save', 'markdown', 'ui-parts', 'ui-feedback'];
 const loaded = p => p.evaluate(() => performance.getEntriesByType('resource').map(e => e.name).filter(n => /\.js(\?|$)/.test(n)));
 const name = u => u.replace(/^.*\/(js\/)?/, '').replace(/\.js.*$/, '');
-const goHash = (p, id) => p.evaluate(x => { location.hash = '#' + x; }, id).then(() => p.waitForFunction(x => document.getElementById('app').dataset.page === x, id));
+const goHash = (p, id) => p.evaluate(x => { location.hash = '#' + x; }, id).then(() => p.waitForFunction(x => document.getElementById('app').dataset.page === x, id)).catch(err => { throw new Error(`${id}: ${err.message}`); });
 
 try {
   for (const width of [390, 1280]) {
@@ -81,10 +81,11 @@ try {
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
     await ctx.addInitScript(() => localStorage.setItem('apmes-logbook-demo-small', '1'));
     let fail = true;
-    await ctx.route(/\/js\/ui-progress\.js/, r => (fail ? (fail = false, r.abort()) : r.continue()));
+    await ctx.route(/\/js\/ui-progress\.js/, r => (fail ? r.abort() : r.continue()));
     const p = await ctx.newPage();
     await p.goto(base + '?demo#progress');
     await p.getByText('This page didn’t load').waitFor();
+    fail = false;   // keep retries failing until the explicit reload
     await p.getByRole('button', { name: 'Reload' }).click();
     await p.waitForFunction(() => document.getElementById('app')?.dataset.page === 'progress', null, { timeout: 15000 });   // (?.: it may run mid-reload)
     assert.doesNotMatch(await p.locator('#app').innerText(), /didn’t load/);

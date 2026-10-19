@@ -123,7 +123,7 @@ try { for (const width of [390, 1280]) {
   await p.locator('dialog[open]').getByLabel('Plain text (.txt)').check();
   await p.locator('dialog[open]').getByRole('button', { name: 'Download', exact: true }).click();
   const zipPath = await (await dl).path();
-  const names = lf((await import('node:child_process')).execFileSync('python3', ['-c', 'import sys,zipfile; print("\\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))', zipPath]).toString()).trim().split('\n');
+  const names = lf((await import('node:child_process')).execFileSync(process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'), ['-c', 'import sys,zipfile; print("\\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))', zipPath]).toString()).trim().split('\n');
   assert.equal(names.length, 2); assert.ok(names.every(n => n.endsWith('.txt')), names.join('|'));
   assert.ok(names.some(n => /^\d{4}-\d{2}-\d{2} Fake teaching point\.txt$/.test(n)), names.join('|'));
 
