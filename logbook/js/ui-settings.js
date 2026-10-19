@@ -101,7 +101,7 @@ export function renderDisplay() {
 const themeSwatch = t => {
   const band = t.band || (t.look.band === 'none' ? null : ['#e57200', '#e4002b', '#178fd7', '#002f6c']);
   const tint = TINTS[t.look.bgTint] || {};
-  const dark = !!t.mode;
+  const dark = !!t.mode && t.mode !== 'auto';
   const bg = (dark ? tint.dark?.bg : tint.light?.bg) || (dark ? '#121417' : '#f3f3f3');
   const panel = (dark ? tint.dark?.panel : tint.light?.panel) || (dark ? '#1b1e23' : '#ffffff');
   return h('span', { class: 'theme-sw', 'aria-hidden': 'true', style: `--tb:${bg};--tp:${panel};--ta:${t.look.accent || (t.keep ? cleanAccent(display().accent) || DEFAULT_ACCENT : DEFAULT_ACCENT)}` },
