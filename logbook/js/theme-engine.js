@@ -22,8 +22,30 @@ export const ICON_SETS = {
   line: { label: 'Line (default)' },
   sharp: { label: 'Sharp (square ends)', css: ':root .ico, :root .ico.i { stroke-linecap: square; stroke-linejoin: miter; }' },
   soft: { label: 'Soft (rounded, tinted inside)', css: ':root .ico, :root .ico.i { stroke-width: 2.2; fill: color-mix(in srgb, currentColor 14%, transparent); }' },
-  ios: { label: 'iOS-style (thin, round)', css: ':root .ico, :root .ico.i { stroke-width: 1.6; }', paths: {} },
-  material: { label: 'Material-style (even, square-ish)', css: ':root .ico, :root .ico.i { stroke-width: 2; stroke-linecap: butt; stroke-linejoin: miter; }', paths: {} },
+  ios: { label: 'iOS-style (thin, round)', css: ':root .ico, :root .ico.i { stroke-width: 1.6; }', paths: {
+    log: 'M12 4v16M4 12h16',
+    logbook: 'M7 3.5h11a2 2 0 0 1 2 2v15H7a3 3 0 0 1-3-3v-11a3 3 0 0 1 3-3Zm0 0v17M10 8h6M10 12h6M10 16h4',
+    reflect: 'M4 19V6a2 2 0 0 1 2-2h5v15H7c-1.7 0-3 .8-3 2V19Zm7-15h7a2 2 0 0 1 2 2v15c0-1.2-1.3-2-3-2h-6M7 8h1M14 8h3M14 12h3',
+    progress: 'M4 20V10a1 1 0 0 1 1-1h2v11M10.5 20V5a1 1 0 0 1 1-1h2v16M17 20V8a1 1 0 0 1 1-1h2v12a1 1 0 0 1-1 1H4',
+    totals: 'M5 3.5h14a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19V5A1.5 1.5 0 0 1 5 3.5ZM4 9h16M9 9v11M9 14.5h11',
+    notes: 'M6 3.5h12a2 2 0 0 1 2 2v10l-5 5H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2ZM15 20v-5h5M8 8h8M8 12h8M8 16h3',
+    more: 'M6 12a1 1 0 1 0-2 0 1 1 0 0 0 2 0Zm7 0a1 1 0 1 0-2 0 1 1 0 0 0 2 0Zm7 0a1 1 0 1 0-2 0 1 1 0 0 0 2 0Z',
+    settings: 'M4 6h16M4 12h16M4 18h16M8 3.5v5M16 9.5v5M10 15.5v5',
+    account: 'M12 3.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM4.5 20.5v-1a6 6 0 0 1 6-6h3a6 6 0 0 1 6 6v1Z',
+    search: 'M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0ZM15.2 15.2l5.3 5.3',
+  } },
+  material: { label: 'Material-style (even, square-ish)', css: ':root .ico, :root .ico.i { stroke-width: 2; stroke-linecap: butt; stroke-linejoin: miter; }', paths: {
+    log: 'M11 3h2v8h8v2h-8v8h-2v-8H3v-2h8Z',
+    logbook: 'M5 3h15v18H5V3ZM8 3v18M11 7h6M11 11h6M11 15h4M3 7h3M3 17h3',
+    reflect: 'M3 4h8l1 1 1-1h8v16h-8l-1 1-1-1H3V4ZM12 5v16M6 8h3M6 12h3M15 8h3M15 12h3',
+    progress: 'M4 21V12h3v9H4Zm6 0V3h3v18h-3Zm6 0V8h3v13h-3Z',
+    totals: 'M3 3h18v18H3V3ZM3 9h18M3 15h18M9 9v12M15 9v12',
+    notes: 'M4 3h16v13l-5 5H4V3ZM15 21v-5h5M7 7h10M7 11h10M7 15h4',
+    more: 'M5 10h2v3H5v-3Zm6 0h2v3h-2v-3Zm6 0h2v3h-2v-3Z',
+    settings: 'M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1 1-3ZM15.5 12a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z',
+    account: 'M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM4 21v-3c0-3 4-4 8-4s8 1 8 4v3H4Z',
+    search: 'M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0ZM15 15l6 6',
+  } },
 };
 // the path to draw for an icon: the set's own, else the default; set: <html data-icons> (display.js applyLook)
 export function iconPath(name, fallback, set = typeof document !== 'undefined' ? document.documentElement.dataset.icons : '') {
@@ -62,7 +84,7 @@ export const FACETS = [
   // Header and status bar
   { key: 'statusBar', group: 'header', label: 'Phone status bar', js: true, line: 'The strip above the app on Android and in browsers (display.js paintStatusBar).', choices: [['accent', 'My colour (default)'], ['header', 'Match the header'], ['page', 'Match the page']] },
   { key: 'headerStyle', group: 'header', label: 'Header', choices: [['plain', 'Plain (default)'], ['filled', 'Filled with my colour (Android apps)'], ['large', 'Large title (iOS)']], css: {
-    filled: ':root:root .top { background: var(--accent); color: var(--accent-ink); border-bottom-color: transparent; } :root:root .top :is(h1, .sub, a, .who, .email) { color: var(--accent-ink); } :root:root:root:root .top .who :is(button, .btn) { background: transparent; color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }',
+    filled: ':root:root .top { --header-ink: var(--accent-ink); background: var(--accent); color: var(--accent-ink); border-bottom-color: transparent; } :root:root .top :is(h1, .sub, a, .who, .email) { color: var(--accent-ink); } :root:root:root:root .top .who :is(button, .btn) { background: transparent; color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }',
     // the large title gets its own row under the header's buttons, as on iOS
     large: ':root:root .top { flex-wrap: wrap; row-gap: 2px; } :root:root .top .who { order: 1; margin-left: auto; } :root:root .top .brand { order: 2; flex: 1 0 100%; display: flex; flex-direction: column; align-items: flex-start; } :root:root .top h1 { flex: none; text-align: start; font-size: calc(32px * var(--fs, 1)); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }' } },
   { key: 'barBlur', group: 'header', label: 'See-through header and tab bar', bool: true, line: 'Content shows blurred behind them as you scroll (iOS, Instagram).',
@@ -74,14 +96,21 @@ export const FACETS = [
     css: '@media (max-width: 600px) { .tabs button:not([aria-selected="true"]) .lbl { display: none; } }' },
   { key: 'tabIconFill', group: 'tabs', label: 'Fill the current tab’s icon', bool: true, line: 'As iPhone and Android tab bars do.',
     css: ':root .tabs button[aria-selected="true"] .ico { fill: color-mix(in srgb, currentColor 28%, transparent); }' },
+  { key: 'tabTone', group: 'tabs', label: 'Active tab colour', choices: [['accent', 'My colour (default)'], ['ink', 'Text colour']],
+    css: { ink: ':root:root:root .tabs button[aria-selected="true"] { color: var(--ink); }' } },
 
   // Lists and type
   { key: 'listStyle', group: 'lists', label: 'List style', line: 'How Logbook rows sit on the page.', choices: [['default', 'Cards (default)'], ['inset', 'Inset grouped (iOS)'], ['edge', 'Edge to edge (Material, chat apps)']], css: {
     inset: 'ul.cases, .more-list { background: var(--panel); border-radius: calc(12px * var(--round, 1)); overflow: hidden; } ul.cases li { padding-left: 14px; padding-right: 12px; } ul.cases li:last-child { border-bottom: 0; } ul.cases li { border-bottom-color: color-mix(in srgb, var(--ink) 14%, transparent); }',
-    edge: 'section.card { border-radius: 0; border-left: 0; border-right: 0; box-shadow: none; margin-left: -12px; margin-right: -12px; } ul.cases li { padding-left: 12px; padding-right: 12px; }' } },
+    edge: 'section.card { border-radius: 0; border-left: 0; border-right: 0; box-shadow: none; margin-left: -12px; margin-right: -12px; } body.compact section.card { margin-left: -8px; margin-right: -8px; } ul.cases li { padding-left: 12px; padding-right: 12px; }' } },
   { key: 'typeStyle', group: 'lists', label: 'Type style', line: 'Weight and spacing of titles.', choices: [['default', 'As now (default)'], ['ios', 'iOS (bold titles, tight)'], ['material', 'Material (medium weight)']], css: {
     ios: ':root .top h1, :root h1, :root h2, :root section.card h2 { font-weight: 700; letter-spacing: -0.02em; } :root .top h1 { font-size: calc(20px * var(--fs, 1)); } body { letter-spacing: -0.01em; }',
     material: ':root .top h1, :root h1, :root h2, :root h3, :root section.card h2 { font-weight: 500; letter-spacing: 0; } .tabs button { letter-spacing: .02em; font-weight: 500; }' } },
+
+  // Plain app headers usually use neutral titles even when their actions have a bright accent.
+  // Filled headers keep their contrasting title through --header-ink (set only by headerStyle).
+  { key: 'headingTone', group: 'lists', label: 'Heading colour', choices: [['accent', 'My colour (default)'], ['ink', 'Text colour']],
+    css: { ink: ':root:root :is(h1, h2, h3), :root:root section.card h2 { color: var(--ink); } :root:root .top h1 { color: var(--header-ink, var(--ink)); }' } },
 
   // Icons (the set first, then the weight, so a chosen weight wins over the set's)
   { key: 'iconSet', group: 'icons', label: 'Icon style', choices: opts(ICON_SETS), css: Object.fromEntries(Object.entries(ICON_SETS).filter(([, s]) => s.css).map(([k, s]) => [k, s.css])) },

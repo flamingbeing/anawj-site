@@ -31,7 +31,7 @@ try {
   for (const name of ['Phone status bar', 'Header', 'Fill the current tab’s icon', 'Icon style', 'Moving between pages', 'Pop-up boxes', 'Messages (Saved, Undo)', 'Text boxes', 'Tick boxes']) {
     assert.ok(await p.getByText(name, { exact: false }).count() > 0, name + ' has a setting');
   }
-  const ENGINE = { statusBar: 'header', headerStyle: 'filled', tabIconFill: true, iconSet: 'sharp', pageMotion: 'material', sheetStyle: 'ios', toastStyle: 'material', fieldStyle: 'filled', checkStyle: 'round' };
+  const ENGINE = { statusBar: 'header', headerStyle: 'filled', tabIconFill: true, iconSet: 'sharp', pageMotion: 'material', sheetStyle: 'ios', toastStyle: 'material', fieldStyle: 'filled', checkStyle: 'round', headingTone: 'ink', tabTone: 'ink' };
   await apply(ENGINE);
   const css2 = await p.evaluate(() => document.getElementById('look-css').textContent);
   for (const re of [/background: var\(--accent\)/, /fill: color-mix/, /stroke-linecap: square/, /--dur: 300ms/, /sheet-up/, /#313033/, /inset 0 -2px 0/, /border-radius: 50%/]) assert.match(css2, re);

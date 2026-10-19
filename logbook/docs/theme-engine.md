@@ -37,8 +37,10 @@ A theme **never** sets light or dark (no `mode`): give it both palettes and it m
 | `titleAlign` | centre | centred header title |
 | `tabActiveLabel` | true | only the current tab keeps its label |
 | `tabIconFill` | true | the current tab's icon is filled |
+| `tabTone` | ink | neutral active tabs instead of accent-coloured tabs |
 | `listStyle` | inset, edge | iOS inset grouped, or edge-to-edge lists |
 | `typeStyle` | ios, material | title weight and letter spacing |
+| `headingTone` | ink | neutral headings; filled headers keep their contrasting title |
 | `iconSet` | sharp, soft, ios, material | how icons are drawn (see Icon sets) |
 | `iconWeight` | thin, bold | icon line weight |
 | `pageMotion` | ios, material, fade, none | moving between pages (and between tabs for material, fade) |
@@ -72,7 +74,39 @@ that reads it), add its key to `DISPLAY_KEYS` in display.js (a literal list: the
 to this table. The Themes page, Your themes, the settings file and the first-paint cache pick it up from the list.
 Defaults must stay pixel-identical: `test/e2e/app-style.mjs` checks that all off draws the page as before.
 
+## Inspired catalogue
+
+The catalogue has 67 Inspired looks: the original 17 and 50 additional apps. `FEATURED` stays at eight; additions
+appear in Browse all themes. Each look owns a complete light and dark palette, uses system font stacks, and resets
+unused facets through `themePatch` (off/default values are omitted). Pixel now has a fixed lavender Material You
+reference palette, rather than keeping a previous accent behind its own colour overrides.
+
+These are interpretations of app interfaces, not official skins or copies of app screens. The common Logbook content
+and controls stay the same. Platform and app versions differ; the palette and facet choices target recognisable
+mobile surfaces, with desktop rails where appropriate. Light appearances for primarily dark media services are
+readable adaptations of the same palette. No logos, source artwork, brand typefaces or promotional copy are included.
+Secondary text is adjusted only as needed for 4.5:1 on both surfaces; button text uses white or black for contrast.
+
+`headingTone` and `tabTone` fill two specific gaps: most apps use neutral headings, and social/media apps often keep
+the selected tab neutral even when actions use a bright colour. Both default to the existing accent treatment. A
+filled header still uses `accentInk`. The edge list facet also accounts for compact mode's smaller page gutters.
+
+Reference systems checked for role and platform conventions (20 Oct 2026):
+
+- [Apple dark appearance](https://developer.apple.com/design/human-interface-guidelines/dark-mode)
+- [Material colour roles](https://m3.material.io/styles/color/roles)
+- [Atlassian colour and themes](https://atlassian.design/foundations/color)
+- [GitHub Primer colour primitives](https://primer.style/product/primitives/color/)
+- [LINE messenger colour guide](https://designsystem.line.me/LDSM/foundation/color/line-color-guide-ex-en)
+- [Discord colour reference](https://discord.com/branding)
+
+`test/themes.test.mjs` checks all 50 names, palette completeness and contrast (including OLED), sanitisation and
+export/import for every Inspired look. `test/e2e/inspired-themes.mjs` renders all 67 in light and dark at 390 px,
+checks effective tokens, system tab paths, neutral chrome, phone overflow, persistence and reset. Set `E2E_OUT` to
+save representative viewport screenshots. The original app-style suite checks that defaults stay pixel-identical.
+
 ## Checks
 
 `node logbook/test/theme-engine.test.mjs`, `node logbook/test/themes.test.mjs`, `node logbook/test/e2e/app-style.mjs`
 (also runs `layouts.mjs`), `node logbook/test/e2e/my-themes.mjs`, and `node logbook/test/e2e/a11y.mjs` after UI changes.
+Catalogue browser coverage: `node logbook/test/e2e/inspired-themes.mjs`.

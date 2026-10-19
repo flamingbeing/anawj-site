@@ -32,7 +32,8 @@ for (const width of [390, 600, 900, 901, 1200]) for (const tabBar of ['auto', 't
   assert.equal(barAtBottom({ width, tabBar, navStyle: 'rail' }), width > 900 ? false : barAtBottom({ width, tabBar }));
   checks++;
 }
-for (const [id, key, value] of [['x', 'rowLayout', 'chat'], ['notion', 'rowLayout', 'timeline'], ['office', 'navStyle', 'rail']]) {
+// X uses compact feed rows; conversation themes keep the chat timestamp layout.
+for (const [id, key, value] of [['x', 'rowLayout', 'compact'], ['notion', 'rowLayout', 'timeline'], ['office', 'navStyle', 'rail']]) {
   const d = themePatch(themeById(id));
   assert.equal(d[key], value);
   assert.equal(themeState(d).custom, false);

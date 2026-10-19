@@ -86,7 +86,7 @@ export function cachedCompact() {
 const DISPLAY_KEY = 'apmes-logbook-display';
 export const DISPLAY_KEYS = ['colours', 'listHeight', 'myThemes', 'pageSize', 'lbGroup', 'lbSort', 'gridLines', 'gridCols', 'calRefl', 'totalsCompact', 'totalsTargets', 'boxHeight', 'boxGrow', 'moreOrder', 'noteToolbar', 'compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'navStyle', 'rowLayout', 'formLayout', 'rowHold', 'dayCopy', 'hideTabsTyping',
   'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band', 'barBlur', 'tabActiveLabel', 'listStyle', 'titleAlign', 'switchStyle', 'pressStyle', 'iconWeight', 'typeStyle',
-  'statusBar', 'headerStyle', 'tabIconFill', 'iconSet', 'pageMotion', 'sheetStyle', 'toastStyle', 'fieldStyle', 'checkStyle'];
+  'statusBar', 'headerStyle', 'tabIconFill', 'iconSet', 'pageMotion', 'sheetStyle', 'toastStyle', 'fieldStyle', 'checkStyle', 'headingTone', 'tabTone'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }

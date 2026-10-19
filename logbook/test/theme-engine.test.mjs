@@ -37,11 +37,15 @@ for (const f of FACETS) for (const v of f.bool ? [true] : f.choices.slice(1).map
   assert.ok(!/<|@import|url\(\s*['"]?(?!data:)/.test(css), `${f.key}: ${v}`);
   assert.equal((css.match(/\{/g) || []).length, (css.match(/\}/g) || []).length, `${f.key}: ${v} braces`);
 }
-assert.match(lookCss({ headerStyle: 'filled' }), /\.top \{ background: var\(--accent\)/);
+assert.match(lookCss({ headerStyle: 'filled' }), /\.top \{ --header-ink: var\(--accent-ink\); background: var\(--accent\)/);
 assert.match(lookCss({ sheetStyle: 'ios' }), /sheet-up/);
 assert.match(lookCss({ toastStyle: 'material' }), /#313033/);
 assert.match(lookCss({ fieldStyle: 'filled' }), /inset 0 -2px 0 var\(--accent\)/);
 assert.match(lookCss({ checkStyle: 'round' }), /border-radius: 50%/);
+assert.match(lookCss({ headingTone: 'ink' }), /color: var\(--header-ink, var\(--ink\)\)/);
+assert.match(lookCss({ tabTone: 'ink' }), /aria-selected="true".*color: var\(--ink\)/);
+assert.equal(lookCss({ headingTone: 'accent', tabTone: 'accent' }), '');
+assert.match(lookCss({ listStyle: 'edge' }), /body\.compact section\.card \{ margin-left: -8px; margin-right: -8px;/);
 assert.match(lookCss({ pageMotion: 'ios' }), /--dur: 350ms/);
 assert.match(lookCss({ tabIconFill: true }), /fill: color-mix/);
 
@@ -52,6 +56,16 @@ assert.equal(iconPath('copy', 'M0 0', 'test'), 'M0 0');
 assert.equal(iconPath('search', 'M0 0', ''), 'M0 0');
 delete ICON_SETS.test;
 for (const [k, s] of Object.entries(ICON_SETS)) for (const [n, d] of Object.entries(s.paths || {})) assert.match(d, /^[MmLlHhVvCcSsQqTtAaZz0-9.,\s-]+$/, `${k}.${n}`);
+
+// Every tab and search has an original drawing in both system sets; unknown icons still fall back.
+for (const set of ['ios', 'material']) {
+  for (const name of ['log', 'logbook', 'reflect', 'progress', 'totals', 'notes', 'more', 'settings', 'account', 'search']) {
+    assert.ok(ICON_SETS[set].paths[name], `${set}.${name} has a drawing`);
+    assert.equal(iconPath(name, 'fallback', set), ICON_SETS[set].paths[name]);
+    assert.notEqual(ICON_SETS.ios.paths[name], ICON_SETS.material.paths[name], `${name} has distinct system drawings`);
+  }
+  assert.equal(iconPath('unknown', 'fallback', set), 'fallback');
+}
 
 // page motion: the default is the old slide; every motion with a duration has frames both ways
 assert.equal(pageMotion({}), PAGE_MOTIONS.default);
