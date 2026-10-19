@@ -554,10 +554,14 @@ const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (!t.owner ||
 const barCandidates = () => visibleTabs().filter(t => !t.hidden || t.bar).map(t => t.id);
 const TAB_ALIASES = { reflections: 'reflect' };
 const tabFromHash = () => {
-  const raw = location.hash.replace(/^#/, '');
+  // a link to a heading on a page: #logging?find=Teach%20it%20from%20an%20example (the same find as a Settings search result)
+  const [raw, query = ''] = location.hash.replace(/^#/, '').split('?');
   const id = TAB_ALIASES[raw] || raw;
   if (!visibleTabs().some(t => t.id === id)) return null;
-  if (id !== raw) history.replaceState(history.state, '', location.pathname + location.search + '#' + id);   // old links: #reflections → #reflect
+  let want = '';
+  try { want = new URLSearchParams(query).get('find') || ''; } catch { /* a malformed link just opens the page */ }
+  if (want) findAfterRender = want;
+  if (id !== raw || query) history.replaceState(history.state, '', location.pathname + location.search + '#' + id);   // old links: #reflections → #reflect; the find is used once, so the address stays #logging
   return id;
 };
 
@@ -635,7 +639,7 @@ document.addEventListener('keydown', e => {
   const t = e.target;
   if (t && t.getAttribute && t.getAttribute('role') === 'button' && t.tagName !== 'BUTTON') { e.preventDefault(); t.click(); }
 });
-const syncNavigation = () => { if (S.user) { const t = tabFromHash(); if (t) navigation.sync(t); } };
+const syncNavigation = () => { if (S.user) { const t = tabFromHash(); if (t) { navigation.sync(t); if (findAfterRender && S.tab === t && app.dataset.page === t) showFound(); } } };
 window.addEventListener('popstate', syncNavigation);
 window.addEventListener('hashchange', syncNavigation);
 
