@@ -46,6 +46,31 @@ class AnthropicReader:
             return {'text': '', 'legible': False}
 
 
+class OllamaReader:
+    """A vision model on this computer through Ollama (no API, nothing leaves the PC). Same two prompts and the same
+    two-read agreement as the Claude reader. Needs Ollama running and a model that accepts images (`ollama show <model>`
+    lists "vision"); --model or SCAN_MODEL picks it, OLLAMA_HOST the server."""
+    def __init__(self, model=None, host=None):
+        self.model = model or os.environ.get('SCAN_MODEL', 'gemma4:12b')
+        self.url = (host or os.environ.get('OLLAMA_HOST', 'http://localhost:11434')).rstrip('/')
+        if not self.url.startswith('http'):
+            self.url = 'http://' + self.url
+
+    def read(self, png, f, variant):
+        import urllib.request
+        unit = f' ({f["unit"]})' if f.get('unit') else ''
+        prompt = (PROMPT_A if variant == 0 else PROMPT_B).format(label=f['label'], unit=unit, expect=_expect(f))
+        body = json.dumps({'model': self.model, 'stream': False, 'format': 'json', 'options': {'temperature': 0},
+                           'messages': [{'role': 'user', 'content': prompt, 'images': [base64.b64encode(png).decode()]}]})
+        req = urllib.request.Request(self.url + '/api/chat', body.encode(), {'Content-Type': 'application/json'})
+        try:
+            raw = json.load(urllib.request.urlopen(req, timeout=300))['message']['content']
+            j = json.loads(re.search(r'\{.*\}', raw, re.S).group(0))
+            return {'text': str(j.get('text', '')), 'legible': bool(j.get('legible', False))}
+        except Exception:
+            return {'text': '', 'legible': False}
+
+
 class StubReader:
     """For tests: answers from a known truth, optionally wrong now and then, so the checks can be exercised."""
     def __init__(self, truth, wrong=None):

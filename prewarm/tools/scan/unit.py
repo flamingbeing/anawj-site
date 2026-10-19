@@ -74,4 +74,32 @@ pick = locate.choose_glyphs({'a': [[100, 100, 130, 130]], 'b': [[100, 160, 130, 
 assert pick['c'] == [100, 220, 130, 250], pick
 # no other options to line up with: the top-most, left-most box
 assert locate.choose_glyphs({'x': [[500, 800, 530, 830], [100, 300, 130, 330]]})['x'] == [100, 300, 130, 330]
+# the Ollama reader: a fake server on this machine answers like Ollama; nothing else is called
+import json, os, tempfile, threading, http.server
+import readers, bench
+G = lambda id, type, **k: dict(id=id, type=type, **k)
+seen = []
+class Fake(http.server.BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def do_POST(self):
+        body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+        seen.append(body)
+        reply = {'message': {'content': '{"text": "36.4", "legible": true}' if len(seen) == 1 else 'not json'}}
+        self.send_response(200); self.end_headers(); self.wfile.write(json.dumps(reply).encode())
+srv = http.server.HTTPServer(('127.0.0.1', 0), Fake); threading.Thread(target=srv.serve_forever, daemon=True).start()
+r = readers.OllamaReader('test-model', f'127.0.0.1:{srv.server_port}')
+fcore = G('prewarm_0_core', 'num', label='Core temp', unit='°C')
+assert r.read(b'png', fcore, 0) == {'text': '36.4', 'legible': True}
+assert seen[0]['model'] == 'test-model' and seen[0]['messages'][0]['images'] and 'Core temp' in seen[0]['messages'][0]['content']
+assert r.read(b'png', fcore, 1) == {'text': '', 'legible': False}      # a reply that isn't JSON is "can't read", never a guess
+srv.shutdown()
+# bench: right, flagged and silently wrong are told apart
+d = tempfile.mkdtemp()
+fs = [G('a_core', 'num', label='a'), G('b_core', 'num', label='b'), G('c_core', 'num', label='c')]
+json.dump(fs, open(f'{d}/fields.json', 'w'))
+for f in fs: cv2.imwrite(f'{d}/{f["id"]}.png', np.full((20, 40), 255, np.uint8))
+json.dump({'fields': {'a_core': '36.5', 'b_core': '36.6', 'c_core': '36.7'}}, open(f'{d}/truth.json', 'w'))
+stub = readers.StubReader({'a_core': '36.5', 'b_core': '36.6', 'c_core': '36.1'}, wrong={('b_core', 1): '36.8'})
+res = bench.main(['--form-dir', d, '--crops', d, '--truth', f'{d}/truth.json'], reader=stub)
+assert res == {'right': ['a_core'], 'flagged': ['b_core'], 'WRONG': ['c_core']}, res
 print('unit: ok')
