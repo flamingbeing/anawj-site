@@ -116,7 +116,7 @@ export function cleanColours(value) {
     const got = value?.[side];
     if (!got || typeof got !== 'object' || Array.isArray(got)) continue;
     const tokens = {};
-    for (const k of COLOUR_TOKENS) if (Object.hasOwn(got, k) && cleanAccent(got[k])) tokens[k] = cleanAccent(got[k]);
+    for (const k of COLOUR_TOKENS) if (Object.hasOwn(got, k) && typeof got[k] === 'string' && cleanAccent(got[k])) tokens[k] = cleanAccent(got[k]);
     if (Object.keys(tokens).length) out[side] = tokens;
   }
   return out;
@@ -155,7 +155,8 @@ export function colourChecks(d = {}, tint = {}, oled = false) {
   return out;
 }
 export function checkColours(d = {}, tint = {}) {
-  // Existing looks stay unchanged; check every pair affected by an override, including OLED.
-  const failed = [...colourChecks(d, tint), ...colourChecks(d, tint, true).filter(p => p.side === 'dark')].find(p => p.changed && p.ratio < 4.5);
+  // Existing looks stay unchanged; full colour looks must pass in both modes, including OLED.
+  if (!Object.keys(cleanColours(d.colours)).length) return;
+  const failed = [...colourChecks(d, tint), ...colourChecks(d, tint, true).filter(p => p.side === 'dark')].find(p => p.ratio < 4.5);
   if (failed) throw new Error(`${failed.side === 'light' ? 'Light' : 'Dark'} ${failed.fg} on ${failed.bg}: ${failed.ratio.toFixed(2)}:1 (needs 4.5:1)`);
 }

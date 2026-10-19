@@ -7,13 +7,14 @@
 // Phone and desk run at the same time (about 1.5 min for both); each step prints its time and the
 // slowest five are listed. E2E_ONLY=<words>: only up to the last step whose name has the words.
 // E2E_FAILFAST=1: stop at the first failure. E2E_NAP: cap on the short pauses (ms, default 160).
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 const require = createRequire(import.meta.url);
-const LB = new URL('../../', import.meta.url).pathname;   // logbook/
-const ExcelJS = require(LB + 'vendor/exceljs.min.js');
-const JSZip = require(LB + 'vendor/jszip.min.js');
+const LB = new URL('../../', import.meta.url).href;   // logbook/
+const ExcelJS = require(fileURLToPath(new URL('vendor/exceljs.min.js', LB)));
+const JSZip = require(fileURLToPath(new URL('vendor/jszip.min.js', LB)));
 import zlib from 'node:zlib';
 function makePng(w, h) {
   const crcT = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
@@ -123,7 +124,7 @@ async function run(label, ctxOpts) {
   // ===================== round 5: Account tab (portfolio Section 1) =====================
   async function round5() {
     const ACCT = DIR + 'acct/';
-    const BLANK = process.env.E2E_BLANK || new URL('../../../apmes/templates/portfolio-template-blank.docx', import.meta.url).pathname;
+    const BLANK = process.env.E2E_BLANK || fileURLToPath(new URL('../../../apmes/templates/portfolio-template-blank.docx', import.meta.url));
     fs.mkdirSync(ACCT, { recursive: true });
     const field = lbl => p.locator('.acct label.field', { hasText: lbl }).first().locator('input, textarea').first();
     const group = t => p.locator('.acct details.acct-group', { has: p.locator('summary', { hasText: t }) }).first();

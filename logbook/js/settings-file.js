@@ -10,6 +10,7 @@ import { cleanExportOpts } from './export-opts.js';
 import { cleanDestinations } from './destinations.js';
 import { SWITCH_KEYS } from './profiles.js';
 import { cleanSync } from './sync-md.js';
+import { cleanColours } from './colors.js';
 import { cleanMine } from './my-themes.js';
 import { cleanLayout } from './analytics.js';
 import { cleanLabels, cleanCaseTemplate } from './parts.js';
@@ -23,6 +24,7 @@ const SKIP = new Set(['sharedSeen', 'rYear', 'rYearAY', 'importMap', 'cloudBacku
 const str = (v, n = 200) => (typeof v === 'string' ? v.slice(0, n) : '');
 const strs = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string').map(x => x.slice(0, 80)).slice(0, 300) : []);
 const OBJECTS = {
+  colours: v => { const c = cleanColours(v); return Object.keys(c).length ? c : null; },
   tagSet: v => (v == null ? null : cleanTagSet(v)),
   shareFormat: v => cleanFormat(v),
   markdown: v => { try { return storedMarkdown(v); } catch { return null; } },

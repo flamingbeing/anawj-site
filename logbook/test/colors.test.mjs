@@ -30,7 +30,7 @@ console.log('colour tests passed');
 
 // Partial palettes are sanitised, independent and keep the accent/tint fallback.
 assert.deepEqual(cleanColours({ light: { bg: '#ABCDEF', ink: 'red', evil: '#123456', accentInk: '#FFFFFF' }, dark: [], other: { bg: '#ffffff' } }), { light: { bg: '#abcdef', accentInk: '#ffffff' } });
-for (const value of [null, [], 'red', { light: null }, { light: { bg: '#fff', panel: 'url(x)' } }]) assert.deepEqual(cleanColours(value), {});
+for (const value of [null, [], 'red', { light: null }, { light: { bg: '#fff', panel: 'url(x)', ink: ['#ffffff'] } }]) assert.deepEqual(cleanColours(value), {});
 const look = { accent: '#2563eb', colours: { light: { bg: '#ffffff', accentInk: '#ffffff' }, dark: { line: '#556677' } } };
 assert.equal(colourPalette(look).bg, '#ffffff');
 assert.equal(colourPalette(look).accent, lightPalette(look.accent).accent);
@@ -50,6 +50,8 @@ assert.doesNotThrow(() => checkColours(look));
 assert.throws(() => checkColours({ colours: { light: { ink: '#ffffff' } } }), /Light ink on bg: 1\.\d+:1/);
 assert.throws(() => checkColours({ colours: { dark: { accentInk: '#ffffff', accent: '#ffffff' } } }), /Dark accentInk on accent: 1\.00:1/);
 assert.throws(() => checkColours({ colours: { light: { muted: '#ffffff' } } }), /muted on bg/);
-// Untouched legacy pairs may be below 4.5:1; a decorative token must not invalidate an old look.
-assert.doesNotThrow(() => checkColours({ colours: { dark: { line: '#556677' } } }, { dark: { muted: '#71767b', bg: '#000000', panel: '#000000' } }));
+// Legacy looks without overrides still import unchanged; edited palettes check every text pair.
+const legacyTint = { dark: { muted: '#71767b', bg: '#000000', panel: '#121212' } };
+assert.doesNotThrow(() => checkColours({}, legacyTint));
+assert.throws(() => checkColours({ colours: { dark: { line: '#556677' } } }, legacyTint), /Dark muted on panel/);
 console.log('full colour tokens: ok');

@@ -129,3 +129,5 @@ console.log('settings-file display keys and profile switches tests passed');
   assert.equal(readSettingsFile(JSON.stringify({ kind: 'apmes-logbook-settings', settings: { listFormat: 'x' } })).settings.listFormat, null);
   console.log('list format settings passed');
 }
+
+assert.deepEqual(readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: { colours: { light: { bg: '#FFFFFF', ink: 'red', unknown: '#123456' } } } })).settings.colours, { light: { bg: '#ffffff' } });
