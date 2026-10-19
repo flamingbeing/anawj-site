@@ -66,12 +66,46 @@ ok(st.rules.some(r => r.id === 'r-jp-weak'), 'weak/weak rule present');
 ok(st.staff.some(p => (p.tags || []).includes('mo2')), 'level tag saved');
 await shot(page, 'junior-pool');
 
-// Rules: To confirm badges, confirm all, add a request
+// Rules: no To confirm tags, the Priorities sheet (bars, bulk change), add a request
 await page.goto(`${BASE}?demo#rules`);
 await page.waitForSelector('.rv-card', { timeout: 10000 });
-ok((await page.locator('.bx-badge:has-text("To confirm")').count()) >= 5, 'To confirm badges');
-ok(await page.locator('button:has-text("Confirm all")').isVisible(), 'Confirm all button');
+ok((await page.locator('.bx-badge:has-text("To confirm")').count()) === 0, 'no To confirm badges');
 await axe(page, 'rules with junior rules');
+await page.click('[data-k="priorities"]');
+await page.waitForSelector('.rq-row', { timeout: 5000 });
+ok((await page.locator('.rq-range').count()) >= 3 && (await page.locator('.rq-fill.hard').count()) >= 3, 'bars for preferences and must-hold rules');
+await axe(page, 'rule priorities');
+await shot(page, 'rule-priorities');
+// drag the fourth preference to the top by its grip, then move it back down one with the keyboard
+const prefIds = () => page.$$eval('.rq-list[data-hard="0"] > li[data-id]', els => els.map(e => e.dataset.id));
+let before = await prefIds();
+const last = before[3];
+await page.locator('.rq-list[data-hard="0"]').scrollIntoViewIfNeeded();
+const gb = await page.locator(`li[data-id="${last}"] .rq-grip`).boundingBox();
+const tb = await page.locator('.rq-list[data-hard="0"] > li[data-id]').first().boundingBox();
+await page.mouse.move(gb.x + gb.width / 2, gb.y + gb.height / 2);
+await page.mouse.down();
+await page.mouse.move(gb.x + gb.width / 2, tb.y + 4, { steps: 12 });
+await page.waitForTimeout(150);
+await page.mouse.up();
+await page.waitForTimeout(300);
+let after = await prefIds();
+ok(after[0] === last, 'dragged rule is now first');
+st = await state(page);
+const top = st.rules.find(r => r.id === last), second = st.rules.find(r => r.id === after[1]);
+ok(top.weight >= second.weight, 'its priority is now at least the next one');
+await page.locator(`li[data-id="${last}"] .rq-grip`).focus();
+await page.keyboard.press('ArrowDown');
+await page.waitForTimeout(300);
+ok((await prefIds())[1] === last, 'arrow key moves it down one');
+ok(await page.evaluate(id => document.activeElement === document.querySelector(`li[data-id="${id}"] .rq-grip`), last), 'focus stays on its grip');
+await page.click('button:has-text("Select preferences")');
+await page.selectOption('.rq-bar select', '80');
+await page.waitForTimeout(300);
+st = await state(page);
+ok(st.rules.filter(r => !r.hard).every(r => r.weight === 80), 'every preference set to 80 at once');
+await page.keyboard.press('Escape');
+await page.waitForTimeout(300);
 await page.click('button:has-text("Add a request")');
 await page.waitForSelector('#rq-who', { timeout: 5000 });
 await axe(page, 'request form');
@@ -80,9 +114,6 @@ await page.click('button:has-text("Add request")');
 await page.waitForTimeout(400);
 st = await state(page);
 ok(st.rules.some(r => /^Request:/.test(r.name) && r.when.from === '2026-11-10'), 'request became a rule');
-await page.click('button:has-text("Confirm all")'); await page.waitForTimeout(300);
-st = await state(page);
-ok(!st.rules.some(r => /Predicted/.test(r.note || '')), 'all confirmed');
 
 // Check: APS weeks and leave dates
 await page.goto(`${BASE}?demo#check?v=aps`);

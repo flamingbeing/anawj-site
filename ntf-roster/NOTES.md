@@ -340,3 +340,15 @@ restriction" (same day, following days, between two people, and ready-made ones)
 - The old address `anawj.com/ntf-roster/` (GitHub Pages; not an authorised sign-in domain) forwards to
   ntfroster.anawj.com. A browser with a roster saved there stays and shows a "Moved" bar: Download backup, then Go
   (Restore from a backup at the new address).
+
+## Rules: all confirmed, Priorities sheet (19 Oct 2026)
+
+- The owner confirmed every rule: no "To confirm" tag or Confirm buttons any more. Older saves drop the old
+  "Predicted from the drafted rules" sentence from rule notes once (`settings.rcv`); the junior rules no longer carry it.
+- Rules › Priorities (`ui-ruleprio.js`): every rule as a bar (preferences by priority, then must hold, off greyed).
+  Drag a bar to change one; tick several to set a priority, raise or lower by 10, make must hold or preference, or turn
+  on or off together (`bulkSet`; share-fairly rules stay preferences).
+- Rules can be dragged by their grip (⠿; arrow keys on a focused grip) to reorder them, or between Preferences and
+  Must hold (`placeRule`). A dropped preference keeps its priority if it already fits between its new neighbours,
+  otherwise gets the midpoint; ties are ordered by the rules list, so the rule also moves there (the Rules tab sorts
+  the same way). Drag listens on the window: moving the row in the page drops pointer capture.

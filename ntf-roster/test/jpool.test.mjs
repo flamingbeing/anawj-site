@@ -12,6 +12,7 @@ import * as io from '../js/io.js';
 import * as cloud from '../js/cloud.js';
 import { ruleForRequest } from '../js/ui-requests.js';
 import { applyAssignments } from '../js/ui-roster.js';
+import { bulkSet, placeRule } from '../js/ui-ruleprio.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ExcelJS = createRequire(import.meta.url)(path.join(here, '../vendor/exceljs.min.js'));
@@ -64,7 +65,7 @@ function pool() {
   eq(s.rules.find(r => r.id === 'r-phd').enabled, false, 'public holiday day shift off (half calls instead)');
   eq(s.rules.find(r => r.id === 'r-jcall').who.tags, J.CALL_TAGS, 'old junior call rule points at the call list');
   for (const r of s.rules) eq(R.validateRule(r, s), [], 'valid: ' + r.id);
-  ok(J.JUNIOR_RULES.filter(r => /Predicted/.test(r.note)).length >= 6, 'assumed rules are marked To confirm');
+  ok(!J.JUNIOR_RULES.some(r => /Predicted/.test(r.note || '')), 'no rule is marked To confirm');
   ok(M.migrate(JSON.parse(JSON.stringify(s))).rules.length === s.rules.length, 'survives migrate');
 }
 
@@ -352,6 +353,48 @@ function pool() {
   const parsed = { people: [{ key: 'k3', name: 'Fake Moved', group: 'srp', matchId: 'r3', note: 'R3' }], months: [], cells: [] };
   try { io.applyImport(s, parsed); } catch { /* only the people part matters here */ }
   eq([by('r3').pool, by('r3').note], ['senior', 'R3'], 'reimport keeps the move by hand');
+}
+
+// ---------- rules: no To confirm, priorities in bulk ----------
+{
+  const old = M.defaultState();
+  delete old.settings.rcv;
+  old.rules.push({ ...old.rules[0], id: 'rx', note: 'Keep this. Predicted from the drafted rules: confirm or change.' });
+  const s = M.migrate(old);
+  eq(s.rules.find(r => r.id === 'rx').note, 'Keep this.', 'the old To confirm sentence goes, the rest of the note stays');
+  const soft = s.rules.filter(r => !r.hard).slice(0, 2), hard = s.rules.find(r => r.hard);
+  const spread = s.rules.find(r => r.type === 'spread');
+  const ids = new Set([...soft.map(r => r.id), hard.id]);
+  eq(bulkSet(s, ids, { weight: 70 }) >= 2, true, 'set priority changes the selected rules');
+  eq(soft.map(r => s.rules.find(x => x.id === r.id).weight), [70, 70], 'to 70');
+  ok(s.rules.find(r => r.id === hard.id).hard, 'a must-hold rule stays must hold when given a priority');
+  bulkSet(s, ids, { by: 40 });
+  eq(s.rules.find(r => r.id === soft[0].id).weight, 100, 'raising stops at 100');
+  bulkSet(s, new Set([spread.id]), { hard: true });
+  ok(!s.rules.find(r => r.id === spread.id).hard, 'a share-fairly rule cannot become must hold');
+  bulkSet(s, ids, { enabled: false });
+  ok([...ids].every(id => s.rules.find(r => r.id === id).enabled === false), 'turned off together');
+}
+
+// dragging a rule in Priorities: it lands between its neighbours, ties keep the order it was dropped in
+{
+  const s = { rules: [
+    { id: 'a', type: 'cap', hard: false, weight: 80 }, { id: 'b', type: 'cap', hard: false, weight: 50 },
+    { id: 'c', type: 'cap', hard: false, weight: 50 }, { id: 'd', type: 'cap', hard: true, weight: 50 },
+    { id: 's', type: 'spread', hard: false, weight: 10 }] };
+  const sorted = () => s.rules.filter(r => !r.hard).sort((x, y) => y.weight - x.weight).map(r => r.id);
+  ok(placeRule(s, 's', { hard: false, aboveId: 'a', belowId: 'b' }), 'moved');
+  eq(s.rules.find(r => r.id === 's').weight, 65, 'between 80 and 50 it gets 65');
+  placeRule(s, 'a', { hard: false, aboveId: 'b', belowId: 'c' });
+  eq(sorted(), ['s', 'b', 'a', 'c'], 'between two at 50 it gets 50 and sits between them');
+  placeRule(s, 'c', { hard: false, aboveId: null, belowId: 's' });
+  eq(s.rules.find(r => r.id === 'c').weight, 83, 'to the top: halfway to 100');
+  placeRule(s, 'b', { hard: false, aboveId: 'a', belowId: null });
+  eq(sorted().at(-1), 'b', 'to the bottom');
+  ok(placeRule(s, 'd', { hard: false, aboveId: 'c', belowId: 's' }) && !s.rules.find(r => r.id === 'd').hard, 'a must-hold rule dragged into preferences becomes one');
+  ok(placeRule(s, 'a', { hard: true }) && s.rules.find(r => r.id === 'a').hard, 'dragged into Must hold');
+  eq(placeRule(s, 's', { hard: true }), false, 'a share-fairly rule cannot go into Must hold');
+  eq(placeRule(s, 'c', { hard: false, aboveId: null, belowId: 'd' }), false, 'dropped where it was: nothing changes');
 }
 
 console.log(`junior pool tests: ${n} checks passed`);
