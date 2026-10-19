@@ -101,6 +101,7 @@ const ICONS = {
   feedback: 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5',   // a speech bubble
   formview: 'M6 3h12v18H6zM9 8h6M9 12h6M9 16h3',   // a form sheet
   feedbackinbox: 'M3 13l3-8h12l3 8v6H3zM3 13h5l1 2h6l1-2h5',   // an in-tray
+  link: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',   // chain (copy link)
   more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
 };
 // the Advanced pages (Settings menu) use their parent page's icon
@@ -352,7 +353,7 @@ function settingsSearch() {
       // a link straight to this setting (the page and the heading, read by tabFromHash)
       h('button', { type: 'button', class: 'copy-link', title: 'Copy a link to this setting', 'aria-label': 'Copy a link to ' + x.text,
         onclick: () => import('./share.js').then(m => m.copyText(location.origin + location.pathname + '#' + x.id + (x.open ? '' : '?find=' + encodeURIComponent(x.text)), 'Link copied'))
-      }, '🔗'))),
+      }, icon('link')))),
       box.value.trim() && !found.length ? h('li', { class: 'hint', style: 'padding:10px 4px' }, 'No setting matches. Try another word.') : null);
   };
   if (settingsQuery) search();

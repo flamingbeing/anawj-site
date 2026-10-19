@@ -1233,7 +1233,8 @@ details.an-sec > summary { align-items: flex-start; padding-right: 30px; }
 .refl-guide > summary { font-weight: 600; min-height: 40px; display: flex; align-items: center; }
 .refl-guide ul { font-size: calc(13px * var(--fs, 1)); }
 .settings-search li { display: flex; align-items: center; } .settings-search li > a { flex: 1; min-width: 0; }
-.settings-search .copy-link { flex: none; min-width: 44px; min-height: 44px; background: none; border: 0; font-size: calc(18px * var(--fs, 1)); cursor: pointer; }
+.settings-search .copy-link { flex: none; display: grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0; background: none; border: 0; cursor: pointer; }
+.settings-search .copy-link .ico { width: 20px; height: 20px; stroke: var(--muted); } .settings-search .copy-link:hover .ico { stroke: var(--accent); }
 .settings-search input[type=search] { width: 100%; } .settings-search ul { margin-top: 6px; }
 /* Display preview: a made-up row drawn with the app's own classes, in view while the page scrolls */
 .display-preview { position: sticky; top: var(--pin-top, 0px); z-index: 6; background: var(--panel); border: 1px solid var(--edge, var(--line)); border-radius: var(--radius, calc(14px * var(--round, 1))); padding: 6px 12px 10px; margin-bottom: 12px; box-shadow: 0 8px 12px -12px rgba(0,0,0,.4); pointer-events: none; }
