@@ -337,3 +337,6 @@ restriction" (same day, following days, between two people, and ready-made ones)
   sign-in client needs `https://ntfroster.anawj.com/__/auth/handler` in its Authorised redirect URIs.
 - The installed app and Firefox on Android sign in by redirect (a popup there loses its opener); elsewhere the popup,
   with redirect when a popup is blocked. `watchUser` finishes a redirect with `getRedirectResult`.
+- The old address `anawj.com/ntf-roster/` (GitHub Pages; not an authorised sign-in domain) forwards to
+  ntfroster.anawj.com. A browser with a roster saved there stays and shows a "Moved" bar: Download backup, then Go
+  (Restore from a backup at the new address).

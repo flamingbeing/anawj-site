@@ -551,6 +551,7 @@ function onboard(key) {
 // ---------- bars ----------
 function renderDemoBar() {
   const bar = $('#demobar');
+  if (!app.isDemo && window.NTF_MOVED_TO) { movedBar(bar); return; }
   if (!app.isDemo) { bar.hidden = true; return; }
   bar.hidden = false;
   bar.innerHTML = '';
@@ -559,6 +560,23 @@ function renderDemoBar() {
     h('span', { class: 'demo-text' }, '(made-up department)', h('span', { class: 'demo-long' }, '. Changes stay in this browser.')),
     h('button', { type: 'button', class: 'linkish', onclick: resetDemo }, 'Reset'),
     h('a', { class: 'linkish', href: './', 'aria-label': 'Leave practice' }, h('span', { class: 'demo-leave' }, 'Leave practice'), h('span', { class: 'demo-leave-s', 'aria-hidden': 'true' }, 'Leave')));
+}
+
+// The old address (anawj.com/ntf-roster/) with a roster saved in this browser: sign-in works only at the new one, and
+// what is saved here stays here. Download a backup, then Restore from a backup at the new address.
+function movedBar(bar) {
+  const go = () => { try { localStorage.setItem('ntf-roster-moved', '1'); } catch (e) { /* no storage */ } location.replace(window.NTF_MOVED_TO); };
+  const backup = async () => {
+    const io = await import('./io.js');
+    io.download(new Blob([io.backupJSON(app.store.get())], { type: 'application/json' }), `ntf-roster-backup-${M.iso(new Date())}.json`);
+  };
+  bar.hidden = false;
+  bar.innerHTML = '';
+  bar.append(
+    h('span', { class: 'demo-pill' }, 'Moved'),
+    h('span', { class: 'demo-text' }, 'The roster is now at ntfroster.anawj.com (sign-in works there). Download a backup, then use Restore from a backup in More there.'),
+    h('button', { type: 'button', class: 'linkish', onclick: backup }, 'Download backup'),
+    h('button', { type: 'button', class: 'linkish', onclick: go }, 'Go'));
 }
 
 async function resetDemo() {

@@ -4,6 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
+<script>
+// The roster lives at ntfroster.anawj.com (sign-in works only there). The same folder is still served at
+// anawj.com/ntf-roster/, so send visitors on from there (path, query and # kept); a no-op on ntfroster.anawj.com,
+// previews and localhost. A browser with a roster saved at the old address stays: what is saved belongs to its
+// address, so the page offers a backup first (window.NTF_MOVED_TO, the bar at the top).
+if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname)) (function () {
+  var to = 'https://ntfroster.anawj.com/' + location.pathname.replace(/^\/ntf-roster\/?/, '') + location.search + location.hash;
+  var saved = false;
+  try { saved = !!localStorage.getItem('ntf-roster-v1') && !localStorage.getItem('ntf-roster-moved'); } catch (e) { /* no storage */ }
+  if (saved && !/[?&]demo\b/.test(location.search)) window.NTF_MOVED_TO = to;
+  else location.replace(to);
+})();
+</script>
 <title>NTF Roster</title>
 <meta name="description" content="Plan the NTF anaesthesia monthly duty roster with leave, requests, rules you edit and auto-fill.">
 <link rel="manifest" href="manifest.webmanifest">
