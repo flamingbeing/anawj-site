@@ -2,6 +2,7 @@
 // the one-person calendar (#roster?p=staffId) and the Auto-fill dialog (openAutofill, also used by the header button).
 // The grid is built as one HTML string per render from lookup maps made once, so 80 people x 31 days stays fast.
 import * as M from './model.js';
+import { priorityRow } from './ui-reqprio.js';
 
 const WD = ['Su', 'M', 'Tu', 'W', 'Th', 'F', 'Sa'];
 const KIND_ORDER = [['shift', 'Shifts'], ['leave', 'Leave'], ['request', 'Requests'], ['other', 'Other']];
@@ -396,9 +397,9 @@ export function mount(el, app) {
         names.push((du ? du.name : code) + (isAuto ? ' (auto)' : ''));
       }
       for (const code of cell.r || []) {
-        const i = dutyIdx.get(code);
-        chips += `<span class="chip rq${i == null ? '' : ' dc-' + i}${code.length > 3 ? ' sm' : ''}">${esc(code)}</span>`;
-        names.push('request ' + (dmap.get(code)?.name || code));
+        const i = dutyIdx.get(code), mk = (cell.rp && cell.rp[code]) || '';
+        chips += `<span class="chip rq${i == null ? '' : ' dc-' + i}${code.length + mk.length > 3 ? ' sm' : ''}">${esc(code + mk)}</span>`;
+        names.push('request ' + (dmap.get(code)?.name || code) + (mk === '!' ? ', must' : mk === '?' ? ', if possible' : ''));
       }
     }
     if (post && !(cell?.a || []).includes('x')) { chips += '<span class="chip dx">x</span>'; names.push('post call'); }
@@ -982,6 +983,9 @@ export function mount(el, app) {
           h('span', { class: 'vi', html: app.icon('alert') }), h('span', null, v.msg, v.hard ? '' : h('span', { class: 'muted' }, ' (soft)'))))));
       }
       for (const x of built.extras) wrap.insertBefore(x, built.firstSec);
+      // Cr / Nc in the cell: how much each counts, and Must / Auto / If possible
+      const prow = priorityRow(app, d, sid);
+      if (prow) { wrap.insertBefore(prow, built.noteSec); built.extras.push(prow); }
       const unknown = [...(cell.a || []), ...(cell.r || [])].filter(c => !dmap.has(c));
       if (unknown.length) {
         const u = h('p', { class: 'ced-info' }, `Codes not in the list: ${unknown.join(', ')}. Add them under People › Duty codes.`);
@@ -1137,7 +1141,7 @@ export function mount(el, app) {
         chips.append(h('span', { class: `chip dc-${dutyIdx.get(c)} k-${du?.kind || 'other'}${(cell.auto || []).includes(c) ? ' au' : ''}` }, c));
         names.push(du ? du.name : c);
       }
-      for (const c of cell?.r || []) { chips.append(h('span', { class: `chip rq dc-${dutyIdx.get(c)}` }, c)); names.push('request ' + (dmap.get(c)?.name || c)); }
+      for (const c of cell?.r || []) { const mk = (cell.rp && cell.rp[c]) || ''; chips.append(h('span', { class: `chip rq dc-${dutyIdx.get(c)}` }, c + mk)); names.push('request ' + (dmap.get(c)?.name || c) + (mk === '!' ? ', must' : mk === '?' ? ', if possible' : '')); }
       if (post) { chips.append(h('span', { class: 'chip dx' }, 'x')); names.push('post call'); }
       box.append(chips);
       if (cell?.note) { box.append(h('span', { class: 'cd-note' }, cell.note)); names.push('note: ' + cell.note); }

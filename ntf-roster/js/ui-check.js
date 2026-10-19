@@ -31,7 +31,8 @@ export function mount(el, app) {
       h('div', { class: 'bx-head' }, h('div', { class: 'bx-head-text' },
         h('h2', { class: 'bx-h' }, 'Check'),
         h('p', { class: 'bx-sub' }, `${M.fmtMonth(app.month)} against ${rulesOn} ${rulesOn === 1 ? 'rule' : 'rules'} that are on. `,
-          h('a', { href: '#rules' }, 'Change the rules')))),
+          h('a', { href: '#rules' }, 'Change the rules'))),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': 'reqprio', onclick: () => import('./ui-reqprio.js').then(mod => mod.openPriorities(app)) }, 'Request priority')),
       h('div', { class: 'cv-sum', 'data-tour': 'check' },   // (data-tour: the first-time tour, tour.js)
         stat(ev.hard, 'must fix', 'Hard rules broken', ev.hard ? 'bad' : 'ok'),
         stat(ev.soft, 'to improve', 'Preferences not met', ev.soft ? 'warn' : 'ok'),
