@@ -18,6 +18,7 @@ try { for (const width of [390, 1280]) {
   const rnd = () => p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--round').trim());
   assert.equal(await now(), 'NUHS');
   assert.equal(await card.locator('.tip').count(), 0, 'nothing to save yet');
+  assert.equal(await card.getByRole('button', { name: 'Export…' }).count(), 1, 'Export is there before anything is saved (it saves the look you have)');
   // change something: Custom, and the card asks to save it
   await p.locator('input[type=range][aria-label="Corners"]').fill('0');
   await p.getByRole('radio', { name: /Outlined/ }).check({ force: true });

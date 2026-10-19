@@ -141,6 +141,7 @@ const TABS = [
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
   { id: 'themes', label: 'Themes', render: page(['settings'], m => m.settings.renderThemes()), hidden: true, under: 'settings', unlisted: true, desc: 'Ready-made looks, colour, light or dark, the top band' },
+  { id: 'themesall', label: 'Browse all themes', render: page(['settings'], m => m.settings.renderThemesAll()), hidden: true, under: 'themes', unlisted: true, desc: 'Every theme, search, suggest a theme' },
   { id: 'display', label: 'Display', render: page(['settings'], m => m.settings.renderDisplay()), hidden: true, under: 'settings', unlisted: true, desc: 'Compact mode, the screen it opens on; more under Advanced' },
   { id: 'access', label: 'Accessibility', render: page(['settings'], m => m.settings.renderAccessibility()), hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion, swipe gestures' },
   { id: 'displayadv', label: 'Advanced display', render: page(['settings'], m => m.settings.renderDisplayAdvanced()), hidden: true, under: 'display', unlisted: true, desc: 'The header and tab bar, Logbook rows, fonts, custom CSS' },
@@ -921,7 +922,7 @@ document.addEventListener('touchend', async e => {
 // its counts in place; other screens re-render when nothing is being edited (pendingRender: declared above render()).
 // Settings pages that show no case data: drawing them again would only throw away what is half filled in there (a
 // sync place being added, a search being typed)
-const CASE_FREE = new Set(['settings', 'showhide', 'themes', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'sendto', 'sync']);
+const CASE_FREE = new Set(['settings', 'showhide', 'themes', 'themesall', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'sendto', 'sync']);
 hooks.casesChanged = () => {
   paintWho();
   if (S.tab === 'log') return logCasesChanged();
@@ -1312,7 +1313,7 @@ addEventListener('keydown', e => {
   e.preventDefault();   // instead of the browser's own zoom, so the setting and the screen agree
   const v = stepZoom(dir);
   toast(`Zoom ${Math.round(v * 100)}%`, { ms: 1200 });
-  if (S.tab === 'display' || S.tab === 'themes') render();
+  if (S.tab === 'display' || S.tab === 'themes' || S.tab === 'themesall') render();
 });
 if (cachedCompact()) document.body.classList.add('compact');   // first paint; corrected once the logbook loads
 paintWho();

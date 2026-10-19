@@ -10,10 +10,10 @@ import { pickDialog, CASE_PARTS, AFTER_SAVE, RECENT_COUNTS } from './ui-log.js';
 import { recentCount as snapRecent } from './logging.js';
 import { OPERATOR_HELP } from './search-ops.js';
 import { DEFAULT_ACCENT, cleanAccent, SWATCHES } from './colors.js';
-import { THEMES, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, SPACINGS, TAB_STYLES, BANDS, HEAD_FONTS } from './themes.js';
+import { THEMES, FEATURED, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, SPACINGS, TAB_STYLES, BANDS, HEAD_FONTS, LIST_STYLES, TITLE_ALIGNS, SWITCH_STYLES, PRESS_STYLES, ICON_WEIGHTS, TYPE_STYLES } from './themes.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS, HEAD_STYLES, mdDate, fileDate } from './markdown.js';
 import { checkCss } from './custom-css.js';
-import { cleanMine, saveMine, minePatch, matchMine, exportText, importText } from './my-themes.js';
+import { cleanMine, saveMine, minePatch, matchMine, exportText, importText, lookOf } from './my-themes.js';
 import { FONTS, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont } from './fonts.js';
 import { SWITCHES, switchLabel, switchChanges, applyPatch, resetPatch, tabsAfter } from './profiles.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
@@ -101,7 +101,7 @@ export function renderDisplay() {
 const themeSwatch = t => {
   const band = t.band || (t.look.band === 'none' ? null : ['#e57200', '#e4002b', '#178fd7', '#002f6c']);
   const tint = TINTS[t.look.bgTint] || {};
-  const dark = !!t.mode;
+  const dark = !!t.mode && t.mode !== 'auto';
   const bg = (dark ? tint.dark?.bg : tint.light?.bg) || (dark ? '#121417' : '#f3f3f3');
   const panel = (dark ? tint.dark?.panel : tint.light?.panel) || (dark ? '#1b1e23' : '#ffffff');
   return h('span', { class: 'theme-sw', 'aria-hidden': 'true', style: `--tb:${bg};--tp:${panel};--ta:${t.look.accent || (t.keep ? cleanAccent(display().accent) || DEFAULT_ACCENT : DEFAULT_ACCENT)}` },
@@ -109,25 +109,27 @@ const themeSwatch = t => {
     h('span', { class: 'theme-card-in' }, h('i', { class: 'theme-dot' }), h('i', { class: 'theme-line' })));
 };
 function pickTheme(t) {
-  const before = display(), beforeMode = cachedTheme();
+  const before = display();
   const patch = themePatch(t, before);
-  if (t.mode) { applyTheme(t.mode); patch.themeMode = true; } else if (before.themeMode) { applyTheme('light'); patch.themeMode = null; }
+  patch.themeMode = null;   // a theme never changes Light or dark
   applyDisplay(setDisplay(patch));
   hooks.render();
   toast(`Theme: ${t.name}`, { action: 'Undo', onaction: () => {
-    applyTheme(beforeMode);
     applyDisplay(setDisplay(Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode'].map(k => [k, before[k] ?? null]))));
     hooks.render();
   } });
 }
 let themeQuery = '';
 resetters.push(() => { themeQuery = ''; });
-function inspiredList() {
+const themeCard = (t, theme, custom) => h('button', { type: 'button', class: 'theme-card', 'aria-pressed': String(t.id === theme.id && !custom), onclick: () => pickTheme(t) },
+  themeSwatch(t), h('b', {}, t.name));   // (the descriptions are on Browse all themes)
+// Settings → Themes → Browse all themes (#themesall): every theme, searchable, and Suggest a theme
+function themeFinder() {
   const st = display(), { theme, custom } = themeState(st);
-  const list = h('ul', { class: 'theme-list', role: 'list' });
+  const list = h('ul', { class: 'theme-list all', role: 'list' });
   const paint = () => {
     const q = themeQuery.trim().toLowerCase();
-    const found = THEMES.filter(t => t.group === 'inspired' && (!q || (t.name + ' ' + t.desc).toLowerCase().includes(q)));
+    const found = THEMES.filter(t => !q || (t.name + ' ' + t.desc).toLowerCase().includes(q));
     fill(list, found.length ? found.map(t => h('li', {}, h('button', { type: 'button', class: 'theme-row', 'aria-pressed': String(t.id === theme.id && !custom), onclick: () => pickTheme(t) },
       themeSwatch(t), h('span', { class: 'mt' }, h('b', {}, t.name), h('small', {}, t.desc))))) : h('li', { class: 'empty' }, 'No theme matches. Suggest one below.'));
   };
@@ -135,6 +137,18 @@ function inspiredList() {
   return h('div', { class: 'theme-inspired' },
     h('input', { type: 'search', class: 'theme-find', placeholder: 'Find a theme (WhatsApp, Notion, dark…)', 'aria-label': 'Find a theme', value: themeQuery, oninput: e => { themeQuery = e.target.value; paint(); } }),
     list);
+}
+export function renderThemesAll() {
+  const st = display();
+  return h('div', { class: 'set-page themes-page' },
+    h('section', { class: 'card' },
+      h('h2', {}, 'Browse all themes'),
+      h('p', { class: 'theme-now' }, 'Now: ', h('b', {}, themeLabel(st))),
+      themeFinder(),
+      h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('button', { type: 'button', class: 'small', onclick: async () => {
+        const m = await import('./ui-feedback.js'); m.setFeedbackDraft?.('Theme suggestion: '); location.hash = '#feedback';
+      } }, 'Suggest a theme')),
+      help('In the style of other apps: their colours, corners and type, never their logos.')));
 }
 export function renderThemes() {
   const st = display(), { theme, custom } = themeState(st);
@@ -146,14 +160,11 @@ export function renderThemes() {
       h('p', { class: 'theme-now' }, 'Now: ', h('b', {}, matchMine(st.myThemes, st) && custom ? `${matchMine(st.myThemes, st).name} (yours)` : themeLabel(st))),
       help('A theme sets the colours, light or dark, corners, lines, fonts and spacing in one go. Change anything below afterwards; your changes stay.'),
       h('h3', {}, 'Classic'),
-      h('div', { class: 'theme-grid' }, THEMES.filter(t => t.group === 'classic').map(t => h('button', { type: 'button', class: 'theme-card', 'aria-pressed': String(t.id === theme.id && !custom), onclick: () => pickTheme(t) },
-        themeSwatch(t), h('b', {}, t.name), h('small', {}, t.desc)))),
+      h('div', { class: 'theme-grid' }, THEMES.filter(t => t.group === 'classic').map(t => themeCard(t, theme, custom))),
       h('h3', {}, 'Inspired'),
       help('In the style of other apps: their colours, corners and type, never their logos.'),
-      inspiredList(),
-      h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('button', { type: 'button', class: 'small', onclick: async () => {
-        const m = await import('./ui-feedback.js'); m.setFeedbackDraft?.('Theme suggestion: '); location.hash = '#feedback';
-      } }, 'Suggest a theme'))),
+      h('div', { class: 'theme-grid' }, FEATURED.map(id => themeCard(THEMES.find(t => t.id === id), theme, custom))),
+      h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('a', { class: 'btn small', href: '#themesall' }, 'Browse all themes'))),
     myThemesCard(st, custom),
     h('section', { class: 'card' },
       h('h2', {}, 'Colour and light'),
@@ -179,6 +190,21 @@ export function renderThemes() {
       fontPicker('log'),
       lookPick('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
       DEVICE_NOTE()),
+    h('section', { class: 'card' },
+      h('h2', {}, 'App-style details'),
+      help('Finer touches that make the logbook feel like other phone apps. Each is its own setting and off until you choose it.'),
+      h('h3', {}, 'Header and tab bar'),
+      toggle('See-through header and tab bar', st.barBlur, v => { applyDisplay(setDisplay({ barBlur: v || null })); hooks.render(); }, 'Content shows blurred behind them as you scroll (iOS, Instagram).'),
+      toggle('Name only the tab you’re on', st.tabActiveLabel, v => { applyDisplay(setDisplay({ tabActiveLabel: v || null })); hooks.render(); }, 'The other tabs show just their icon (phone width, bottom bar).'),
+      look('titleAlign', 'Header title', TITLE_ALIGNS, 'default'),
+      h('h3', {}, 'Lists and type'),
+      look('listStyle', 'List style', LIST_STYLES, 'default', 'How Logbook rows sit on the page.'),
+      look('typeStyle', 'Type style', TYPE_STYLES, 'default', 'Weight and spacing of titles.'),
+      look('iconWeight', 'Icon line weight', ICON_WEIGHTS, 'default'),
+      h('h3', {}, 'Controls'),
+      look('switchStyle', 'Switches', SWITCH_STYLES, 'default', 'The on / off switches in Settings.'),
+      look('pressStyle', 'When you press', PRESS_STYLES, 'default', 'What buttons and rows do under your finger.'),
+      DEVICE_NOTE()),
     resetLink('the theme and every look setting on this page (light, the NUHS colours, lines, corners, fonts and spacing) on this device', () => {
       applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'fontUiName', 'fontLogName'].map(k => [k, null])) }));
     }));
@@ -196,17 +222,16 @@ function myThemesCard(st, custom) {
     catch (err) { toast(err.message); }
   };
   const use = t => {
-    const before = display(), beforeMode = cachedTheme();
-    if (t.mode) applyTheme(t.mode);
+    const before = display();
     applyDisplay(setDisplay(minePatch(t))); hooks.render();
-    toast(`Theme: ${t.name}`, { action: 'Undo', onaction: () => { applyTheme(beforeMode); applyDisplay(setDisplay(Object.fromEntries([...THEME_KEYS, 'theme'].map(k => [k, before[k] ?? null])))); hooks.render(); } });
+    toast(`Theme: ${t.name}`, { action: 'Undo', onaction: () => { applyDisplay(setDisplay(Object.fromEntries([...THEME_KEYS, 'theme'].map(k => [k, before[k] ?? null])))); hooks.render(); } });
   };
   const drop = t => {
     const before = display().myThemes;
     put(cleanMine(before).filter(x => x.id !== t.id));
     toast(`Deleted “${t.name}”`, { action: 'Undo', onaction: () => put(cleanMine(before)) });
   };
-  const exportAll = () => { download('my-logbook-themes.json', new Blob([exportText(mine)], { type: 'application/json' })); toast('Themes saved as a file'); };
+  const exportAll = () => { download('my-logbook-themes.json', new Blob([exportText(mine.length ? mine : [{ name: themeLabel(st).slice(0, 40), look: lookOf(st) }])], { type: 'application/json' })); toast(mine.length ? 'Themes saved as a file' : 'This look saved as a file'); };
   const importBtn = fileButton('Import…', '.json,application/json', async file => {
     try { const r = importText(await file.text(), display().myThemes); put(r.list); toast(`${r.added} theme${r.added === 1 ? '' : 's'} added`); }
     catch (err) { toast(err.message); }
@@ -221,8 +246,8 @@ function myThemesCard(st, custom) {
         themeSwatch({ look: t.look, mode: t.mode === 'dark' || t.mode === 'oled' ? t.mode : null }), h('span', { class: 'mt' }, h('b', {}, t.name), h('small', {}, t.mode ? `Yours · ${t.mode}` : 'Yours'))),
       h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Delete ${t.name}`, title: 'Delete', onclick: () => drop(t) }, '×')))) : null,
     h('div', { class: 'bar', style: 'margin:10px 0 0' },
-      mine.length ? h('button', { type: 'button', class: 'small', onclick: exportAll }, 'Export…') : null, importBtn),
-    help('Export saves your themes as a file to keep or send to someone; Import adds themes from such a file. Only look settings travel, never cases or names.'));
+      h('button', { type: 'button', class: 'small', onclick: exportAll }, 'Export…'), importBtn),
+    help('Export saves your themes (or, with none saved, the look you have now) as a file to keep or send to someone; Import adds themes from such a file. Only look settings travel, never cases or names.'));
 }
 
 export function renderDisplayAdvanced() {
