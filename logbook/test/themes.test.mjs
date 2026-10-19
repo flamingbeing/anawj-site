@@ -75,7 +75,7 @@ assert.equal(bandColours({ band: 'shades' }), 'shades');
 
 // the CSS: nothing for the default look; the band, none, tint, fonts, spacing, tabs
 assert.equal(lookCss({}), '');
-assert.match(lookCss(themePatch(themeById('whatsapp'))), /background: var\(--accent\); color: var\(--accent-ink\)/);
+assert.match(lookCss(themePatch(themeById('whatsapp'))), /--header-ink: var\(--accent-ink\); background: var\(--accent\); color: var\(--accent-ink\)/);
 assert.match(lookCss({ band: 'shades' }, ['#111111', '#222222', '#333333', '#444444']), /--s4: #444444/);
 assert.equal(lookCss({ band: 'shades' }), '');   // no shades worked out: the usual band
 assert.match(lookCss({ band: 'none' }), /\.top \{ background: var\(--panel\); \}/);

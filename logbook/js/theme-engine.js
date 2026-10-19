@@ -84,7 +84,7 @@ export const FACETS = [
   // Header and status bar
   { key: 'statusBar', group: 'header', label: 'Phone status bar', js: true, line: 'The strip above the app on Android and in browsers (display.js paintStatusBar).', choices: [['accent', 'My colour (default)'], ['header', 'Match the header'], ['page', 'Match the page']] },
   { key: 'headerStyle', group: 'header', label: 'Header', choices: [['plain', 'Plain (default)'], ['filled', 'Filled with my colour (Android apps)'], ['large', 'Large title (iOS)']], css: {
-    filled: ':root:root .top { background: var(--accent); color: var(--accent-ink); border-bottom-color: transparent; } :root:root .top :is(h1, .sub, a, .who, .email) { color: var(--accent-ink); } :root:root:root:root .top .who :is(button, .btn) { background: transparent; color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }',
+    filled: ':root:root .top { --header-ink: var(--accent-ink); background: var(--accent); color: var(--accent-ink); border-bottom-color: transparent; } :root:root .top :is(h1, .sub, a, .who, .email) { color: var(--accent-ink); } :root:root:root:root .top .who :is(button, .btn) { background: transparent; color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }',
     // the large title gets its own row under the header's buttons, as on iOS
     large: ':root:root .top { flex-wrap: wrap; row-gap: 2px; } :root:root .top .who { order: 1; margin-left: auto; } :root:root .top .brand { order: 2; flex: 1 0 100%; display: flex; flex-direction: column; align-items: flex-start; } :root:root .top h1 { flex: none; text-align: start; font-size: calc(32px * var(--fs, 1)); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }' } },
   { key: 'barBlur', group: 'header', label: 'See-through header and tab bar', bool: true, line: 'Content shows blurred behind them as you scroll (iOS, Instagram).',
@@ -96,6 +96,8 @@ export const FACETS = [
     css: '@media (max-width: 600px) { .tabs button:not([aria-selected="true"]) .lbl { display: none; } }' },
   { key: 'tabIconFill', group: 'tabs', label: 'Fill the current tab’s icon', bool: true, line: 'As iPhone and Android tab bars do.',
     css: ':root .tabs button[aria-selected="true"] .ico { fill: color-mix(in srgb, currentColor 28%, transparent); }' },
+  { key: 'tabTone', group: 'tabs', label: 'Active tab colour', choices: [['accent', 'My colour (default)'], ['ink', 'Text colour']],
+    css: { ink: ':root:root:root .tabs button[aria-selected="true"] { color: var(--ink); }' } },
 
   // Lists and type
   { key: 'listStyle', group: 'lists', label: 'List style', line: 'How Logbook rows sit on the page.', choices: [['default', 'Cards (default)'], ['inset', 'Inset grouped (iOS)'], ['edge', 'Edge to edge (Material, chat apps)']], css: {
@@ -104,6 +106,11 @@ export const FACETS = [
   { key: 'typeStyle', group: 'lists', label: 'Type style', line: 'Weight and spacing of titles.', choices: [['default', 'As now (default)'], ['ios', 'iOS (bold titles, tight)'], ['material', 'Material (medium weight)']], css: {
     ios: ':root .top h1, :root h1, :root h2, :root section.card h2 { font-weight: 700; letter-spacing: -0.02em; } :root .top h1 { font-size: calc(20px * var(--fs, 1)); } body { letter-spacing: -0.01em; }',
     material: ':root .top h1, :root h1, :root h2, :root h3, :root section.card h2 { font-weight: 500; letter-spacing: 0; } .tabs button { letter-spacing: .02em; font-weight: 500; }' } },
+
+  // Plain app headers usually use neutral titles even when their actions have a bright accent.
+  // Filled headers keep their contrasting title through --header-ink (set only by headerStyle).
+  { key: 'headingTone', group: 'lists', label: 'Heading colour', choices: [['accent', 'My colour (default)'], ['ink', 'Text colour']],
+    css: { ink: ':root:root :is(h1, h2, h3), :root:root section.card h2 { color: var(--ink); } :root:root .top h1 { color: var(--header-ink, var(--ink)); }' } },
 
   // Icons (the set first, then the weight, so a chosen weight wins over the set's)
   { key: 'iconSet', group: 'icons', label: 'Icon style', choices: opts(ICON_SETS), css: Object.fromEntries(Object.entries(ICON_SETS).filter(([, s]) => s.css).map(([k, s]) => [k, s.css])) },

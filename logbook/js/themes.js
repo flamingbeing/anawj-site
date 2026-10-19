@@ -59,7 +59,8 @@ export const THEMES = [
       iconSet: 'sharp', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material',
       fieldStyle: 'outlined', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 1,
       borders: 2, shadows: false, btnStyle: 'tinted', fontUi: 'system', fontLog: 'system', headFont: 'system',
-      band: 'none', rowLayout: 'compact', navStyle: 'rail', spacing: 'tight', compact: true, accent: '#7f6df2',
+      band: 'none', rowLayout: 'compact', navStyle: 'rail', spacing: 'tight', compact: true, headingTone: 'ink',
+      tabTone: 'ink', accent: '#7f6df2',
       colours: {
         light: { bg: '#ffffff', panel: '#f6f6f6', ink: '#222222', muted: '#666666', line: '#e3e3e3', accent: '#7f6df2', accentInk: '#000000' },
         dark: { bg: '#1e1e1e', panel: '#262626', ink: '#dadada', muted: '#ababab', line: '#363636', accent: '#a88bfa', accentInk: '#000000' },
@@ -73,7 +74,7 @@ export const THEMES = [
       checkStyle: 'round', switchStyle: 'ios', pressStyle: 'highlight', round: 1, borders: 1, shadows: false,
       btnStyle: 'plain', fontUi: 'system', fontLog: 'serif', headFont: 'system', band: 'none',
       rowLayout: 'compact', navStyle: 'tabs', barBlur: true, titleAlign: 'centre', iconWeight: 'thin',
-      spacing: 'roomy', accent: '#d44444',
+      spacing: 'roomy', headingTone: 'ink', accent: '#d44444',
       colours: {
         light: { bg: '#fbfbf9', panel: '#ffffff', ink: '#333333', muted: '#74746f', line: '#e6e6e1', accent: '#d44444', accentInk: '#000000' },
         dark: { bg: '#1e1e1e', panel: '#282828', ink: '#e5e5e5', muted: '#a2a2a2', line: '#3b3b3b', accent: '#ed6969', accentInk: '#000000' },
@@ -86,7 +87,7 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material',
       fieldStyle: 'outlined', checkStyle: 'round', switchStyle: 'material', pressStyle: 'highlight', round: 1,
       borders: 1, shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system',
-      band: 'none', rowLayout: 'compact', navStyle: 'tabs', accent: '#008f26',
+      band: 'none', rowLayout: 'compact', navStyle: 'tabs', headingTone: 'ink', accent: '#008f26',
       colours: {
         light: { bg: '#f8f8f8', panel: '#ffffff', ink: '#202020', muted: '#666666', line: '#e5e5e5', accent: '#008f26', accentInk: '#000000' },
         dark: { bg: '#1a1a1a', panel: '#262626', ink: '#eeeeee', muted: '#a8a8a8', line: '#3a3a3a', accent: '#00c344', accentInk: '#000000' },
@@ -100,7 +101,7 @@ export const THEMES = [
       checkStyle: 'round', switchStyle: 'ios', pressStyle: 'highlight', round: 1, borders: 0, shadows: false,
       btnStyle: 'plain', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
       rowLayout: 'timeline', navStyle: 'tabs', titleAlign: 'centre', iconWeight: 'thin', spacing: 'tight',
-      accent: '#37352f',
+      headingTone: 'ink', tabTone: 'ink', accent: '#37352f',
       colours: {
         light: { bg: '#ffffff', panel: '#ffffff', ink: '#37352f', muted: '#6b6a67', line: '#e9e9e7', accent: '#37352f', accentInk: '#ffffff' },
         dark: { bg: '#191919', panel: '#202020', ink: '#ebebea', muted: '#9b9b9b', line: '#373737', accent: '#ebebea', accentInk: '#000000' },
@@ -114,7 +115,7 @@ export const THEMES = [
       checkStyle: 'round', switchStyle: 'ios', pressStyle: 'highlight', round: 3, borders: 1, shadows: false,
       btnStyle: 'tinted', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
       rowLayout: 'chat', navStyle: 'tabs', barBlur: true, titleAlign: 'centre', iconWeight: 'thin',
-      accent: '#2481cc',
+      headingTone: 'ink', accent: '#2481cc',
       colours: {
         light: { bg: '#efeff4', panel: '#ffffff', ink: '#000000', muted: '#686d71', line: '#d9dce0', accent: '#2481cc', accentInk: '#000000' },
         dark: { bg: '#17212b', panel: '#232e3c', ink: '#f5f5f5', muted: '#a8b4c0', line: '#344250', accent: '#6ab2f2', accentInk: '#000000' },
@@ -128,7 +129,7 @@ export const THEMES = [
       fieldStyle: 'outlined', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 0,
       borders: 2, shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system',
       band: 'none', rowLayout: 'compact', navStyle: 'rail', spacing: 'tight', headerStyle: 'filled',
-      accent: '#185abd',
+      headingTone: 'ink', accent: '#185abd',
       colours: {
         light: { bg: '#f3f2f1', panel: '#ffffff', ink: '#323130', muted: '#605e5c', line: '#edebe9', accent: '#185abd', accentInk: '#ffffff' },
         dark: { bg: '#1b1a19', panel: '#292827', ink: '#f3f2f1', muted: '#b3b0ad', line: '#484644', accent: '#6ea4ef', accentInk: '#000000' },
@@ -141,7 +142,8 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material',
       fieldStyle: 'ios', checkStyle: 'round', switchStyle: 'material', pressStyle: 'highlight', round: 3,
       borders: 1, shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system',
-      band: 'none', rowLayout: 'chat', navStyle: 'tabs', headerStyle: 'filled', accent: '#008069',
+      band: 'none', rowLayout: 'chat', navStyle: 'tabs', headerStyle: 'filled', headingTone: 'ink',
+      accent: '#008069',
       colours: {
         light: { bg: '#efeae2', panel: '#ffffff', ink: '#111b21', muted: '#54656f', line: '#e9edef', accent: '#008069', accentInk: '#ffffff' },
         dark: { bg: '#0b141a', panel: '#111b21', ink: '#e9edef', muted: '#8696a0', line: '#26343d', accent: '#00a884', accentInk: '#000000' },
@@ -154,7 +156,7 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material',
       fieldStyle: 'filled', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 3,
       borders: 1, shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system',
-      band: 'none', rowLayout: 'compact', navStyle: 'tabs', accent: '#6750a4',
+      band: 'none', rowLayout: 'compact', navStyle: 'tabs', headingTone: 'ink', accent: '#6750a4',
       colours: {
         light: { bg: '#fffbfe', panel: '#f3edf7', ink: '#1c1b1f', muted: '#49454f', line: '#cac4d0', accent: '#6750a4', accentInk: '#ffffff' },
         dark: { bg: '#141218', panel: '#211f26', ink: '#e6e1e5', muted: '#cac4d0', line: '#49454f', accent: '#d0bcff', accentInk: '#000000' },
@@ -165,10 +167,10 @@ export const THEMES = [
     look: {
       statusBar: 'header', tabStyle: 'plain', tabIconFill: true, listStyle: 'inset', typeStyle: 'ios',
       iconSet: 'ios', pageMotion: 'ios', sheetStyle: 'ios', toastStyle: 'ios', fieldStyle: 'ios',
-      checkStyle: 'round', switchStyle: 'ios', pressStyle: 'highlight', round: 3, borders: 1, shadows: false,
+      checkStyle: 'round', switchStyle: 'ios', pressStyle: 'highlight', borders: 1, shadows: false,
       btnStyle: 'plain', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
       rowLayout: 'compact', navStyle: 'tabs', barBlur: true, iconWeight: 'thin', headerStyle: 'large',
-      accent: '#007aff',
+      headingTone: 'ink', accent: '#007aff',
       colours: {
         light: { bg: '#f2f2f7', panel: '#ffffff', ink: '#000000', muted: '#6c6c70', line: '#c6c6c8', accent: '#007aff', accentInk: '#000000' },
         dark: { bg: '#000000', panel: '#1c1c1e', ink: '#ffffff', muted: '#98989d', line: '#38383a', accent: '#0a84ff', accentInk: '#000000' },
@@ -181,7 +183,7 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material',
       fieldStyle: 'filled', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 1,
       borders: 1, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'compact', navStyle: 'tabs', headerStyle: 'filled', accent: '#3f51b5',
+      rowLayout: 'compact', navStyle: 'tabs', headerStyle: 'filled', headingTone: 'ink', accent: '#3f51b5',
       colours: {
         light: { bg: '#fafafa', panel: '#ffffff', ink: '#212121', muted: '#616161', line: '#e0e0e0', accent: '#3f51b5', accentInk: '#ffffff' },
         dark: { bg: '#121212', panel: '#1e1e1e', ink: '#ffffff', muted: '#b3b3b3', line: '#373737', accent: '#9fa8da', accentInk: '#000000' },
@@ -195,7 +197,7 @@ export const THEMES = [
       checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 1, borders: 1,
       shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
       rowLayout: 'compact', navStyle: 'tabs', iconWeight: 'bold', tabIcons: true, barBlur: true,
-      accent: '#0095f6',
+      headingTone: 'ink', tabTone: 'ink', accent: '#0095f6',
       colours: {
         light: { bg: '#ffffff', panel: '#ffffff', ink: '#262626', muted: '#737373', line: '#dbdbdb', accent: '#0095f6', accentInk: '#000000' },
         dark: { bg: '#000000', panel: '#121212', ink: '#f5f5f5', muted: '#a8a8a8', line: '#262626', accent: '#4cb5f9', accentInk: '#000000' },
@@ -208,7 +210,8 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'none', sheetStyle: 'material', toastStyle: 'material',
       fieldStyle: 'outlined', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 0,
       borders: 3, shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system',
-      band: 'none', rowLayout: 'compact', navStyle: 'tabs', spacing: 'tight', accent: '#d32f2f',
+      band: 'none', rowLayout: 'compact', navStyle: 'tabs', spacing: 'tight', headingTone: 'ink',
+      accent: '#d32f2f',
       colours: {
         light: { bg: '#f2f2f2', panel: '#ffffff', ink: '#292929', muted: '#666666', line: '#cccccc', accent: '#d32f2f', accentInk: '#ffffff' },
         dark: { bg: '#181818', panel: '#242424', ink: '#f2f2f2', muted: '#b0b0b0', line: '#484848', accent: '#ef7777', accentInk: '#000000' },
@@ -222,7 +225,7 @@ export const THEMES = [
       checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 2,
       shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
       rowLayout: 'compact', navStyle: 'tabs', iconWeight: 'bold', tabIcons: true, barBlur: true,
-      accent: '#1d9bf0',
+      headingTone: 'ink', tabTone: 'ink', accent: '#1d9bf0',
       colours: {
         light: { bg: '#ffffff', panel: '#ffffff', ink: '#0f1419', muted: '#536471', line: '#eff3f4', accent: '#1d9bf0', accentInk: '#000000' },
         dark: { bg: '#000000', panel: '#000000', ink: '#e7e9ea', muted: '#71767b', line: '#2f3336', accent: '#1d9bf0', accentInk: '#000000' },
@@ -235,7 +238,7 @@ export const THEMES = [
       pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'square',
       switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 0, shadows: false, btnStyle: 'filled',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      spacing: 'roomy', iconWeight: 'bold', accent: '#1ed760',
+      spacing: 'roomy', iconWeight: 'bold', headingTone: 'ink', tabTone: 'ink', accent: '#1ed760',
       colours: {
         light: { bg: '#ffffff', panel: '#f6f6f6', ink: '#191414', muted: '#6a6a6a', line: '#e5e5e5', accent: '#1ed760', accentInk: '#000000' },
         dark: { bg: '#121212', panel: '#1f1f1f', ink: '#ffffff', muted: '#b3b3b3', line: '#2a2a2a', accent: '#1ed760', accentInk: '#000000' },
@@ -248,7 +251,8 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios',
       checkStyle: 'round', switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 1, shadows: false,
       btnStyle: 'tinted', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'compact', navStyle: 'tabs', iconWeight: 'bold', accent: '#ff0000',
+      rowLayout: 'compact', navStyle: 'tabs', iconWeight: 'bold', headingTone: 'ink', tabTone: 'ink',
+      accent: '#ff0000',
       colours: {
         light: { bg: '#ffffff', panel: '#ffffff', ink: '#0f0f0f', muted: '#606060', line: '#e5e5e5', accent: '#ff0000', accentInk: '#000000' },
         dark: { bg: '#0f0f0f', panel: '#212121', ink: '#f1f1f1', muted: '#aaaaaa', line: '#303030', accent: '#ff4444', accentInk: '#000000' },
@@ -261,7 +265,7 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material',
       fieldStyle: 'outlined', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 3,
       borders: 1, shadows: false, btnStyle: 'tinted', fontUi: 'system', fontLog: 'system', headFont: 'system',
-      band: 'none', rowLayout: 'compact', navStyle: 'tabs', accent: '#b3261e',
+      band: 'none', rowLayout: 'compact', navStyle: 'tabs', headingTone: 'ink', accent: '#b3261e',
       colours: {
         light: { bg: '#f6f8fc', panel: '#ffffff', ink: '#202124', muted: '#5f6368', line: '#dadce0', accent: '#b3261e', accentInk: '#ffffff' },
         dark: { bg: '#131314', panel: '#1e1f20', ink: '#e3e3e3', muted: '#c4c7c5', line: '#444746', accent: '#f2b8b5', accentInk: '#000000' },
@@ -274,7 +278,8 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios',
       checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 1,
       shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'compact', navStyle: 'tabs', iconWeight: 'bold', tabIcons: true, accent: '#fe2c55',
+      rowLayout: 'compact', navStyle: 'tabs', iconWeight: 'bold', tabIcons: true, headingTone: 'ink',
+      tabTone: 'ink', accent: '#fe2c55',
       colours: {
         light: { bg: '#ffffff', panel: '#ffffff', ink: '#161823', muted: '#6a6b7e', line: '#e3e3e4', accent: '#fe2c55', accentInk: '#000000' },
         dark: { bg: '#000000', panel: '#121212', ink: '#ffffff', muted: '#a6a6ab', line: '#2f2f2f', accent: '#fe2c55', accentInk: '#000000' },
@@ -283,11 +288,11 @@ export const THEMES = [
   { id: 'facebook', name: 'Facebook-style', group: 'inspired',
     desc: 'Blue actions, grey feed ground and rounded white cards',
     look: {
-      statusBar: 'header', tabStyle: 'plain', tabIconFill: true, typeStyle: 'ios', iconSet: 'material',
-      pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'square',
-      switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 0, shadows: false, btnStyle: 'filled',
-      fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      iconWeight: 'bold', accent: '#0866ff',
+      statusBar: 'header', tabStyle: 'plain', tabIconFill: true, listStyle: 'edge', typeStyle: 'ios',
+      iconSet: 'material', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios',
+      checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 0,
+      shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
+      rowLayout: 'card', navStyle: 'tabs', iconWeight: 'bold', headingTone: 'ink', accent: '#0866ff',
       colours: {
         light: { bg: '#f0f2f5', panel: '#ffffff', ink: '#050505', muted: '#65676b', line: '#ced0d4', accent: '#0866ff', accentInk: '#ffffff' },
         dark: { bg: '#18191a', panel: '#242526', ink: '#e4e6eb', muted: '#b0b3b8', line: '#3e4042', accent: '#4599ff', accentInk: '#000000' },
@@ -300,7 +305,7 @@ export const THEMES = [
       iconSet: 'ios', pageMotion: 'ios', sheetStyle: 'ios', toastStyle: 'ios', fieldStyle: 'ios',
       checkStyle: 'round', switchStyle: 'ios', pressStyle: 'highlight', round: 3, borders: 1, shadows: false,
       btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'chat', navStyle: 'tabs', accent: '#006aff',
+      rowLayout: 'chat', navStyle: 'tabs', headingTone: 'ink', tabTone: 'ink', accent: '#006aff',
       colours: {
         light: { bg: '#ffffff', panel: '#f5f5f5', ink: '#050505', muted: '#65676b', line: '#e4e6eb', accent: '#006aff', accentInk: '#ffffff' },
         dark: { bg: '#000000', panel: '#242526', ink: '#e4e6eb', muted: '#b0b3b8', line: '#3e4042', accent: '#0a7cff', accentInk: '#000000' },
@@ -313,7 +318,8 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios',
       checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 1,
       shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'compact', navStyle: 'tabs', iconWeight: 'bold', tabIcons: true, accent: '#101010',
+      rowLayout: 'compact', navStyle: 'tabs', iconWeight: 'bold', tabIcons: true, headingTone: 'ink',
+      tabTone: 'ink', accent: '#101010',
       colours: {
         light: { bg: '#ffffff', panel: '#fafafa', ink: '#101010', muted: '#737373', line: '#e0e0e0', accent: '#101010', accentInk: '#ffffff' },
         dark: { bg: '#101010', panel: '#181818', ink: '#f3f5f7', muted: '#999999', line: '#323232', accent: '#f3f5f7', accentInk: '#000000' },
@@ -322,11 +328,12 @@ export const THEMES = [
   { id: 'linkedin', name: 'LinkedIn-style', group: 'inspired',
     desc: 'Professional blue, warm grey ground and fine card borders',
     look: {
-      statusBar: 'header', tabStyle: 'plain', tabIconFill: true, typeStyle: 'ios', iconSet: 'material',
-      pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'square',
-      switchStyle: 'material', pressStyle: 'highlight', round: 1, borders: 2, shadows: false, btnStyle: 'filled',
-      fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      iconWeight: 'bold', accent: '#0a66c2',
+      statusBar: 'header', tabStyle: 'plain', tabIconFill: true, listStyle: 'edge', typeStyle: 'ios',
+      iconSet: 'material', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios',
+      checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 1, borders: 2,
+      shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
+      rowLayout: 'card', navStyle: 'tabs', iconWeight: 'bold', headingTone: 'ink', tabTone: 'ink',
+      accent: '#0a66c2',
       colours: {
         light: { bg: '#f4f2ee', panel: '#ffffff', ink: '#191919', muted: '#666666', line: '#e0dfdc', accent: '#0a66c2', accentInk: '#ffffff' },
         dark: { bg: '#000000', panel: '#1b1f23', ink: '#ffffff', muted: '#b0b4b8', line: '#38434f', accent: '#71b7fb', accentInk: '#000000' },
@@ -335,11 +342,12 @@ export const THEMES = [
   { id: 'reddit', name: 'Reddit-style', group: 'inspired',
     desc: 'Orange actions, compact discussions and grey feed cards',
     look: {
-      statusBar: 'header', tabStyle: 'plain', tabIconFill: true, typeStyle: 'ios', iconSet: 'material',
-      pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'square',
-      switchStyle: 'material', pressStyle: 'highlight', round: 1, borders: 1, shadows: false, btnStyle: 'filled',
-      fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      iconWeight: 'bold', tabActiveLabel: true, accent: '#d93900',
+      statusBar: 'header', tabStyle: 'plain', tabIconFill: true, listStyle: 'edge', typeStyle: 'ios',
+      iconSet: 'material', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios',
+      checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 1, borders: 1,
+      shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
+      rowLayout: 'card', navStyle: 'tabs', iconWeight: 'bold', tabActiveLabel: true, headingTone: 'ink',
+      tabTone: 'ink', accent: '#d93900',
       colours: {
         light: { bg: '#dae0e6', panel: '#ffffff', ink: '#1a1a1b', muted: '#5c6267', line: '#cccfd2', accent: '#d93900', accentInk: '#ffffff' },
         dark: { bg: '#0b1416', panel: '#1a282d', ink: '#eef1f3', muted: '#a7b0b5', line: '#34464e', accent: '#ff683b', accentInk: '#000000' },
@@ -352,7 +360,8 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios',
       checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 1,
       shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'chat', navStyle: 'rail', iconWeight: 'bold', spacing: 'tight', accent: '#5865f2',
+      rowLayout: 'chat', navStyle: 'rail', iconWeight: 'bold', spacing: 'tight', headingTone: 'ink',
+      tabTone: 'ink', accent: '#5865f2',
       colours: {
         light: { bg: '#f2f3f5', panel: '#ffffff', ink: '#313338', muted: '#5c5e66', line: '#dcdde1', accent: '#5865f2', accentInk: '#ffffff' },
         dark: { bg: '#313338', panel: '#2b2d31', ink: '#f2f3f5', muted: '#b5bac1', line: '#3f4147', accent: '#8991ff', accentInk: '#000000' },
@@ -365,7 +374,8 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material',
       fieldStyle: 'outlined', checkStyle: 'round', switchStyle: 'material', pressStyle: 'highlight', round: 1,
       borders: 1, shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system',
-      band: 'none', rowLayout: 'chat', navStyle: 'rail', spacing: 'tight', accent: '#611f69',
+      band: 'none', rowLayout: 'chat', navStyle: 'rail', spacing: 'tight', headingTone: 'ink', tabTone: 'ink',
+      accent: '#611f69',
       colours: {
         light: { bg: '#f8f8f8', panel: '#ffffff', ink: '#1d1c1d', muted: '#616061', line: '#dddddd', accent: '#611f69', accentInk: '#ffffff' },
         dark: { bg: '#1a1d21', panel: '#222529', ink: '#d1d2d3', muted: '#ababad', line: '#35383c', accent: '#d5a5db', accentInk: '#000000' },
@@ -378,7 +388,7 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios',
       checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 1, borders: 1,
       shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'chat', navStyle: 'rail', spacing: 'tight', accent: '#5b5fc7',
+      rowLayout: 'chat', navStyle: 'rail', spacing: 'tight', headingTone: 'ink', accent: '#5b5fc7',
       colours: {
         light: { bg: '#f5f5f5', panel: '#ffffff', ink: '#242424', muted: '#616161', line: '#e0e0e0', accent: '#5b5fc7', accentInk: '#ffffff' },
         dark: { bg: '#1f1f1f', panel: '#292929', ink: '#ffffff', muted: '#adadad', line: '#424242', accent: '#a6a7dc', accentInk: '#000000' },
@@ -391,7 +401,7 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios',
       checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 1,
       shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'compact', navStyle: 'tabs', accent: '#0b5cff',
+      rowLayout: 'compact', navStyle: 'tabs', headingTone: 'ink', tabTone: 'ink', accent: '#0b5cff',
       colours: {
         light: { bg: '#f7f9fa', panel: '#ffffff', ink: '#232333', muted: '#6b737d', line: '#dfe3e8', accent: '#0b5cff', accentInk: '#ffffff' },
         dark: { bg: '#101014', panel: '#232329', ink: '#f5f5f5', muted: '#a6a8b1', line: '#393941', accent: '#6b9bff', accentInk: '#000000' },
@@ -404,7 +414,7 @@ export const THEMES = [
       iconSet: 'ios', pageMotion: 'ios', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios',
       checkStyle: 'round', switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 1, shadows: false,
       btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'chat', navStyle: 'tabs', accent: '#3a76f0',
+      rowLayout: 'chat', navStyle: 'tabs', headingTone: 'ink', accent: '#3a76f0',
       colours: {
         light: { bg: '#ffffff', panel: '#f6f6f6', ink: '#1b1b1b', muted: '#5e5e5e', line: '#e9e9e9', accent: '#3a76f0', accentInk: '#000000' },
         dark: { bg: '#121212', panel: '#242424', ink: '#e9e9e9', muted: '#b9b9b9', line: '#3b3b3b', accent: '#7aa7ff', accentInk: '#000000' },
@@ -417,7 +427,7 @@ export const THEMES = [
       iconSet: 'ios', pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios',
       checkStyle: 'round', switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 1, shadows: false,
       btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'chat', navStyle: 'tabs', titleAlign: 'centre', accent: '#06c755',
+      rowLayout: 'chat', navStyle: 'tabs', titleAlign: 'centre', headingTone: 'ink', accent: '#06c755',
       colours: {
         light: { bg: '#f7f7f7', panel: '#ffffff', ink: '#111111', muted: '#717171', line: '#e5e5e5', accent: '#06c755', accentInk: '#000000' },
         dark: { bg: '#111111', panel: '#202020', ink: '#f5f5f5', muted: '#aaaaaa', line: '#353535', accent: '#06c755', accentInk: '#000000' },
@@ -430,7 +440,7 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'ios', sheetStyle: 'ios', toastStyle: 'ios', fieldStyle: 'ios',
       checkStyle: 'round', switchStyle: 'ios', pressStyle: 'highlight', round: 1, borders: 1, shadows: false,
       btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'compact', navStyle: 'tabs', titleAlign: 'centre', accent: '#07c160',
+      rowLayout: 'compact', navStyle: 'tabs', titleAlign: 'centre', headingTone: 'ink', accent: '#07c160',
       colours: {
         light: { bg: '#ededed', panel: '#ffffff', ink: '#191919', muted: '#666666', line: '#d9d9d9', accent: '#07c160', accentInk: '#000000' },
         dark: { bg: '#111111', panel: '#191919', ink: '#e5e5e5', muted: '#a6a6a6', line: '#303030', accent: '#07c160', accentInk: '#000000' },
@@ -444,7 +454,7 @@ export const THEMES = [
       checkStyle: 'round', switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 1, shadows: false,
       btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
       rowLayout: 'compact', navStyle: 'tabs', iconWeight: 'bold', tabIcons: true, titleAlign: 'centre',
-      accent: '#fffc00',
+      headingTone: 'ink', tabTone: 'ink', accent: '#fffc00',
       colours: {
         light: { bg: '#ffffff', panel: '#f5f5f5', ink: '#16191c', muted: '#656b73', line: '#e6e8eb', accent: '#fffc00', accentInk: '#000000' },
         dark: { bg: '#121212', panel: '#1e1e1e', ink: '#ffffff', muted: '#b2b2b2', line: '#333333', accent: '#fffc00', accentInk: '#000000' },
@@ -457,7 +467,7 @@ export const THEMES = [
       pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'round',
       switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 0, shadows: false, btnStyle: 'filled',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      spacing: 'roomy', iconWeight: 'bold', tabIcons: true, accent: '#e60023',
+      spacing: 'roomy', iconWeight: 'bold', tabIcons: true, headingTone: 'ink', tabTone: 'ink', accent: '#e60023',
       colours: {
         light: { bg: '#ffffff', panel: '#f0f0f0', ink: '#111111', muted: '#5f5f5f', line: '#dedede', accent: '#e60023', accentInk: '#ffffff' },
         dark: { bg: '#101010', panel: '#262626', ink: '#efefef', muted: '#b0b0b0', line: '#3b3b3b', accent: '#ff4b68', accentInk: '#000000' },
@@ -471,7 +481,7 @@ export const THEMES = [
       fieldStyle: 'filled', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 0,
       borders: 1, shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system',
       band: 'none', rowLayout: 'compact', navStyle: 'tabs', iconWeight: 'bold', tabIcons: true,
-      headerStyle: 'filled', accent: '#001935',
+      headerStyle: 'filled', headingTone: 'ink', tabTone: 'ink', accent: '#001935',
       colours: {
         light: { bg: '#f2f6fa', panel: '#ffffff', ink: '#001935', muted: '#536471', line: '#d9e0e8', accent: '#001935', accentInk: '#ffffff' },
         dark: { bg: '#001935', panel: '#122943', ink: '#ffffff', muted: '#b5c5d6', line: '#2b405a', accent: '#00b8ff', accentInk: '#000000' },
@@ -484,7 +494,7 @@ export const THEMES = [
       pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'square',
       switchStyle: 'material', pressStyle: 'highlight', round: 1, borders: 0, shadows: false, btnStyle: 'filled',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      spacing: 'roomy', iconWeight: 'bold', accent: '#e50914',
+      spacing: 'roomy', iconWeight: 'bold', headingTone: 'ink', tabTone: 'ink', accent: '#e50914',
       colours: {
         light: { bg: '#ffffff', panel: '#f3f3f3', ink: '#141414', muted: '#666666', line: '#dedede', accent: '#e50914', accentInk: '#ffffff' },
         dark: { bg: '#141414', panel: '#232323', ink: '#ffffff', muted: '#b3b3b3', line: '#3b3b3b', accent: '#e50914', accentInk: '#ffffff' },
@@ -497,7 +507,7 @@ export const THEMES = [
       pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'square',
       switchStyle: 'material', pressStyle: 'highlight', round: 1, borders: 0, shadows: false, btnStyle: 'filled',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      spacing: 'roomy', iconWeight: 'thin', accent: '#0063e5',
+      spacing: 'roomy', iconWeight: 'thin', headingTone: 'ink', tabTone: 'ink', accent: '#0063e5',
       colours: {
         light: { bg: '#f5f6fa', panel: '#ffffff', ink: '#25283b', muted: '#62667b', line: '#d7d9e3', accent: '#0063e5', accentInk: '#ffffff' },
         dark: { bg: '#040714', panel: '#161a2b', ink: '#f9f9f9', muted: '#b5b8c5', line: '#34394e', accent: '#69b6ff', accentInk: '#000000' },
@@ -510,7 +520,7 @@ export const THEMES = [
       pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'square',
       switchStyle: 'material', pressStyle: 'highlight', round: 1, borders: 0, shadows: false, btnStyle: 'filled',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      spacing: 'roomy', iconWeight: 'bold', accent: '#007cad',
+      spacing: 'roomy', iconWeight: 'bold', headingTone: 'ink', tabTone: 'ink', accent: '#007cad',
       colours: {
         light: { bg: '#ffffff', panel: '#f1f4f8', ink: '#0f171e', muted: '#536575', line: '#d5dde5', accent: '#007cad', accentInk: '#ffffff' },
         dark: { bg: '#0f171e', panel: '#1b2530', ink: '#ffffff', muted: '#b6c3ce', line: '#334352', accent: '#00a8e1', accentInk: '#000000' },
@@ -521,10 +531,10 @@ export const THEMES = [
     look: {
       statusBar: 'header', tabStyle: 'plain', tabIconFill: true, listStyle: 'edge', typeStyle: 'ios',
       iconSet: 'ios', pageMotion: 'ios', sheetStyle: 'ios', toastStyle: 'ios', fieldStyle: 'ios',
-      checkStyle: 'round', switchStyle: 'ios', pressStyle: 'highlight', round: 1, borders: 1, shadows: false,
+      checkStyle: 'round', switchStyle: 'ios', pressStyle: 'highlight', borders: 1, shadows: false,
       btnStyle: 'tinted', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'compact', navStyle: 'tabs', barBlur: true, iconWeight: 'thin', headerStyle: 'large',
-      accent: '#fa233b',
+      rowLayout: 'compact', navStyle: 'tabs', barBlur: true, iconWeight: 'thin', headerStyle: 'large', round: 1,
+      headingTone: 'ink', accent: '#fa233b',
       colours: {
         light: { bg: '#f2f2f7', panel: '#ffffff', ink: '#1d1d1f', muted: '#6c6c70', line: '#d1d1d6', accent: '#fa233b', accentInk: '#000000' },
         dark: { bg: '#000000', panel: '#1c1c1e', ink: '#f5f5f7', muted: '#98989d', line: '#38383a', accent: '#ff375f', accentInk: '#000000' },
@@ -537,7 +547,7 @@ export const THEMES = [
       pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'square',
       switchStyle: 'material', pressStyle: 'highlight', round: 1, borders: 0, shadows: false, btnStyle: 'filled',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      listStyle: 'edge', accent: '#ff5500',
+      listStyle: 'edge', headingTone: 'ink', tabTone: 'ink', accent: '#ff5500',
       colours: {
         light: { bg: '#f2f2f2', panel: '#ffffff', ink: '#333333', muted: '#666666', line: '#e5e5e5', accent: '#ff5500', accentInk: '#000000' },
         dark: { bg: '#111111', panel: '#222222', ink: '#f2f2f2', muted: '#b2b2b2', line: '#383838', accent: '#ff7700', accentInk: '#000000' },
@@ -546,12 +556,12 @@ export const THEMES = [
   { id: 'duolingo', name: 'Duolingo-style', group: 'inspired',
     desc: 'Bright green actions, thick outlines and very round controls',
     look: {
-      statusBar: 'page', tabStyle: 'indicator', tabIconFill: true, listStyle: 'inset', typeStyle: 'ios',
+      statusBar: 'page', tabStyle: 'plain', tabIconFill: true, listStyle: 'inset', typeStyle: 'ios',
       iconSet: 'soft', pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material',
-      fieldStyle: 'filled', checkStyle: 'round', switchStyle: 'material', pressStyle: 'highlight', round: 3,
+      fieldStyle: 'outlined', checkStyle: 'round', switchStyle: 'material', pressStyle: 'highlight', round: 3,
       borders: 3, shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system',
       band: 'none', rowLayout: 'compact', navStyle: 'tabs', iconWeight: 'bold', spacing: 'roomy',
-      accent: '#58cc02',
+      headingTone: 'ink', accent: '#58cc02',
       colours: {
         light: { bg: '#ffffff', panel: '#ffffff', ink: '#3c3c3c', muted: '#767676', line: '#e5e5e5', accent: '#58cc02', accentInk: '#000000' },
         dark: { bg: '#131f24', panel: '#202f36', ink: '#f1f7fb', muted: '#afbec5', line: '#37464f', accent: '#58cc02', accentInk: '#000000' },
@@ -564,7 +574,8 @@ export const THEMES = [
       pageMotion: 'ios', sheetStyle: 'ios', toastStyle: 'ios', fieldStyle: 'ios', checkStyle: 'round',
       switchStyle: 'ios', pressStyle: 'highlight', round: 3, borders: 1, shadows: false, btnStyle: 'filled',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      barBlur: true, spacing: 'roomy', headerStyle: 'large', accent: '#ff385c',
+      barBlur: true, spacing: 'roomy', headerStyle: 'large', headingTone: 'ink', tabTone: 'ink',
+      accent: '#ff385c',
       colours: {
         light: { bg: '#ffffff', panel: '#f7f7f7', ink: '#222222', muted: '#6a6a6a', line: '#dddddd', accent: '#ff385c', accentInk: '#000000' },
         dark: { bg: '#121212', panel: '#222222', ink: '#f7f7f7', muted: '#b0b0b0', line: '#444444', accent: '#ff6682', accentInk: '#000000' },
@@ -577,7 +588,7 @@ export const THEMES = [
       pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'square',
       switchStyle: 'material', pressStyle: 'highlight', round: 1, borders: 1, shadows: false, btnStyle: 'filled',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      iconWeight: 'bold', spacing: 'roomy', accent: '#000000',
+      iconWeight: 'bold', spacing: 'roomy', headingTone: 'ink', tabTone: 'ink', accent: '#000000',
       colours: {
         light: { bg: '#ffffff', panel: '#f3f3f3', ink: '#000000', muted: '#545454', line: '#e2e2e2', accent: '#000000', accentInk: '#ffffff' },
         dark: { bg: '#000000', panel: '#1f1f1f', ink: '#ffffff', muted: '#afafaf', line: '#333333', accent: '#ffffff', accentInk: '#000000' },
@@ -590,7 +601,7 @@ export const THEMES = [
       pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'filled',
       checkStyle: 'round', switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 1, shadows: false,
       btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'card', navStyle: 'tabs', spacing: 'roomy', accent: '#00804a',
+      rowLayout: 'card', navStyle: 'tabs', spacing: 'roomy', headingTone: 'ink', accent: '#00804a',
       colours: {
         light: { bg: '#f7f7f7', panel: '#ffffff', ink: '#1c1c1c', muted: '#676767', line: '#e5e5e5', accent: '#00804a', accentInk: '#ffffff' },
         dark: { bg: '#101c17', panel: '#1b2b23', ink: '#f1f8f4', muted: '#adc0b4', line: '#35483c', accent: '#00b14f', accentInk: '#000000' },
@@ -603,7 +614,7 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material',
       fieldStyle: 'filled', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 3,
       borders: 1, shadows: false, btnStyle: 'tinted', fontUi: 'system', fontLog: 'system', headFont: 'system',
-      band: 'none', rowLayout: 'compact', navStyle: 'tabs', accent: '#1a73e8',
+      band: 'none', rowLayout: 'compact', navStyle: 'tabs', headingTone: 'ink', accent: '#1a73e8',
       colours: {
         light: { bg: '#f8f9fa', panel: '#ffffff', ink: '#202124', muted: '#5f6368', line: '#dadce0', accent: '#1a73e8', accentInk: '#000000' },
         dark: { bg: '#202124', panel: '#303134', ink: '#e8eaed', muted: '#bdc1c6', line: '#5f6368', accent: '#8ab4f8', accentInk: '#000000' },
@@ -616,7 +627,7 @@ export const THEMES = [
       iconSet: 'material', pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material',
       fieldStyle: 'outlined', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 1,
       borders: 2, shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system',
-      band: 'none', rowLayout: 'timeline', navStyle: 'tabs', accent: '#1a73e8',
+      band: 'none', rowLayout: 'timeline', navStyle: 'tabs', headingTone: 'ink', accent: '#1a73e8',
       colours: {
         light: { bg: '#ffffff', panel: '#f8fafd', ink: '#3c4043', muted: '#5f6368', line: '#dadce0', accent: '#1a73e8', accentInk: '#000000' },
         dark: { bg: '#131314', panel: '#1e1f20', ink: '#e3e3e3', muted: '#c4c7c5', line: '#444746', accent: '#a8c7fa', accentInk: '#000000' },
@@ -629,7 +640,7 @@ export const THEMES = [
       pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'outlined',
       checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 2,
       shadows: false, btnStyle: 'tinted', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'card', navStyle: 'tabs', accent: '#fbbc04',
+      rowLayout: 'card', navStyle: 'tabs', headingTone: 'ink', tabTone: 'ink', accent: '#fbbc04',
       colours: {
         light: { bg: '#ffffff', panel: '#ffffff', ink: '#202124', muted: '#5f6368', line: '#e0e0e0', accent: '#fbbc04', accentInk: '#000000' },
         dark: { bg: '#202124', panel: '#28292a', ink: '#e8eaed', muted: '#bdc1c6', line: '#5f6368', accent: '#fbbc04', accentInk: '#000000' },
@@ -642,7 +653,7 @@ export const THEMES = [
       pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'filled',
       checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 1,
       shadows: false, btnStyle: 'tinted', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'card', navStyle: 'rail', accent: '#0b57d0',
+      rowLayout: 'card', navStyle: 'rail', headingTone: 'ink', accent: '#0b57d0',
       colours: {
         light: { bg: '#f8fafd', panel: '#ffffff', ink: '#1f1f1f', muted: '#444746', line: '#c4c7c5', accent: '#0b57d0', accentInk: '#ffffff' },
         dark: { bg: '#131314', panel: '#1e1f20', ink: '#e3e3e3', muted: '#c4c7c5', line: '#444746', accent: '#a8c7fa', accentInk: '#000000' },
@@ -655,7 +666,8 @@ export const THEMES = [
       iconSet: 'sharp', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material',
       fieldStyle: 'outlined', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 0,
       borders: 2, shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system',
-      band: 'none', rowLayout: 'compact', navStyle: 'rail', spacing: 'tight', accent: '#0061ff',
+      band: 'none', rowLayout: 'compact', navStyle: 'rail', spacing: 'tight', headingTone: 'ink', tabTone: 'ink',
+      accent: '#0061ff',
       colours: {
         light: { bg: '#f7f5f2', panel: '#ffffff', ink: '#1e1919', muted: '#627280', line: '#d8d3cc', accent: '#0061ff', accentInk: '#ffffff' },
         dark: { bg: '#1e1919', panel: '#2b2929', ink: '#f7f5f2', muted: '#b8b1a9', line: '#484444', accent: '#7daaff', accentInk: '#000000' },
@@ -668,7 +680,7 @@ export const THEMES = [
       pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'outlined',
       checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 1, borders: 1,
       btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'card', navStyle: 'rail', spacing: 'tight', accent: '#0c66e4',
+      rowLayout: 'card', navStyle: 'rail', spacing: 'tight', headingTone: 'ink', accent: '#0c66e4',
       colours: {
         light: { bg: '#f1f2f4', panel: '#ffffff', ink: '#172b4d', muted: '#44546f', line: '#dcdfe4', accent: '#0c66e4', accentInk: '#ffffff' },
         dark: { bg: '#1d2125', panel: '#282e33', ink: '#b6c2cf', muted: '#9fadbc', line: '#454f59', accent: '#579dff', accentInk: '#000000' },
@@ -681,7 +693,7 @@ export const THEMES = [
       pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'round',
       switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 1, shadows: false, btnStyle: 'filled',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'compact',
-      navStyle: 'rail', spacing: 'tight', accent: '#f06a6a',
+      navStyle: 'rail', spacing: 'tight', headingTone: 'ink', accent: '#f06a6a',
       colours: {
         light: { bg: '#f9f8f8', panel: '#ffffff', ink: '#1e1f21', muted: '#6d6e6f', line: '#edeae9', accent: '#f06a6a', accentInk: '#000000' },
         dark: { bg: '#1e1f21', panel: '#252628', ink: '#f5f4f3', muted: '#a2a0a2', line: '#424244', accent: '#f58a8a', accentInk: '#000000' },
@@ -695,7 +707,7 @@ export const THEMES = [
       checkStyle: 'round', switchStyle: 'ios', pressStyle: 'highlight', round: 1, borders: 1, shadows: false,
       btnStyle: 'plain', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
       rowLayout: 'compact', navStyle: 'tabs', iconWeight: 'thin', headerStyle: 'large', spacing: 'tight',
-      accent: '#dc4c3e',
+      headingTone: 'ink', accent: '#dc4c3e',
       colours: {
         light: { bg: '#fafafa', panel: '#ffffff', ink: '#202020', muted: '#666666', line: '#eeeeee', accent: '#dc4c3e', accentInk: '#000000' },
         dark: { bg: '#1f1f1f', panel: '#282828', ink: '#eeeeee', muted: '#a0a0a0', line: '#3d3d3d', accent: '#ff786b', accentInk: '#000000' },
@@ -706,10 +718,10 @@ export const THEMES = [
     look: {
       statusBar: 'header', tabStyle: 'plain', tabIconFill: true, listStyle: 'inset', typeStyle: 'ios',
       iconSet: 'ios', pageMotion: 'ios', sheetStyle: 'ios', toastStyle: 'ios', fieldStyle: 'ios',
-      checkStyle: 'square', switchStyle: 'ios', pressStyle: 'highlight', round: 3, borders: 1, shadows: false,
+      checkStyle: 'square', switchStyle: 'ios', pressStyle: 'highlight', borders: 1, shadows: false,
       btnStyle: 'plain', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
       rowLayout: 'compact', navStyle: 'tabs', barBlur: true, iconWeight: 'thin', headerStyle: 'large',
-      spacing: 'roomy', accent: '#147efb',
+      spacing: 'roomy', headingTone: 'ink', accent: '#147efb',
       colours: {
         light: { bg: '#f7f7f5', panel: '#ffffff', ink: '#242424', muted: '#71716e', line: '#e5e5e2', accent: '#147efb', accentInk: '#000000' },
         dark: { bg: '#1c1c1e', panel: '#2c2c2e', ink: '#f2f2f7', muted: '#aeaeb2', line: '#48484a', accent: '#5aa5ff', accentInk: '#000000' },
@@ -720,9 +732,10 @@ export const THEMES = [
     look: {
       statusBar: 'header', tabStyle: 'plain', tabIconFill: true, typeStyle: 'ios', iconSet: 'ios',
       pageMotion: 'ios', sheetStyle: 'ios', toastStyle: 'ios', fieldStyle: 'ios', checkStyle: 'round',
-      switchStyle: 'ios', pressStyle: 'highlight', round: 3, borders: 1, shadows: false, btnStyle: 'tinted',
+      switchStyle: 'ios', pressStyle: 'highlight', borders: 1, shadows: false, btnStyle: 'tinted',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      barBlur: true, iconWeight: 'thin', headerStyle: 'large', spacing: 'roomy', accent: '#2a6df4',
+      barBlur: true, iconWeight: 'thin', headerStyle: 'large', spacing: 'roomy', headingTone: 'ink',
+      tabTone: 'ink', accent: '#2a6df4',
       colours: {
         light: { bg: '#faf9f6', panel: '#ffffff', ink: '#292929', muted: '#6d6d6a', line: '#e7e5e0', accent: '#2a6df4', accentInk: '#000000' },
         dark: { bg: '#1b1b1c', panel: '#262627', ink: '#f3f2ef', muted: '#aaa9a5', line: '#3b3b3d', accent: '#7ba9ff', accentInk: '#000000' },
@@ -736,7 +749,7 @@ export const THEMES = [
       fieldStyle: 'outlined', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 0,
       borders: 1, shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system',
       band: 'none', rowLayout: 'compact', navStyle: 'rail', spacing: 'tight', headerStyle: 'filled',
-      accent: '#7719aa',
+      headingTone: 'ink', accent: '#7719aa',
       colours: {
         light: { bg: '#f5f5f5', panel: '#ffffff', ink: '#242424', muted: '#616161', line: '#e1dfdd', accent: '#7719aa', accentInk: '#ffffff' },
         dark: { bg: '#1f1f1f', panel: '#292929', ink: '#f5f5f5', muted: '#b3b0ad', line: '#484644', accent: '#c49be8', accentInk: '#000000' },
@@ -750,7 +763,7 @@ export const THEMES = [
       fieldStyle: 'outlined', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 1,
       borders: 1, shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system',
       band: 'none', rowLayout: 'compact', navStyle: 'tabs', spacing: 'tight', headerStyle: 'filled',
-      accent: '#0078d4',
+      headingTone: 'ink', accent: '#0078d4',
       colours: {
         light: { bg: '#f3f6fc', panel: '#ffffff', ink: '#242424', muted: '#616161', line: '#e1dfdd', accent: '#0078d4', accentInk: '#000000' },
         dark: { bg: '#1f1f1f', panel: '#292929', ink: '#f5f5f5', muted: '#b3b0ad', line: '#484644', accent: '#75b6e7', accentInk: '#000000' },
@@ -761,10 +774,10 @@ export const THEMES = [
     look: {
       statusBar: 'header', tabStyle: 'plain', tabIconFill: true, listStyle: 'inset', typeStyle: 'ios',
       iconSet: 'ios', pageMotion: 'ios', sheetStyle: 'ios', toastStyle: 'ios', fieldStyle: 'ios',
-      checkStyle: 'round', switchStyle: 'ios', pressStyle: 'highlight', round: 3, borders: 1, shadows: false,
+      checkStyle: 'round', switchStyle: 'ios', pressStyle: 'highlight', borders: 1, shadows: false,
       btnStyle: 'plain', fontUi: 'system', fontLog: 'serif', headFont: 'system', band: 'none',
       rowLayout: 'compact', navStyle: 'tabs', barBlur: true, iconWeight: 'thin', headerStyle: 'large',
-      accent: '#ac7900',
+      headingTone: 'ink', accent: '#ac7900',
       colours: {
         light: { bg: '#f2f2f7', panel: '#ffffff', ink: '#1c1c1e', muted: '#6c6c70', line: '#d1d1d6', accent: '#ac7900', accentInk: '#000000' },
         dark: { bg: '#000000', panel: '#1c1c1e', ink: '#ffffff', muted: '#98989d', line: '#38383a', accent: '#ffd60a', accentInk: '#000000' },
@@ -775,10 +788,10 @@ export const THEMES = [
     look: {
       statusBar: 'header', tabStyle: 'plain', tabIconFill: true, listStyle: 'inset', typeStyle: 'ios',
       iconSet: 'ios', pageMotion: 'ios', sheetStyle: 'ios', toastStyle: 'ios', fieldStyle: 'ios',
-      checkStyle: 'round', switchStyle: 'ios', pressStyle: 'highlight', round: 3, borders: 1, shadows: false,
+      checkStyle: 'round', switchStyle: 'ios', pressStyle: 'highlight', borders: 1, shadows: false,
       btnStyle: 'plain', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card',
       navStyle: 'tabs', barBlur: true, iconWeight: 'thin', headerStyle: 'large', spacing: 'roomy',
-      accent: '#e93651',
+      headingTone: 'ink', accent: '#e93651',
       colours: {
         light: { bg: '#f2f2f7', panel: '#ffffff', ink: '#1c1c1e', muted: '#6c6c70', line: '#d1d1d6', accent: '#e93651', accentInk: '#000000' },
         dark: { bg: '#000000', panel: '#1c1c1e', ink: '#ffffff', muted: '#98989d', line: '#38383a', accent: '#ff6482', accentInk: '#000000' },
@@ -791,7 +804,7 @@ export const THEMES = [
       pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'square',
       switchStyle: 'material', pressStyle: 'highlight', round: 1, borders: 1, shadows: false, btnStyle: 'filled',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      iconWeight: 'bold', accent: '#fc4c02',
+      iconWeight: 'bold', headingTone: 'ink', accent: '#fc4c02',
       colours: {
         light: { bg: '#f7f7fa', panel: '#ffffff', ink: '#242428', muted: '#66666b', line: '#dedee3', accent: '#fc4c02', accentInk: '#000000' },
         dark: { bg: '#090909', panel: '#1c1c1c', ink: '#f5f5fa', muted: '#aaaab0', line: '#38383d', accent: '#ff763b', accentInk: '#000000' },
@@ -804,7 +817,7 @@ export const THEMES = [
       pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'square',
       switchStyle: 'material', pressStyle: 'highlight', round: 0, borders: 0, shadows: false, btnStyle: 'filled',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      spacing: 'roomy', iconWeight: 'bold', tabIcons: true, accent: '#c8ff00',
+      spacing: 'roomy', iconWeight: 'bold', tabIcons: true, headingTone: 'ink', tabTone: 'ink', accent: '#c8ff00',
       colours: {
         light: { bg: '#ffffff', panel: '#f5f5f5', ink: '#111111', muted: '#656565', line: '#e5e5e5', accent: '#c8ff00', accentInk: '#000000' },
         dark: { bg: '#000000', panel: '#1a1a1a', ink: '#ffffff', muted: '#b0b0b0', line: '#333333', accent: '#c8ff00', accentInk: '#000000' },
@@ -817,7 +830,7 @@ export const THEMES = [
       pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'round',
       switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 0, shadows: false, btnStyle: 'filled',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      spacing: 'roomy', accent: '#f47c20',
+      spacing: 'roomy', headingTone: 'ink', tabTone: 'ink', accent: '#f47c20',
       colours: {
         light: { bg: '#fff9f1', panel: '#ffffff', ink: '#413d45', muted: '#6b6570', line: '#e8dfd4', accent: '#f47c20', accentInk: '#000000' },
         dark: { bg: '#211f2b', panel: '#302c3e', ink: '#f6f0e9', muted: '#c1b8cb', line: '#494257', accent: '#ffad66', accentInk: '#000000' },
@@ -830,7 +843,8 @@ export const THEMES = [
       pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'square',
       switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 0, shadows: false, btnStyle: 'tinted',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      spacing: 'roomy', iconWeight: 'thin', barBlur: true, tabActiveLabel: true, accent: '#2869b2',
+      spacing: 'roomy', iconWeight: 'thin', barBlur: true, tabActiveLabel: true, headingTone: 'ink',
+      tabTone: 'ink', accent: '#2869b2',
       colours: {
         light: { bg: '#eef6fc', panel: '#ffffff', ink: '#20334e', muted: '#576b80', line: '#d4e3ef', accent: '#2869b2', accentInk: '#ffffff' },
         dark: { bg: '#10233f', panel: '#1b3454', ink: '#f3f7fc', muted: '#b0c5dc', line: '#365274', accent: '#92c4ff', accentInk: '#000000' },
@@ -841,9 +855,9 @@ export const THEMES = [
     look: {
       statusBar: 'header', tabStyle: 'plain', listStyle: 'edge', typeStyle: 'ios', iconSet: 'ios',
       pageMotion: 'fade', sheetStyle: 'ios', toastStyle: 'ios', fieldStyle: 'ios', checkStyle: 'round',
-      switchStyle: 'ios', pressStyle: 'highlight', round: 0, borders: 0, shadows: false, btnStyle: 'plain',
+      switchStyle: 'ios', pressStyle: 'highlight', borders: 0, shadows: false, btnStyle: 'plain',
       fontUi: 'system', fontLog: 'serif', headFont: 'serif', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      iconWeight: 'thin', spacing: 'roomy', accent: '#1a8917',
+      iconWeight: 'thin', spacing: 'roomy', round: 0, headingTone: 'ink', tabTone: 'ink', accent: '#1a8917',
       colours: {
         light: { bg: '#ffffff', panel: '#faf9f6', ink: '#242424', muted: '#6b6b6b', line: '#f2f2f2', accent: '#1a8917', accentInk: '#000000' },
         dark: { bg: '#121212', panel: '#1c1c1c', ink: '#e6e6e6', muted: '#a3a3a3', line: '#333333', accent: '#6cce69', accentInk: '#000000' },
@@ -854,9 +868,9 @@ export const THEMES = [
     look: {
       statusBar: 'header', tabStyle: 'plain', listStyle: 'edge', typeStyle: 'ios', iconSet: 'ios',
       pageMotion: 'fade', sheetStyle: 'ios', toastStyle: 'ios', fieldStyle: 'ios', checkStyle: 'round',
-      switchStyle: 'ios', pressStyle: 'highlight', round: 1, borders: 0, shadows: false, btnStyle: 'filled',
+      switchStyle: 'ios', pressStyle: 'highlight', borders: 0, shadows: false, btnStyle: 'filled',
       fontUi: 'system', fontLog: 'serif', headFont: 'serif', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      spacing: 'roomy', accent: '#ff6719',
+      spacing: 'roomy', round: 1, headingTone: 'ink', tabTone: 'ink', accent: '#ff6719',
       colours: {
         light: { bg: '#faf9f6', panel: '#ffffff', ink: '#363737', muted: '#717171', line: '#e3e2de', accent: '#ff6719', accentInk: '#000000' },
         dark: { bg: '#161616', panel: '#222222', ink: '#eeeeee', muted: '#ababab', line: '#383838', accent: '#ff853d', accentInk: '#000000' },
@@ -867,9 +881,9 @@ export const THEMES = [
     look: {
       statusBar: 'header', tabStyle: 'plain', listStyle: 'edge', typeStyle: 'ios', iconSet: 'sharp',
       pageMotion: 'fade', sheetStyle: 'ios', toastStyle: 'ios', fieldStyle: 'ios', checkStyle: 'round',
-      switchStyle: 'ios', pressStyle: 'highlight', round: 0, borders: 0, shadows: false, btnStyle: 'plain',
+      switchStyle: 'ios', pressStyle: 'highlight', borders: 0, shadows: false, btnStyle: 'plain',
       fontUi: 'system', fontLog: 'serif', headFont: 'serif', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      iconWeight: 'thin', spacing: 'roomy', accent: '#0073bb',
+      iconWeight: 'thin', spacing: 'roomy', round: 0, headingTone: 'ink', tabTone: 'ink', accent: '#0073bb',
       colours: {
         light: { bg: '#fbf5e9', panel: '#fffaf0', ink: '#29251f', muted: '#6b6256', line: '#ded5c5', accent: '#0073bb', accentInk: '#ffffff' },
         dark: { bg: '#121212', panel: '#202020', ink: '#dfdfdf', muted: '#a6a6a6', line: '#3a3a3a', accent: '#76bce8', accentInk: '#000000' },
@@ -882,7 +896,8 @@ export const THEMES = [
       iconSet: 'sharp', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material',
       fieldStyle: 'outlined', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 1,
       borders: 2, shadows: false, btnStyle: 'outlined', fontUi: 'system', fontLog: 'system', headFont: 'system',
-      band: 'none', rowLayout: 'compact', navStyle: 'rail', spacing: 'tight', accent: '#0969da',
+      band: 'none', rowLayout: 'compact', navStyle: 'rail', spacing: 'tight', headingTone: 'ink',
+      accent: '#0969da',
       colours: {
         light: { bg: '#f6f8fa', panel: '#ffffff', ink: '#1f2328', muted: '#59636e', line: '#d1d9e0', accent: '#0969da', accentInk: '#ffffff' },
         dark: { bg: '#0d1117', panel: '#151b23', ink: '#f0f6fc', muted: '#9198a1', line: '#3d444d', accent: '#4493f8', accentInk: '#000000' },
@@ -895,7 +910,8 @@ export const THEMES = [
       iconSet: 'sharp', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material',
       fieldStyle: 'outlined', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 0,
       borders: 2, shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system',
-      band: 'none', rowLayout: 'compact', navStyle: 'rail', spacing: 'tight', accent: '#0d99ff',
+      band: 'none', rowLayout: 'compact', navStyle: 'rail', spacing: 'tight', headingTone: 'ink', tabTone: 'ink',
+      accent: '#0d99ff',
       colours: {
         light: { bg: '#f5f5f5', panel: '#ffffff', ink: '#1e1e1e', muted: '#666666', line: '#e6e6e6', accent: '#0d99ff', accentInk: '#000000' },
         dark: { bg: '#1e1e1e', panel: '#2c2c2c', ink: '#ffffff', muted: '#b3b3b3', line: '#444444', accent: '#80caff', accentInk: '#000000' },
@@ -908,7 +924,8 @@ export const THEMES = [
       pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'filled',
       checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 1,
       shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'card', navStyle: 'tabs', spacing: 'roomy', accent: '#8b3dff',
+      rowLayout: 'card', navStyle: 'tabs', spacing: 'roomy', headingTone: 'ink', tabTone: 'ink',
+      accent: '#8b3dff',
       colours: {
         light: { bg: '#f6f7f8', panel: '#ffffff', ink: '#0d1216', muted: '#596066', line: '#e1e4e7', accent: '#8b3dff', accentInk: '#ffffff' },
         dark: { bg: '#18191b', panel: '#252627', ink: '#f5f5f5', muted: '#a6abb0', line: '#414447', accent: '#be95ff', accentInk: '#000000' },
@@ -921,7 +938,8 @@ export const THEMES = [
       pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'filled',
       checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 1, borders: 1,
       shadows: false, btnStyle: 'filled', fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none',
-      rowLayout: 'card', navStyle: 'tabs', headerStyle: 'filled', spacing: 'tight', accent: '#ee4d2d',
+      rowLayout: 'card', navStyle: 'tabs', headerStyle: 'filled', spacing: 'tight', headingTone: 'ink',
+      accent: '#ee4d2d',
       colours: {
         light: { bg: '#f5f5f5', panel: '#ffffff', ink: '#222222', muted: '#666666', line: '#e8e8e8', accent: '#ee4d2d', accentInk: '#000000' },
         dark: { bg: '#141414', panel: '#242424', ink: '#f5f5f5', muted: '#b0b0b0', line: '#3b3b3b', accent: '#ff8065', accentInk: '#000000' },
@@ -934,7 +952,7 @@ export const THEMES = [
       pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'round',
       switchStyle: 'material', pressStyle: 'highlight', round: 3, borders: 0, shadows: false, btnStyle: 'filled',
       fontUi: 'system', fontLog: 'system', headFont: 'system', band: 'none', rowLayout: 'card', navStyle: 'tabs',
-      spacing: 'roomy', accent: '#00754a',
+      spacing: 'roomy', headingTone: 'ink', tabTone: 'ink', accent: '#00754a',
       colours: {
         light: { bg: '#f7f7f7', panel: '#ffffff', ink: '#1e3932', muted: '#59655f', line: '#d4ddd8', accent: '#00754a', accentInk: '#ffffff' },
         dark: { bg: '#12251f', panel: '#1e3932', ink: '#f1f8f4', muted: '#b4c8be', line: '#38564b', accent: '#5fcba0', accentInk: '#000000' },

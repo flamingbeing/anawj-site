@@ -29,6 +29,8 @@ try {
         const tokens = Object.fromEntries(['bg', 'panel', 'ink', 'muted', 'line', 'accent', 'accent-ink'].map(k => [k, style.getPropertyValue('--' + k).trim()]));
         return { tokens, mode: root.dataset.theme, icons: root.dataset.icons,
           logPath: document.querySelector('.tabs button[data-tab="logbook"] .ico path')?.getAttribute('d'),
+          heading: getComputedStyle(document.querySelector('.top h1')).color,
+          activeTab: getComputedStyle(document.querySelector('.tabs button[aria-selected="true"]')).color,
           overflow: root.scrollWidth > innerWidth + 1,
           custom: t.themeState(d.display()).custom };
       }, { id: theme.id, side });
@@ -39,7 +41,11 @@ try {
       assert.equal(actual.icons, theme.look.iconSet, theme.id);
       assert.equal(actual.custom, false, `${theme.id}: selected look survives saving`);
       assert.equal(actual.overflow, false, `${theme.id} ${side}: fits phone width`);
-      if (actual.logPath && ICON_SETS[actual.icons]?.paths?.logbook) {
+      const cssRgb = hex => 'rgb(' + [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(', ') + ')';
+      assert.equal(actual.heading, cssRgb(theme.look.headerStyle === 'filled' ? tokens['accent-ink'] : tokens.ink), `${theme.id} ${side}: heading tone`);
+      assert.equal(actual.activeTab, cssRgb(theme.look.tabTone === 'ink' ? tokens.ink : tokens.accent), `${theme.id} ${side}: active tab tone`);
+      assert.ok(actual.logPath, `${theme.id}: rendered Logbook icon`);
+      if (ICON_SETS[actual.icons]?.paths?.logbook) {
         assert.equal(actual.logPath, ICON_SETS[actual.icons].paths.logbook, `${theme.id}: tab drawing`);
       }
       if (shots && ['apple', 'pixel', 'discord', 'duolingo', 'github', 'netflix', 'applenotes', 'starbucks'].includes(theme.id)) {
