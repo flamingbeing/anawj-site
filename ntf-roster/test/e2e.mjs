@@ -366,7 +366,8 @@ await page.waitForSelector('.cell');
 ok(await page.locator('.cell').count() >= 28, 'the roster grid shows the new person');
 await go(page, '#more');
 await page.waitForSelector('.more-foot .appver');
-ok(/Team sharing isn't switched on yet|not set up yet/.test(await page.textContent('section[aria-labelledby="more-team"]')), 'team sharing says it is off until set up');
+await page.waitForFunction(() => /Sign in with Google|could not start/.test(document.querySelector('section[aria-labelledby="more-team"]').textContent), null, { timeout: 15000 });
+ok(true, 'team sharing is on: it offers Google sign-in (or says it could not start offline)');
 await page.context().close();
 
 await b.close();
