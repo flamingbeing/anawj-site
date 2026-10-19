@@ -24,6 +24,18 @@ try { for (const width of [390, 1280]) {
   assert.match(await p.locator('.set-page').innerText(), /Add some fixed text/);
   await p.getByLabel('A case starts with').fill('{n}. === {initials} (');
   await p.getByLabel('A case starts with').dispatchEvent('change');
+  // teach it from an example: mark the start and the initials, then use the learned format
+  await p.evaluate(async () => { const { patchLogbook } = await import('./js/ui-core.js'); await patchLogbook({ settings: { listFormat: null } }); });
+  await p.goto(base + '?demo#logging'); await p.waitForSelector('.set-page');
+  await p.locator('.list-teach summary').click();
+  const ta = p.getByLabel('Sample list', { exact: true });
+  await ta.fill(blob);
+  const sel = (needle) => ta.evaluate((el, n) => { const i = el.value.indexOf(n); el.setSelectionRange(i, i + n.length); }, needle);
+  await sel('1. === AAB ('); await p.locator('.list-teach').getByRole('button', { name: 'Case starts here' }).click();
+  await sel('AAB'); await p.locator('.list-teach').getByRole('button', { name: 'Initials', exact: true }).click();
+  await p.waitForFunction(() => /3 cases found in the sample/.test(document.querySelector('.list-teach')?.textContent || ''), null, { timeout: 5000 });
+  await p.getByRole('button', { name: 'Use this format' }).click();
+  await p.waitForFunction(async () => { const { settings } = await import('./js/ui-core.js'); return settings().listFormat?.start === '{n}. === {initials} ('; }, null, { timeout: 5000 });
   // the List box on the Case tab uses it
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
   await p.locator('button[data-mode="bulk"]').click();

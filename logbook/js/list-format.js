@@ -75,3 +75,27 @@ export function trimCase(s, fmt) {
   }
   return t;
 }
+
+// Teach it by example (Settings → Logging → Teach it my format): the resident pastes a sample and marks spans in it,
+// { role, s, e } with s/e offsets into the sample. Roles: 'start' (the text that begins a case, e.g. "1. === AAB ("),
+// 'initials' and 'date' (inside the start span), 'skip' (characters to skip after it) and 'end' (text that ends a case,
+// any number). Numbers in the fixed text become {n}, so "2." and "3." match too.
+// -> { format } (cleanListFormat shape) or { error } saying what is missing.
+export const MARK_ROLES = ['start', 'initials', 'date', 'skip', 'end'];
+export function learnFormat(sample, marks) {
+  const text = String(sample || '');
+  const ms = (Array.isArray(marks) ? marks : []).filter(m => m && MARK_ROLES.includes(m.role) && Number.isInteger(m.s) && Number.isInteger(m.e) && m.s >= 0 && m.e <= text.length && m.e > m.s);
+  const st = ms.find(m => m.role === 'start');
+  if (!st) return { error: 'Mark the text that starts a case first (for example "1. === AB (").' };
+  const lit = s => s.replace(/[{}]/g, '').replace(/\s+/g, ' ').replace(/\d+/g, '{n}');
+  const inner = MARK_ROLES.slice(1, 3).map(r => ms.find(m => m.role === r && m.s >= st.s && m.e <= st.e)).filter(Boolean).sort((a, b) => a.s - b.s);
+  let tpl = '', pos = st.s;
+  for (const m of inner) { if (m.s < pos) continue; tpl += lit(text.slice(pos, m.s)) + '{' + m.role + '}'; pos = m.e; }
+  tpl += lit(text.slice(pos, st.e));
+  tpl = tpl.replace(/(\{n\})+/g, '{n}').trim();
+  if (!startUsable(tpl)) return { error: 'The start needs some fixed text too, such as "===" or "Case", not just a number or the initials.' };
+  const sk = ms.find(m => m.role === 'skip');
+  const dropEnd = ms.filter(m => m.role === 'end').map(m => text.slice(m.s, m.e).trim());
+  const format = cleanListFormat({ start: tpl, skip: sk ? sk.e - sk.s : 0, dropEnd });
+  return format ? { format } : { error: 'Nothing to learn from those marks.' };
+}

@@ -51,3 +51,18 @@ assert.equal(splitByStart('a b', { start: '   ' }), null);
 const t0 = Date.now(); splitByStart('=== '.repeat(5000), { start: '{any}{any}{any}x' }); assert.ok(Date.now() - t0 < 2000);
 
 console.log('list-format tests passed');
+
+// teach by example
+{
+  const { learnFormat } = await import('../js/list-format.js');
+  const sample = '1. === AAB (60/M) ===Op: knee scope --2. === CDE (40/F) ===Op: lap chole --';
+  const at = (needle, from = 0) => { const s = sample.indexOf(needle, from); return { s, e: s + needle.length }; };
+  const L = learnFormat(sample, [{ role: 'start', ...at('1. === AAB (') }, { role: 'initials', ...at('AAB') }, { role: 'end', ...at('--', 20) }]);
+  assert.deepEqual(L.format, { start: '{n}. === {initials} (', dropEnd: '--' });
+  assert.equal(parseBulk(sample, null, now, { format: L.format }).map(c => c.initials).join(), 'AAB,CDE');
+  assert.match(learnFormat(sample, []).error, /starts a case/);
+  assert.match(learnFormat(sample, [{ role: 'start', ...at('1') }]).error, /fixed text/);
+  const D = learnFormat('#1 12/3 EF 70F', [{ role: 'start', s: 0, e: 7 }, { role: 'date', s: 3, e: 7 }, { role: 'skip', s: 7, e: 10 }]);
+  assert.deepEqual(D.format, { start: '#{n} {date}', skip: 3 });
+  console.log('learn format tests passed');
+}

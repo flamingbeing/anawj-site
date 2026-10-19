@@ -3,7 +3,7 @@
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
 import { sortCodes, uid, academicYear, withParents, weekStart, humanAge, cleanSkip, parseBulk } from './engine.js';
-import { cleanListFormat, startUsable } from './list-format.js';
+import { cleanListFormat, startUsable, learnFormat } from './list-format.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, facultyRole, shows, setShown, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, updateMany, updatedToast, UNDO_SECS, rowIcon } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace, placeNewTag } from './tags.js';
 import { pickDialog, CASE_PARTS, AFTER_SAVE, RECENT_COUNTS } from './ui-log.js';
@@ -546,6 +546,43 @@ function listFormatCard(st, save) {
     out);
 }
 
+// Teach it from an example (owner, 19 Oct 2026): paste a sample, select a piece of it and tap what it is (where a case
+// starts, initials, date, characters to skip, what ends a case). learnFormat() turns the marks into the same
+// listFormat the fields above hold; it is shown on the sample first and saved only on "Use this format".
+const TEACH_ROLES = [['start', 'Case starts here'], ['initials', 'Initials'], ['date', 'Date'], ['skip', 'Skip'], ['end', 'Case ends with']];
+function listTeach(save) {
+  let marks = [], learned = null;
+  const ta = h('textarea', { rows: '5', placeholder: 'Paste one or two cases (made-up text is fine). Then select a piece and tap what it is.', 'aria-label': 'Sample list',
+    oninput: () => { marks = []; paint(); } });
+  const out = h('div', { 'aria-live': 'polite' }), chips = h('div', { class: 'bar', style: 'flex-wrap:wrap;margin:6px 0' });
+  const mark = role => {
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    if (!(e > s)) { toast('Select the text in the sample first'); return; }
+    marks = [...marks.filter(m => role === 'end' ? !(m.role === 'end' && m.s === s && m.e === e) : m.role !== role), { role, s, e }];
+    paint();
+  };
+  function paint() {
+    const text = ta.value;
+    fill(chips, marks.map((m, i) => h('button', { type: 'button', class: 'chip', title: 'Remove this mark', onclick: () => { marks.splice(i, 1); paint(); } },
+      (TEACH_ROLES.find(r => r[0] === m.role) || [])[1] + ': “' + text.slice(m.s, m.e).replace(/\s+/g, ' ').slice(0, 24) + '” ✕')));
+    const r = marks.length ? learnFormat(text, marks) : null;
+    learned = r && r.format ? r.format : null;
+    if (!r) { fill(out); return; }
+    if (!learned) { fill(out, h('p', { class: 'hint', style: 'color:var(--err)' }, r.error)); return; }
+    const rows = parseBulk(text, null, undefined, { format: learned });
+    fill(out,
+      h('p', { class: 'hint' }, 'Learned: starts with ', h('b', {}, learned.start), learned.skip ? ', skips ' + learned.skip + ' characters' : '', learned.dropEnd ? ', ends with ' + learned.dropEnd : '', ' · ' + rows.length + (rows.length === 1 ? ' case' : ' cases') + ' found in the sample.'),
+      rows.slice(0, 5).map((c, i) => h('p', { class: 'hint', style: 'margin:2px 0' }, (i + 1) + '. ' + (c.date ? c.date + ' · ' : '') + (c.initials ? c.initials + ' · ' : '') + c.details.replace(/\s+/g, ' ').slice(0, 60))),
+      h('div', { class: 'bar' }, h('button', { type: 'button', class: 'primary', onclick: () => save({ listFormat: learned }, 'Format saved').then(() => hooks.render()) }, 'Use this format')));
+  }
+  return h('details', { class: 'list-teach', style: 'margin:8px 0' },
+    h('summary', {}, 'Teach it from an example'),
+    h('p', { class: 'hint help' }, 'Paste a sample, select the text where a case starts (for example “1. === AB (”) and tap Case starts here. Inside it, select the initials and the date and tap those. Select text that ends a case and tap Case ends with. Numbers are matched for you.'),
+    ta,
+    h('div', { class: 'bar', style: 'flex-wrap:wrap;margin-top:6px' }, TEACH_ROLES.map(([role, label]) => h('button', { type: 'button', class: 'small', onclick: () => mark(role) }, label))),
+    chips, out);
+}
+
 const ENTER_MODES = [['newline', 'New line (default)'], ['double', 'Press Enter twice to save'], ['single', 'Enter saves (Shift+Enter for a new line)']];
 export function renderLogging() {
   const st = settings();
@@ -581,6 +618,7 @@ export function renderLogging() {
           onchange: e => { const list = cleanSkip(e.target.value); e.target.value = list.join(', '); save({ skipStarts: list.length ? list.join(', ') : null }, 'Saved'); } })),
       h('p', { class: 'hint help', id: 'skip-help' }, 'Separated by commas. Dropped from the start of a case before the initials are read, e.g. "=== AB 45F" saves AB and 45F. Not when there are no initials after them.'),
       listFormatCard(st, save),
+      listTeach(save),
       h('h3', {}, 'Start a case'), h('p', { class: 'hint' }, 'Device setting · other devices keep their own style.'),
       toggle('Show common tags first', display().compactTags, v => { setDisplay({ compactTags: v }); paintPreview(); },
         'A shortlist from your recent cases.', 'Off by default. All tags stay searchable and can be expanded.'),
