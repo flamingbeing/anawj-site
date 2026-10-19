@@ -8,6 +8,7 @@ on:
       - 'nuh-roster/firestore.rules'
       - 'prewarm/firestore.rules'
       - 'nuh-junior-monthly/firestore.rules'
+      - 'ntf-roster/firestore.rules'
   workflow_dispatch:
 
 jobs:
@@ -18,6 +19,7 @@ jobs:
       roster: ${{ steps.filter.outputs.roster }}
       prewarm: ${{ steps.filter.outputs.prewarm }}
       junior: ${{ steps.filter.outputs.junior }}
+      ntf: ${{ steps.filter.outputs.ntf }}
     steps:
       - uses: actions/checkout@v4
       - id: filter
@@ -28,6 +30,7 @@ jobs:
             roster: 'nuh-roster/firestore.rules'
             prewarm: 'prewarm/firestore.rules'
             junior: 'nuh-junior-monthly/firestore.rules'
+            ntf: 'ntf-roster/firestore.rules'
 
   deploy:
     needs: changes
@@ -48,6 +51,9 @@ jobs:
           - dir: nuh-junior-monthly
             project: nuh-junior-monthly
             changed: junior
+          - dir: ntf-roster
+            project: ntf-roster
+            changed: ntf
     steps:
       - uses: actions/checkout@v4
         if: github.event_name == 'workflow_dispatch' || needs.changes.outputs[matrix.changed] == 'true'

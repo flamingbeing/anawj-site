@@ -101,6 +101,7 @@ const ICONS = {
   feedback: 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5',   // a speech bubble
   formview: 'M6 3h12v18H6zM9 8h6M9 12h6M9 16h3',   // a form sheet
   feedbackinbox: 'M3 13l3-8h12l3 8v6H3zM3 13h5l1 2h6l1-2h5',   // an in-tray
+  link: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',   // chain (copy link)
   more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
 };
 // the Advanced pages (Settings menu) use their parent page's icon
@@ -349,7 +350,11 @@ function settingsSearch() {
     if (!settingsIndex || missing.length) settingsIndex = buildSettingsIndex();
     const found = searchSettings(settingsIndex, box.value);
     fill(results, ...found.map(x => h('li', {}, h('a', { href: '#' + x.id, 'data-go': x.id, onclick: e => { e.preventDefault(); if (x.open) return x.open(); findAfterRender = x.text; if (S.tab === x.id) showFound(); else go(x.id); } },
-      h('span', { class: 'mt' }, h('b', {}, x.text), h('small', {}, x.page)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))),
+      h('span', { class: 'mt' }, h('b', {}, x.text), h('small', {}, x.page)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')),
+      // a link straight to this setting (the page and the heading, read by tabFromHash)
+      h('button', { type: 'button', class: 'copy-link', title: 'Copy a link to this setting', 'aria-label': 'Copy a link to ' + x.text,
+        onclick: () => import('./share.js').then(m => m.copyText(location.origin + location.pathname + '#' + x.id + (x.open ? '' : '?find=' + encodeURIComponent(x.text)), 'Link copied'))
+      }, icon('link')))),
       box.value.trim() && !found.length ? h('li', { class: 'hint', style: 'padding:10px 4px' }, 'No setting matches. Try another word.') : null);
   };
   if (settingsQuery) search();
@@ -555,10 +560,14 @@ const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (!t.owner ||
 const barCandidates = () => visibleTabs().filter(t => !t.hidden || t.bar).map(t => t.id);
 const TAB_ALIASES = { reflections: 'reflect' };
 const tabFromHash = () => {
-  const raw = location.hash.replace(/^#/, '');
+  // a link to a heading on a page: #logging?find=Teach%20it%20from%20an%20example (the same find as a Settings search result)
+  const [raw, query = ''] = location.hash.replace(/^#/, '').split('?');
   const id = TAB_ALIASES[raw] || raw;
   if (!visibleTabs().some(t => t.id === id)) return null;
-  if (id !== raw) history.replaceState(history.state, '', location.pathname + location.search + '#' + id);   // old links: #reflections → #reflect
+  let want = '';
+  try { want = new URLSearchParams(query).get('find') || ''; } catch { /* a malformed link just opens the page */ }
+  if (want) findAfterRender = want;
+  if (id !== raw || query) history.replaceState(history.state, '', location.pathname + location.search + '#' + id);   // old links: #reflections → #reflect; the find is used once, so the address stays #logging
   return id;
 };
 
@@ -636,7 +645,7 @@ document.addEventListener('keydown', e => {
   const t = e.target;
   if (t && t.getAttribute && t.getAttribute('role') === 'button' && t.tagName !== 'BUTTON') { e.preventDefault(); t.click(); }
 });
-const syncNavigation = () => { if (S.user) { const t = tabFromHash(); if (t) navigation.sync(t); } };
+const syncNavigation = () => { if (S.user) { const t = tabFromHash(); if (t) { navigation.sync(t); if (findAfterRender && S.tab === t && app.dataset.page === t) showFound(); } } };
 window.addEventListener('popstate', syncNavigation);
 window.addEventListener('hashchange', syncNavigation);
 

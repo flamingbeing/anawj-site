@@ -58,7 +58,7 @@ export function bulkDialog(spec) {
       h('h3', { class: 'bulk-h' }, `Change ${plural(pairs.length, word)}`),
       h('ul', { class: 'bulk-lines' }, spec.lines(ch).map(l => h('li', {}, l))),
       skipped ? h('p', { class: 'hint' }, `${plural(skipped, word)} left as ${skipped === 1 ? 'it is' : 'they are'}${why ? ` (${why})` : ''}.`) : null,
-      over ? h('p', { class: 'bulk-warn', role: 'note' }, `⚠ This replaces what these ${word}s have now. Undo stays in the message after saving.`) : null,
+      over ? h('p', { class: 'bulk-warn', role: 'note' }, `This replaces what these ${word}s have now. Undo stays in the message after saving.`) : null,
       h('p', { class: 'hint' }, pairs.length > 3 ? 'For example:' : 'Before → after:'), h('ul', { class: 'bulk-samples' }, pairs.slice(0, 3).map(sample)),
       h('div', { class: 'bar bulk-btns' }, h('span', { class: 'grow' }),
         h('button', { onclick: step1 }, 'Back'),

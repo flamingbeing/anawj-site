@@ -6,12 +6,13 @@
 import * as M from './model.js';
 import { RULE_TYPES, describeRule } from './rules.js';
 import { whoMatches, whenMatches, chipStyle } from './ui-rules.js';
+import { renderAps, renderLeave } from './ui-aps.js';
 
 const PAGE = 6;   // problems shown per rule before "Show all"
 
 export function mount(el, app) {
   const { h } = app;
-  let view = ['problems', 'fairness', 'coverage'].includes(app.params.v) ? app.params.v : 'problems';
+  let view = ['problems', 'fairness', 'coverage', 'aps', 'leave'].includes(app.params.v) ? app.params.v : 'problems';
   let person = '';
   let hardOnly = false;
   let ruleFocus = app.params.rule || '';
@@ -44,13 +45,15 @@ export function mount(el, app) {
         : `${nFailed} ${nFailed === 1 ? 'rule' : 'rules'} can't be checked and ${nFailed === 1 ? 'is' : 'are'} left out: ${names.join('; ') || 'unknown rule type'}. Edit or delete ${nFailed === 1 ? 'it' : 'them'} under Rules.`));
     }
     const tabs = h('div', { class: 'bx-tabs', role: 'tablist', 'aria-label': 'Check sections', 'data-tour': 'check' },
-      [['problems', 'Problems'], ['fairness', 'Fairness'], ['coverage', 'Coverage']].map(([k, l]) => h('button', {
+      [['problems', 'Problems'], ['fairness', 'Fairness'], ['coverage', 'Coverage'], ['aps', 'APS weeks'], ['leave', 'Leave dates']].map(([k, l]) => h('button', {
         type: 'button', role: 'tab', class: 'bx-tab', id: `cv-tab-${k}`, 'aria-selected': String(view === k), onclick: () => { view = k; render(); },
       }, l)));
     const panel = h('div', { class: 'cv-panel', role: 'tabpanel', 'aria-labelledby': `cv-tab-${view}` });
     root.append(tabs, panel);
     if (view === 'problems') renderProblems(panel, st, ev);
     else if (view === 'fairness') renderFairness(panel, st);
+    else if (view === 'aps') renderAps(app, panel, st);
+    else if (view === 'leave') renderLeave(app, panel, st);
     else renderCoverage(panel, st);
     if (keepFocus) { const f = root.querySelector(keepFocus); if (f) f.focus({ preventScroll: true }); }
   }
@@ -61,7 +64,7 @@ export function mount(el, app) {
 
   // ---------- problems ----------
   function renderProblems(panel, st, ev) {
-    const people = M.staffInMonth(st, app.month);
+    const people = M.staffInView(st, app.month);
     const pid = fid();
     const sel = h('select', { id: pid, 'data-k': 'person', onchange: () => { person = sel.value; render(); } },
       h('option', { value: '' }, 'Everyone'), people.map(p => h('option', { value: p.id }, p.name)));
@@ -125,7 +128,7 @@ export function mount(el, app) {
   // ---------- fairness ----------
   function renderFairness(panel, st) {
     const days = M.monthDays(app.month);
-    const people = M.staffInMonth(st, app.month);
+    const people = M.staffInView(st, app.month);
     const auto = (st.duties || []).filter(d => d.kind === 'shift' && d.auto);
     const counts = new Map();   // staffId -> { code: n, we, hol, total }
     const used = new Set();
@@ -238,7 +241,7 @@ export function mount(el, app) {
     update() { render(); },
     route(params) {
       if (params.rule) { ruleFocus = params.rule; view = 'problems'; }
-      if (['problems', 'fairness', 'coverage'].includes(params.v)) view = params.v;
+      if (['problems', 'fairness', 'coverage', 'aps', 'leave'].includes(params.v)) view = params.v;
       render();
     },
   };

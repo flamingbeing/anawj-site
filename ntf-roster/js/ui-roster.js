@@ -320,7 +320,7 @@ export function mount(el, app) {
   }
 
   function filteredStaff(state) {
-    let list = M.staffInMonth(state, app.month);
+    let list = M.staffInView(state, app.month);
     const gmap = M.groupMap(state);
     if (ui.group === '@senior' || ui.group === '@junior') {
       const kind = ui.group.slice(1);
@@ -439,7 +439,7 @@ export function mount(el, app) {
     const c = ctx;
     dutyStyles(state);
     const staff = filteredStaff(state);
-    const all = M.staffInMonth(state, app.month);
+    const all = M.staffInView(state, app.month);
     // summary columns: auto codes used this month (C always) + weekend/holiday calls
     const used = new Set();
     for (const d of c.days) {
@@ -1060,7 +1060,7 @@ export function mount(el, app) {
     const overnight = new Set((state.duties || []).filter(d => d.overnight).map(d => d.code));
     const ev = app.evaluation();
     const today = M.iso(new Date());
-    const list = M.staffInMonth(state, app.month);
+    const list = M.staffInView(state, app.month);
     const idx = list.findIndex(x => x.id === sid);
     const prev = list[idx - 1], next = list[idx + 1];
     const g = M.groupMap(state).get(p.group);
@@ -1348,7 +1348,7 @@ export function openAutofill(app) {
   function run() {
     runCount++;
     const seed = runCount;
-    const snapshot = app.store.get();
+    const snapshot = app.scope(app.store.get());   // the pool in view only: the other pool's people and rules are left out
     stageProgress();
     const opts = { from, to, seed, timeMs };
     let fellBack = false;
@@ -1388,10 +1388,12 @@ export function openAutofill(app) {
 
   function diff(snapshot, result) {
     const asg = result.assignments || {};
+    const inFill = new Set((snapshot.staff || []).map(p => p.id));
     let added = 0, removed = 0;
     for (const d of days) {
       const ids = new Set([...Object.keys(snapshot.cells?.[d] || {}), ...Object.keys(asg[d] || {})]);
       for (const sid of ids) {
+        if (!inFill.has(sid)) continue;
         const cell = snapshot.cells?.[d]?.[sid];
         if (cell?.lock) continue;
         const before = new Set(cell?.auto || []);
@@ -1440,7 +1442,7 @@ export function openAutofill(app) {
       h('button', {
         type: 'button', class: 'btn btn-primary', autofocus: true,
         onclick: () => {
-          app.store.commit(`Auto-fill ${M.fmtMonth(app.month)}`, draft => applyAssignments(draft, result, days));
+          app.store.commit(`Auto-fill ${M.fmtMonth(app.month)}`, draft => applyAssignments(draft, result, days, new Set((snapshot.staff || []).map(p => p.id))));
           close();
           app.toast(`Auto-fill applied: ${changedTxt.toLowerCase()}`, { action: { label: 'Undo', fn: () => app.store.undo() } });
         },
@@ -1458,11 +1460,13 @@ export function openAutofill(app) {
 }
 
 // Set each cell's auto codes from the solver result, keeping every non-auto code. Locked cells are skipped.
-export function applyAssignments(draft, result, days) {
+// `only` (a Set of staff ids): the people the fill covered (one pool); everyone else's cells are left alone.
+export function applyAssignments(draft, result, days, only = null) {
   const asg = result.assignments || {};
   for (const d of days) {
     const ids = new Set([...Object.keys(draft.cells?.[d] || {}), ...Object.keys(asg[d] || {})]);
     for (const sid of ids) {
+      if (only && !only.has(sid)) continue;
       const cell = M.getCell(draft, d, sid);
       if (cell?.lock) continue;
       const oldAuto = cell?.auto || [];

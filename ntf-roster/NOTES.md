@@ -219,9 +219,45 @@ the real People app).
   checks nobody else saved since you loaded (conflict: load theirs or save anyway) and keeps a permanent copy
   (`versions`). The rules allow only `{ email, name }` stamps with the saver's own email (the app shows the email
   beside the name) and no save times more than 10 minutes in the future. Members are admin, rosterer (both save) or viewer (reads). Rules tested in the emulator
-  (`tools/test-rules.sh`, project `demo-ntf-roster`).
+  (`tools/test-rules.sh`, project `demo-ntf-roster`). `team/main` also carries `aps` (the APS week tally); the pool you
+  look at (`settings.pool`) stays in each browser. The rules deploy on merge (matrix entry in
+  `deploy-firestore-rules.yml`) once the project `ntf-roster` exists and has Firebase Rules Admin granted.
 - Installable and offline (`sw.js`, `manifest.webmanifest`); More ends with the app version and "Get the latest
   version" (AGENTS.md).
+
+## Junior pool (19 Oct 2026)
+
+The junior roster is run by a different person from the senior one, from the same department sheet. One state, two pools.
+
+- **Pool switch** (Junior | Senior | All, beside the month; `settings.pool`) narrows the grid, Day, Check and More lists, and
+  scopes the rule check and Auto-fill to that pool (`scopeToPool` in `js/jpool.js`: the other pool's people are left out and a
+  rule only about them is off, so a consultant call rule is not reported while viewing juniors). A person's pool is the tag
+  `jpool` / `spool`, else their section's kind (`M.poolOf`). **People > Junior pool** sets where the pool starts (this person
+  and everyone below), each person's call level (MO2 = the senior MO on call, MO1 = the junior MO on call, No calls) and
+  strong / weak. Levels are tags (`mo2`, `mo2strong`, `mo2weak`, `mo1…`, `nocall`); setting the first one installs the junior rules.
+- **Junior rules** (`JUNIOR_RULES`, ids `r-jp-…`, `installJuniorPool`, one time per saved state via `settings.jpRules`): cover (1 MO2 and
+  1 MO1 on call, 3 on Saturday, a half call HC on Sundays and public holidays, a PM shift on weekdays), no calls for No calls
+  people (one half call a month at most, last resort), rest after calls and PM shifts, JR teaching day, at most 3 on AL (pointed
+  out, leave is never moved), pain service week (no calls, then the Monday PM shift), weak MO2 never with weak MO1 (strong with
+  strong is a preference), and a set marked **To confirm** (gap, weekend limit, no call before an APS week, fair spread, Nc means no
+  PM or half call). Rules whose note starts "Predicted" show a To confirm badge; Confirm / Confirm all drops it (ported from
+  the NUH junior monthly screen, with the priority-ordered Preferences list and the how-it-works panel). No new rule type was needed.
+- **Sheet colours** (`io.js` `fillKind`): blue (99CCFF) = approved, so the cell gets `ap: true`; white leave is a request. Green
+  (33CC33, or 92D050 in older sheets) with no text = a pain service (APS) week. A blue cell with text that is not a code (a course
+  with a time) becomes a leave code, the course word first. Section headings with lowercase (the PACU / pain nurses) map to the `nurse` group.
+- **Fill the sheet back** (`fillDeptWorkbook`, More > Export): writes C, P, HC and green APS weeks into the file the department
+  sent and nothing else (a request the shift satisfies, like Cr beside a C, stays as written). The file is kept in memory from the
+  import (or chosen again). ExcelJS shares style objects between cells: set `cell.style = { ...cell.style, fill }`, never `cell.fill =`.
+- **APS weeks** (`js/aps.js`, Check > APS weeks): a week is Monday to Sunday, stored as APS on 7 days. Suggestions rank by weeks done (typed
+  count `state.aps` + weeks in the cells after it), JRs first when manpower is good, never R3, never two months running, one per
+  person a month; the person confirms. "Read old rosters" counts green weeks from past sheets.
+- **Leave dates** (Check > Leave dates): unapproved AL / AAL that puts more than 3 of the call list away; up to 3 nearby windows of the
+  same length and weekend mix, with a Move button. **Add a request** (Rules, or Request… on a person): a one-off request becomes a
+  `limit` rule for its dates only, named "Request: …".
+- Limits: a public holiday on a Monday (a holiday in lieu) must be added in settings or the Monday PM rule after an APS week
+  expects a shift; fair spread is per month, not scaled by free days; the weekend limit counts Saturdays and Sundays, not holidays on weekdays.
+- Tests: `test/jpool.test.mjs` (tags, install, scoping, auto-fill on a made-up pool, APS, leave, sheet colours and fill back),
+  `test/pool.e2e.mjs` (switch, setup, To confirm, request form, APS, phone width).
 
 ## Decisions
 
