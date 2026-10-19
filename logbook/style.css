@@ -1057,7 +1057,7 @@ details.refl-foot { margin: 4px 4px 12px; }
 .theme-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ta); flex: none; }
 .theme-line { flex: 1; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--ta) 45%, transparent); }
 .theme-find { width: 100%; margin: 6px 0 8px; }
-.theme-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 360px; overflow-y: auto; }
+.theme-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .theme-row { width: 100%; align-items: center; justify-content: flex-start; gap: 10px; text-align: left; }   /* the swatch always starts at the left edge */
 .theme-row .mt { display: flex; flex-direction: column; align-items: flex-start; flex: 1; min-width: 0; text-align: left; }
 .theme-list .empty { color: var(--muted); padding: 6px 2px; }

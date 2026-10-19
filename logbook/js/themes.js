@@ -77,6 +77,8 @@ export const THEMES = [
   { id: 'gmail', name: 'Gmail-style', group: 'inspired', desc: 'Pale blue-grey ground, white cards, red, icon pill tabs', look: { accent: '#d93025', bgTint: 'gmail', shadows: false, borders: 1, round: 3, fontUi: 'system', band: 'none', tabStyle: 'indicator', listStyle: 'edge', pressStyle: 'highlight', switchStyle: 'material', typeStyle: 'material', btnStyle: 'tinted' } },
   { id: 'tiktok', name: 'TikTok-style', group: 'inspired', desc: 'Black, red buttons, cyan and pink-red edges, icons only', look: { accent: '#fe2c55', bgTint: 'tiktok', shadows: false, borders: 2, fontUi: 'inter', tabStyle: 'plain', tabIcons: true, typeStyle: 'ios' }, band: ['#25f4ee', '#25f4ee', '#fe2c55', '#fe2c55'] },
 ];
+// the Inspired themes shown on the Themes page; the rest are under Browse all themes (owner, 19 Oct 2026)
+export const FEATURED = ['apple', 'pixel', 'evernote', 'obsidian', 'notion', 'whatsapp', 'office', 'acgme'];
 export const themeById = id => THEMES.find(t => t.id === id) || THEMES[0];
 
 // the look keys to save when a theme is picked: its own values, the defaults (null) for the rest, kept keys as now

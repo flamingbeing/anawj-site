@@ -192,6 +192,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   `switchStyle` (`ios`, `material`), `pressStyle` (`highlight`, `none`), `iconWeight` (`thin`, `bold`), `typeStyle` (`ios`, `material`).
   New Inspired themes use them: X-, Spotify-, YouTube-, Gmail-style; Apple-, Pixel-, WhatsApp-, Telegram-, Instagram-, TikTok-, Material-style and the other Inspired ones now use their app's own ground, text and line colours (colours and shapes only).
 - **Themes never change Light or dark** (owner, 19 Oct 2026): no theme has a `mode`; every theme carries a light and a dark palette (`TINTS`), so it matches its app either way. Picking a theme or one of Your themes leaves the Light or dark setting alone.
+- **Inspired themes box** (owner, 19 Oct 2026): the Themes page shows the Inspired themes as cards, only `FEATURED` in themes.js (Apple, Pixel, Evernote, Obsidian, Notion, WhatsApp, Office, ACGME), with no scrolling list. **Browse all themes** (`#themesall`, under Themes) has every theme in a searchable list and **Suggest a theme**. Your themes always has Export (with none saved it saves the look you have now) and Import.
 - **Your themes** (owner, 16 Oct 2026; `my-themes.js`, unit-tested; e2e `my-themes.mjs`): once the look is Custom, the
   "Your themes" card says so and offers Save this look under a name (`display().myThemes`, this device, up to 12, a
   name already there is replaced; light or dark is kept with it). Saved looks are picked like any theme ("Now: Night
