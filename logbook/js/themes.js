@@ -4,13 +4,14 @@
 // fonts) sit in a searchable list. Pure, unit-tested; the CSS for the new look settings (background tint, spacing,
 // tab bar style, heading font, the top band) is made here too, cached for the first paint (index.html).
 
-import { coloursCss } from './colors.js';
+import { coloursCss, checkColours } from './colors.js';
 import { STACKS } from './fonts.js';
+import { FACETS, FACET_KEYS, facetCss, cleanFacet } from './theme-engine.js';
 
 // the display keys a theme sets; anything a theme doesn't list goes back to its default (null), unless it keeps it
 export const THEME_KEYS = ['colours', 'accent', 'colourful', 'borders', 'flat', 'round', 'shadows', 'fontUi', 'fontLog', 'headFont', 'lineHeight',
-  'compact', 'btnStyle', 'iconBtns', 'tabIcons', 'pageTitles', 'calPlain', 'rowShort', 'navStyle', 'rowLayout', 'formLayout', 'contrast', 'bgTint', 'spacing', 'tabStyle', 'band',
-  'barBlur', 'tabActiveLabel', 'listStyle', 'titleAlign', 'switchStyle', 'pressStyle', 'iconWeight', 'typeStyle'];
+  'compact', 'btnStyle', 'iconBtns', 'tabIcons', 'pageTitles', 'calPlain', 'rowShort', 'navStyle', 'rowLayout', 'formLayout', 'contrast', 'bgTint', 'band',
+  ...FACET_KEYS];   // the theme engine's facets (theme-engine.js): spacing, tab style, header, icons, motion, pop-ups, controls…
 
 // Background tints: the page ground (and for some the cards and text) in light and dark
 export const TINTS = {
@@ -35,15 +36,6 @@ export const TINTS = {
   tiktok: { label: 'TikTok-style', light: { bg: '#ffffff', panel: '#ffffff', ink: '#161823', muted: '#6a6b7e', line: '#e3e3e4' }, dark: { bg: '#000000', panel: '#121212', ink: '#ffffff', muted: '#a6a6ab', line: '#2f2f2f' } },
   black: { label: 'Black', light: { bg: '#f4f4f4' }, dark: { bg: '#000000', panel: '#121212', line: '#2a2a2a' } },
 };
-export const SPACINGS = [['tight', 'Tight'], ['normal', 'Normal (default)'], ['roomy', 'Roomy']];
-export const TAB_STYLES = [['underline', 'Underline (default)'], ['pill', 'Pill'], ['plain', 'Plain (colour only)'], ['indicator', 'Icon pill (Material)']];
-// App-style details (Themes → App-style details; owner, 19 Oct 2026): each its own device setting, off by default (nothing changes until chosen)
-export const LIST_STYLES = [['default', 'Cards (default)'], ['inset', 'Inset grouped (iOS)'], ['edge', 'Edge to edge (Material, chat apps)']];
-export const TITLE_ALIGNS = [['default', 'As now (default)'], ['centre', 'Centred (iOS)']];
-export const SWITCH_STYLES = [['default', 'As now (default)'], ['ios', 'iOS (green, round)'], ['material', 'Material (outlined, big knob)']];
-export const PRESS_STYLES = [['default', 'Dim (default)'], ['highlight', 'Grey highlight (Material)'], ['none', 'No change']];
-export const ICON_WEIGHTS = [['default', 'Regular (default)'], ['thin', 'Thin'], ['bold', 'Bold']];
-export const TYPE_STYLES = [['default', 'As now (default)'], ['ios', 'iOS (bold titles, tight)'], ['material', 'Material (medium weight)']];
 export const BANDS = [['theme', 'The theme’s colours (default)'], ['shades', 'Shades of my colour'], ['nuh', 'The NUH stripe'], ['none', 'None']];
 export const HEAD_FONTS = [['same', 'Same as the interface (default)'], ['serif', 'Serif'], ['system', 'This device’s font'], ['inter', 'Inter'], ['lexend', 'Lexend'], ['atkinson', 'Atkinson Hyperlegible'], ['mono', 'Monospace']];
 export const NUH_BAND = ['#e57200', '#e4002b', '#178fd7', '#002f6c'];
@@ -64,18 +56,18 @@ export const THEMES = [
   { id: 'bear', name: 'Bear-style', group: 'inspired', desc: 'Warm off-white, red, roomy, serif headings', look: { accent: '#dd4c4f', bgTint: 'cream', headFont: 'serif', spacing: 'roomy', shadows: false, borders: 2, band: 'none', listStyle: 'edge', typeStyle: 'ios' } },
   { id: 'evernote', name: 'Evernote-style', group: 'inspired', desc: 'White, green, clean', look: { accent: '#00a82d', bgTint: 'white', fontUi: 'system', shadows: false, borders: 3, round: 1, band: 'none', typeStyle: 'material', listStyle: 'edge' } },
   { id: 'notion', name: 'Notion-style', group: 'inspired', desc: 'White, near-black, grey hairlines', look: { rowLayout: 'timeline', accent: '#37352f', bgTint: 'notion', headFont: 'serif', shadows: false, borders: 2, round: 1, btnStyle: 'plain', tabStyle: 'plain', band: 'none', typeStyle: 'ios', iconWeight: 'thin', pressStyle: 'highlight' } },
-  { id: 'telegram', name: 'Telegram-style', group: 'inspired', desc: 'Blue, rounded, pale blue-grey, see-through bars', look: { accent: '#2481cc', bgTint: 'bluegrey', round: 3, tabStyle: 'plain', btnStyle: 'tinted', shadows: false, borders: 1, fontUi: 'system', band: 'none', barBlur: true, switchStyle: 'ios', listStyle: 'edge', titleAlign: 'centre', pressStyle: 'highlight' } },
+  { id: 'telegram', name: 'Telegram-style', group: 'inspired', desc: 'Blue, rounded, pale blue-grey, see-through bars', look: { accent: '#2481cc', bgTint: 'bluegrey', round: 3, tabStyle: 'plain', btnStyle: 'tinted', shadows: false, borders: 1, fontUi: 'system', band: 'none', barBlur: true, switchStyle: 'ios', listStyle: 'edge', titleAlign: 'centre', pressStyle: 'highlight', statusBar: 'header', iconSet: 'ios', pageMotion: 'ios', sheetStyle: 'ios', toastStyle: 'ios', fieldStyle: 'ios', checkStyle: 'round' } },
   { id: 'office', name: 'Office-style', group: 'inspired', desc: 'Square, outlined, a dark blue band', look: { navStyle: 'rail', accent: '#185abd', bgTint: 'grey', round: 0, shadows: false, borders: 3, fontUi: 'system' }, band: ['#185abd', '#107c41', '#c43e1c', '#7719aa'] },
-  { id: 'whatsapp', name: 'WhatsApp-style', group: 'inspired', desc: 'Teal-green header, beige chat ground, icon pill tabs', look: { accent: '#008069', bgTint: 'beige', shadows: false, borders: 1, fontUi: 'system', tabStyle: 'indicator', listStyle: 'edge', switchStyle: 'material', typeStyle: 'material', pressStyle: 'highlight' }, band: ['#008069', '#008069', '#008069', '#008069'] },
-  { id: 'pixel', name: 'Pixel-style', group: 'inspired', desc: 'Material You: soft, round, icon pill tabs; follows your colour', keep: ['accent'], look: { round: 3, tabStyle: 'indicator', btnStyle: 'tinted', shadows: false, borders: 1, spacing: 'roomy', fontUi: 'system', band: 'shades', switchStyle: 'material', pressStyle: 'highlight', typeStyle: 'material', listStyle: 'edge' } },
-  { id: 'apple', name: 'Apple-style', group: 'inspired', desc: 'iOS: grouped grey lists, blue, see-through bars, green switches, centred titles', look: { accent: '#007aff', bgTint: 'iosgrey', shadows: false, borders: 1, fontUi: 'system', tabStyle: 'plain', btnStyle: 'plain', band: 'none', barBlur: true, listStyle: 'inset', titleAlign: 'centre', switchStyle: 'ios', typeStyle: 'ios', iconWeight: 'thin' } },
-  { id: 'material', name: 'Material-style', group: 'inspired', desc: 'Indigo, light grey ground, raised white cards, filled buttons', look: { accent: '#3f51b5', bgTint: 'materialgrey', round: 1, fontUi: 'system', btnStyle: 'filled', band: 'none', switchStyle: 'material', typeStyle: 'material', pressStyle: 'highlight' } },
+  { id: 'whatsapp', name: 'WhatsApp-style', group: 'inspired', desc: 'Teal-green header, beige chat ground, icon pill tabs', look: { accent: '#008069', bgTint: 'beige', shadows: false, borders: 1, fontUi: 'system', tabStyle: 'indicator', listStyle: 'edge', switchStyle: 'material', typeStyle: 'material', pressStyle: 'highlight', statusBar: 'header', headerStyle: 'filled', tabIconFill: true, iconSet: 'material', pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'ios', checkStyle: 'round' }, band: ['#008069', '#008069', '#008069', '#008069'] },
+  { id: 'pixel', name: 'Pixel-style', group: 'inspired', desc: 'Material You: soft, round, icon pill tabs; follows your colour', keep: ['accent'], look: { round: 3, tabStyle: 'indicator', btnStyle: 'tinted', shadows: false, borders: 1, spacing: 'roomy', fontUi: 'system', band: 'shades', switchStyle: 'material', pressStyle: 'highlight', typeStyle: 'material', listStyle: 'edge', statusBar: 'page', tabIconFill: true, iconSet: 'material', pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'filled', checkStyle: 'square' } },
+  { id: 'apple', name: 'Apple-style', group: 'inspired', desc: 'iOS: grouped grey lists, blue, see-through bars, green switches, centred titles', look: { accent: '#007aff', bgTint: 'iosgrey', shadows: false, borders: 1, fontUi: 'system', tabStyle: 'plain', btnStyle: 'plain', band: 'none', barBlur: true, listStyle: 'inset', titleAlign: 'centre', switchStyle: 'ios', typeStyle: 'ios', iconWeight: 'thin', statusBar: 'header', headerStyle: 'large', tabIconFill: true, iconSet: 'ios', pageMotion: 'ios', sheetStyle: 'ios', toastStyle: 'ios', fieldStyle: 'ios', checkStyle: 'round' } },
+  { id: 'material', name: 'Material-style', group: 'inspired', desc: 'Indigo, light grey ground, raised white cards, filled buttons', look: { accent: '#3f51b5', bgTint: 'materialgrey', round: 1, fontUi: 'system', btnStyle: 'filled', band: 'none', switchStyle: 'material', typeStyle: 'material', pressStyle: 'highlight', statusBar: 'header', headerStyle: 'filled', iconSet: 'material', pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'filled', checkStyle: 'square' } },
   { id: 'instagram', name: 'Instagram-style', group: 'inspired', desc: 'White, black text, blue buttons, story-ring gradient, icons only', look: { accent: '#0095f6', bgTint: 'instagram', shadows: false, borders: 2, fontUi: 'system', tabStyle: 'plain', tabIcons: true, barBlur: true, typeStyle: 'ios', titleAlign: 'centre', iconWeight: 'bold' }, band: ['#feda75', '#fa7e1e', '#d62976', '#962fbf'] },
   { id: 'acgme', name: 'ACGME-style', group: 'inspired', desc: 'Case-log red, white forms, square fields, grey labels', look: { accent: '#d32f2f', bgTint: 'grey', round: 0, shadows: false, borders: 3, fontUi: 'system', btnStyle: 'filled', tabStyle: 'plain' }, band: ['#e53935', '#e53935', '#d32f2f', '#d32f2f'] },
   { id: 'x', name: 'X-style', group: 'inspired', desc: 'Black, blue, edge-to-edge lists, see-through bars, icons only', look: { rowLayout: 'chat', accent: '#1d9bf0', bgTint: 'xblack', shadows: false, borders: 2, fontUi: 'system', band: 'none', barBlur: true, listStyle: 'edge', tabStyle: 'plain', tabIcons: true, typeStyle: 'ios', pressStyle: 'highlight' } },
   { id: 'spotify', name: 'Spotify-style', group: 'inspired', desc: 'Near-black, green, rounded, bold titles', look: { accent: '#1ed760', bgTint: 'spotify', shadows: false, borders: 0, round: 3, fontUi: 'system', band: 'none', tabStyle: 'plain', tabActiveLabel: true, typeStyle: 'ios', pressStyle: 'highlight' } },
   { id: 'youtube', name: 'YouTube-style', group: 'inspired', desc: 'White or near-black, red, plain tabs, edge-to-edge lists', look: { accent: '#ff0000', bgTint: 'youtube', shadows: false, borders: 1, fontUi: 'system', band: 'none', tabStyle: 'plain', listStyle: 'edge', pressStyle: 'highlight', typeStyle: 'material', btnStyle: 'tinted' } },
-  { id: 'gmail', name: 'Gmail-style', group: 'inspired', desc: 'Pale blue-grey ground, white cards, red, icon pill tabs', look: { accent: '#d93025', bgTint: 'gmail', shadows: false, borders: 1, round: 3, fontUi: 'system', band: 'none', tabStyle: 'indicator', listStyle: 'edge', pressStyle: 'highlight', switchStyle: 'material', typeStyle: 'material', btnStyle: 'tinted' } },
+  { id: 'gmail', name: 'Gmail-style', group: 'inspired', desc: 'Pale blue-grey ground, white cards, red, icon pill tabs', look: { accent: '#d93025', bgTint: 'gmail', shadows: false, borders: 1, round: 3, fontUi: 'system', band: 'none', tabStyle: 'indicator', listStyle: 'edge', pressStyle: 'highlight', switchStyle: 'material', typeStyle: 'material', btnStyle: 'tinted', statusBar: 'page', tabIconFill: true, iconSet: 'material', pageMotion: 'material', sheetStyle: 'material', toastStyle: 'material', fieldStyle: 'outlined', checkStyle: 'square' } },
   { id: 'tiktok', name: 'TikTok-style', group: 'inspired', desc: 'Black, red buttons, cyan and pink-red edges, icons only', look: { accent: '#fe2c55', bgTint: 'tiktok', shadows: false, borders: 2, fontUi: 'inter', tabStyle: 'plain', tabIcons: true, typeStyle: 'ios' }, band: ['#25f4ee', '#25f4ee', '#fe2c55', '#fe2c55'] },
 ];
 // the Inspired themes shown on the Themes page; the rest are under Browse all themes (owner, 19 Oct 2026)
@@ -92,10 +84,29 @@ export function themePatch(theme, current = {}) {
 export function themeState(d = {}) {
   const theme = themeById(d.theme || 'nuhs');
   // off switches save as false or null alike (Soft shadows aside: false there means off, null on)
-  const val = (o, k) => (o[k] === false && k !== 'shadows' ? null : o[k] ?? null);
+  // (colours is an object: compared by its contents)
+  const val = (o, k) => (o[k] === false && k !== 'shadows' ? null : o[k] && typeof o[k] === 'object' ? JSON.stringify(o[k]) : o[k] ?? null);
   const custom = THEME_KEYS.some(k => !(theme.keep || []).includes(k) && val(d, k) !== val(theme.look, k)
     && !(k === 'borders' && d.flat && theme.look.flat));
   return { theme, custom };
+}
+// The problems with a theme (an empty list when it is fine): run over every theme by the tests, so a new one can't
+// set an unknown key or value, leave text hard to read, or use a brand name without "-style" (docs/theme-engine.md)
+export function checkTheme(t) {
+  const bad = [];
+  if (!/^[a-z0-9]{1,20}$/.test(t.id || '')) bad.push('id: lower-case letters and digits');
+  if (!t.name || (t.group === 'inspired' && !/-style$/.test(t.name))) bad.push('name: Inspired themes end in "-style"');
+  if (!['classic', 'inspired'].includes(t.group)) bad.push('group: classic or inspired');
+  if (!t.desc || t.desc.length > 90) bad.push('desc: one short line');
+  if (t.mode) bad.push('mode: themes never set light or dark');
+  for (const [k, v] of Object.entries(t.look || {})) {
+    if (!THEME_KEYS.includes(k)) bad.push(`look.${k}: not a look setting`);
+    else if (FACETS.some(f => f.key === k) && cleanFacet(k, v) === null) bad.push(`look.${k}: ${JSON.stringify(v)} is not one of its choices`);
+  }
+  if (t.look?.bgTint && !TINTS[t.look.bgTint]) bad.push(`look.bgTint: no tint ${t.look.bgTint}`);
+  if (t.band && !(t.band.length === 4 && t.band.every(c => /^#[0-9a-f]{6}$/.test(c)))) bad.push('band: four #rrggbb colours');
+  try { checkColours(t.look || {}, TINTS[t.look?.bgTint] || {}); } catch (err) { bad.push('colours: ' + err.message); }
+  return bad;
 }
 export const themeLabel = d => { const { theme, custom } = themeState(d); return custom ? `Custom (based on ${theme.name})` : theme.name; };
 
@@ -128,26 +139,8 @@ export function lookCss(d = {}, shades = null) {
   if (band === 'none') out.push('.top { background: var(--panel); } .top, .top[class] { padding-top: max(12px, env(safe-area-inset-top, 0px)); }');
   else if (four && four.length === 4) out.push(`:root:root, :root:root[data-theme="dark"] { --s1: ${four[0]}; --s2: ${four[1]}; --s3: ${four[2]}; --s4: ${four[3]}; }`);
   if (d.headFont && d.headFont !== 'same' && STACKS[d.headFont]) out.push(`:root { --font-head: ${STACKS[d.headFont]}; }`);
-  if (d.spacing === 'roomy') out.push('section.card { padding: 20px; margin-bottom: 16px; } ul.cases li { padding-top: 12px; padding-bottom: 12px; } .chips { gap: 8px; }');
-  if (d.spacing === 'tight') out.push('section.card { padding: 11px; margin-bottom: 8px; } ul.cases li { padding-top: 6px; padding-bottom: 6px; } .chips { gap: 4px; }');
-  if (d.tabStyle === 'pill') out.push('.tabs button[aria-selected="true"], html.tabs-top .tabs button[aria-selected="true"], html.tabs-bottom .tabs button[aria-selected="true"] { border-color: transparent; background: var(--accent-soft); color: var(--accent); border-radius: 999px; }');
-  if (d.tabStyle === 'plain') out.push('.tabs button[aria-selected="true"], html.tabs-top .tabs button[aria-selected="true"], html.tabs-bottom .tabs button[aria-selected="true"] { border-color: transparent; color: var(--accent); }');
-
-  // App-style details: CSS only, so the first paint has it too (index.html). Nothing is added unless chosen.
-  if (d.barBlur) out.push(':root:root .top { background-color: color-mix(in srgb, var(--panel) 72%, transparent); backdrop-filter: saturate(1.8) blur(20px); -webkit-backdrop-filter: saturate(1.8) blur(20px); } @media (max-width: 600px) { :root:root .tabs { background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: saturate(1.8) blur(20px); -webkit-backdrop-filter: saturate(1.8) blur(20px); } }');
-  if (d.tabActiveLabel) out.push('@media (max-width: 600px) { .tabs button:not([aria-selected="true"]) .lbl { display: none; } }');
-  if (d.tabStyle === 'indicator') out.push('.tabs button[aria-selected="true"], html.tabs-top .tabs button[aria-selected="true"], html.tabs-bottom .tabs button[aria-selected="true"] { border-color: transparent; background: var(--accent-soft); color: var(--accent); border-radius: 999px; } @media (max-width: 600px) { :root:root:not(.tabs-top) .tabs button[aria-selected="true"] { background: none; border-radius: 0; } :root:root:not(.tabs-top) .tabs button[aria-selected="true"] .ico { box-sizing: content-box; padding: 4px 18px; margin: -4px 0 0; border-radius: 999px; background: var(--accent-soft); } }');
-  if (d.listStyle === 'inset') out.push('ul.cases, .more-list { background: var(--panel); border-radius: calc(12px * var(--round, 1)); overflow: hidden; } ul.cases li { padding-left: 14px; padding-right: 12px; } ul.cases li:last-child { border-bottom: 0; } ul.cases li { border-bottom-color: color-mix(in srgb, var(--ink) 14%, transparent); }');
-  if (d.listStyle === 'edge') out.push('section.card { border-radius: 0; border-left: 0; border-right: 0; box-shadow: none; margin-left: -12px; margin-right: -12px; } ul.cases li { padding-left: 12px; padding-right: 12px; }');
-  if (d.titleAlign === 'centre') out.push('.top h1 { flex: 1; text-align: center; }');
-  if (d.switchStyle === 'ios') out.push(':root .set-page label.check > input[type=checkbox] { width: 51px; height: 31px; border-radius: 16px; } :root .set-page label.check > input[type=checkbox]::before { top: 2px; left: 2px; width: 27px; height: 27px; box-shadow: 0 2px 4px rgba(0, 0, 0, .25); } :root .set-page label.check > input[type=checkbox]:checked { background: #34c759; } :root .set-page label.check > input[type=checkbox]:checked::before { transform: translateX(20px); }');
-  if (d.switchStyle === 'material') out.push(':root .set-page label.check > input[type=checkbox] { width: 52px; height: 32px; border-radius: 16px; background: var(--panel); box-shadow: inset 0 0 0 2px var(--muted); } :root .set-page label.check > input[type=checkbox]::before { top: 8px; left: 8px; width: 16px; height: 16px; background: var(--muted); box-shadow: none; } :root .set-page label.check > input[type=checkbox]:checked { background: var(--accent); box-shadow: none; } :root .set-page label.check > input[type=checkbox]:checked::before { width: 24px; height: 24px; top: 4px; left: 4px; background: #fff; transform: translateX(20px); }');
-  if (d.pressStyle === 'highlight') out.push(':root :is(button, .btn, .chip, [role=button]):not(:disabled):active { opacity: 1; background-color: color-mix(in srgb, var(--ink) 12%, var(--panel)); }');
-  if (d.pressStyle === 'none') out.push(':root :is(button, .btn, .chip, [role=button]):not(:disabled):active { opacity: 1; } :root :is(ul.cases > li:not(.monthhead), .more-list a, .picker li, details > summary, ul.ready-list li, .notes-list li):active { background-color: transparent; }');
-  if (d.iconWeight === 'thin') out.push(':root .ico, :root .ico.i { stroke-width: 1.4; }');
-  if (d.iconWeight === 'bold') out.push(':root .ico, :root .ico.i { stroke-width: 2.6; }');
-  if (d.typeStyle === 'ios') out.push(':root .top h1, :root h1, :root h2, :root section.card h2 { font-weight: 700; letter-spacing: -0.02em; } :root .top h1 { font-size: calc(20px * var(--fs, 1)); } body { letter-spacing: -0.01em; }');
-  if (d.typeStyle === 'material') out.push(':root .top h1, :root h1, :root h2, :root h3, :root section.card h2 { font-weight: 500; letter-spacing: 0; } .tabs button { letter-spacing: .02em; font-weight: 500; }');
+  // the theme engine's facets (theme-engine.js): App-style details, spacing, tab style; nothing unless chosen
+  out.push(...facetCss(d));
   out.push(coloursCss(d.colours));
   return out.filter(Boolean).join('\n');
 }

@@ -5,6 +5,7 @@
 import { S, h, toast, modal, hooks, profile, facultyRole, shows } from './ui-core.js';
 import { DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
 import { lookCss } from './themes.js';
+import { cleanFacet } from './theme-engine.js';
 import { checkCss } from './custom-css.js';
 import { applyFonts } from './fonts.js';
 import { rowLayoutOf } from './device-presets.js';
@@ -28,6 +29,7 @@ export function applyTheme(t) {
   document.documentElement.dataset.theme = theme === 'oled' ? 'dark' : theme;
   if (theme === 'oled') document.documentElement.dataset.oled = ''; else delete document.documentElement.dataset.oled;
   try { theme === 'light' ? localStorage.removeItem(THEME_KEY) : localStorage.setItem(THEME_KEY, theme); } catch { /* storage blocked */ }
+  paintStatusBar();
 }
 export function cachedTheme() {
   try { return localStorage.getItem(THEME_KEY) || 'light'; } catch { return 'light'; }
@@ -83,7 +85,8 @@ export function cachedCompact() {
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
 export const DISPLAY_KEYS = ['colours', 'listHeight', 'myThemes', 'pageSize', 'lbGroup', 'lbSort', 'gridLines', 'gridCols', 'calRefl', 'totalsCompact', 'totalsTargets', 'boxHeight', 'boxGrow', 'moreOrder', 'noteToolbar', 'compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'navStyle', 'rowLayout', 'formLayout', 'rowHold', 'dayCopy', 'hideTabsTyping',
-  'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band', 'barBlur', 'tabActiveLabel', 'listStyle', 'titleAlign', 'switchStyle', 'pressStyle', 'iconWeight', 'typeStyle'];
+  'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band', 'barBlur', 'tabActiveLabel', 'listStyle', 'titleAlign', 'switchStyle', 'pressStyle', 'iconWeight', 'typeStyle',
+  'statusBar', 'headerStyle', 'tabIconFill', 'iconSet', 'pageMotion', 'sheetStyle', 'toastStyle', 'fieldStyle', 'checkStyle'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -124,7 +127,23 @@ export function applyThemeLook(d = display()) {
   if (el.textContent !== css) el.textContent = css;
   if (el.nextElementSibling || el.parentNode !== document.head) document.head.append(el);   // last, after the colour's
   try { css ? localStorage.setItem(LOOK_CSS_KEY, css) : localStorage.removeItem(LOOK_CSS_KEY); } catch { /* storage blocked */ }
+  paintStatusBar(d);
 }
+// The phone's status bar (theme engine, statusBar; <meta name="theme-color">): my colour (as always), or the colour the
+// header or the page is drawn in now, light or dark; cached for the first paint (index.html)
+const STATUS_KEY = 'apmes-logbook-statusbar';
+export function paintStatusBar(d = display()) {
+  if (typeof document === 'undefined') return;
+  const meta = document.querySelector('meta[name="theme-color"]'); if (!meta) return;
+  const mode = d.statusBar === 'header' || d.statusBar === 'page' ? d.statusBar : null;
+  const root = getComputedStyle(document.documentElement);
+  const token = mode === 'page' || (mode === 'header' && document.documentElement.classList.contains('no-header')) ? '--bg' : d.headerStyle === 'filled' ? '--accent' : '--panel';
+  const colour = (mode && root.getPropertyValue(token).trim()) || lightPalette(cleanAccent(d.accent) || DEFAULT_ACCENT).accent;
+  if (meta.getAttribute('content') !== colour) meta.setAttribute('content', colour);
+  try { mode ? localStorage.setItem(STATUS_KEY, colour) : localStorage.removeItem(STATUS_KEY); } catch { /* storage blocked */ }
+}
+// Auto light or dark: the phone switching changes the colours under the status bar too
+if (typeof window !== 'undefined' && window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => paintStatusBar());
 // page width (lineWidth), line spacing, contrast, motion, icons-only tabs: classes on <html> and --lh (style.css, end); also set at
 // first paint from the same localStorage entry (index.html)
 export const LINE_WIDTHS = [['narrow', 'Narrow (easier to read on a big screen)'], ['normal', 'Normal (default)'], ['wide', 'Wide'], ['full', 'Full (no limit)']];
@@ -138,6 +157,9 @@ export function applyLook(d = {}) {
   const ct = d.contrast || 'auto'; c.toggle('hc', ct === 'high'); c.toggle('hc-auto', ct === 'auto');
   const mo = d.motion || 'auto'; c.toggle('rm', mo === 'reduce'); c.toggle('rm-auto', mo === 'auto');
   c.toggle('tab-icons', !!d.tabIcons);
+  // the theme engine's icon set (theme-engine.js ICON_SETS: ic() and the tab bar draw its own paths, if it has them)
+  const icons = cleanFacet('iconSet', d.iconSet);
+  if (icons) document.documentElement.dataset.icons = icons; else delete document.documentElement.dataset.icons;
   c.toggle('tabs-top', d.tabBar === 'top'); c.toggle('tabs-bottom', d.tabBar === 'bottom');
   c.toggle('no-header', !!d.hideHeader);
   c.toggle('case-inverted', !!d.caseInverted);

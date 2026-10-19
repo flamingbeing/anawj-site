@@ -1,5 +1,6 @@
 // Shared UI state and helpers for the logbook screens (ui-*.js). app.js owns boot, auth and tabs.
 
+import { iconPath } from './theme-engine.js';
 import { BY_CODE, CATEGORIES, DEFAULT_NAMES, yearName, appYear } from './categories.js';
 import { tagSetOf, tagTree, flatTree, userCatNames, tagName as tagNameIn, tagLinks as tagLinksIn } from './tags.js';
 import { countCases, uid, todayISO, sortCodes, progress, rYearDefault, academicYear, splitInitials, cleanInitials, ID_RE, setDetection, detectionFrom } from './engine.js';
@@ -202,7 +203,7 @@ const ICON_PATHS = {
 const svgIcon = (k, cls) => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', cls); svg.setAttribute('aria-hidden', 'true');
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', ICON_PATHS[k]);
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', iconPath(k, ICON_PATHS[k]));   // (an icon set's own drawing, theme-engine.js)
   svg.append(path); return svg;
 };
 export const rowIcon = k => svgIcon(k, 'ico');

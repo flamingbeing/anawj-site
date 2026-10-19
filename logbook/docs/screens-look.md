@@ -198,6 +198,18 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   `tabStyle: 'indicator'` (Material icon pill), `listStyle` (`inset` iOS grouped, `edge` edge to edge), `titleAlign: 'centre'`,
   `switchStyle` (`ios`, `material`), `pressStyle` (`highlight`, `none`), `iconWeight` (`thin`, `bold`), `typeStyle` (`ios`, `material`).
   New Inspired themes use them: X-, Spotify-, YouTube-, Gmail-style; Apple-, Pixel-, WhatsApp-, Telegram-, Instagram-, TikTok-, Material-style and the other Inspired ones now use their app's own ground, text and line colours (colours and shapes only).
+- **Theme engine** (owner, 19 Oct 2026; `theme-engine.js`, guide [theme-engine.md](theme-engine.md), unit tests
+  `theme-engine.test.mjs`, e2e `app-style.mjs`): every App-style detail, spacing and tab style is a facet in `FACETS`
+  (key, choices, group, CSS); the Themes page draws "App-style details" from it, `lookCss` adds its CSS, Your themes and
+  the settings file keep only listed values, and `checkTheme` (themes.js) refuses unknown keys or values, unreadable
+  colours and Inspired names without "-style". Added with it: `statusBar` (header / page: `<meta theme-color>`,
+  display.js `paintStatusBar`, cached as `apmes-logbook-statusbar` for the first paint), `headerStyle` (filled / large),
+  `tabIconFill`, `iconSet` (`ICON_SETS`: CSS per set and optional per-icon paths, read by ui-core `ic()` and the tab bar
+  through `iconPath`; `<html data-icons>`), `pageMotion` (`PAGE_MOTIONS`, app.js `slidePages`; material and fade also
+  fade between bar tabs), `sheetStyle` (iOS bottom sheets / Material dialogs, `dialog:not(.full)`), `toastStyle` (iOS
+  banner / Material snackbar), `fieldStyle` (ios / filled / outlined), `checkStyle` (round / square; never the settings
+  switches). The first-paint look-CSS cache allows 60 KB (index.html). Apple, Pixel, Material, WhatsApp, Gmail and
+  Telegram-style use them.
 - **Themes never change Light or dark** (owner, 19 Oct 2026): no theme has a `mode`; every theme carries a light and a dark palette (`TINTS`), so it matches its app either way. Picking a theme or one of Your themes leaves the Light or dark setting alone.
 - **Inspired themes box** (owner, 19 Oct 2026): the Themes page shows the Inspired themes as cards, only `FEATURED` in themes.js (Apple, Pixel, Evernote, Obsidian, Notion, WhatsApp, Office, ACGME), with no scrolling list. **Browse all themes** (`#themesall`, under Themes) has every theme in a searchable list and **Suggest a theme**. Your themes always has Export (with none saved it saves the look you have now) and Import.
 - **Your themes** (owner, 16 Oct 2026; `my-themes.js`, unit-tested; e2e `my-themes.mjs`): once the look is Custom, the

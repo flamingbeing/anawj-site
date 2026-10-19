@@ -3,6 +3,7 @@
 // them to a file (.json) to keep or pass on; Import reads such a file back (only known look settings, checked).
 // Pure (test/my-themes.test.mjs); the page is ui-settings.js renderThemes.
 import { THEME_KEYS, TINTS } from './themes.js';
+import { FACET_KEYS, cleanFacet } from './theme-engine.js';
 import { cleanAccent, cleanColours, checkColours } from './colors.js';
 
 export const MAX_MINE = 12;
@@ -18,6 +19,7 @@ const OK = {
   accent: v => !!cleanAccent(v), bgTint: v => typeof v === 'string' && Object.hasOwn(TINTS, v),
   borders: small, round: small, flat: v => v === true, shadows: v => v === false,
   colourful: v => v === true || word(v), lineHeight: v => typeof v === 'string' && /^\d(\.\d{1,2})?$/.test(v),
+  ...Object.fromEntries(FACET_KEYS.map(k => [k, v => cleanFacet(k, v) !== null])),   // the theme engine's facets: listed choices only
 };
 const okValue = (k, v) => v != null && (OK[k] ? OK[k](v) : typeof v === 'boolean' || word(v));
 

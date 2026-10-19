@@ -8,6 +8,7 @@ import { S, hooks, h, toast, basicHides, basicMode, logbookOnly, facultyMode, fa
 import { renderLog, focusLog, logCasesChanged, clearDrafts } from './ui-log.js';
 import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, IPHONE_APP, setPageLabel, START_TABS, arrangeTabs, setTabOnBar, barTabs, MAX_BAR } from './display.js';
 import { gripDrag, moveIn } from './drag-list.js';
+import { iconPath, pageMotion } from './theme-engine.js';
 import { createNavigation } from './navigation.js';
 import { renderNotes, leaveNotes, openDayNote, renderNoteSettings } from './ui-notepad.js';
 import { fromQuery, keepShared, readInbox } from './share-in.js';
@@ -110,7 +111,7 @@ const icon = id => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'ico'); svg.setAttribute('aria-hidden', 'true');
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  path.setAttribute('d', ICONS[id]);
+  path.setAttribute('d', iconPath(id, ICONS[id]));   // (an icon set's own drawing, theme-engine.js)
   svg.append(path);
   return svg;
 };
@@ -580,7 +581,7 @@ function paintTabs() {
   // for its own pages too, and anything else off the bar under More
   const bar = visibleTabs(), { shown, sel } = barTabOf(S.tab);
   // same tabs as before: only move the selection, so the bar never blinks while changing tab (swipe included)
-  const key = shown.map(id => id + ':' + bar.find(t => t.id === id).label).join('|');
+  const key = shown.map(id => id + ':' + bar.find(t => t.id === id).label).join('|') + '#' + (document.documentElement.dataset.icons || '');   // (a new icon set redraws the icons)
   tabsEl.classList.toggle('many', shown.length > 5);
   if (tabsEl.dataset.key === key && tabsEl.children.length) {
     for (const b of tabsEl.children) b.setAttribute('aria-selected', String(b.dataset.tab === sel));
@@ -696,8 +697,9 @@ function render() {
   if (findAfterRender) { if (drawn) showFound(); }   // (kept until the page is drawn)
   // the inverted Case tab (Settings → Display, phones) opens at the bottom, where the case box is
   else if (lastRendered !== 'log' && invertedCase()) requestAnimationFrame(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const tabFade = !dir && tabChangeMotion(lastRendered, tab.id);
   lastRendered = tab.id;
-  if (dir) slidePages(dir);
+  if (dir || tabFade) slidePages(dir);
 }
 let lastRendered = '';
 
@@ -712,12 +714,19 @@ function slideDirection(from, to) {
   const a = depthOf(from), b = depthOf(to);
   return b > a ? 1 : b < a ? -1 : 0;
 }
+// The theme engine's Page motion (theme-engine.js PAGE_MOTIONS) says how: the default slide, an iOS push, Material's
+// shift and fade (which also fades between bar tabs), a fade, or none.
+function tabChangeMotion(from, to) {
+  if (!from || from === to || !pageMotion(display()).tabs || reduceMotion() || document.documentElement.classList.contains('swiping') || !app.firstChild) return false;
+  return barTabOf(from).sel !== barTabOf(to).sel;
+}
 let sliding = null, afterSlide = null;   // afterSlide: Settings search scrolling to its find once the page stops sliding
 function slidePages(dir) {
   sliding?.();   // a slide still running ends now
+  const m = pageMotion(display());
+  if (!m.ms) return;
   pin();
-  const x = Math.round(innerWidth * 0.3) * dir;
-  const a = app.animate([{ transform: `translateX(${x}px)`, opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }], { duration: 280, easing: 'cubic-bezier(.2, .7, .2, 1)' });
+  const a = app.animate(m.frames(dir, innerWidth), { duration: m.ms, easing: m.ease });
   const done = () => { if (sliding !== done) return; sliding = null; a.cancel(); unpin(); const then = afterSlide; afterSlide = null; then?.(); };
   sliding = done;
   a.finished.then(done, done);
