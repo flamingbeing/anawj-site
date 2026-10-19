@@ -348,7 +348,11 @@ function settingsSearch() {
     if (!settingsIndex || missing.length) settingsIndex = buildSettingsIndex();
     const found = searchSettings(settingsIndex, box.value);
     fill(results, ...found.map(x => h('li', {}, h('a', { href: '#' + x.id, 'data-go': x.id, onclick: e => { e.preventDefault(); if (x.open) return x.open(); findAfterRender = x.text; if (S.tab === x.id) showFound(); else go(x.id); } },
-      h('span', { class: 'mt' }, h('b', {}, x.text), h('small', {}, x.page)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))),
+      h('span', { class: 'mt' }, h('b', {}, x.text), h('small', {}, x.page)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')),
+      // a link straight to this setting (the page and the heading, read by tabFromHash)
+      h('button', { type: 'button', class: 'copy-link', title: 'Copy a link to this setting', 'aria-label': 'Copy a link to ' + x.text,
+        onclick: () => import('./share.js').then(m => m.copyText(location.origin + location.pathname + '#' + x.id + (x.open ? '' : '?find=' + encodeURIComponent(x.text)), 'Link copied'))
+      }, '🔗'))),
       box.value.trim() && !found.length ? h('li', { class: 'hint', style: 'padding:10px 4px' }, 'No setting matches. Try another word.') : null);
   };
   if (settingsQuery) search();
