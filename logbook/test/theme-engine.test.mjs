@@ -53,6 +53,16 @@ assert.equal(iconPath('search', 'M0 0', ''), 'M0 0');
 delete ICON_SETS.test;
 for (const [k, s] of Object.entries(ICON_SETS)) for (const [n, d] of Object.entries(s.paths || {})) assert.match(d, /^[MmLlHhVvCcSsQqTtAaZz0-9.,\s-]+$/, `${k}.${n}`);
 
+// Every tab and search has an original drawing in both system sets; unknown icons still fall back.
+for (const set of ['ios', 'material']) {
+  for (const name of ['log', 'logbook', 'reflect', 'progress', 'totals', 'notes', 'more', 'settings', 'account', 'search']) {
+    assert.ok(ICON_SETS[set].paths[name], `${set}.${name} has a drawing`);
+    assert.equal(iconPath(name, 'fallback', set), ICON_SETS[set].paths[name]);
+    assert.notEqual(ICON_SETS.ios.paths[name], ICON_SETS.material.paths[name], `${name} has distinct system drawings`);
+  }
+  assert.equal(iconPath('unknown', 'fallback', set), 'fallback');
+}
+
 // page motion: the default is the old slide; every motion with a duration has frames both ways
 assert.equal(pageMotion({}), PAGE_MOTIONS.default);
 assert.equal(pageMotion({ pageMotion: 'nope' }), PAGE_MOTIONS.default);
