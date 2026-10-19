@@ -248,7 +248,8 @@ export function migrate(s) {
     if (!s.groups.some(g => g.id === 'nurse')) s.groups.push(clone(DEFAULT_GROUPS.find(g => g.id === 'nurse')));
     s.settings.jpv = 1;
   }
-  if (!['all', 'junior', 'senior'].includes(s.settings.pool)) s.settings.pool = 'all';
+  // which roster this browser works on (owner, 19 Oct 2026: two rosters, one at a time; the old "All" view is gone)
+  if (!['junior', 'senior'].includes(s.settings.pool)) s.settings.pool = 'junior';
   s.staff = byId(s.staff).map(p => {
     const x = {
       short: '', group: 'mo', tags: [], fte: 1, start: '', end: '', note: '', active: true, ...p,
@@ -283,6 +284,7 @@ export function migrate(s) {
     s.aps = { base: num(s.aps.base), last: mon(s.aps.last), through: /^\d{4}-\d{2}$/.test(s.aps.through) ? s.aps.through : '' };
   } else delete s.aps;
   if (!isObj(s.months)) s.months = {};
+  for (const [m, v] of Object.entries(s.months)) if (isObj(v)) s.months[m] = monthMeta(v);
   if (!isObj(s.cells)) s.cells = {};
   // cells: { date: { staffId: { a: [], r: [], auto: [], note, lock } } }; drop anything else
   for (const [d, day] of Object.entries(s.cells)) {
@@ -318,14 +320,29 @@ export function addDays(s, n) {
   const [y, m, d] = String(s).split('-').map(Number);
   return iso(new Date(y, m - 1, d + n));
 }
-// A month is locked (finished) when its status is 'published': the team copy already stores that status, so locking is
-// shared with the team and needs no change to the rules. While locked, no change to that month's days goes through
-// (store.js), whoever tries it: edits, Auto-fill, import, a pull from People.
-export const isMonthLocked = (state, m) => !!(state && state.months && state.months[m] && state.months[m].status === 'published');
-export function setMonthLocked(draft, m, locked) {
-  if (!draft.months || typeof draft.months !== 'object') draft.months = {};
-  draft.months[m] = { ...(draft.months[m] || {}), status: locked ? 'published' : 'draft', publishedAt: locked ? new Date().toISOString() : '' };
+// Each roster locks its own month (owner, 19 Oct 2026): months[m].locks = { junior, senior }, each '' (open) or when
+// it was locked. While a roster's month is locked, no change to its people's days in that month goes through
+// (store.js), whoever tries it: edits, Auto-fill, import, a pull from People. status is 'published' only when both
+// are locked (what older copies of the app read); a month from before then, 'published', is locked for both.
+// pool: 'junior' or 'senior'; left out, the roster this browser is working on.
+const viewOf = state => ((state && state.settings && state.settings.pool) === 'senior' ? 'senior' : 'junior');
+export function monthMeta(v) {
+  const o = isObj(v) ? v : {};
+  const old = o.status === 'published' ? (str(o.publishedAt) || 'yes') : '';
+  const l = isObj(o.locks) ? o.locks : { junior: old, senior: old };
+  const locks = { junior: str(l.junior), senior: str(l.senior) };
+  const both = !!(locks.junior && locks.senior);
+  return { ...o, locks, status: both ? 'published' : 'draft', publishedAt: both ? (str(o.publishedAt) || locks.junior) : '' };
 }
+export const isMonthLocked = (state, m, pool = viewOf(state)) => !!(state && state.months && state.months[m] && monthMeta(state.months[m]).locks[pool]);
+export function setMonthLocked(draft, m, locked, pool = viewOf(draft)) {
+  if (!draft.months || typeof draft.months !== 'object') draft.months = {};
+  const v = monthMeta(draft.months[m]);
+  const at = new Date().toISOString();
+  for (const k of pool === 'both' ? RULE_POOLS : [pool]) v.locks[k] = locked ? at : '';
+  draft.months[m] = monthMeta({ ...v, status: 'draft', publishedAt: '' });
+}
+export const POOL_LABEL = { junior: 'junior roster', senior: 'senior roster' };
 export function monthDays(m) {
   const [y, mo] = String(m).split('-').map(Number);
   const last = new Date(y, mo, 0).getDate();

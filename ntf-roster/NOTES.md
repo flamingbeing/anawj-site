@@ -367,3 +367,18 @@ restriction" (same day, following days, between two people, and ready-made ones)
   bulk changes only reach the rules shown. The rule editor has a Roster field; requests take the person's roster.
 - Cloud merge by pool now keeps my roster's rules and takes theirs for the other, by `pool`.
 - The demo no longer puts senior residents on the junior call (they are on the senior roster since 19 Oct).
+
+## One roster at a time (19 Oct 2026)
+
+- The owner: two rosterers share the app and don't edit each other's work. The header switch is Junior | Senior only
+  (no All; `settings.pool`, per browser, defaults to junior). It applies to the whole app: grid, People, Rules,
+  Priorities, checks and Fill show only the roster in view. Both rosters stay editable; the switch picks which.
+- Month lock is per roster: `months[m].locks = { junior, senior }` (each '' or a time). `status` is `published` only
+  when both are locked (older saves: published = both locked; `M.monthMeta`). The padlock and `store.commit` act on
+  the roster in view (`lockedHit` checks only that roster's people); `lockAll`/`ensureLocked` lock both. Firestore
+  allows `locks` on month and version docs (`validLocks`); cloud merge by pool keeps my roster's lock, takes theirs.
+- The grid's "Senior roster" / "Junior roster" toolbar button shows the other roster below, greyed and read-only
+  (`tr.ro`, `.cell-ro`, no editor); kept in the UI settings (`ui.other`).
+- New people start in a group of the roster in view.
+- Limit: a junior-roster check can't see who is on the senior roster, so "Baby MO needs an SRP/RP on call" only counts
+  junior-roster people.

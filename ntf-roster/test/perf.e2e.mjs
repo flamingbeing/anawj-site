@@ -38,7 +38,7 @@ window.__waitFor = (src, timeout = 20000) => new Promise((resolve, reject) => {
   })();
 });`;
 // every row of the grid drawn (rows below the screen are added over a few frames after a full redraw)
-const ALL_ROWS = `(() => { const a = window.ntfApp, M = a.model, st = a.store.get(); const ppl = M.staffInMonth(st, a.month);
+const ALL_ROWS = `(() => { const a = window.ntfApp, M = a.model, st = a.store.get(); const ppl = M.staffInView(st, a.month);
   return document.querySelectorAll('table.grid tbody tr').length === ppl.length + new Set(ppl.map(p => p.group)).size; })()`;
 
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
@@ -82,7 +82,7 @@ async function timedTap([x, y], cond) {
 const cells = await page.evaluate(() => {
   const app = window.ntfApp, M = app.model, st = app.store.get(), out = [];
   const days = M.monthDays(app.month).filter(d => !M.isWeekend(d) && !M.isHoliday(st, d));
-  for (const p of M.staffInMonth(st, app.month).slice(6, 30)) {
+  for (const p of M.staffInView(st, app.month).slice(6, 30)) {
     const d = days.find(x => !M.getCell(st, x, p.id) && !M.effectiveCodes(st, x, p.id).length);
     if (d) out.push(`.cell[data-d="${d}"][data-s="${p.id}"]`);
   }

@@ -34,18 +34,41 @@ await page.waitForSelector('.view-roster, .rv-grid, [data-view]', { timeout: 150
 await page.waitForTimeout(800);
 const rows = () => page.locator('[data-staff], tr[data-sid], .rg-row').count();
 
-// pool switch: three buttons, All is on, Junior hides the consultants
-ok((await page.locator('#poolsw .pool-btn').count()) === 3, 'three pool buttons');
-ok((await page.locator('#poolsw [data-pool="all"]').getAttribute('aria-pressed')) === 'true', 'All is pressed at first');
-const all = await page.evaluate(() => document.body.innerText.includes('Consultant') || true);
-await page.click('#poolsw [data-pool="junior"]');
-await page.waitForTimeout(400);
-ok((await page.locator('#poolsw [data-pool="junior"]').getAttribute('aria-pressed')) === 'true', 'Junior pressed');
+// roster switch: two buttons, Junior at first; the grid shows that roster only
+ok((await page.locator('#poolsw .pool-btn').count()) === 2, 'two roster buttons');
+ok((await page.locator('#poolsw [data-pool="junior"]').getAttribute('aria-pressed')) === 'true', 'Junior is pressed at first');
 let st = await state(page);
-ok(st.settings && st.settings.pool === 'junior', 'pool saved in the state');
+ok(!st.settings || !st.settings.pool || st.settings.pool === 'junior', 'junior at first (the practice copy is saved on its first change)');
 await page.click('#poolsw [data-pool="senior"]'); await page.waitForTimeout(300);
-await page.click('#poolsw [data-pool="all"]'); await page.waitForTimeout(300);
-void all; void rows;
+await page.click('#poolsw [data-pool="junior"]'); await page.waitForTimeout(400);
+st = await state(page);
+ok(st.settings.pool === 'junior', 'the roster is saved in the state');
+const poolOfId = id => { const p = st.staff.find(x => x.id === id); const t = p.tags || []; return p.pool || (t.includes('jpool') ? 'junior' : t.includes('spool') ? 'senior' : (st.groups.find(g => g.id === p.group) || {}).kind === 'junior' ? 'junior' : 'senior'); };
+const gridIds = () => page.$$eval('.nm-btn', els => els.map(e => e.dataset.p));
+let ids = await gridIds();
+ok(ids.length > 5 && ids.every(id => poolOfId(id) === 'junior'), 'Junior: only the junior roster on the grid');
+// the other roster: greyed rows, view only
+await page.click('[data-k="other"]'); await page.waitForTimeout(400);
+ok((await page.locator('tbody tr.ro').count()) > 3 && (await page.locator('tbody tr.ro .cell').count()) === 0, 'Senior roster button: greyed rows with nothing to edit');
+ok((await gridIds()).length === ids.length, 'the editable rows are still the junior roster');
+await axe(page, 'grid with the other roster');
+await shot(page, 'other-roster');
+await page.click('[data-k="other"]'); await page.waitForTimeout(300);
+ok((await page.locator('tbody tr.ro').count()) === 0, 'hidden again');
+// each roster locks its own month
+await page.click('#lockm'); await page.waitForTimeout(300);
+st = await state(page);
+let mk = Object.keys(st.months || {}).find(m => st.months[m].locks && st.months[m].locks.junior);
+ok(mk && !st.months[mk].locks.senior, 'the padlock locks the junior roster only');
+await page.click('#poolsw [data-pool="senior"]'); await page.waitForTimeout(400);
+ok((await page.locator('#poolsw [data-pool="senior"]').getAttribute('aria-pressed')) === 'true', 'Senior pressed');
+ok((await page.locator('#lockm').getAttribute('aria-pressed')) === 'false', 'the senior roster is still open');
+ids = await gridIds();
+ok(ids.length > 3 && ids.every(id => poolOfId(id) === 'senior'), 'Senior: only the senior roster on the grid');
+await page.click('#poolsw [data-pool="junior"]'); await page.waitForTimeout(400);
+ok((await page.locator('#lockm').getAttribute('aria-pressed')) === 'true', 'back on Junior: still locked');
+await page.click('#lockm'); await page.waitForTimeout(300);
+void rows;
 
 // Junior pool setup: choose the first person of the pool, set a call level, the junior rules arrive
 await page.goto(`${BASE}?demo#people?s=pool`);
@@ -103,7 +126,8 @@ await page.click('button:has-text("Select preferences")');
 await page.selectOption('.rq-bar select', '80');
 await page.waitForTimeout(300);
 st = await state(page);
-ok(st.rules.filter(r => !r.hard).every(r => r.weight === 80), 'every preference set to 80 at once');
+ok(st.rules.filter(r => !r.hard && r.pool === 'junior').every(r => r.weight === 80), 'every junior preference set to 80 at once');
+const seniorWeights = JSON.stringify(st.rules.filter(r => r.pool === 'senior').map(r => r.weight));
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 // each roster has its own rules: Junior shows only the junior roster's, in the list and in Priorities
@@ -121,11 +145,13 @@ await page.click('button:has-text("Select all")');
 await page.selectOption('.rq-bar select', '40');
 await page.waitForTimeout(300);
 st = await state(page);
-ok(st.rules.filter(r => r.pool === 'senior' && !r.hard).every(r => r.weight === 80), 'a bulk change in Junior leaves the senior rules alone');
+ok(JSON.stringify(st.rules.filter(r => r.pool === 'senior').map(r => r.weight)) === seniorWeights, 'a bulk change in Junior leaves the senior rules alone');
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
-await page.click('#poolsw [data-pool="all"]'); await page.waitForTimeout(400);
-ok((await page.locator('.rv-card .bx-badge.sen').count()) > 0 && (await page.locator('.rv-card .bx-badge.jun').count()) > 0, 'All: each rule says whose it is');
+await page.click('#poolsw [data-pool="senior"]'); await page.waitForTimeout(400);
+shown = await page.$$eval('.rv-card[data-rule]', els => els.map(e => e.dataset.rule));
+ok(shown.length > 3 && shown.every(id => st.rules.find(r => r.id === id).pool === 'senior'), 'Senior: only the senior roster\'s rules');
+await page.click('#poolsw [data-pool="junior"]'); await page.waitForTimeout(400);
 await page.click('button:has-text("Add a request")');
 await page.waitForSelector('#rq-who', { timeout: 5000 });
 await axe(page, 'request form');
