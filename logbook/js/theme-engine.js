@@ -100,7 +100,7 @@ export const FACETS = [
   // Lists and type
   { key: 'listStyle', group: 'lists', label: 'List style', line: 'How Logbook rows sit on the page.', choices: [['default', 'Cards (default)'], ['inset', 'Inset grouped (iOS)'], ['edge', 'Edge to edge (Material, chat apps)']], css: {
     inset: 'ul.cases, .more-list { background: var(--panel); border-radius: calc(12px * var(--round, 1)); overflow: hidden; } ul.cases li { padding-left: 14px; padding-right: 12px; } ul.cases li:last-child { border-bottom: 0; } ul.cases li { border-bottom-color: color-mix(in srgb, var(--ink) 14%, transparent); }',
-    edge: 'section.card { border-radius: 0; border-left: 0; border-right: 0; box-shadow: none; margin-left: -12px; margin-right: -12px; } ul.cases li { padding-left: 12px; padding-right: 12px; }' } },
+    edge: 'section.card { border-radius: 0; border-left: 0; border-right: 0; box-shadow: none; margin-left: -12px; margin-right: -12px; } body.compact section.card { margin-left: -8px; margin-right: -8px; } ul.cases li { padding-left: 12px; padding-right: 12px; }' } },
   { key: 'typeStyle', group: 'lists', label: 'Type style', line: 'Weight and spacing of titles.', choices: [['default', 'As now (default)'], ['ios', 'iOS (bold titles, tight)'], ['material', 'Material (medium weight)']], css: {
     ios: ':root .top h1, :root h1, :root h2, :root section.card h2 { font-weight: 700; letter-spacing: -0.02em; } :root .top h1 { font-size: calc(20px * var(--fs, 1)); } body { letter-spacing: -0.01em; }',
     material: ':root .top h1, :root h1, :root h2, :root h3, :root section.card h2 { font-weight: 500; letter-spacing: 0; } .tabs button { letter-spacing: .02em; font-weight: 500; }' } },

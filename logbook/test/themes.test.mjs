@@ -1,7 +1,42 @@
 // Themes (js/themes.js): a theme is a bundle of look settings; changing one makes it "Custom (based on …)".
 import assert from 'node:assert/strict';
 import { THEMES, THEME_KEYS, TINTS, themePatch, themeState, themeLabel, bandColours, lookCss, NUH_BAND, themeById } from '../js/themes.js';
-import { contrast } from '../js/colors.js';
+import { contrast, colourChecks } from '../js/colors.js';
+import { FEATURED, checkTheme } from '../js/themes.js';
+import { lookOf, exportText, importText } from '../js/my-themes.js';
+
+// The Inspired catalogue is complete, accessible in both appearances, and portable through Your themes.
+const additions = ['Facebook', 'Messenger', 'Threads', 'LinkedIn', 'Reddit', 'Discord', 'Slack',
+  'Microsoft Teams', 'Zoom', 'Signal', 'LINE', 'WeChat', 'Snapchat', 'Pinterest', 'Tumblr', 'Netflix',
+  'Disney+', 'Prime Video', 'Apple Music', 'SoundCloud', 'Duolingo', 'Airbnb', 'Uber', 'Grab',
+  'Google Maps', 'Google Calendar', 'Google Keep', 'Google Drive', 'Dropbox', 'Trello', 'Asana',
+  'Todoist', 'Things', 'Craft', 'OneNote', 'Outlook', 'Apple Notes', 'Apple Health', 'Strava',
+  'Nike Run Club', 'Headspace', 'Calm', 'Medium', 'Substack', 'Kindle', 'GitHub', 'Figma', 'Canva',
+  'Shopee', 'Starbucks'];
+const inspired = THEMES.filter(t => t.group === 'inspired');
+assert.equal(additions.length, 50);
+assert.equal(inspired.length, 67);
+assert.deepEqual(FEATURED, ['apple', 'pixel', 'evernote', 'obsidian', 'notion', 'whatsapp', 'office', 'acgme']);
+for (const app of additions) assert.equal(inspired.filter(t => t.name === `${app}-style`).length, 1, app);
+assert.equal(new Set(inspired.map(t => JSON.stringify(t.look))).size, inspired.length, 'distinct looks');
+for (const t of inspired) {
+  assert.deepEqual(checkTheme(t), [], t.id);
+  for (const side of ['light', 'dark']) {
+    for (const k of ['bg', 'panel', 'ink', 'muted', 'line', 'accent', 'accentInk']) {
+      assert.match(t.look.colours[side][k], /^#[0-9a-f]{6}$/, `${t.id} ${side} ${k}`);
+    }
+  }
+  for (const oled of [false, true]) for (const c of colourChecks(t.look, {}, oled)) {
+    assert.ok(c.ratio >= 4.5, `${t.id} ${c.side} ${c.fg} on ${c.bg}`);
+  }
+  assert.equal(t.look.fontUi, 'system', `${t.id}: no bundled UI font`);
+  assert.ok(['system', 'serif', 'mono'].includes(t.look.fontLog), `${t.id}: system logging stack`);
+  assert.ok(['system', 'serif', 'mono'].includes(t.look.headFont), `${t.id}: system heading stack`);
+  const look = lookOf(t.look);
+  assert.deepEqual(look, t.look, `${t.id}: every setting survives sanitisation`);
+  const imported = importText(exportText([{ id: 'saved', name: t.name, look }]), []).list;
+  assert.deepEqual(imported[0].look, look, `${t.id}: palette and facets survive export/import`);
+}
 
 // ids are unique, every theme only sets known keys, and every theme round-trips
 assert.equal(new Set(THEMES.map(t => t.id)).size, THEMES.length);
@@ -19,8 +54,9 @@ assert.equal(flat.compact, null);
 assert.equal(flat.accent, null);
 assert.equal(flat.theme, 'flat');
 assert.equal(themePatch(themeById('nuhs')).theme, null);
-// a kept key stays as it is (Pixel-style follows your colour)
-assert.equal(themePatch(themeById('pixel'), { accent: '#123456' }).accent, '#123456');
+// A theme can still keep device settings; Pixel now has a complete fixed reference palette.
+assert.equal(themePatch({ id: 'kept', look: {}, keep: ['accent'] }, { accent: '#123456' }).accent, '#123456');
+assert.equal(themePatch(themeById('pixel'), { accent: '#123456' }).accent, '#6750a4');
 // a change afterwards makes it custom; an off switch saved as false is still the theme
 const tg = themePatch(themeById('telegram'));
 assert.equal(themeLabel({ ...tg, round: 1 }), 'Custom (based on Telegram-style)');
@@ -32,14 +68,14 @@ assert.equal(themeLabel({ ...flat, borders: 2 }), 'Flat');
 
 // the top band: NUHS keeps the usual stripe (null), others bring their own, the setting can override
 assert.equal(bandColours({}), null);
-assert.deepEqual(bandColours({ theme: 'whatsapp' }), themeById('whatsapp').band);
+assert.equal(bandColours(themePatch(themeById('whatsapp'))), 'none');
 assert.deepEqual(bandColours({ theme: 'whatsapp', band: 'nuh' }), NUH_BAND);
 assert.equal(bandColours({ theme: 'whatsapp', band: 'none' }), 'none');
 assert.equal(bandColours({ band: 'shades' }), 'shades');
 
 // the CSS: nothing for the default look; the band, none, tint, fonts, spacing, tabs
 assert.equal(lookCss({}), '');
-assert.match(lookCss({ theme: 'whatsapp' }), /--s1: #008069; --s2: #008069; --s3: #008069; --s4: #008069;/);
+assert.match(lookCss(themePatch(themeById('whatsapp'))), /background: var\(--accent\); color: var\(--accent-ink\)/);
 assert.match(lookCss({ band: 'shades' }, ['#111111', '#222222', '#333333', '#444444']), /--s4: #444444/);
 assert.equal(lookCss({ band: 'shades' }), '');   // no shades worked out: the usual band
 assert.match(lookCss({ band: 'none' }), /\.top \{ background: var\(--panel\); \}/);

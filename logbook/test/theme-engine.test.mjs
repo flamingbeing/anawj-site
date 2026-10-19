@@ -42,6 +42,7 @@ assert.match(lookCss({ sheetStyle: 'ios' }), /sheet-up/);
 assert.match(lookCss({ toastStyle: 'material' }), /#313033/);
 assert.match(lookCss({ fieldStyle: 'filled' }), /inset 0 -2px 0 var\(--accent\)/);
 assert.match(lookCss({ checkStyle: 'round' }), /border-radius: 50%/);
+assert.match(lookCss({ listStyle: 'edge' }), /body\.compact section\.card \{ margin-left: -8px; margin-right: -8px;/);
 assert.match(lookCss({ pageMotion: 'ios' }), /--dur: 350ms/);
 assert.match(lookCss({ tabIconFill: true }), /fill: color-mix/);
 
