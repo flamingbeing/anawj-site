@@ -28,8 +28,20 @@
 import {
   DEFAULT_RULES, dutyMap, addDays, monthDays, monthOf, fmtDay, fmtMonth, uid, isHoliday, getCell, TOKENS,
 } from './model.js';
+import { isFair, weigh, monthPriorities, capOf } from './reqprio.js';
 
 export { DEFAULT_RULES };
+
+// The Cr/Nc priorities of every month the context covers (worked out once per context; requests don't change while a
+// month is checked or auto-filled).
+function reqPriorities(ctx) {
+  if (ctx.reqPrio) return ctx.reqPrio;
+  const st = ctx.state, ids = new Set(ctx.people.map(p => p.id)), all = new Map();
+  for (const m of new Set(ctx.month)) {
+    for (const [k, v] of monthPriorities(monthDays(m), d => (st.cells || {})[d], capOf(st), ids)) all.set(k, v);
+  }
+  return (ctx.reqPrio = all);
+}
 
 // ---------- context: the grid of effective codes for a date range, built once per evaluate ----------
 
@@ -879,6 +891,10 @@ export const RULE_TYPES = {
       const cb = ctx.kindBit.get(code) || F.ANY, flags = ctx.flags;
       const has = i => (flags[i] & cb) !== 0 && (ctx.req[i].includes(code) || ctx.codes[i].includes(code));
       const reqTxt = `${X.T.code(code)} (${code})`;
+      // Cr and Nc: each person's first few a month count in full, later ones less (reqprio.js); marks ! and ? override
+      const prio = !weekend && isFair(code) ? reqPriorities(ctx) : null;
+      const wt = (pi, d) => (prio ? weigh(prio.get(`${ctx.days[d]}|${ctx.people[pi].id}|${code}`), u, X.hard) : null);
+      const tag = w => (w && !w.hard && X.hard ? ' (if possible)' : '');
       // a weekend request can sit up to 6 days before its weekend (Mon..Sun), and a weekend can straddle the
       // range (Sat 31 Oct, Sun 1 Nov): scan those request days too, keep weekends with a day in the range
       const dA = weekend ? Math.max(0, ctx.lo - 6) : ctx.lo, dB = weekend ? Math.min(n - 1, ctx.hi + 1) : ctx.hi;
@@ -907,8 +923,9 @@ export const RULE_TYPES = {
             if (!weekend) {
               const hit = m(i);
               if (want ? hit : !hit) continue;
-              pen += u; ctx.n2++;
-              if (out) out.push(X.V(u, want ? `${X.day(d)}: ${X.name(pi)} asked for ${X.T.codes(p.codes)} (${code})` : `${X.day(d)}: ${X.name(pi)} has ${X.T.codes(p.codes)} despite ${reqTxt}`, { staffId: ctx.people[pi].id, date: X.iso(d) }));
+              const w = wt(pi, d), pu = w ? w.pen : u;
+              pen += pu; ctx.n2++;
+              if (out) out.push(X.V(pu, (want ? `${X.day(d)}: ${X.name(pi)} asked for ${X.T.codes(p.codes)} (${code})` : `${X.day(d)}: ${X.name(pi)} has ${X.T.codes(p.codes)} despite ${reqTxt}`) + tag(w), { staffId: ctx.people[pi].id, date: X.iso(d), ...(w ? { hard: w.hard } : {}) }));
               continue;
             }
             const wd = ctx.wd[d];

@@ -242,6 +242,17 @@ the real People app).
 - Header: one line on phones (name, cloud, undo, redo, help; then month, Today, padlock, Fill). The main button reads
   "Fill" with no icon; it hides in a locked month.
 
+## Request priority (19 Oct 2026, `js/reqprio.js`, `js/ui-reqprio.js`)
+
+- Call requests (Cr) and no-call requests (Nc) are counted together per person per month. The first
+  `settings.requestCap` (default 2) by date count in full; later ones are "if possible": a broken one under a hard
+  rule (Nc) is soft at 60 x cap / count, under a soft rule (Cr) its weight x cap / count, so whoever asked for more
+  gives way first. Marks in the cell (`cell.rp = { Cr: '!' }`): `!` counts in full (hard stays hard, soft x3), `?` is
+  if possible (x1/2 within the cap) and frees a place for the next one. Weekend requests (Wr, Nw) and Pr/NP unchanged.
+- Shown as `Cr!` / `Nc?` in the grid, Day view and Excel export; the import reads them. The cell editor has Must /
+  Auto / If possible per Cr or Nc; Check > Request priority lists every one by person (most requests first), with
+  the limit and bulk marking.
+
 ## Junior pool (19 Oct 2026)
 
 The junior roster is run by a different person from the senior one, from the same department sheet. One state, two pools.

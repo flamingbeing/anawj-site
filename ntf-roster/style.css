@@ -1055,3 +1055,26 @@ body.month-locked #autofill { display: none; }   /* Fill can't change a locked m
   .lock-note .ln-more { display: none; }
   .lock-note .btn { min-height: 40px; padding: 0 10px; }
 }
+
+/* request priority (ui-reqprio.js): must, counts in full, if possible */
+.rp-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 6px; }
+.rp-code { font-weight: 700; min-width: 2.2em; }
+.rp-opts { display: inline-flex; gap: 4px; }
+.rp-why { font-size: 13px; flex: 1 1 100%; }
+.rp-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.rp-list { list-style: none; margin: 0; padding: 0; }
+.rp-person { padding: 8px 0; border-top: 1px solid var(--line); }
+.rp-who { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.rp-who .btn { margin-left: auto; }
+.rp-n { font-size: 13px; color: var(--muted, #5b6675); }
+.rp-n.over { color: #7a4a00; font-weight: 600; }
+.rp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rp-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0 10px; border-radius: 999px; border: 1.5px solid transparent; font: inherit; font-size: 13px; cursor: pointer; }
+.rp-chip small { font-size: 11px; opacity: .8; }
+.rp-chip.lv-must { background: var(--navy, #002f6c); color: #fff; }
+.rp-chip.lv-normal { background: #e8f0f8; color: var(--navy, #002f6c); border-color: #b9cde3; }
+.rp-chip.lv-low { background: #fff; color: #5b6675; border: 1.5px dashed #9aa6b4; }
+.rp-chip.sel { outline: 3px solid #e57200; outline-offset: 1px; }
+.rp-bar { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; padding: 8px 0; background: var(--surface, #fff); border-top: 1px solid var(--line); }
+.rp-count { flex: 1 1 auto; font-size: 14px; }
+#rp-cap { margin: 0 2px; }

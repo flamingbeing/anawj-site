@@ -240,6 +240,7 @@ export function migrate(s) {
       for (const k of ['a', 'r', 'auto']) if (c[k] !== undefined) c[k] = strList(c[k]);
       if (c.note !== undefined && typeof c.note !== 'string') c.note = str(c.note);
       if (c.ap !== undefined) c.ap = !!c.ap;
+      if (c.rp !== undefined && (!c.rp || typeof c.rp !== 'object' || Array.isArray(c.rp))) delete c.rp;
     }
   }
   return s;
@@ -371,6 +372,12 @@ export function setCell(draft, s, staffId, patch) {
   const a = uniq(next.a);
   const cell = { a, r: uniq(next.r), auto: uniq(next.auto).filter(c => a.includes(c)), note: String(next.note || ''), lock: !!next.lock };
   if (next.ap) cell.ap = true;   // leave the department has approved (blue in the sheet); white leave is still a request
+  // a request's priority mark ('!' must, '?' if possible; reqprio.js), only for requests still in the cell
+  if (next.rp && typeof next.rp === 'object') {
+    const rp = {};
+    for (const [c, v] of Object.entries(next.rp)) if (cell.r.includes(c) && (v === '!' || v === '?')) rp[c] = v;
+    if (Object.keys(rp).length) cell.rp = rp;
+  }
   if (!cell.a.length && !cell.r.length && !cell.note && !cell.lock) delete day[staffId];
   else day[staffId] = cell;
   if (!Object.keys(day).length) delete draft.cells[s];

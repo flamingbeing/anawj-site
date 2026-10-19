@@ -95,6 +95,20 @@ await page.goto(`${BASE}?demo#check?v=leave`);
 await page.waitForSelector('.cv-panel', { timeout: 10000 });
 await axe(page, 'leave dates');
 
+// request priority: the sheet lists Cr / Nc by person; selecting two and pressing Must marks them !
+await page.goto(`${BASE}?demo#check`);
+await page.waitForSelector('[data-k="reqprio"]', { timeout: 10000 });
+await page.click('[data-k="reqprio"]');
+await page.waitForSelector('button.rp-chip', { timeout: 5000 });
+await axe(page, 'request priority');
+await page.locator('button.rp-chip').nth(0).click();
+await page.locator('button.rp-chip').nth(1).click();
+await page.click('.rp-bar .btn-primary');
+await page.waitForTimeout(300);
+st = await state(page);
+ok(Object.values(st.cells).flatMap(d => Object.values(d)).filter(c => c.rp && Object.values(c.rp).includes('!')).length >= 1, 'Must marks the selected requests !');
+await page.keyboard.press('Escape');
+
 // phone: switch and setup fit without sideways scroll
 const phone = await open({ width: 390, height: 800 });
 await phone.goto(`${BASE}?demo#roster`);

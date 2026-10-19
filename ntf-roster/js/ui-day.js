@@ -159,7 +159,7 @@ export function mount(el, app) {
           h('span', { class: 'who-n' }, nm(p)),
           h('span', { class: 'who-g' }, gmap.get(p.group)?.name || ''),
           auto ? h('span', { class: 'who-auto', title: 'Placed by auto-fill' }, 'auto') : null,
-          (cell.r || []).length ? h('span', { class: 'who-req' }, cell.r.join(' ')) : null))));
+          (cell.r || []).length ? h('span', { class: 'who-req' }, cell.r.map(c => c + ((cell.rp && cell.rp[c]) || '')).join(' ')) : null))));
       } else card.append(h('p', { class: 'muted dc-empty' }, 'Nobody yet'));
       dutyGrid.append(card);
     }

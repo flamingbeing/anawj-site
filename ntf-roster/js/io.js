@@ -2,6 +2,7 @@
 // same layout), JSON backup / restore, rules-only JSON, an ICS calendar for one person and a CSV of a month.
 // ExcelJS is passed in (node tests) or loaded the first time Excel is used (browser), so opening the app stays light.
 import * as M from './model.js';
+import { splitMark } from './reqprio.js';
 
 // ---------- ExcelJS ----------
 
@@ -148,7 +149,10 @@ export function parseCellText(text, state, lookup = codeIndex(state)) {
   const toks = String(text || '').split(/[\s/,;+&]+/).filter(Boolean);
   for (const tok of toks) {
     if (tok.toLowerCase() === 'x') continue;   // post call is derived, never stored
-    const d = lookup(tok);
+    let d = lookup(tok);
+    // "Cr!" / "Nc?": a request with a priority mark (reqprio.js)
+    const sm = d ? null : splitMark(tok);
+    if (sm && sm.mark) { const dd = lookup(sm.code); if (dd && dd.kind === 'request') { d = dd; (out.rp || (out.rp = {}))[dd.code] = sm.mark; } }
     if (d && d.kind !== 'derived') {
       const list = d.kind === 'request' ? out.r : out.a;
       if (!list.includes(d.code)) list.push(d.code);
@@ -299,7 +303,7 @@ export async function parseDeptWorkbook(input, state, opts = {}) {
         const own = date.startsWith(hdr.month);
         // A date seen on two sheets (the 29, 30 / JAN columns): the sheet whose own month it is wins.
         if (day[person.key] && !own) continue;
-        day[person.key] = { a: pc.a, r: pc.r, note: pc.note, u: pc.u, own, ap: !!pc.ap };
+        day[person.key] = { a: pc.a, r: pc.r, ...(pc.rp ? { rp: pc.rp } : {}), note: pc.note, u: pc.u, own, ap: !!pc.ap };
         if (own) monthInfo.cells++;
       }
     }
@@ -394,7 +398,7 @@ export function applyImport(draft, parsed, choices = {}) {
       const keptShifts = cur && !sheetShifts.length ? (cur.a || []).filter(c => kindOf.get(c) === 'shift') : [];
       const a = [...keptShifts, ...sheetA];
       const note = [noteWords.join(' '), pc.note].filter(Boolean).join(' ').trim() || (cur ? cur.note : '');
-      M.setCell(draft, date, sid, { a, r: pc.r, note, auto: (cur && cur.auto || []).filter(c => keptShifts.includes(c)), lock: cur ? cur.lock : false, ap: !!pc.ap });
+      M.setCell(draft, date, sid, { a, r: pc.r, rp: pc.rp || (cur && cur.rp) || null, note, auto: (cur && cur.auto || []).filter(c => keptShifts.includes(c)), lock: cur ? cur.lock : false, ap: !!pc.ap });
       sum.cells++;
     }
   }
@@ -507,7 +511,7 @@ function cellCodes(state, date, sid) {
   const cell = M.getCell(state, date, sid);
   const eff = M.effectiveCodes(state, date, sid);
   const out = eff.filter(c => c !== 'x');
-  for (const r of (cell && cell.r) || []) if (!out.includes(r)) out.push(r);
+  for (const r of (cell && cell.r) || []) if (!out.includes(r)) out.push(r + ((cell.rp && cell.rp[r]) || ''));
   if (eff.includes('x')) out.push('x');
   return { codes: out, note: cell ? cell.note : '' };
 }
@@ -609,7 +613,7 @@ export async function buildDeptWorkbook(state, months, opts = {}) {
             cell.fill = fill(main.color);
             cell.font = { size: 9, bold: main.kind === 'shift', color: { argb: argb(main.ink) } };
           } else {
-            const req = codes.map(c => dm.get(c)).find(x => x && x.kind === 'request');
+            const req = codes.map(c => dm.get(c) || dm.get(c.replace(/[!?]$/, ''))).find(x => x && x.kind === 'request');
             cell.font = { size: 9, bold: !!req, color: { argb: req ? argb(req.color) : (codes.includes('x') ? 'FF555555' : 'FF26303D') } };
             if (!own) cell.fill = fill('#ffe3e3');
             else if (M.isHoliday(state, d)) cell.fill = fill('#fff1dd');
