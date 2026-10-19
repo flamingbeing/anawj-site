@@ -77,18 +77,39 @@ export function createStore({ demo = false, fallback } = {}) {
     }
   }
 
+  // does month m have any days filled in?
+  const hasDays = (st, m) => Object.keys(st.cells || {}).some(d => d.startsWith(m + '-'));
+
   const store = {
     isDemo: !!demo,
     key,
     onSaveError: null,   // set by the app: shows a bar with "Download backup"
+    onLocked: null,      // set by the app: a change to a locked month was refused (shows why)
+    unlocked: [],
     onConflict: null,    // set by the app: another tab saved first, this change was not saved
 
     get() { return state; },
 
-    commit(label, fn) {
+    // Months that are locked now and whose days this change would alter (none is allowed to).
+    lockedHit(next) {
+      const hit = [];
+      for (const m of Object.keys(state.months || {})) {
+        if (!M.isMonthLocked(state, m)) continue;
+        if (M.monthDays(m).some(d => JSON.stringify((state.cells || {})[d] || null) !== JSON.stringify((next.cells || {})[d] || null))) hit.push(m);
+      }
+      return hit;
+    },
+
+    // opts.unlock: a change the user asked for on purpose (an import) unlocks the locked months it touches, in the same
+    // undo step, instead of being refused. store.unlocked lists those months until the next commit.
+    commit(label, fn, opts = {}) {
       const draft = structuredClone(state);
       const out = fn(draft);
       if (out === false) return false;   // fn can cancel by returning false
+      const locked = store.lockedHit(draft);
+      store.unlocked = [];
+      if (locked.length && opts.unlock) { for (const m of locked) M.setMonthLocked(draft, m, false); store.unlocked = locked; }
+      else if (locked.length) { if (typeof store.onLocked === 'function') store.onLocked(locked, label); return false; }
       undo.push({ label, state });
       if (undo.length > MAX_UNDO) undo.shift();
       redo = [];
@@ -106,6 +127,30 @@ export function createStore({ demo = false, fallback } = {}) {
       state = { ...state, settings: { ...state.settings, onboarding: { ...ob, ...patch } } };
       store.save();
       notify(label, 'mark');
+      return true;
+    },
+
+    // Every month with something in it is locked whenever the app opens (as in NUH junior monthly; an empty month has
+    // nothing to protect, so a new roster can be started straight away): ensureLocked locks the month on screen the
+    // first time it is seen with days in it, and lockAll every such month (at start, and again when the app is closed).
+    // Unlocking lasts one visit. Quiet like a Getting started tick (not an undo step); never in practice.
+    ensureLocked(m) {
+      if (store.isDemo || !m || (state.months || {})[m] || !hasDays(state, m)) return false;
+      state = { ...state, months: { ...(state.months || {}), [m]: { status: 'published', publishedAt: new Date().toISOString(), note: '' } } };
+      store.save();
+      notify('Lock ' + m, 'mark');
+      return true;
+    },
+    lockAll() {
+      if (store.isDemo) return false;
+      const all = new Set([...Object.keys(state.months || {}), ...Object.keys(state.cells || {}).map(d => d.slice(0, 7))]);
+      const open = [...all].map(m => [m, (state.months || {})[m]]).filter(([m, v]) => !(v && v.status === 'published') && hasDays(state, m));
+      if (!open.length) return false;
+      const months = { ...(state.months || {}) };
+      for (const [m, v] of open) months[m] = { ...(v || {}), status: 'published', publishedAt: new Date().toISOString(), note: (v && v.note) || '' };
+      state = { ...state, months };
+      store.save();
+      notify('Lock every month', 'mark');
       return true;
     },
 

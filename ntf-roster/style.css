@@ -1029,3 +1029,29 @@ body.has-taskcard .sheet { max-height: calc(100vh - var(--task-h, 0px) - 64px); 
 }
 .welcome-team { text-align: center; margin: 14px 0 6px; }
 .welcome-team p { margin: 0 0 10px; }
+
+/* the month lock (padlock beside Today): a locked month can't change (store.js) */
+#lockm { display: inline-flex; align-items: center; gap: 5px; padding: 0 10px; }
+#lockm .lk-t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+#lockm[aria-pressed="true"] { background: var(--navy, #002f6c); color: #fff; border-color: var(--navy, #002f6c); }
+.monthnav #lockm { margin-left: 4px; }
+body.month-locked #autofill { display: none; }   /* Fill can't change a locked month */
+.lock-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 8px; padding: 6px 12px; border-radius: 8px; background: #e8f0f8; color: var(--navy, #002f6c); font-size: 14px; }
+.lock-note .ln-t { flex: 1 1 auto; min-width: 0; }
+#autofill { white-space: nowrap; }
+.top-tools #cloudbtn { margin-right: 4px; }
+.brand { min-width: 0; }
+.brand-text { min-width: 0; overflow: hidden; }
+@media (max-width: 720px) {
+  /* one line each: the name, cloud, undo, redo and help; then the month, Today, the padlock and Fill */
+  .brand { flex: 1 1 0; }
+  .brand-text { white-space: nowrap; text-overflow: ellipsis; }
+  .ctx-row { flex-wrap: wrap; }
+  .monthnav { flex: 1 1 auto; min-width: 0; }
+  .month-title { min-width: 0; flex: 1 1 auto; }
+  #lockm { width: 44px; min-width: 44px; min-height: 44px; padding: 0; justify-content: center; }
+  .monthnav #lockm { margin-left: 2px; }
+  .lock-note { flex-wrap: nowrap; min-height: 40px; margin: 6px 8px 0; padding: 0 4px 0 12px; gap: 8px; border-radius: 10px; }
+  .lock-note .ln-more { display: none; }
+  .lock-note .btn { min-height: 40px; padding: 0 10px; }
+}

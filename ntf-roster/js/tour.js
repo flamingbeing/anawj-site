@@ -50,7 +50,7 @@ export const TOUR_STEPS = [
     phone: { target: 'tab-check', text: app => hardCount(app)
       ? 'The number on Check counts this month\'s must-fix problems: hard rules that are broken. A red corner in the grid marks each cell.'
       : 'Check lists the month\'s problems. Must-fix ones (hard rules that are broken) put a number on Check and a red corner on the cell; this month has none.' } },
-  { id: 'autofill', tab: 'roster', target: 'autofill', title: 'Auto-fill',
+  { id: 'autofill', tab: 'roster', target: 'autofill', title: 'Fill',
     text: 'Drafts the calls and PM shifts around leave and requests, from your rules. You see a preview first, and Apply can be undone.' },
   { id: 'rules', tab: 'rules', target: ['addrule', 'tab-rules'], title: 'Rules are yours to change',
     text: 'Every rule is listed here, on or off. Add rule › Combination restriction covers what can\'t go together: Call and Clinic on one day, or two people never on call together.' },

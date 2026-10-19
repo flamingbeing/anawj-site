@@ -138,11 +138,12 @@ export function mount(el, app) {
         { label: 'Cancel' },
         { label: 'Apply import', primary: true, fn: () => {
           let sum = null;
-          store.commit('Import Excel sheet', draft => { sum = io.applyImport(draft, parsed, choices); });
+          store.commit('Import Excel sheet', draft => { sum = io.applyImport(draft, parsed, choices); }, { unlock: true });
           const parts = [`${sum.cells} cells`];
           if (sum.added) parts.unshift(`${sum.added} people added`);
           if (sum.matched) parts.unshift(`${sum.matched} matched`);
           if (sum.codesAdded.length) parts.push(`${sum.codesAdded.length} new code${sum.codesAdded.length === 1 ? '' : 's'}`);
+          if (store.unlocked.length) parts.push(`${store.unlocked.map(M.fmtMonth).join(', ')} unlocked`);
           app.toast(`Imported: ${parts.join(', ')}`, { action: { label: 'Undo', fn: () => store.undo() }, ms: 8000 });
           const first = parsed.months[0].month;
           if (first !== app.month) app.setMonth(first);
@@ -185,7 +186,7 @@ export function mount(el, app) {
         { label: 'Cancel' },
         { label: 'Apply', primary: true, fn: () => {
           let sum = null;
-          store.commit('Rotations from APMES People', draft => { sum = R.applyRotations(draft, plan); });
+          store.commit('Rotations from APMES People', draft => { sum = R.applyRotations(draft, plan); }, { unlock: true });
           app.toast(`Added ${plural(sum.cells, 'cell', 'cells')}${sum.codesAdded.length ? ` and ${plural(sum.codesAdded.length, 'new code', 'new codes')}` : ''}`, { action: { label: 'Undo', fn: () => store.undo() }, ms: 8000 });
         } },
       ] : [{ label: 'Close' }],
