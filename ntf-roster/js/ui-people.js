@@ -170,9 +170,18 @@ export function mount(el, app) {
     const note = h('textarea', { id: ids.note, rows: '2', placeholder: 'Rotation, dates, anything useful' }, d.note || '');
     const active = h('input', { type: 'checkbox', checked: d.active !== false });
     const tagBox = tagToggles(st, d.tags);
+    ids.pool = fid('ppl');
+    const autoName = () => (M.autoPoolOf(st, { ...d, group: group.value }) === 'junior' ? 'junior' : 'senior');
+    const autoOpt = h('option', { value: '' });
+    const setAuto = () => { autoOpt.textContent = `Automatic (${autoName()}, from the group)`; };
+    setAuto();
+    group.addEventListener('change', setAuto);
+    const pool = h('select', { id: ids.pool }, autoOpt, h('option', { value: 'junior' }, 'Junior roster'), h('option', { value: 'senior' }, 'Senior roster'));
+    pool.value = d.pool || '';
     const bodyEl = h('div', { class: 'bx-form' },
       field('Name', ids.name, name),
       h('div', { class: 'bx-two' }, field('Short name (optional)', ids.short, short), field('Group', ids.group, group)),
+      field('Roster (moving someone by hand is kept on every import)', ids.pool, pool),
       (st.tags || []).length ? h('div', { class: 'bx-field' }, h('p', { class: 'bx-label' }, 'Tags'), tagBox) : null,
       h('div', { class: 'bx-two' }, field('FTE (1 = full time)', ids.fte, fte), h('div', { class: 'bx-field bx-sw-field' }, h('label', { class: 'switch' }, active, h('span', { class: 'sw-track' }), h('span', null, 'Active')))),
       h('div', { class: 'bx-two' }, field('Starts (optional)', ids.start, start), field('Leaves (optional)', ids.end, end)),
@@ -185,6 +194,7 @@ export function mount(el, app) {
         if (start.value && end.value && end.value < start.value) { err.textContent = 'The leaving date is before the start date.'; return false; }
         const f = Number(fte.value);
         const out = { ...d, name: nm, short: short.value.trim(), group: group.value, tags: [...d.tags], fte: f > 0 && f <= 1 ? Math.round(f * 100) / 100 : 1, start: start.value, end: end.value, note: note.value.trim(), active: active.checked };
+        if (pool.value) out.pool = pool.value; else delete out.pool;
         app.store.commit(isNew ? 'Add person' : 'Edit person', s => {
           const i = s.staff.findIndex(x => x.id === out.id);
           if (i >= 0) s.staff[i] = out;

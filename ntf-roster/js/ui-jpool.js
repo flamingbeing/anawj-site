@@ -30,13 +30,19 @@ export function renderPool(app, body) {
           const ids = new Map(people.map((p, i) => [p.id, i]));
           for (const p of d.staff) {
             const i = ids.get(p.id);
-            if (i === undefined) continue;
+            if (i === undefined || p.pool) continue;   // people moved by hand stay where they were put
+            const g = gmap.get(p.group);
             p.tags = (p.tags || []).filter(t => t !== 'jpool' && t !== 'spool');
-            p.tags.push(i >= at ? 'jpool' : 'spool');
+            p.tags.push(i >= at && !(g && g.kind === 'senior') ? 'jpool' : 'spool');
           }
         });
-        app.toast(`${people.length - at} people are in the junior pool`, { action: undoAct });
+        const n = app.store.get().staff.filter(p => people.some(x => x.id === p.id) && M.poolOf(app.store.get(), p) === 'junior').length;
+        app.toast(`${n} people are in the junior pool`, { action: undoAct });
       } }, 'Set'))));
+
+  const moved = people.filter(p => p.pool);
+  if (moved.length) body.append(h('p', { class: 'bx-help' }, 'Moved by hand (kept when you set the start or import again; change it in the person\'s details): ',
+    moved.map(p => `${p.name} (${p.pool})`).join(', '), '.'));
 
   const mine = inPool.filter(p => true);
   if (!mine.length) {
