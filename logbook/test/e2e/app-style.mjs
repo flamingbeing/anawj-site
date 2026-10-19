@@ -28,8 +28,8 @@ try {
   assert.equal(await p.evaluate(() => document.getElementById('look-css').textContent), '', 'all off: no CSS');
   assert.ok(await shot() === before, 'all off: the same page as before');
   // an inspired theme brings its details along, and Undo takes them away
-  await p.locator('.theme-find').fill('iOS Settings');
-  await p.locator('.theme-row', { hasText: 'iOS Settings-style' }).click();
+  await p.locator('.theme-find').fill('Apple');
+  await p.locator('.theme-row', { hasText: 'Apple-style' }).click();
   assert.match(await p.evaluate(() => document.getElementById('look-css').textContent), /#34c759/);
   assert.deepEqual(errors, []);
   console.log('PASS app-style details');

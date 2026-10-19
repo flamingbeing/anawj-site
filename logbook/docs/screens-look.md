@@ -190,7 +190,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   settings file carry them): `barBlur` (see-through header and tab bar), `tabActiveLabel` (label only on the current tab),
   `tabStyle: 'indicator'` (Material icon pill), `listStyle` (`inset` iOS grouped, `edge` edge to edge), `titleAlign: 'centre'`,
   `switchStyle` (`ios`, `material`), `pressStyle` (`highlight`, `none`), `iconWeight` (`thin`, `bold`), `typeStyle` (`ios`, `material`).
-  New Inspired themes use them: iOS Settings-, Material 3-, X-, Spotify-, YouTube-, Gmail-style (colours and shapes only).
+  New Inspired themes use them: X-, Spotify-, YouTube-, Gmail-style; Apple-, Pixel-, WhatsApp-, Telegram-, Instagram-, TikTok-, Material-style and the other Inspired ones now use their app's own ground, text and line colours (colours and shapes only).
 - **Your themes** (owner, 16 Oct 2026; `my-themes.js`, unit-tested; e2e `my-themes.mjs`): once the look is Custom, the
   "Your themes" card says so and offers Save this look under a name (`display().myThemes`, this device, up to 12, a
   name already there is replaced; light or dark is kept with it). Saved looks are picked like any theme ("Now: Night

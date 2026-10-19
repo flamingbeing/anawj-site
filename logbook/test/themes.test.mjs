@@ -39,7 +39,7 @@ assert.equal(bandColours({ band: 'shades' }), 'shades');
 
 // the CSS: nothing for the default look; the band, none, tint, fonts, spacing, tabs
 assert.equal(lookCss({}), '');
-assert.match(lookCss({ theme: 'whatsapp' }), /--s1: #25d366; --s2: #00a884; --s3: #008069; --s4: #075e54;/);
+assert.match(lookCss({ theme: 'whatsapp' }), /--s1: #008069; --s2: #008069; --s3: #008069; --s4: #008069;/);
 assert.match(lookCss({ band: 'shades' }, ['#111111', '#222222', '#333333', '#444444']), /--s4: #444444/);
 assert.equal(lookCss({ band: 'shades' }), '');   // no shades worked out: the usual band
 assert.match(lookCss({ band: 'none' }), /\.top \{ background: var\(--panel\); \}/);
