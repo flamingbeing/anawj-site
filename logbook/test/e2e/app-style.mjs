@@ -27,6 +27,37 @@ try {
   await apply(Object.fromEntries(Object.keys(OPTIONS).map(k => [k, null])));
   assert.equal(await p.evaluate(() => document.getElementById('look-css').textContent), '', 'all off: no CSS');
   assert.ok(await shot() === before, 'all off: the same page as before');
+  // the theme engine's newer facets (19 Oct 2026): each on the page, each changes the look, all off is as before
+  for (const name of ['Phone status bar', 'Header', 'Fill the current tab’s icon', 'Icon style', 'Moving between pages', 'Pop-up boxes', 'Messages (Saved, Undo)', 'Text boxes', 'Tick boxes']) {
+    assert.ok(await p.getByText(name, { exact: false }).count() > 0, name + ' has a setting');
+  }
+  const ENGINE = { statusBar: 'header', headerStyle: 'filled', tabIconFill: true, iconSet: 'sharp', pageMotion: 'material', sheetStyle: 'ios', toastStyle: 'material', fieldStyle: 'filled', checkStyle: 'round' };
+  await apply(ENGINE);
+  const css2 = await p.evaluate(() => document.getElementById('look-css').textContent);
+  for (const re of [/background: var\(--accent\)/, /fill: color-mix/, /stroke-linecap: square/, /--dur: 300ms/, /sheet-up/, /#313033/, /inset 0 -2px 0/, /border-radius: 50%/]) assert.match(css2, re);
+  assert.ok(await shot() !== before, 'the engine’s looks changed the page');
+  // the status bar takes the header's colour (filled: my colour), and the icon set is on <html>
+  const st = await p.evaluate(() => ({ meta: document.querySelector('meta[name="theme-color"]').content, accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(), icons: document.documentElement.dataset.icons }));
+  assert.equal(st.meta, st.accent); assert.equal(st.icons, 'sharp');
+  await apply({ headerStyle: null });
+  assert.equal(await p.evaluate(() => document.querySelector('meta[name="theme-color"]').content), await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--panel').trim()), 'plain header: the panel colour');
+  // a message and a pop-up still open and close in their new styles
+  await p.evaluate(async () => { const m = await import('./js/ui-core.js'); m.toast('Fake saved', { action: 'Undo', onaction: () => {} }); });
+  await p.locator('#toast.show').waitFor();
+  const tb = await p.locator('#toast').boundingBox(); assert.ok(tb.y > 500, 'the snackbar sits at the bottom');
+  await p.evaluate(async () => { const m = await import('./js/ui-core.js'); m.confirmBox('Fake title', 'Fake text', 'OK'); });
+  await p.locator('dialog[open]').waitFor(); await p.waitForTimeout(450);
+  const db = await p.locator('dialog[open]').boundingBox(); assert.ok(db.y + db.height > 830, 'the iOS sheet sits at the bottom');
+  await p.getByRole('button', { name: 'Cancel' }).click();
+  // a page change with Material motion fades in without errors (then back, as it was)
+  await p.evaluate(() => { location.hash = '#display'; }); await p.waitForTimeout(400); await p.goBack();
+  await p.locator('section.card', { hasText: 'App-style details' }).waitFor();
+  await apply(Object.fromEntries(Object.keys(ENGINE).map(k => [k, null])));
+  await p.evaluate(async () => { const c = await import('./js/ui-core.js'); c.clearToast(); c.hooks.render(); window.scrollTo(0, 0); });
+  await p.mouse.move(195, 300);   // (off the tab bar, where the sheet's Cancel was)
+  assert.equal(await p.evaluate(() => document.getElementById('look-css').textContent), '', 'engine off: no CSS');
+  assert.equal(await p.evaluate(() => document.documentElement.dataset.icons), undefined);
+  { const now = await shot(); if (now !== before && process.env.SHOTS) { const fs = await import('node:fs'); fs.writeFileSync(process.env.SHOTS + '/a.png', Buffer.from(before, 'base64')); fs.writeFileSync(process.env.SHOTS + '/b.png', Buffer.from(now, 'base64')); } assert.ok(now === before, 'engine off: the same page as before'); }
   // an inspired theme brings its details along, and Undo takes them away
   assert.equal(await p.locator('.theme-grid').nth(1).locator('.theme-card').count(), 8, 'eight Inspired themes on the page');
   assert.equal(await p.locator('.theme-list').count(), 0, 'no scrolling list on the Themes page');

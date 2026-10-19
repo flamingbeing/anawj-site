@@ -10,7 +10,8 @@ import { pickDialog, CASE_PARTS, AFTER_SAVE, RECENT_COUNTS } from './ui-log.js';
 import { recentCount as snapRecent } from './logging.js';
 import { OPERATOR_HELP } from './search-ops.js';
 import { DEFAULT_ACCENT, cleanAccent, SWATCHES, COLOUR_TOKENS, cleanColours, colourPalette, colourChecks, checkColours } from './colors.js';
-import { THEMES, FEATURED, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, SPACINGS, TAB_STYLES, BANDS, HEAD_FONTS, LIST_STYLES, TITLE_ALIGNS, SWITCH_STYLES, PRESS_STYLES, ICON_WEIGHTS, TYPE_STYLES } from './themes.js';
+import { THEMES, FEATURED, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, BANDS, HEAD_FONTS } from './themes.js';
+import { FACETS, FACET_GROUPS, facetDefault } from './theme-engine.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS, HEAD_STYLES, mdDate, fileDate } from './markdown.js';
 import { checkCss } from './custom-css.js';
 import { cleanMine, saveMine, minePatch, matchMine, exportText, importText, lookOf } from './my-themes.js';
@@ -157,6 +158,10 @@ export function renderThemesAll() {
 export function renderThemes() {
   const st = display(), { theme, custom } = themeState(st);
   const look = (k, label, opts, dflt, line) => pick(label, opts, st[k] ?? dflt, v => applyDisplay(setDisplay({ [k]: v === dflt ? null : v })) || hooks.render(), line);
+  // one theme-engine facet (theme-engine.js): a switch or a ✓ list; the default saves as null
+  const facetRow = f => (f.bool ? toggle(f.label, st[f.key], v => { applyDisplay(setDisplay({ [f.key]: v || null })); hooks.render(); }, f.line)
+    : look(f.key, f.label, f.choices, facetDefault(f), f.line));
+  const facetsOf = g => FACETS.filter(f => f.group === g).map(facetRow);
   return h('div', { class: 'set-page themes-page' },
     displayPreview(),
     h('section', { class: 'card' },
@@ -185,8 +190,7 @@ export function renderThemes() {
       h('h2', {}, 'Shape and type'),
       pick('Card style', CARD_STYLES, cardStyle(st), v => { applyDisplay(setDisplay(cardPatch(v))); hooks.render(); }, 'How cards and lists stand off the page. How strong the lines are: Advanced display.'),
       slider('Corners', ROUNDS.map(([n]) => n), roundLevel(st), 2, n => applyDisplay(setDisplay({ round: n }))),
-      look('spacing', 'Spacing', SPACINGS, 'normal'),
-      look('tabStyle', 'Tab bar style', TAB_STYLES, 'underline', 'How the tab you’re on is marked.'),
+      facetsOf('shape'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Heading font',
         h('select', { 'aria-label': 'Heading font', onchange: e => { applyDisplay(setDisplay({ headFont: e.target.value === 'same' ? null : e.target.value })); hooks.render(); } },
           HEAD_FONTS.map(([k, t]) => h('option', { value: k, selected: (st.headFont || 'same') === k }, t)))),
@@ -203,17 +207,7 @@ export function renderThemes() {
     h('section', { class: 'card' },
       h('h2', {}, 'App-style details'),
       help('Finer touches that make the logbook feel like other phone apps. Each is its own setting and off until you choose it.'),
-      h('h3', {}, 'Header and tab bar'),
-      toggle('See-through header and tab bar', st.barBlur, v => { applyDisplay(setDisplay({ barBlur: v || null })); hooks.render(); }, 'Content shows blurred behind them as you scroll (iOS, Instagram).'),
-      toggle('Name only the tab you’re on', st.tabActiveLabel, v => { applyDisplay(setDisplay({ tabActiveLabel: v || null })); hooks.render(); }, 'The other tabs show just their icon (phone width, bottom bar).'),
-      look('titleAlign', 'Header title', TITLE_ALIGNS, 'default'),
-      h('h3', {}, 'Lists and type'),
-      look('listStyle', 'List style', LIST_STYLES, 'default', 'How Logbook rows sit on the page.'),
-      look('typeStyle', 'Type style', TYPE_STYLES, 'default', 'Weight and spacing of titles.'),
-      look('iconWeight', 'Icon line weight', ICON_WEIGHTS, 'default'),
-      h('h3', {}, 'Controls'),
-      look('switchStyle', 'Switches', SWITCH_STYLES, 'default', 'The on / off switches in Settings.'),
-      look('pressStyle', 'When you press', PRESS_STYLES, 'default', 'What buttons and rows do under your finger.'),
+      FACET_GROUPS.filter(([g, title]) => title).map(([g, title]) => [h('h3', {}, title), facetsOf(g)]),
       DEVICE_NOTE()),
     editColours(st),
     resetLink('the theme and every look setting on this page (light, the NUHS colours, lines, corners, fonts and spacing) on this device', () => {
