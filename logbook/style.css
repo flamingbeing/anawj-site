@@ -1792,14 +1792,14 @@ ul.cases li.lb-planned a { display: block; padding: 8px 4px; }
 
 /* Layout variants (Themes): the usual tabs, cards and Case page remain the defaults. */
 ul.cases .chat-time { display: none; }
-html.rows-chat ul.cases li:not(.monthhead):not(.refl-row) { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; margin: 0; }
-html.rows-chat ul.cases li:not(.monthhead) .dt { display: none; }
-html.rows-chat ul.cases li:not(.monthhead) .chat-time { display: block; grid-area: dt; color: var(--muted); font-size: calc(12px * var(--fs, 1)); }
-html.rows-chat ul.cases li:not(.monthhead) .c-tags { flex-wrap: nowrap; overflow: hidden; }
-html.rows-chat ul.cases li:not(.monthhead) .c-tags .flag { background: none; color: var(--muted); border: 0; padding: 0; }
+html.rows-chat ul.cases li[data-date] { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; margin: 0; }
+html.rows-chat ul.cases li[data-date] .dt { display: none; }
+html.rows-chat ul.cases li[data-date] .chat-time { display: block; grid-area: dt; color: var(--muted); font-size: calc(12px * var(--fs, 1)); }
+html.rows-chat ul.cases li[data-date] .c-tags { flex-wrap: nowrap; overflow: hidden; }
+html.rows-chat ul.cases li[data-date] .c-tags .flag { background: none; color: var(--muted); border: 0; padding: 0; }
 html.rows-timeline ul.cases { padding-left: 24px; }
-html.rows-timeline ul.cases li:not(.monthhead):not(.refl-row) { position: relative; border: 0; border-left: 1px solid var(--line); border-radius: 0; box-shadow: none; background: transparent; margin: 0; padding-left: 20px; }
-html.rows-timeline ul.cases li:not(.monthhead):not(.refl-row)::before { content: ''; position: absolute; left: -5px; top: 22px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+html.rows-timeline ul.cases li[data-date] { position: relative; border: 0; border-left: 1px solid var(--line); border-radius: 0; box-shadow: none; background: transparent; margin: 0; padding-left: 20px; }
+html.rows-timeline ul.cases li[data-date]::before { content: ''; position: absolute; left: -5px; top: 22px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
 html.rows-timeline ul.cases .monthhead { margin-left: -24px; }
 html.form-sections .log-card { display: block; }
 html.form-sections .case-section { border-bottom: 1px solid var(--line); margin-bottom: 12px; }
@@ -1815,3 +1815,6 @@ html.form-sections .case-section .lp-left, html.form-sections .case-section .lp-
   html.nav-rail .tabs .lbl { display: block; font-size: calc(13px * var(--fs, 1)); }
   html.nav-rail body.typing-nobar .tabs { display: flex; }
 }
+
+html:is(.rows-chat, .rows-timeline) ul.cases li[data-date]:hover { background: var(--row-alt); }
+html:is(.rows-chat, .rows-timeline) ul.cases li.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }

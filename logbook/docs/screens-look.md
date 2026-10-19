@@ -292,3 +292,12 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   the box is the one source. Saved searches are the Logbook's list (`settings.savedSearches`); one saved on Search has
   `global: true` and the magnifier icon, and runs in Search when tapped on the Logbook. Select ticks results into bulk edit: one
   kind opens its own popup; several kinds share the date (`ui-bulk-mixed.js`), with Copy and Move to the bin.
+
+- **Layout** (Themes): `navStyle` tabs (default) or a left icon-and-label rail above 900 px; smaller windows keep
+  the existing `tabBar` placement. `rowLayout` card (default), compact (the older `rowShort` alias), chat (bold
+  case, logged-at time when available, grey tags and separators), or timeline (a day spine, retaining the saved sort).
+  Choosing a row layout clears the alias; an explicit layout wins over it. `formLayout` page (default) or native
+  collapsible Case details and Tags sections, the first open. All three belong to the device and travel with themes
+  and settings files; stored cases stay unchanged. X-style chooses chat, Notion-style timeline, Office-style rail.
+  Focused checks: `node logbook/test/layouts.test.mjs` and `node logbook/test/e2e/layouts.mjs` (phone/desk, tap,
+  menu and selection holds, resizing, keyboard activation, disclosure fields, and accessibility).

@@ -194,7 +194,7 @@ function applyNavOrientation() {
   const rail = document.documentElement.classList.contains('nav-rail') && window.innerWidth > 900;
   document.getElementById('tabs')?.setAttribute('aria-orientation', rail ? 'vertical' : 'horizontal');
 }
-window.addEventListener('resize', applyNavOrientation);
+if (typeof window !== 'undefined') window.addEventListener('resize', applyNavOrientation);
 export const BUTTON_STYLES = [['outlined', 'Outlined (default)'], ['filled', 'Filled'], ['tinted', 'Tinted'], ['plain', 'Plain']];
 // the header's words: the app's name, or with Page titles the page's ("Logbook"); render() in app.js says which page
 let pageLabel = '';

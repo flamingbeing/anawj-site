@@ -70,7 +70,10 @@ function pick(label, opts, cur, set, line, ...more) {
 }
 // a display key as a ✓ list; the default is saved as nothing
 const lookPick = (k, label, opts, dflt, line, ...more) =>
-  pick(label, opts, k === 'rowLayout' ? rowLayoutOf(display()) : display()[k] ?? dflt, v => applyDisplay(setDisplay({ [k]: v === dflt ? null : v, ...(k === 'rowLayout' ? { rowShort: null } : {}) })), line, ...more);
+  pick(label, opts, k === 'rowLayout' ? rowLayoutOf(display()) : display()[k] ?? dflt, v => {
+    applyDisplay(setDisplay({ [k]: v === dflt ? null : v, ...(k === 'rowLayout' ? { rowShort: null } : {}) }));
+    if (['navStyle', 'rowLayout', 'formLayout'].includes(k)) hooks.render();
+  }, line, ...more);
 const DEVICE_NOTE = () => h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.');
 const THEME_MODES = [['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED (pure black)'], ['auto', 'Auto (match the phone)']];
 const slider = (label, names, level, dflt, onLevel) => {

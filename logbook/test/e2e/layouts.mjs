@@ -26,6 +26,8 @@ try { for (const width of [390, 1200]) {
     for (const [i, date] of ['2020-01-02', '2020-01-02', '2020-01-01'].entries()) await cloud.saveCase(S.user.email, { id: 'layout-' + i, date, initials: 'ZQ', details: 'Layout sample ' + i, cats: ['16'], createdAt: 1577959200000 + i, updatedAt: Date.now(), source: 'app' });
     setCases(await cloud.listCases(S.user.email));
   });
+  const savedCases = () => p.evaluate(async () => { const { S, cloud } = await import('./js/ui-core.js'); return JSON.stringify(await cloud.listCases(S.user.email)); });
+  const beforeCases = await savedCases();
   // Native disclosure sections preserve text and tags when folded, reopened and returned to the page layout.
   await p.locator('textarea.details').fill('ZQ layout draft');
   await apply({ formLayout: 'sections', autoFocus: false });
@@ -40,7 +42,11 @@ try { for (const width of [390, 1200]) {
   assert.equal(await p.locator('textarea.details').inputValue(), 'ZQ layout draft'); passed++;
   await tab('themes');
   const layout = p.locator('section.card').filter({ has: p.getByRole('heading', { name: 'Layout', exact: true }) });
-  assert.equal(await layout.getByRole('radio').count(), 8); passed++;
+  assert.equal(await layout.getByRole('radio').count(), 8);
+  await layout.locator('input[value=chat]').check();
+  assert.ok(await p.locator('html.rows-chat').count());
+  assert.match(await p.locator('.theme-now').innerText(), /Custom/);
+  await layout.locator('input[value=card]').check(); passed++;
   await tab('logbook'); await p.locator('.seg button', { hasText: 'List' }).click();
   await p.getByLabel('Search cases').fill('Layout sample');
   await p.waitForFunction(() => document.querySelectorAll('ul.cases li[data-date]').length === 3);
@@ -61,6 +67,7 @@ try { for (const width of [390, 1200]) {
     await p.locator('dialog[open] .row-menu-list').waitFor();
     await p.keyboard.press('Escape'); await p.waitForTimeout(400);
     await audit();
+    if (process.env.E2E_OUT) { mkdirSync(process.env.E2E_OUT, { recursive: true }); await p.screenshot({ path: `${process.env.E2E_OUT}/layout-${rowLayout}-${width}.png` }); }
     await apply({ rowHold: false });
     await first.scrollIntoViewIfNeeded();
     const selectionBox = await first.boundingBox();
@@ -92,6 +99,7 @@ try { for (const width of [390, 1200]) {
     await apply({ formLayout: 'sections' });
     await p.screenshot({ path: process.env.E2E_OUT + '/layout-sections-phone.png' });
   }
+  assert.equal(await savedCases(), beforeCases, 'layout choices never rewrite cases');
   assert.deepEqual(errors, []);
   await ctx.close();
   console.log(`PASS layouts ${width}px`);
