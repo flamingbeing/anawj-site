@@ -75,3 +75,14 @@ console.log('themes tests passed');
   for (const t of THEMES) assert.ok(CARD_STYLES.some(([k]) => k === cardStyle(t.look)), t.id);
   console.log('card style: ok');
 }
+
+// App-style details (19 Oct 2026): each its own setting, nothing in the CSS until chosen
+for (const [k, v, re] of [['barBlur', true, /backdrop-filter/], ['tabActiveLabel', true, /\.lbl \{ display: none/], ['tabStyle', 'indicator', /padding: 4px 18px/],
+  ['listStyle', 'inset', /overflow: hidden/], ['listStyle', 'edge', /margin-left: -12px/], ['titleAlign', 'centre', /text-align: center/],
+  ['switchStyle', 'ios', /#34c759/], ['switchStyle', 'material', /width: 52px/], ['pressStyle', 'highlight', /opacity: 1/], ['pressStyle', 'none', /transparent/],
+  ['iconWeight', 'thin', /1\.4/], ['iconWeight', 'bold', /2\.6/], ['typeStyle', 'ios', /-0\.02em/], ['typeStyle', 'material', /font-weight: 500/]]) {
+  assert.match(lookCss({ [k]: v }), re, `${k}=${v}`);
+  assert.equal(lookCss({ [k]: null }), '', `${k} off`);
+}
+for (const k of ['barBlur', 'tabActiveLabel', 'listStyle', 'titleAlign', 'switchStyle', 'pressStyle', 'iconWeight', 'typeStyle']) assert.ok(THEME_KEYS.includes(k), k);
+assert.equal(lookCss({ listStyle: 'default', switchStyle: 'default', pressStyle: 'default', iconWeight: 'default', typeStyle: 'default', titleAlign: 'default' }), '');

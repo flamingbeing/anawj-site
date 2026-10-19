@@ -185,6 +185,12 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
 - Display keeps layout (compact, start tab, header and tab bar, rows); Themes holds looks: light or dark, colour
   swatches (NUH, muted, pastel, Custom), Colourful, background tint, Top band, card style, corners, spacing, tab
   bar style, heading font, fonts, line spacing. Advanced display keeps the fine controls (line strength, button style).
+- **App-style details** (owner, 19 Oct 2026; Themes card, `lookCss` in themes.js, CSS only so the first paint has it; unit tests in
+  themes.test.mjs, e2e `app-style.mjs`): each its own device key, off by default, part of `THEME_KEYS` (so themes, Your themes and the
+  settings file carry them): `barBlur` (see-through header and tab bar), `tabActiveLabel` (label only on the current tab),
+  `tabStyle: 'indicator'` (Material icon pill), `listStyle` (`inset` iOS grouped, `edge` edge to edge), `titleAlign: 'centre'`,
+  `switchStyle` (`ios`, `material`), `pressStyle` (`highlight`, `none`), `iconWeight` (`thin`, `bold`), `typeStyle` (`ios`, `material`).
+  New Inspired themes use them: iOS Settings-, Material 3-, X-, Spotify-, YouTube-, Gmail-style (colours and shapes only).
 - **Your themes** (owner, 16 Oct 2026; `my-themes.js`, unit-tested; e2e `my-themes.mjs`): once the look is Custom, the
   "Your themes" card says so and offers Save this look under a name (`display().myThemes`, this device, up to 12, a
   name already there is replaced; light or dark is kept with it). Saved looks are picked like any theme ("Now: Night

@@ -10,7 +10,7 @@ import { pickDialog, CASE_PARTS, AFTER_SAVE, RECENT_COUNTS } from './ui-log.js';
 import { recentCount as snapRecent } from './logging.js';
 import { OPERATOR_HELP } from './search-ops.js';
 import { DEFAULT_ACCENT, cleanAccent, SWATCHES } from './colors.js';
-import { THEMES, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, SPACINGS, TAB_STYLES, BANDS, HEAD_FONTS } from './themes.js';
+import { THEMES, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, SPACINGS, TAB_STYLES, BANDS, HEAD_FONTS, LIST_STYLES, TITLE_ALIGNS, SWITCH_STYLES, PRESS_STYLES, ICON_WEIGHTS, TYPE_STYLES } from './themes.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS, HEAD_STYLES, mdDate, fileDate } from './markdown.js';
 import { checkCss } from './custom-css.js';
 import { cleanMine, saveMine, minePatch, matchMine, exportText, importText } from './my-themes.js';
@@ -178,6 +178,21 @@ export function renderThemes() {
       fontPicker('ui'),
       fontPicker('log'),
       lookPick('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
+      DEVICE_NOTE()),
+    h('section', { class: 'card' },
+      h('h2', {}, 'App-style details'),
+      help('Finer touches that make the logbook feel like other phone apps. Each is its own setting and off until you choose it.'),
+      h('h3', {}, 'Header and tab bar'),
+      toggle('See-through header and tab bar', st.barBlur, v => { applyDisplay(setDisplay({ barBlur: v || null })); hooks.render(); }, 'Content shows blurred behind them as you scroll (iOS, Instagram).'),
+      toggle('Name only the tab you’re on', st.tabActiveLabel, v => { applyDisplay(setDisplay({ tabActiveLabel: v || null })); hooks.render(); }, 'The other tabs show just their icon (phone width, bottom bar).'),
+      look('titleAlign', 'Header title', TITLE_ALIGNS, 'default'),
+      h('h3', {}, 'Lists and type'),
+      look('listStyle', 'List style', LIST_STYLES, 'default', 'How Logbook rows sit on the page.'),
+      look('typeStyle', 'Type style', TYPE_STYLES, 'default', 'Weight and spacing of titles.'),
+      look('iconWeight', 'Icon line weight', ICON_WEIGHTS, 'default'),
+      h('h3', {}, 'Controls'),
+      look('switchStyle', 'Switches', SWITCH_STYLES, 'default', 'The on / off switches in Settings.'),
+      look('pressStyle', 'When you press', PRESS_STYLES, 'default', 'What buttons and rows do under your finger.'),
       DEVICE_NOTE()),
     resetLink('the theme and every look setting on this page (light, the NUHS colours, lines, corners, fonts and spacing) on this device', () => {
       applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'fontUiName', 'fontLogName'].map(k => [k, null])) }));

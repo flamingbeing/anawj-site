@@ -8,7 +8,8 @@ import { STACKS } from './fonts.js';
 
 // the display keys a theme sets; anything a theme doesn't list goes back to its default (null), unless it keeps it
 export const THEME_KEYS = ['accent', 'colourful', 'borders', 'flat', 'round', 'shadows', 'fontUi', 'fontLog', 'headFont', 'lineHeight',
-  'compact', 'btnStyle', 'iconBtns', 'tabIcons', 'pageTitles', 'calPlain', 'rowShort', 'contrast', 'bgTint', 'spacing', 'tabStyle', 'band'];
+  'compact', 'btnStyle', 'iconBtns', 'tabIcons', 'pageTitles', 'calPlain', 'rowShort', 'contrast', 'bgTint', 'spacing', 'tabStyle', 'band',
+  'barBlur', 'tabActiveLabel', 'listStyle', 'titleAlign', 'switchStyle', 'pressStyle', 'iconWeight', 'typeStyle'];
 
 // Background tints: the page ground (and for some the cards and text) in light and dark
 export const TINTS = {
@@ -25,7 +26,14 @@ export const TINTS = {
   black: { label: 'Black', light: { bg: '#f4f4f4' }, dark: { bg: '#000000', panel: '#121212', line: '#2a2a2a' } },
 };
 export const SPACINGS = [['tight', 'Tight'], ['normal', 'Normal (default)'], ['roomy', 'Roomy']];
-export const TAB_STYLES = [['underline', 'Underline (default)'], ['pill', 'Pill'], ['plain', 'Plain (colour only)']];
+export const TAB_STYLES = [['underline', 'Underline (default)'], ['pill', 'Pill'], ['plain', 'Plain (colour only)'], ['indicator', 'Icon pill (Material)']];
+// App-style details (Themes → App-style details; owner, 19 Oct 2026): each its own device setting, off by default (nothing changes until chosen)
+export const LIST_STYLES = [['default', 'Cards (default)'], ['inset', 'Inset grouped (iOS)'], ['edge', 'Edge to edge (Material, chat apps)']];
+export const TITLE_ALIGNS = [['default', 'As now (default)'], ['centre', 'Centred (iOS)']];
+export const SWITCH_STYLES = [['default', 'As now (default)'], ['ios', 'iOS (green, round)'], ['material', 'Material (outlined, big knob)']];
+export const PRESS_STYLES = [['default', 'Dim (default)'], ['highlight', 'Grey highlight (Material)'], ['none', 'No change']];
+export const ICON_WEIGHTS = [['default', 'Regular (default)'], ['thin', 'Thin'], ['bold', 'Bold']];
+export const TYPE_STYLES = [['default', 'As now (default)'], ['ios', 'iOS (bold titles, tight)'], ['material', 'Material (medium weight)']];
 export const BANDS = [['theme', 'The theme’s colours (default)'], ['shades', 'Shades of my colour'], ['nuh', 'The NUH stripe'], ['none', 'None']];
 export const HEAD_FONTS = [['same', 'Same as the interface (default)'], ['serif', 'Serif'], ['system', 'This device’s font'], ['inter', 'Inter'], ['lexend', 'Lexend'], ['atkinson', 'Atkinson Hyperlegible'], ['mono', 'Monospace']];
 export const NUH_BAND = ['#e57200', '#e4002b', '#178fd7', '#002f6c'];
@@ -54,6 +62,12 @@ export const THEMES = [
   { id: 'material', name: 'Material-style', group: 'inspired', desc: 'Bold colour, raised cards', look: { accent: '#3f51b5', round: 1, fontUi: 'system', btnStyle: 'filled', band: 'shades' } },
   { id: 'instagram', name: 'Instagram-style', group: 'inspired', desc: 'Pink to orange, white, rounded', look: { accent: '#d62976', bgTint: 'white', shadows: false, borders: 2 }, band: ['#833ab4', '#c13584', '#fd1d1d', '#fcaf45'] },
   { id: 'acgme', name: 'ACGME-style', group: 'inspired', desc: 'Case-log red, white forms, square fields, grey labels', look: { accent: '#d32f2f', bgTint: 'grey', round: 0, shadows: false, borders: 3, fontUi: 'system', btnStyle: 'filled', tabStyle: 'plain' }, band: ['#e53935', '#e53935', '#d32f2f', '#d32f2f'] },
+  { id: 'ios', name: 'iOS Settings-style', group: 'inspired', desc: 'Inset grouped lists, see-through bars, green switches, centred titles', look: { accent: '#007aff', bgTint: 'iosgrey', shadows: false, borders: 1, fontUi: 'system', tabStyle: 'plain', btnStyle: 'plain', band: 'none', barBlur: true, tabActiveLabel: null, listStyle: 'inset', titleAlign: 'centre', switchStyle: 'ios', typeStyle: 'ios', iconWeight: 'thin', pressStyle: null } },
+  { id: 'material3', name: 'Material 3-style', group: 'inspired', desc: 'Icon pill tabs, outlined switches, grey highlight; follows your colour', keep: ['accent'], look: { round: 3, tabStyle: 'indicator', btnStyle: 'tinted', shadows: false, borders: 1, fontUi: 'system', band: 'none', switchStyle: 'material', pressStyle: 'highlight', typeStyle: 'material', listStyle: 'edge', tabActiveLabel: null } },
+  { id: 'x', name: 'X-style', group: 'inspired', desc: 'Black, blue, edge-to-edge lists, see-through bars, icons only', mode: 'oled', look: { accent: '#1d9bf0', bgTint: 'black', shadows: false, borders: 2, fontUi: 'system', band: 'none', barBlur: true, listStyle: 'edge', tabStyle: 'plain', tabIcons: true, typeStyle: 'ios', pressStyle: 'highlight' } },
+  { id: 'spotify', name: 'Spotify-style', group: 'inspired', desc: 'Near-black, green, rounded, bold titles', mode: 'dark', look: { accent: '#1db954', bgTint: 'black', shadows: false, borders: 0, round: 3, fontUi: 'system', band: 'none', tabStyle: 'plain', tabActiveLabel: true, typeStyle: 'ios', pressStyle: 'highlight' } },
+  { id: 'youtube', name: 'YouTube-style', group: 'inspired', desc: 'White or near-black, red, plain tabs, edge-to-edge lists', look: { accent: '#ff0000', bgTint: 'white', shadows: false, borders: 1, fontUi: 'system', band: 'none', tabStyle: 'plain', listStyle: 'edge', pressStyle: 'highlight', typeStyle: 'material' } },
+  { id: 'gmail', name: 'Gmail-style', group: 'inspired', desc: 'White, red and blue accents, dense edge-to-edge list, icon pill tabs', look: { accent: '#1a73e8', bgTint: 'white', shadows: false, borders: 1, round: 3, fontUi: 'system', band: 'none', tabStyle: 'indicator', listStyle: 'edge', pressStyle: 'highlight', switchStyle: 'material', typeStyle: 'material' } },
   { id: 'tiktok', name: 'TikTok-style', group: 'inspired', desc: 'Black with cyan and pink-red', mode: 'oled', look: { accent: '#25f4ee', bgTint: 'black', shadows: false, borders: 2, fontUi: 'inter' }, band: ['#25f4ee', '#ffffff', '#fe2c55', '#25f4ee'] },
 ];
 export const themeById = id => THEMES.find(t => t.id === id) || THEMES[0];
@@ -108,5 +122,21 @@ export function lookCss(d = {}, shades = null) {
   if (d.spacing === 'tight') out.push('section.card { padding: 11px; margin-bottom: 8px; } ul.cases li { padding-top: 6px; padding-bottom: 6px; } .chips { gap: 4px; }');
   if (d.tabStyle === 'pill') out.push('.tabs button[aria-selected="true"], html.tabs-top .tabs button[aria-selected="true"], html.tabs-bottom .tabs button[aria-selected="true"] { border-color: transparent; background: var(--accent-soft); color: var(--accent); border-radius: 999px; }');
   if (d.tabStyle === 'plain') out.push('.tabs button[aria-selected="true"], html.tabs-top .tabs button[aria-selected="true"], html.tabs-bottom .tabs button[aria-selected="true"] { border-color: transparent; color: var(--accent); }');
+
+  // App-style details: CSS only, so the first paint has it too (index.html). Nothing is added unless chosen.
+  if (d.barBlur) out.push(':root:root .top { background-color: color-mix(in srgb, var(--panel) 72%, transparent); backdrop-filter: saturate(1.8) blur(20px); -webkit-backdrop-filter: saturate(1.8) blur(20px); } @media (max-width: 600px) { :root:root .tabs { background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: saturate(1.8) blur(20px); -webkit-backdrop-filter: saturate(1.8) blur(20px); } }');
+  if (d.tabActiveLabel) out.push('@media (max-width: 600px) { .tabs button:not([aria-selected="true"]) .lbl { display: none; } }');
+  if (d.tabStyle === 'indicator') out.push('.tabs button[aria-selected="true"], html.tabs-top .tabs button[aria-selected="true"], html.tabs-bottom .tabs button[aria-selected="true"] { border-color: transparent; background: var(--accent-soft); color: var(--accent); border-radius: 999px; } @media (max-width: 600px) { :root:root:not(.tabs-top) .tabs button[aria-selected="true"] { background: none; border-radius: 0; } :root:root:not(.tabs-top) .tabs button[aria-selected="true"] .ico { box-sizing: content-box; padding: 4px 18px; margin: -4px 0 0; border-radius: 999px; background: var(--accent-soft); } }');
+  if (d.listStyle === 'inset') out.push('ul.cases, .more-list { background: var(--panel); border-radius: calc(12px * var(--round, 1)); overflow: hidden; } ul.cases li { padding-left: 14px; padding-right: 12px; } ul.cases li:last-child { border-bottom: 0; } ul.cases li { border-bottom-color: color-mix(in srgb, var(--ink) 14%, transparent); }');
+  if (d.listStyle === 'edge') out.push('section.card { border-radius: 0; border-left: 0; border-right: 0; box-shadow: none; margin-left: -12px; margin-right: -12px; } ul.cases li { padding-left: 12px; padding-right: 12px; }');
+  if (d.titleAlign === 'centre') out.push('.top h1 { flex: 1; text-align: center; }');
+  if (d.switchStyle === 'ios') out.push(':root .set-page label.check > input[type=checkbox] { width: 51px; height: 31px; border-radius: 16px; } :root .set-page label.check > input[type=checkbox]::before { top: 2px; left: 2px; width: 27px; height: 27px; box-shadow: 0 2px 4px rgba(0, 0, 0, .25); } :root .set-page label.check > input[type=checkbox]:checked { background: #34c759; } :root .set-page label.check > input[type=checkbox]:checked::before { transform: translateX(20px); }');
+  if (d.switchStyle === 'material') out.push(':root .set-page label.check > input[type=checkbox] { width: 52px; height: 32px; border-radius: 16px; background: var(--panel); box-shadow: inset 0 0 0 2px var(--muted); } :root .set-page label.check > input[type=checkbox]::before { top: 8px; left: 8px; width: 16px; height: 16px; background: var(--muted); box-shadow: none; } :root .set-page label.check > input[type=checkbox]:checked { background: var(--accent); box-shadow: none; } :root .set-page label.check > input[type=checkbox]:checked::before { width: 24px; height: 24px; top: 4px; left: 4px; background: #fff; transform: translateX(20px); }');
+  if (d.pressStyle === 'highlight') out.push(':root :is(button, .btn, .chip, [role=button]):not(:disabled):active { opacity: 1; background-color: color-mix(in srgb, var(--ink) 12%, var(--panel)); }');
+  if (d.pressStyle === 'none') out.push(':root :is(button, .btn, .chip, [role=button]):not(:disabled):active { opacity: 1; } :root :is(ul.cases > li:not(.monthhead), .more-list a, .picker li, details > summary, ul.ready-list li, .notes-list li):active { background-color: transparent; }');
+  if (d.iconWeight === 'thin') out.push(':root .ico, :root .ico.i { stroke-width: 1.4; }');
+  if (d.iconWeight === 'bold') out.push(':root .ico, :root .ico.i { stroke-width: 2.6; }');
+  if (d.typeStyle === 'ios') out.push(':root .top h1, :root h1, :root h2, :root section.card h2 { font-weight: 700; letter-spacing: -0.02em; } :root .top h1 { font-size: calc(20px * var(--fs, 1)); } body { letter-spacing: -0.01em; }');
+  if (d.typeStyle === 'material') out.push(':root .top h1, :root h1, :root h2, :root h3, :root section.card h2 { font-weight: 500; letter-spacing: 0; } .tabs button { letter-spacing: .02em; font-weight: 500; }');
   return out.join('\n');
 }
