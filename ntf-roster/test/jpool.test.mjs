@@ -327,4 +327,31 @@ function pool() {
   ok(demo.lockAll() === false, 'practice is never locked');
 }
 
+// ---------- senior residents and moving someone by hand ----------
+{
+  eq(M.DEFAULT_GROUPS.find(g => g.id === 'sr').kind, 'senior', 'senior residents are a senior section');
+  const old = M.defaultState();
+  old.groups.find(g => g.id === 'sr').kind = 'junior';
+  delete old.settings.srv;
+  old.staff = [
+    { id: 'r1', name: 'Fake Senior Res', group: 'sr', tags: ['jpool', 'mo2'] },
+    { id: 'r2', name: 'Fake Res Phys', group: 'srp', tags: ['jpool'] },
+    { id: 'r3', name: 'Fake Moved', group: 'srp', tags: ['jpool'], pool: 'senior' },
+    { id: 'r4', name: 'Fake Odd', group: 'mo', tags: [], pool: 'sideways' },
+  ];
+  const s = M.migrate(old);
+  const by = id => s.staff.find(p => p.id === id);
+  eq(s.groups.find(g => g.id === 'sr').kind, 'senior', 'an older save moves the section once');
+  eq([M.poolOf(s, by('r1')), M.poolOf(s, by('r2')), M.poolOf(s, by('r3'))], ['senior', 'junior', 'senior'], 'SRs senior, SRPs junior, a move by hand wins over the tag');
+  eq(by('r1').tags, ['mo2'], 'the old pool tag is dropped from senior residents');
+  ok(!('pool' in by('r4')), 'an unknown pool value is dropped');
+  eq(M.autoPoolOf(s, by('r3')), 'junior', 'the automatic pool ignores the move');
+  s.groups.find(g => g.id === 'sr').kind = 'junior';
+  eq(M.migrate(s).groups.find(g => g.id === 'sr').kind, 'junior', 'a section set back to junior by hand stays');
+  // a reimport keeps the move
+  const parsed = { people: [{ key: 'k3', name: 'Fake Moved', group: 'srp', matchId: 'r3', note: 'R3' }], months: [], cells: [] };
+  try { io.applyImport(s, parsed); } catch { /* only the people part matters here */ }
+  eq([by('r3').pool, by('r3').note], ['senior', 'R3'], 'reimport keeps the move by hand');
+}
+
 console.log(`junior pool tests: ${n} checks passed`);

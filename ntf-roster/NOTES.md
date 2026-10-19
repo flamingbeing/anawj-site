@@ -318,3 +318,14 @@ restriction" (same day, following days, between two people, and ready-made ones)
 - The 2027 dates for Hari Raya Puasa, Hari Raya Haji, Vesak and Deepavali in `demo.js` are from memory: check them
   against the Ministry of Manpower list before relying on them ("Load Singapore public holidays" uses them).
 - The cloud's merge by pool is tested in unit tests and the emulator only, not yet with two people saving live.
+
+## Senior residents and moving someone by hand (19 Oct 2026)
+
+- Senior residents (`sr`) are a senior section: they are rostered with the seniors. Older saves move the section once
+  (`settings.srv`) and drop old pool tags from its people; a section set back to junior by hand stays.
+- Anyone can be moved to the junior or senior roster by hand: person details › Roster (`p.pool`: `junior` | `senior`,
+  absent = automatic). `M.poolOf` checks it first, then the `jpool` / `spool` tags, then the section. The move is kept
+  on reimport (matched people keep their fields) and by "The junior pool starts at", which also never puts a senior
+  section in the junior pool. Junior pool setup lists who was moved by hand.
+- The Excel export's Seniors / Juniors count rows follow the same split. Default rules still name `sr` where they did
+  (e.g. the 2 juniors on call); rule texts say "consultants" for the consultant sections.

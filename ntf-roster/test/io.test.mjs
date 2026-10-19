@@ -280,7 +280,7 @@ const demoBlob = await roundTrip(demo, '2026-10', 'practice department');
   ok(found, 'a call cell was found in the export');
   const seniorsOnC = [];
   ws.eachRow((row) => { if (io.cellText(row.getCell(1).value) === "Seniors on 'C'") for (let c = 6; c <= 36; c++) seniorsOnC.push(row.getCell(c).value); });
-  ok(seniorsOnC.length === 31 && seniorsOnC.every(n => n === 1), 'one senior on call every day of the month');
+  ok(seniorsOnC.length === 31 && seniorsOnC.every(n => n >= 1), 'a senior on call every day of the month (senior residents count as seniors)');
   // Two months -> two sheets
   const two = await io.buildDeptWorkbook(demo, ['2026-10', '2026-11'], { ExcelJS });
   eq(two.worksheets.length, 2, 'one sheet per month');

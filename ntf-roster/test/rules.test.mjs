@@ -21,7 +21,7 @@ function base() {
     P('c1', 'Wong Mei Lan', 'WML', 'cons'),
     P('c2', 'Harold Finch', 'HF', 'cons'),
     P('a1', 'Siti Rahmah', 'SR', 'ac'),
-    P('r1', 'Arjun Pillai', 'AP', 'sr'),
+    P('r1', 'Arjun Pillai', 'AP', 'srp'),
     P('r2', 'Grace Toh', 'GT', 'rp'),
     P('j1', 'Liam Carter', 'LC', 'jr'),
     P('m1', 'Nur Aisyah', 'NA', 'mo', { tags: ['babymo'] }),
@@ -43,7 +43,7 @@ const run = (s, rule, range = NOV) => evaluateRule(s, rule, range);
 eq(M.STORE_KEY, 'ntf-roster-v1');
 eq(M.DEMO_KEY, 'ntf-roster-demo');
 eq(M.DEFAULT_GROUPS.map(g => g.id), ['cons', 'ac', 'ext', 'vc', 'sr', 'srp', 'rp', 'jr', 'locum', 'mo', 'nurse']);
-eq(M.DEFAULT_GROUPS.filter(g => g.kind === 'senior').map(g => g.id), ['cons', 'ac', 'ext', 'vc']);
+eq(M.DEFAULT_GROUPS.filter(g => g.kind === 'senior').map(g => g.id), ['cons', 'ac', 'ext', 'vc', 'sr']);
 eq(M.DEFAULT_TAGS.slice(0, 4).map(t => t.id), ['babymo', 'parttime', 'pain', 'icu']);
 {
   const dm = new Map(M.DEFAULT_DUTIES.map(d => [d.code, d]));
@@ -172,14 +172,14 @@ eq(DEFAULT_RULES.map(r => r.id), ['r-leave', 'r-postcall', 'r-jcall', 'r-scall',
   eq(byId['r-phd'].when.holidays, 'only');
   eq(byId['r-otc'].who.groups, ['cons', 'ac', 'ext', 'vc']);
   eq(byId['r-baby'].params.other.groups, ['sr', 'srp', 'rp', 'ac']);
-  eq(describeRule(byId['r-jcall'], s), 'Each day: exactly 2 juniors on Call');
+  ok(/^Each day: exactly 2 people from Senior residents, /.test(describeRule(byId['r-jcall'], s)), 'senior residents are no longer a junior section, so the rule names its sections');
 }
 
 // ---------- each rule type ----------
 // cover: count of people (in who) with the codes, each day in when
 {
   const s = base();
-  const r = mk(s, 'cover', { codes: ['C'], min: 2, max: 2 }, { who: { groups: ['sr', 'srp', 'rp', 'jr', 'locum', 'mo'] }, when: { from: '2026-11-02', to: '2026-11-04' } });
+  const r = mk(s, 'cover', { codes: ['C'], min: 2, max: 2 }, { who: { groups: ['srp', 'rp', 'jr', 'locum', 'mo'] }, when: { from: '2026-11-02', to: '2026-11-04' } });
   put(s, '2026-11-02', 'r1', ['C']); put(s, '2026-11-02', 'm1', ['C']);                       // 2: fine
   put(s, '2026-11-03', 'r1', ['C']); put(s, '2026-11-03', 'c1', ['C']);                       // 1 junior (c1 is senior)
   put(s, '2026-11-04', 'r2', ['C']); put(s, '2026-11-04', 'm3', ['C']); put(s, '2026-11-04', 'j1', ['C']); // 3
@@ -406,7 +406,7 @@ function addD(d, n) { return M.addDays(d, n); }
   const s = base();
   const r = DEFAULT_RULES.find(x => x.id === 'r-otc');
   put(s, '2026-11-03', 'c1', ['OTC']); put(s, '2026-11-03', 'r1', ['OTC']);
-  eq(run(s, r).map(v => v.msg), ['Tue 3 Nov: AP has OT consultant, only seniors may']);
+  eq(run(s, r).map(v => v.msg), ['Tue 3 Nov: AP has OT consultant, only consultants may']);
 }
 
 // standing
@@ -425,7 +425,7 @@ function addD(d, n) { return M.addDays(d, n); }
 // ---------- describeRule: one per type ----------
 {
   const s = base();
-  const J = { groups: ['sr', 'srp', 'rp', 'jr', 'locum', 'mo'] };
+  const J = { groups: ['srp', 'rp', 'jr', 'locum', 'mo'] };
   const D = (type, params, o) => describeRule(mk(s, type, params, o), s);
   eq(D('cover', { codes: ['C'], min: 2, max: 2 }, { who: J }), 'Each day: exactly 2 juniors on Call');
   eq(D('cover', { codes: ['P'], min: 1, max: 1 }, { who: J, when: { days: [1, 2, 3, 4, 5], holidays: 'exclude' } }), 'Weekdays except public holidays: exactly 1 junior on PM shift');
@@ -445,7 +445,7 @@ function addD(d, n) { return M.addDays(d, n); }
   eq(D('requests', { request: 'Nw', codes: ['@shift'], mode: 'avoid', span: 'weekend' }), 'No weekend shift (Nw): no shift that weekend');
   eq(D('requests', { request: 'Cr', codes: ['C'], mode: 'want', span: 'day' }), 'Call request (Cr): give Call that day');
   eq(D('spread', { codes: ['C'] }, { who: J }), 'Share Call fairly among juniors (weekends x2, holidays x2)');
-  eq(D('eligible', { codes: ['OTC'] }, { who: { groups: ['cons', 'ac', 'ext', 'vc'] } }), 'Only seniors may do OT consultant');
+  eq(D('eligible', { codes: ['OTC'] }, { who: { groups: ['cons', 'ac', 'ext', 'vc'] } }), 'Only consultants may do OT consultant');
   eq(D('standing', { codes: ['APS'] }, { who: { tags: ['pain'] }, when: { days: [1, 2, 3, 4, 5] } }), 'Pain (APS): Acute pain service every day unless away (weekdays)');
   eq(D('cover', { codes: ['C'], min: 1, max: 1 }, { who: { staff: ['m1'], exclude: [] }, when: { from: '2026-11-03', to: '2026-11-09' } }), '3 Nov to 9 Nov: exactly 1 person from NA on Call');
   eq(D('maxRun', { codes: ['C'], max: 2 }, { who: { groups: ['mo'], exclude: ['m3'] } }), 'Medical officers except Priya Menon: at most 2 days in a row of Call');

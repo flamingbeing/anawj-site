@@ -318,19 +318,21 @@ function textKit(state) {
   const dm = dutyMap(state);
   const groups = state.groups || [], tags = state.tags || [], staff = state.staff || [];
   const kindIds = k => groups.filter(g => g.kind === k).map(g => g.id);
+  const isCons = id => /consultant/i.test((groups.find(g => g.id === id) || {}).name || '');
   const codeName = c => TOKEN_WORDS[c] || (dm.get(c) && dm.get(c).name) || c;
   const T = {
     code: codeName,
     codes: list => listOr((list || []).map(codeName)) || '…',   // '…' until codes are chosen ("Never … and … on the same day")
     // "on Call", but "at work", "away", "on leave" for tokens that read better without "on"
     on: list => (list && list.length === 1 && ['@present', '@away', '@any'].includes(list[0]) ? codeName(list[0]) : `on ${T.codes(list)}`),
-    // "juniors", "seniors", "everyone", or names
+    // "juniors", "seniors", "consultants" (every senior section named consultants), "everyone", or names
     who(who) {
       who = { ...blankWho(), ...(who || {}) };
       const parts = [];
       if (who.groups.length) {
         if (sameSet(who.groups, kindIds('junior'))) parts.push('juniors');
         else if (sameSet(who.groups, kindIds('senior'))) parts.push('seniors');
+        else if (who.groups.length > 1 && sameSet(who.groups, kindIds('senior').filter(isCons))) parts.push('consultants');
         else parts.push(...who.groups.map(id => (groups.find(g => g.id === id) || { name: id }).name));
       }
       parts.push(...who.tags.map(id => (tags.find(g => g.id === id) || { name: id }).name));

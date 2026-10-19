@@ -580,7 +580,8 @@ export async function buildDeptWorkbook(state, months, opts = {}) {
     // Sections and names
     let r = 4;
     const people = M.staffInMonth(state, month);
-    const seniorIds = new Set((state.groups || []).filter(g => g.kind === 'senior').map(g => g.id));
+    // the count rows follow the app's senior / junior rosters (moves by hand included)
+    const seniorIds = new Set(people.filter(p => M.poolOf(state, p) === 'senior').map(p => p.id));
     for (const g of state.groups || []) {
       const inGroup = people.filter(p => p.group === g.id);
       if (!inGroup.length) continue;
@@ -627,10 +628,10 @@ export async function buildDeptWorkbook(state, months, opts = {}) {
     // Count rows
     r++;
     const counts = [
-      ['Total Seniors At Work', p => seniorIds.has(p.group), ['@present']],
-      ['Total Juniors At Work', p => !seniorIds.has(p.group), ['@present']],
-      ["Seniors on 'C'", p => seniorIds.has(p.group), ['C']],
-      ["Juniors on 'C'", p => !seniorIds.has(p.group), ['C']],
+      ['Total Seniors At Work', p => seniorIds.has(p.id), ['@present']],
+      ['Total Juniors At Work', p => !seniorIds.has(p.id), ['@present']],
+      ["Seniors on 'C'", p => seniorIds.has(p.id), ['C']],
+      ["Juniors on 'C'", p => !seniorIds.has(p.id), ['C']],
     ];
     for (const [lbl, who, codes] of counts) {
       const row = ws.getRow(r);

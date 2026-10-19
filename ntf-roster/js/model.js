@@ -12,7 +12,7 @@ export const DEFAULT_GROUPS = [
   { id: 'ac', name: 'Associate consultants', kind: 'senior' },
   { id: 'ext', name: 'NUH / NTFGH / ICU consultants', kind: 'senior' },
   { id: 'vc', name: 'Visiting consultants', kind: 'senior' },
-  { id: 'sr', name: 'Senior residents', kind: 'junior' },
+  { id: 'sr', name: 'Senior residents', kind: 'senior' },
   { id: 'srp', name: 'Senior resident physicians', kind: 'junior' },
   { id: 'rp', name: 'Resident physicians', kind: 'junior' },
   { id: 'jr', name: 'Junior residents', kind: 'junior' },
@@ -215,11 +215,24 @@ export function migrate(s) {
     s.settings.jpv = 1;
   }
   if (!['all', 'junior', 'senior'].includes(s.settings.pool)) s.settings.pool = 'all';
-  s.staff = byId(s.staff).map(p => ({
-    short: '', group: 'mo', tags: [], fte: 1, start: '', end: '', note: '', active: true, ...p,
-    name: str(p.name, p.id), short: str(p.short), group: str(p.group, 'mo'), note: str(p.note),
-    start: str(p.start), end: str(p.end), tags: strList(p.tags),
-  }));
+  s.staff = byId(s.staff).map(p => {
+    const x = {
+      short: '', group: 'mo', tags: [], fte: 1, start: '', end: '', note: '', active: true, ...p,
+      name: str(p.name, p.id), short: str(p.short), group: str(p.group, 'mo'), note: str(p.note),
+      start: str(p.start), end: str(p.end), tags: strList(p.tags),
+    };
+    if (x.pool !== 'junior' && x.pool !== 'senior') delete x.pool;   // moved by hand to a pool (kept on reimport)
+    return x;
+  });
+  // senior residents are rostered with the seniors (owner, 19 Oct 2026): once, older saves move the section and its people
+  if (!s.settings.srv) {
+    const sr = s.groups.find(g => g.id === 'sr');
+    if (sr && sr.kind === 'junior') {
+      sr.kind = 'senior';
+      for (const p of s.staff) if (p.group === 'sr' && !p.pool) p.tags = p.tags.filter(t => t !== 'jpool' && t !== 'spool');
+    }
+    s.settings.srv = 1;
+  }
   if (!Array.isArray(s.rules)) s.rules = clone(DEFAULT_RULES);
   s.rules = s.rules.filter(r => isObj(r) && typeof r.type === 'string').map(cleanRule);
   if (!Array.isArray(s.rulesLog)) s.rulesLog = [];
@@ -337,8 +350,14 @@ export function staffInMonth(state, m) {
     .map(({ p }) => p);
 }
 
-// Which roster a person belongs to: the pool tags win, else their section (junior sections are the junior pool).
+// Which roster a person belongs to: a move by hand (p.pool) wins, then the pool tags, else their section (junior
+// sections are the junior pool).
 export function poolOf(state, p) {
+  if (p && (p.pool === 'junior' || p.pool === 'senior')) return p.pool;
+  return autoPoolOf(state, p);
+}
+// The pool without the move by hand (shown as "Automatic" in the person editor).
+export function autoPoolOf(state, p) {
   const t = (p && p.tags) || [];
   if (t.includes('jpool')) return 'junior';
   if (t.includes('spool')) return 'senior';
