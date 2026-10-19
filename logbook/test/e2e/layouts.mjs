@@ -57,7 +57,9 @@ try { for (const width of [390, 1200]) {
     const first = rows.first();
     const css = await first.evaluate(el => ({ grid: getComputedStyle(el).gridTemplateAreas, border: getComputedStyle(el).borderBottomWidth, bg: getComputedStyle(el).backgroundColor, dot: getComputedStyle(el, '::before').content }));
     if (rowLayout === 'compact' || rowLayout === 'chat') assert.match(css.grid, /ini t dt/);
-    if (rowLayout === 'chat') { assert.equal(css.border, '1px'); assert.equal(await first.locator('.chat-time').isVisible(), true); }
+    if (rowLayout === 'chat') {
+      assert.equal(await p.locator('.lb-wrap > section.card:has(ul.cases)').evaluate(el => getComputedStyle(el).boxShadow), 'none');
+      assert.equal(css.border, '1px'); assert.equal(await first.locator('.chat-time').isVisible(), true); }
     if (rowLayout === 'timeline') { assert.equal(await p.locator('ul.cases .monthhead').count(), 2); assert.equal(css.dot, '""'); }
     await first.click(); await p.locator('dialog[open] textarea').waitFor();
     await p.locator('dialog[open]').getByRole('button', { name: 'Cancel', exact: true }).click();

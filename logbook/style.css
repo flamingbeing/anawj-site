@@ -1792,6 +1792,7 @@ ul.cases li.lb-planned a { display: block; padding: 8px 4px; }
 
 /* Layout variants (Themes): the usual tabs, cards and Case page remain the defaults. */
 ul.cases .chat-time { display: none; }
+html.rows-chat .lb-wrap > section.card:has(ul.cases) { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
 html.rows-chat ul.cases li[data-date] { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; margin: 0; }
 html.rows-chat ul.cases li[data-date] .dt { display: none; }
 html.rows-chat ul.cases li[data-date] .chat-time { display: block; grid-area: dt; color: var(--muted); font-size: calc(12px * var(--fs, 1)); }
