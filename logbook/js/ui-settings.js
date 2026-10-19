@@ -170,7 +170,6 @@ export function renderThemes() {
       h('div', { class: 'theme-grid' }, FEATURED.map(id => themeCard(THEMES.find(t => t.id === id), theme, custom))),
       h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('a', { class: 'btn small', href: '#themesall' }, 'Browse all themes'))),
     myThemesCard(st, custom),
-    editColours(st),
     h('section', { class: 'card' },
       h('h2', {}, 'Colour and light'),
       pick('Light or dark', THEME_MODES, cachedTheme(), v => { applyTheme(v); setDisplay({ themeMode: null }); hooks.render(); }),
@@ -216,6 +215,7 @@ export function renderThemes() {
       look('switchStyle', 'Switches', SWITCH_STYLES, 'default', 'The on / off switches in Settings.'),
       look('pressStyle', 'When you press', PRESS_STYLES, 'default', 'What buttons and rows do under your finger.'),
       DEVICE_NOTE()),
+    editColours(st),
     resetLink('the theme and every look setting on this page (light, the NUHS colours, lines, corners, fonts and spacing) on this device', () => {
       applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'fontUiName', 'fontLogName'].map(k => [k, null])) }));
     }));

@@ -60,7 +60,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   dark accent 7:1 on cards, near-white text, neutral grey backgrounds) and writes them into <style id="accent-css">,
   cached for the first paint (index.html). Light / Dark / OLED (pure black: data-oled on top of dark) / Auto is
   separate, per device. (Fixed named themes were tried and dropped: they read as shades of one colour.)
-- **Edit colours** (Themes, per device): `colours: { light: {...}, dark: {...} }` overrides any of `bg`,
+- **Edit colours** (Themes, per device; its card sits below the look settings, above the reset link): `colours: { light: {...}, dark: {...} }` overrides any of `bg`,
   `panel`, `ink`, `muted`, `line`, `accent`, `accentInk`, `ok`, `warn`, `err` (six-digit hex only). Omitted
   tokens keep their accent/tint values; old looks are unchanged. The Light / Dark editor drafts both palettes,
   shows live contrast ratios and resets individual overrides. Save checks ink and muted on bg and panel,
