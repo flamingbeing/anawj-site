@@ -235,6 +235,11 @@ export function migrate(s) {
   }
   if (!Array.isArray(s.rules)) s.rules = clone(DEFAULT_RULES);
   s.rules = s.rules.filter(r => isObj(r) && typeof r.type === 'string').map(cleanRule);
+  // every rule is confirmed (owner, 19 Oct 2026): once, drop the old "Predicted from the drafted rules" note sentence
+  if (!s.settings.rcv) {
+    for (const r of s.rules) if (typeof r.note === 'string' && /Predicted/.test(r.note)) r.note = r.note.replace(/\s*Predicted[^.]*\.?/g, '').trim();
+    s.settings.rcv = 1;
+  }
   if (!Array.isArray(s.rulesLog)) s.rulesLog = [];
   s.rulesLog = s.rulesLog.filter(isObj);
   if (s.rulesLog.length > 200) s.rulesLog = s.rulesLog.slice(-200);
