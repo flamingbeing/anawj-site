@@ -3,7 +3,7 @@
 // them to a file (.json) to keep or pass on; Import reads such a file back (only known look settings, checked).
 // Pure (test/my-themes.test.mjs); the page is ui-settings.js renderThemes.
 import { THEME_KEYS, TINTS } from './themes.js';
-import { cleanAccent } from './colors.js';
+import { cleanAccent, cleanColours, checkColours } from './colors.js';
 
 export const MAX_MINE = 12;
 export const FILE_KIND = 'apmes-logbook-themes';
@@ -21,7 +21,9 @@ const okValue = (k, v) => v != null && (OK[k] ? OK[k](v) : typeof v === 'boolean
 // the look settings of a display (only the set ones)
 export function lookOf(d = {}) {
   const out = {};
-  for (const k of THEME_KEYS) if (okValue(k, d[k])) out[k] = k === 'accent' ? cleanAccent(d[k]) : d[k];
+  for (const k of THEME_KEYS) if (k !== 'colours' && okValue(k, d[k])) out[k] = k === 'accent' ? cleanAccent(d[k]) : d[k];
+  const colours = cleanColours(d.colours);
+  if (Object.keys(colours).length) out.colours = colours;
   return out;
 }
 const cleanName = s => String(s || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
@@ -34,6 +36,7 @@ export function cleanMine(list) {
 }
 // save the look now under a name: a theme of the same name is replaced; the newest first
 export function saveMine(list, name, d, mode = null, id = Math.random().toString(36).slice(2, 10)) {
+  checkColours(d, TINTS[d.bgTint] || {});
   const n = cleanName(name);
   if (!n) throw new Error('Give the theme a name');
   const rest = cleanMine(list).filter(t => t.name.toLowerCase() !== n.toLowerCase());
@@ -56,6 +59,7 @@ export function importText(text, list) {
   try { data = JSON.parse(String(text || '')); } catch { throw new Error('That isn’t a themes file'); }
   const got = data && data.kind === FILE_KIND && Array.isArray(data.themes) ? cleanMine(data.themes) : null;
   if (!got || !got.length) throw new Error('No themes in that file');
+  for (const t of got) checkColours(t.look, TINTS[t.look.bgTint] || {});
   const names = new Set(got.map(t => t.name.toLowerCase()));
   const merged = [...got, ...cleanMine(list).filter(t => !names.has(t.name.toLowerCase()))];
   if (merged.length > MAX_MINE) throw new Error(`Up to ${MAX_MINE} themes of your own: delete some first`);

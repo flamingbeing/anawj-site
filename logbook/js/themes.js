@@ -4,10 +4,11 @@
 // fonts) sit in a searchable list. Pure, unit-tested; the CSS for the new look settings (background tint, spacing,
 // tab bar style, heading font, the top band) is made here too, cached for the first paint (index.html).
 
+import { coloursCss } from './colors.js';
 import { STACKS } from './fonts.js';
 
 // the display keys a theme sets; anything a theme doesn't list goes back to its default (null), unless it keeps it
-export const THEME_KEYS = ['accent', 'colourful', 'borders', 'flat', 'round', 'shadows', 'fontUi', 'fontLog', 'headFont', 'lineHeight',
+export const THEME_KEYS = ['colours', 'accent', 'colourful', 'borders', 'flat', 'round', 'shadows', 'fontUi', 'fontLog', 'headFont', 'lineHeight',
   'compact', 'btnStyle', 'iconBtns', 'tabIcons', 'pageTitles', 'calPlain', 'rowShort', 'contrast', 'bgTint', 'spacing', 'tabStyle', 'band',
   'barBlur', 'tabActiveLabel', 'listStyle', 'titleAlign', 'switchStyle', 'pressStyle', 'iconWeight', 'typeStyle'];
 
@@ -147,5 +148,6 @@ export function lookCss(d = {}, shades = null) {
   if (d.iconWeight === 'bold') out.push(':root .ico, :root .ico.i { stroke-width: 2.6; }');
   if (d.typeStyle === 'ios') out.push(':root .top h1, :root h1, :root h2, :root section.card h2 { font-weight: 700; letter-spacing: -0.02em; } :root .top h1 { font-size: calc(20px * var(--fs, 1)); } body { letter-spacing: -0.01em; }');
   if (d.typeStyle === 'material') out.push(':root .top h1, :root h1, :root h2, :root h3, :root section.card h2 { font-weight: 500; letter-spacing: 0; } .tabs button { letter-spacing: .02em; font-weight: 500; }');
-  return out.join('\n');
+  out.push(coloursCss(d.colours));
+  return out.filter(Boolean).join('\n');
 }
