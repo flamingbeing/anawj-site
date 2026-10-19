@@ -117,10 +117,11 @@ const SECTION_RES = [
   [/^JUNIOR RESIDENT/i, 'jr'],
   [/^LOCUMS?\b/i, 'locum'],
   [/^MEDICAL OFFICERS?\b|^MOS?$/i, 'mo'],
+  [/^PACU\b|\bAPN\b|^NURSES?\b/i, 'nurse'],
 ];
 function sectionGroup(text, state) {
   const t = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!t || /[a-z]/.test(t)) return null;   // headings are in capitals; names usually aren't
+  if (!t || (/[a-z]/.test(t) && !/^PACU\b/.test(t))) return null;   // headings are in capitals; names usually aren't
   const groups = state.groups || [];
   const own = groups.find(g => g.name.toUpperCase() === t.toUpperCase());
   if (own) return own.id;
@@ -161,6 +162,15 @@ export function parseCellText(text, state, lookup = codeIndex(state)) {
 }
 
 // ---------- import: the department sheet ----------
+
+// The meaning of a cell's fill in the department sheet: blue (99CCFF) = approved, green (33CC33) = pain service week.
+export function fillKind(cell) {
+  const f = cell && cell.fill;
+  const c = f && f.type === 'pattern' && f.fgColor && typeof f.fgColor.argb === 'string' ? f.fgColor.argb.toUpperCase() : '';
+  if (c.endsWith('99CCFF')) return 'blue';
+  if (c.endsWith('33CC33') || c.endsWith('92D050')) return 'aps';
+  return '';
+}
 
 // Find the month row ("DECEMBER 2026" in column A) and map each day column to a real date.
 function readMonthHeader(ws) {
@@ -263,9 +273,23 @@ export async function parseDeptWorkbook(input, state, opts = {}) {
         const cell = row.getCell(col);
         const text = cellText(cell.value).trim();
         const comment = noteText(cell.note);
-        if (!text && !comment) continue;
+        const colour = fillKind(cell);
+        if (!text && !comment && colour !== 'aps') continue;
         const pc = parseCellText(text, state, lookup);
+        // Colours carry meaning in the department sheet: blue = approved leave or a course (unavailable), a green
+        // empty cell = a pain service (APS) week.
+        if (colour === 'aps' && !text && lookup('APS')) pc.a.push('APS');
+        if (colour === 'blue' && text) {
+          if (!pc.a.some(c => (lookup(c) || {}).kind === 'leave')) {
+            const m = text.match(/^([A-Za-z]{2,6})(?=[-\s(]|$)/);
+            const d = m && lookup(m[1]);
+            const code = d && d.kind === 'leave' ? d.code : (lookup('CL') ? 'CL' : '');
+            if (code) { pc.a.push(code); pc.u = pc.u.filter(u => u.toLowerCase() !== (m ? m[1].toLowerCase() : '')); if (!pc.note && !(d && d.kind === 'leave')) pc.note = text; else if (!pc.note) pc.note = text.replace(m ? m[0] : '', '').replace(/^[-\s]+/, ''); }
+          }
+          pc.ap = true;
+        } else if (colour === 'blue') pc.ap = false;
         if (comment) pc.note = pc.note ? `${pc.note} ${comment}` : comment;
+        if (colour === 'blue' && pc.a.some(c => (lookup(c) || {}).kind === 'leave')) pc.ap = true;
         if (!pc.a.length && !pc.r.length && !pc.u.length && !pc.note) continue;
         for (const u of pc.u) {
           const k = Object.keys(out.unknownCodes).find(c => c.toLowerCase() === u.toLowerCase()) || u;
@@ -275,7 +299,7 @@ export async function parseDeptWorkbook(input, state, opts = {}) {
         const own = date.startsWith(hdr.month);
         // A date seen on two sheets (the 29, 30 / JAN columns): the sheet whose own month it is wins.
         if (day[person.key] && !own) continue;
-        day[person.key] = { a: pc.a, r: pc.r, note: pc.note, u: pc.u, own };
+        day[person.key] = { a: pc.a, r: pc.r, note: pc.note, u: pc.u, own, ap: !!pc.ap };
         if (own) monthInfo.cells++;
       }
     }
@@ -370,7 +394,7 @@ export function applyImport(draft, parsed, choices = {}) {
       const keptShifts = cur && !sheetShifts.length ? (cur.a || []).filter(c => kindOf.get(c) === 'shift') : [];
       const a = [...keptShifts, ...sheetA];
       const note = [noteWords.join(' '), pc.note].filter(Boolean).join(' ').trim() || (cur ? cur.note : '');
-      M.setCell(draft, date, sid, { a, r: pc.r, note, auto: (cur && cur.auto || []).filter(c => keptShifts.includes(c)), lock: cur ? cur.lock : false });
+      M.setCell(draft, date, sid, { a, r: pc.r, note, auto: (cur && cur.auto || []).filter(c => keptShifts.includes(c)), lock: cur ? cur.lock : false, ap: !!pc.ap });
       sum.cells++;
     }
   }
@@ -400,6 +424,68 @@ export function applyImport(draft, parsed, choices = {}) {
     }
   }
   return sum;
+}
+
+// ---------- export: fill the sheet you were sent ----------
+
+// Writes the roster's calls (C), PM shifts (P), half calls (HC) and pain service weeks (green) into the workbook the
+// department sent, keeping everything else in it as it was (colours, formulas, counts). Only cells that change are
+// touched: a request the shift satisfies (Cr beside a C) is left as written, leave is never overwritten.
+// input: the .xlsx bytes. Returns { blob, changed, missing } (missing: roster people not found in the sheet).
+const WRITE_CODES = ['C', 'P', 'HC'];
+const SATISFIES = { Cr: ['C'], Pr: ['P'], Wr: ['C', 'HC', 'P'] };
+export async function fillDeptWorkbook(input, state, month, opts = {}) {
+  const ExcelJS = await getExcel(opts);
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(input);
+  const lookup = codeIndex(state);
+  const byName = new Map();
+  for (const p of state.staff || []) for (const n of [p.name, p.short]) { const k = normName(n); if (k && !byName.has(k)) byName.set(k, p); }
+  const out = { blob: null, changed: 0, missing: [], sheet: '' };
+  const seen = new Set();
+  for (const ws of wb.worksheets) {
+    const hdr = readMonthHeader(ws);
+    if (!hdr || hdr.month !== month || !hdr.cols.length) continue;
+    out.sheet = ws.name;
+    for (let r = hdr.row + 2; r <= ws.rowCount; r++) {
+      const row = ws.getRow(r);
+      const a = cellText(row.getCell(1).value).replace(/\s+/g, ' ').trim();
+      if (!a) continue;
+      if (STOP_ROW.test(a)) break;
+      if (COUNT_ROW.test(a) || sectionGroup(a, state)) continue;
+      const info = parseNameCell(a);
+      const person = info.name && byName.get(normName(info.name));
+      if (!person) continue;
+      seen.add(person.id);
+      for (const { col, date } of hdr.cols) {
+        if (!date.startsWith(month)) continue;
+        const cell = row.getCell(col);
+        if (cell.isMerged && cell.master && cell.master.address !== cell.address) continue;
+        const mine = M.getCell(state, date, person.id);
+        const want = ((mine && mine.a) || []);
+        const wantShifts = WRITE_CODES.filter(c => want.includes(c));
+        const text = cellText(cell.value).trim();
+        const toks = text.split(/[\s/,;+&]+/).filter(Boolean);
+        const isCode = t => WRITE_CODES.some(c => c.toLowerCase() === t.toLowerCase());
+        const have = toks.filter(isCode).map(t => WRITE_CODES.find(c => c.toLowerCase() === t.toLowerCase()));
+        const reqs = toks.map(t => lookup(t)).filter(d => d && d.kind === 'request').map(d => d.code);
+        const covered = c => reqs.some(rq => (SATISFIES[rq] || []).includes(c));
+        let next = toks.filter(t => !isCode(t) || wantShifts.some(c => c.toLowerCase() === t.toLowerCase()));
+        for (const c of wantShifts) if (!have.includes(c) && !covered(c)) next.push(c);
+        const nextText = next.join(' ');
+        if (nextText !== toks.join(' ')) { cell.value = nextText || null; out.changed++; }
+        // pain service week: a green, empty cell
+        const wantAps = want.includes('APS'), isGreen = fillKind(cell) === 'aps';
+        if (wantAps && !isGreen && !text) { cell.style = { ...cell.style, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF33CC33' } } }; out.changed++; }
+        else if (!wantAps && isGreen && !text) { cell.style = { ...cell.style, fill: { type: 'pattern', pattern: 'none' } }; out.changed++; }
+      }
+    }
+  }
+  if (!out.sheet) throw new Error(`The file has no sheet for ${M.fmtMonth(month)}. Choose the sheet the department sent for that month.`);
+  out.missing = (state.staff || []).filter(p => p.active !== false && !seen.has(p.id) && M.staffInMonth(state, month).includes(p)).map(p => p.name);
+  const buf = await wb.xlsx.writeBuffer();
+  out.blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  return out;
 }
 
 // ---------- export: the department sheet ----------

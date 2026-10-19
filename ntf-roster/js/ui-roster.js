@@ -320,7 +320,7 @@ export function mount(el, app) {
   }
 
   function filteredStaff(state) {
-    let list = M.staffInMonth(state, app.month);
+    let list = M.staffInView(state, app.month);
     const gmap = M.groupMap(state);
     if (ui.group === '@senior' || ui.group === '@junior') {
       const kind = ui.group.slice(1);
@@ -439,7 +439,7 @@ export function mount(el, app) {
     const c = ctx;
     dutyStyles(state);
     const staff = filteredStaff(state);
-    const all = M.staffInMonth(state, app.month);
+    const all = M.staffInView(state, app.month);
     // summary columns: auto codes used this month (C always) + weekend/holiday calls
     const used = new Set();
     for (const d of c.days) {
@@ -1060,7 +1060,7 @@ export function mount(el, app) {
     const overnight = new Set((state.duties || []).filter(d => d.overnight).map(d => d.code));
     const ev = app.evaluation();
     const today = M.iso(new Date());
-    const list = M.staffInMonth(state, app.month);
+    const list = M.staffInView(state, app.month);
     const idx = list.findIndex(x => x.id === sid);
     const prev = list[idx - 1], next = list[idx + 1];
     const g = M.groupMap(state).get(p.group);
@@ -1348,7 +1348,7 @@ export function openAutofill(app) {
   function run() {
     runCount++;
     const seed = runCount;
-    const snapshot = app.store.get();
+    const snapshot = app.scope(app.store.get());   // the pool in view only: the other pool's people and rules are left out
     stageProgress();
     const opts = { from, to, seed, timeMs };
     let fellBack = false;

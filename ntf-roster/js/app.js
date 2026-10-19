@@ -4,6 +4,7 @@
 // Views are separate modules loaded on demand; a view that fails to load shows a friendly placeholder instead.
 
 let M = null;      // model.js
+let J = null;      // jpool.js (the junior pool: scoping a check or fill to one pool)
 let R = null;      // rules.js (may be missing while it is being built)
 let G = null;      // guide.js: Getting started, Help, the tour (tour.js) and "Try it yourself"
 
@@ -104,7 +105,7 @@ const app = {
   selectedCell: null,
   h, icon, esc,
   isDemo: false,
-  setMonth, go, toast, sheet, confirm: confirmBox, evaluation, isPhone,
+  setMonth, go, toast, scope: (st) => (J ? J.scopeToPool(st, ((st.settings && st.settings.pool) || 'all'), M.poolOf) : st), sheet, confirm: confirmBox, evaluation, isPhone,
   selectCell(date, staffId) { app.selectedCell = date && staffId ? { date, staffId } : null; },
   // first-time help (guide.js, tour.js)
   onboard, refreshGuide: renderGuide, openAutofill, shortcuts: () => shortcutsSheet(), settled,
@@ -146,12 +147,13 @@ let evalCache = null;
 const EMPTY_EVAL = () => ({ violations: [], hard: 0, soft: 0, score: 0, failed: [], byCell: new Map(), byDay: new Map(), byRule: new Map() });
 function evaluation() {
   const state = app.store.get();
+  const pool = (state.settings && state.settings.pool) || 'all';
   if (evalCache && evalCache.state === state && evalCache.month === app.month) return evalCache.res;
   let res = EMPTY_EVAL();
   if (R && typeof R.evaluate === 'function') {
     const days = M.monthDays(app.month);
     // a failed check must never look like "No problems": the header and Check say so (error / failed)
-    try { res = R.evaluate(state, { from: days[0], to: days[days.length - 1] }) || res; } catch (e) { console.error('evaluate failed', e); res = { ...EMPTY_EVAL(), error: true }; }
+    try { res = R.evaluate(J ? J.scopeToPool(state, pool, M.poolOf) : state, { from: days[0], to: days[days.length - 1] }) || res; } catch (e) { console.error('evaluate failed', e); res = { ...EMPTY_EVAL(), error: true }; }
   }
   evalCache = { state, month: app.month, res };
   return res;
@@ -330,6 +332,9 @@ function renderHeader() {
   r.title = app.store.canRedo() ? `Redo ${app.store.redoLabel()} (Ctrl+Shift+Z)` : 'Nothing to redo';
   u.setAttribute('aria-label', app.store.canUndo() ? `Undo ${app.store.undoLabel()}` : 'Undo');
   r.setAttribute('aria-label', app.store.canRedo() ? `Redo ${app.store.redoLabel()}` : 'Redo');
+  const pool = (state.settings && state.settings.pool) || 'all';
+  setHTML($('#poolsw'), [['junior', 'Junior'], ['senior', 'Senior'], ['all', 'All']].map(([k, l]) =>
+    `<button type="button" class="pool-btn" data-pool="${k}" aria-pressed="${pool === k}">${l}</button>`).join(''));
   const hasStaff = !!(state.staff || []).length;
   const ev = hasStaff ? evaluation() : EMPTY_EVAL();
   const p = $('#problems');
@@ -647,7 +652,7 @@ async function start() {
   // line): the model, rules, store, the practice department and the first screen's own view (from the link; phones
   // open on Day). Each is still awaited, and handled, where it was before.
   const quiet = p => { p.catch(() => {}); return p; };
-  const pM = quiet(import('./model.js')), pR = quiet(import('./rules.js')), pS = quiet(import('./store.js'));
+  const pJ = quiet(import('./jpool.js')), pM = quiet(import('./model.js')), pR = quiet(import('./rules.js')), pS = quiet(import('./store.js'));
   const pD = demo ? quiet(import('./demo.js')) : null;
   const pG = quiet(import('./guide.js'));
   quiet(import('./tour.js'));   // (guide.js needs it: fetched side by side, not after it)
@@ -659,6 +664,7 @@ async function start() {
     fatal('A part of the app did not load. Check your connection and reload the page.');
     return;
   }
+  try { J = await pJ; } catch (e) { console.warn('jpool.js not loaded; the pool switch only hides rows', e); }
   try { R = await pR; } catch (e) { console.warn('rules.js not loaded; rule checks are off', e); }
   try { G = await pG; } catch (e) { console.warn('guide.js not loaded; no first-time help', e); }
   app.model = M; app.rules = R;
@@ -690,6 +696,13 @@ async function start() {
   $('#prevm').addEventListener('click', () => setMonth(M.addMonths(app.month, -1)));
   $('#nextm').addEventListener('click', () => setMonth(M.addMonths(app.month, 1)));
   $('#today').addEventListener('click', goToday);
+  $('#poolsw').addEventListener('click', e => {
+    const b = e.target.closest('[data-pool]');
+    if (!b || !app.store) return;
+    const k = b.dataset.pool;
+    if (((app.store.get().settings || {}).pool || 'all') === k) return;
+    app.store.commit(k === 'all' ? 'Show all staff' : `Show the ${k} pool`, d => { d.settings.pool = k; });
+  });
   $('#autofill').addEventListener('click', openAutofill);
   document.addEventListener('keydown', onKeydown);
   window.addEventListener('hashchange', route);

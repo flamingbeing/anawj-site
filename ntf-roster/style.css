@@ -988,3 +988,28 @@ body.has-taskcard .sheet { max-height: calc(100vh - var(--task-h, 0px) - 64px); 
   body.has-taskcard .toasts { bottom: calc(68px + var(--task-h, 0px) + 10px + env(safe-area-inset-bottom)); }
 }
 @media print { .tour, .tour-spot, .task-card, .guide-slot { display: none !important; } }
+
+/* pool switch (junior / senior / all) beside the month */
+.pool-sw { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: var(--surface); }
+.pool-btn { border: 0; background: none; color: var(--muted); font-weight: 600; font-size: 13px; min-height: 30px; padding: 0 12px; border-radius: 999px; }
+.pool-btn[aria-pressed="true"] { background: var(--navy); color: #fff; }
+.jp-rows { display: grid; gap: 8px; margin: 12px 0; }
+.jp-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, .7fr) auto; gap: 8px; align-items: center; padding: 8px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.jp-name { display: grid; min-width: 0; }
+.jp-name strong { overflow: hidden; text-overflow: ellipsis; }
+.jp-status { padding: 12px 14px; }
+@media (max-width: 720px) { .jp-row { grid-template-columns: 1fr 1fr; } .jp-name { grid-column: 1 / -1; } }
+.aps-weeks { display: grid; gap: 8px; margin: 12px 0; }
+.aps-week { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 8px; align-items: center; padding: 8px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.aps-when { font-weight: 600; }
+.aps-pick { display: grid; gap: 4px; }
+.aps-held { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.aps-n { width: 70px; }
+.aps-leave { padding: 10px 14px; margin: 8px 0; }
+.aps-opts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+@media (max-width: 720px) { .aps-week { grid-template-columns: 1fr; } }
+@media (max-width: 720px) {
+  .ctx-row { flex-wrap: wrap; }
+  .pool-sw { order: -1; flex: 1 1 100%; }
+  .pool-btn { flex: 1; min-height: 36px; }
+}

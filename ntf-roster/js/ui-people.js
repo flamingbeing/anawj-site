@@ -4,6 +4,7 @@
 
 import * as M from './model.js';
 import { chipStyle, contrast } from './ui-rules.js';
+import { renderPool } from './ui-jpool.js';
 
 const KIND_LABEL = { shift: 'Shifts', leave: 'Leave', request: 'Requests', other: 'Other', derived: 'Worked out (not stored)' };
 const KIND_HELP = {
@@ -16,7 +17,7 @@ const fid = p => `${p}-${++nid}`;
 
 export function mount(el, app) {
   const { h } = app;
-  let part = ['staff', 'groups', 'tags', 'codes'].includes(app.params.s) ? app.params.s : 'staff';
+  let part = ['staff', 'pool', 'groups', 'tags', 'codes'].includes(app.params.s) ? app.params.s : 'staff';
   let q = '';
   let showLeft = false;
   const undoAct = { label: 'Undo', fn: () => app.store.undo() };
@@ -33,7 +34,7 @@ export function mount(el, app) {
   function renderNav() {
     const st = app.store.get();
     nav.innerHTML = '';
-    for (const [k, l, n] of [['staff', 'Staff', (st.staff || []).length], ['groups', 'Groups', (st.groups || []).length], ['tags', 'Tags', (st.tags || []).length], ['codes', 'Duty codes', (st.duties || []).length]]) {
+    for (const [k, l, n] of [['staff', 'Staff', (st.staff || []).length], ['pool', 'Junior pool', (st.staff || []).filter(p => M.poolOf(st, p) === 'junior').length], ['groups', 'Groups', (st.groups || []).length], ['tags', 'Tags', (st.tags || []).length], ['codes', 'Duty codes', (st.duties || []).length]]) {
       nav.append(h('button', { type: 'button', role: 'tab', class: 'bx-tab', 'aria-selected': String(part === k), id: `pv-tab-${k}`,
         onclick: () => { part = k; render(); } }, l, h('span', { class: 'bx-count' }, String(n))));
     }
@@ -46,6 +47,7 @@ export function mount(el, app) {
     const keep = document.activeElement && body.contains(document.activeElement) && document.activeElement.matches('input[type="search"]');
     body.innerHTML = '';
     if (part === 'staff') renderStaff();
+    else if (part === 'pool') renderPool(app, body);
     else if (part === 'groups') renderGroups();
     else if (part === 'tags') renderTags();
     else renderCodes();
