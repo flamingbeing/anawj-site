@@ -51,7 +51,7 @@ class OllamaReader:
     two-read agreement as the Claude reader. Needs Ollama running and a model that accepts images (`ollama show <model>`
     lists "vision"); --model or SCAN_MODEL picks it, OLLAMA_HOST the server."""
     def __init__(self, model=None, host=None):
-        self.model = model or os.environ.get('SCAN_MODEL', 'qwen2.5vl:7b')
+        self.model = model or os.environ.get('SCAN_MODEL', 'gemma4:12b')
         self.url = (host or os.environ.get('OLLAMA_HOST', 'http://localhost:11434')).rstrip('/')
         if not self.url.startswith('http'):
             self.url = 'http://' + self.url

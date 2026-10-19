@@ -1,6 +1,6 @@
 """How well does a reader read the handwritten crops? Run it on crops whose true values a person has confirmed.
 
-python3 bench.py --form-dir form-data --crops crops/ --truth pt01.reviewed.json [--reader ollama] [--model qwen2.5vl:7b]
+python3 bench.py --form-dir form-data --crops crops/ --truth pt01.reviewed.json [--reader ollama] [--model gemma4:12b]
 
 --crops is a folder written by `scan.py --export-crops` (one <field id>.png per cell); --truth is the reviewed file from
 review.html ({"fields": {id: value}}) or a readings file ({id: text}). Each crop is read twice, as scan.py does, and sorted:

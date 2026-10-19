@@ -228,7 +228,7 @@ def main(argv=None, reader=None):
     ap.add_argument('--no-read', action='store_true', help='nobody reads the handwriting: ticks are read, every written value is typed in the review screen')
     ap.add_argument('--min-align', type=float, default=MIN_ALIGN, help=f'lowest page alignment score to accept (default {MIN_ALIGN}); lower it only to test a page, and check its crops')
     ap.add_argument('--reader', choices=['claude', 'ollama'], default='claude', help='who reads the handwriting: Claude through the API (default) or a local vision model through Ollama (nothing leaves this computer)')
-    ap.add_argument('--model', help='model for the reader (default: SCAN_MODEL, else claude-sonnet-5-5 / qwen2.5vl:7b)')
+    ap.add_argument('--model', help='model for the reader (default: SCAN_MODEL, else claude-sonnet-5-5 / gemma4:12b)')
     ap.add_argument('--key-file', metavar='FILE', help='file holding the Anthropic API key, read by this process only (instead of the ANTHROPIC_API_KEY environment variable)')
     ap.add_argument('photos', nargs='+')
     a = ap.parse_args(argv)
