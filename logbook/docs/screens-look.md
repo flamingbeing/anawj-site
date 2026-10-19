@@ -300,4 +300,5 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   collapsible Case details and Tags sections, the first open. All three belong to the device and travel with themes
   and settings files; stored cases stay unchanged. X-style chooses chat, Notion-style timeline, Office-style rail.
   Focused checks: `node logbook/test/layouts.test.mjs` and `node logbook/test/e2e/layouts.mjs` (phone/desk, tap,
-  menu and selection holds, resizing, keyboard activation, disclosure fields, and accessibility).
+  menu and selection holds, resizing, keyboard activation, disclosure fields, and accessibility). The standard
+  App-style browser suite includes these layout checks.

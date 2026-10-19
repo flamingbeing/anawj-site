@@ -43,3 +43,6 @@ try {
   assert.deepEqual(errors, []);
   console.log('PASS app-style details');
 } finally { await b.close(); }
+
+// Layout choices share the Themes page and run with its focused suite.
+await import('./layouts.mjs');
