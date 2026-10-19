@@ -112,10 +112,16 @@ eq(M.fmtMonth('2026-11'), 'November 2026');
 {
   // migrate fills missing fields and keeps what is there
   const s = M.migrate({ staff: [{ id: 'q', name: 'Q Test' }], rules: [{ id: 'x1', type: 'cover', params: { codes: ['C'] } }, { junk: 1 }] });
-  eq([s.v, s.staff[0].group, s.staff[0].fte, s.staff[0].active, s.rules.length], [1, 'mo', 1, true, 1]);
+  eq([s.v, s.staff[0].group, s.staff[0].fte, s.staff[0].active, s.rules.length], [1, 'mo', 1, true, 2]);
+  eq(s.rules.map(r => [r.id, r.pool]), [['x1', 'junior'], ['x1-s', 'senior']], 'a rule about everyone becomes one per roster');
   eq(s.rules[0].who, { groups: [], tags: [], staff: [], exclude: [] });
   ok(s.duties.length === M.DEFAULT_DUTIES.length && s.groups.length === 11 && s.cells && s.months, 'defaults filled');
-  ok(M.defaultState().rules.length === DEFAULT_RULES.length, 'defaultState has the default rules');
+  {
+    const d = M.defaultState().rules, both = DEFAULT_RULES.filter(r => !r.pool).length;
+    ok(d.length === DEFAULT_RULES.length + both, 'defaultState has the default rules, the ones about everyone once per roster');
+    ok(d.every(r => r.pool === 'junior' || r.pool === 'senior'), 'every default rule has a roster');
+    eq(['r-jcall', 'r-scall', 'r-otc', 'r-baby', 'r-leave', 'r-leave-s'].map(id => d.find(r => r.id === id).pool), ['junior', 'senior', 'senior', 'junior', 'junior', 'senior']);
+  }
   ok(M.defaultState().rules !== M.defaultState().rules && M.defaultState().rules[0] !== DEFAULT_RULES[0], 'defaultState copies the rules');
 }
 

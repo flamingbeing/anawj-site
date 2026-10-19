@@ -198,7 +198,7 @@ function fillThisMonth(s, month, rand) {
   const codes = (d, id) => { const c = M.getCell(s, d, id); return c ? [...c.a, ...c.r] : []; };
   const seniorGroups = ['cons', 'ac'], juniorGroups = ['sr', 'srp', 'rp', 'jr', 'locum', 'mo'];
   const seniors = s.staff.filter(p => seniorGroups.includes(p.group));
-  const juniors = s.staff.filter(p => juniorGroups.includes(p.group));
+  const juniors = s.staff.filter(p => juniorGroups.includes(p.group) && M.poolOf(s, p) === 'junior');   // senior residents are on the senior roster
   const calls = new Map(), weekend = new Map(), lastCall = new Map(), pms = new Map();
   const tie = new Map(s.staff.map(p => [p.id, rand()]));
 

@@ -84,9 +84,15 @@ function pool() {
   J.installJuniorPool(s);
   const sc = J.scopeToPool(s, 'junior', M.poolOf);
   ok(sc.staff.length === 23, 'scoped staff');
-  eq(sc.rules.find(r => r.id === 'r-scall').enabled, false, 'consultants\' call rule is off when scoped to juniors');
+  ok(!sc.rules.some(r => r.id === 'r-scall' || r.pool === 'senior'), 'the senior roster\'s rules are left out when scoped to juniors');
   eq(sc.rules.find(r => r.id === 'r-jp-mo2').enabled, true, 'junior rule stays on');
-  ok(J.scopeToPool(s, 'all', M.poolOf) === s, 'all = same state');
+  ok(sc.rules.some(r => r.id === 'r-leave') && !sc.rules.some(r => r.id === 'r-leave-s'), 'the junior copy of a rule about everyone');
+  const all = J.scopeToPool(s, 'all', M.poolOf);
+  ok(all.staff === s.staff && all.rules.length === s.rules.length, 'all: everyone, every rule');
+  const lv = all.rules.find(r => r.id === 'r-leave'), lvs = all.rules.find(r => r.id === 'r-leave-s');
+  ok(lv.who.only.length === 23 && lv.who.only.every(id => M.poolOf(s, s.staff.find(p => p.id === id)) === 'junior'), 'all: the junior copy covers only the junior pool');
+  ok(lvs.who.only.length === s.staff.length - 23, 'all: the senior copy covers only the senior pool');
+  ok(!s.rules.some(r => r.who.only), 'the saved rules are not changed');
 }
 
 // ---------- auto-fill on the fake pool ----------
@@ -302,6 +308,29 @@ function pool() {
   eq(M.getCell(out, '2026-11-02', 'sen').a, ['C'], "their senior's shift");
   let threw = false; try { J.mergeByPool(mine, team, docs, 'all', M.poolOf); } catch { threw = true; }
   ok(threw, 'needs one pool');
+}
+
+// each roster has its own rules: a rule about everyone is split once, and a merge keeps my roster's copy
+{
+  const s = M.defaultState();
+  const n = s.rules.length;
+  eq(M.migrate(s).rules.length, n, 'loading again does not split again');
+  const mine = structuredClone(s), theirs = structuredClone(s);
+  mine.settings.pool = 'junior';
+  mine.rules.find(r => r.id === 'r-gap').weight = 77;      // junior copy, my edit
+  mine.rules.find(r => r.id === 'r-gap-s').weight = 11;    // senior copy, stale
+  theirs.rules.find(r => r.id === 'r-gap').weight = 12;    // junior copy, stale
+  theirs.rules.find(r => r.id === 'r-gap-s').weight = 66;  // senior copy, their edit
+  const out = J.mergeByPool(mine, cloud.pickTeam(theirs), [], 'junior', M.poolOf, cloud.cellsFromDoc);
+  eq([out.rules.find(r => r.id === 'r-gap').weight, out.rules.find(r => r.id === 'r-gap-s').weight], [77, 66], 'my junior copy and their senior copy');
+  eq(out.rules.length, n, 'no rule lost or doubled');
+  // placing rules without a roster: by the people they name
+  const t = M.defaultState();
+  t.staff.push({ id: 'cx', name: 'Con X', group: 'cons', tags: [] }, { id: 'mx', name: 'Mo X', group: 'mo', tags: [] });
+  M.migrate(t);
+  eq(M.guessRulePool(t, { id: 'q1', who: { staff: ['cx'] } }), 'senior', 'a rule naming a consultant: senior');
+  eq(M.guessRulePool(t, { id: 'q2', who: { tags: ['mo2'] } }), 'junior', 'MO2s: junior');
+  eq(M.guessRulePool(t, { id: 'q3', who: { staff: ['cx', 'mx'] } }), '', 'both: split');
 }
 
 // ---------- locking a month (as in NUH junior monthly) ----------

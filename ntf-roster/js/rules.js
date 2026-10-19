@@ -210,11 +210,12 @@ const blankWho = () => ({ groups: [], tags: [], staff: [], exclude: [] });
 export function compileWho(ctx, who) {
   who = { ...blankWho(), ...(who || {}) };
   const everyone = !who.groups.length && !who.tags.length && !who.staff.length;
+  const only = Array.isArray(who.only) ? new Set(who.only) : null;   // set by scopeToPool: the rule's own roster
   const inWho = new Uint8Array(ctx.P);
   const list = [];
   ctx.people.forEach((p, i) => {
     let ok = everyone || who.groups.includes(p.group) || who.staff.includes(p.id) || (p.tags || []).some(t => who.tags.includes(t));
-    if (who.exclude.includes(p.id)) ok = false;
+    if (who.exclude.includes(p.id) || (only && !only.has(p.id))) ok = false;
     if (ok) { inWho[i] = 1; list.push(i); }
   });
   return { inWho, list };

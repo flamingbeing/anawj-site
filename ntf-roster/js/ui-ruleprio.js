@@ -3,7 +3,7 @@
 // reorder it (or into Must hold and back), drag a bar to change one priority, or tick several and set them
 // together (a priority, raise or lower, must hold or preference, on or off).
 import { RULE_TYPES, describeRule } from './rules.js';
-import { clampW } from './ui-rules.js';
+import { clampW, viewPool, POOL_NAME } from './ui-rules.js';
 
 const softOnly = r => !!(RULE_TYPES[r.type] && RULE_TYPES[r.type].soft_only);
 export const isHard = r => !!r.hard && !softOnly(r);
@@ -90,7 +90,8 @@ export function openRulePriorities(app) {
       } }, h('span', { 'aria-hidden': 'true' }, '⠿'));
     li.append(grip,
       h('label', { class: 'rq-tick' }, tick),
-      h('div', { class: 'rq-name' }, h('span', { class: 'rq-ic', 'aria-hidden': 'true' }, t ? t.icon : '?'), h('span', null, title), off ? h('span', { class: 'bx-tag off' }, 'Off') : null),
+      h('div', { class: 'rq-name' }, h('span', { class: 'rq-ic', 'aria-hidden': 'true' }, t ? t.icon : '?'), h('span', null, title), off ? h('span', { class: 'bx-tag off' }, 'Off') : null,
+        viewPool(state) === 'all' && r.pool ? h('span', { class: `bx-badge ${r.pool === 'junior' ? 'jun' : 'sen'}` }, POOL_NAME[r.pool]) : null),
       barEl);
     return li;
   }
@@ -148,11 +149,12 @@ export function openRulePriorities(app) {
 
   function draw() {
     const state = app.store.get();
-    const rules = (state.rules || []).filter(r => showOff || r.enabled !== false);
+    const view = viewPool(state);   // one roster's rules (the switch at the top), or both
+    const rules = (state.rules || []).filter(r => (view === 'all' || r.pool === view) && (showOff || r.enabled !== false));
     for (const id of [...selected]) if (!(state.rules || []).some(r => r.id === id)) selected.delete(id);
     const hard = rules.filter(isHard), soft = rules.filter(r => !isHard(r)).sort((a, b) => clampW(b.weight) - clampW(a.weight));
     body.textContent = '';
-    body.append(h('p', { class: 'team-p' }, 'Must-hold rules are kept whenever possible. Preferences are weighed by priority: a longer bar matters more, and when two clash the longer one wins. Drag a rule by its grip (⠿) to put it higher or lower, or into Must hold; drag a bar to change one priority; or tick several and change them together below.'));
+    body.append(h('p', { class: 'team-p' }, view === 'all' ? 'Both rosters\' rules (pick Junior or Senior at the top to see one). ' : `The ${view} roster's rules only. `, 'Must-hold rules are kept whenever possible. Preferences are weighed by priority: a longer bar matters more, and when two clash the longer one wins. Drag a rule by its grip (⠿) to put it higher or lower, or into Must hold; drag a bar to change one priority; or tick several and change them together below.'));
     body.append(h('div', { class: 'team-row' },
       h('label', { class: 'switch', for: 'rq-off' }, h('input', { type: 'checkbox', id: 'rq-off', checked: showOff, onchange: e => { showOff = e.target.checked; draw(); } }),
         h('span', { class: 'sw-track', 'aria-hidden': 'true' }), h('span', null, 'Show rules that are off')),
