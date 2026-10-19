@@ -122,7 +122,7 @@ function pickTheme(t) {
 let themeQuery = '';
 resetters.push(() => { themeQuery = ''; });
 const themeCard = (t, theme, custom) => h('button', { type: 'button', class: 'theme-card', 'aria-pressed': String(t.id === theme.id && !custom), onclick: () => pickTheme(t) },
-  themeSwatch(t), h('b', {}, t.name), h('small', {}, t.desc));
+  themeSwatch(t), h('b', {}, t.name));   // (the descriptions are on Browse all themes)
 // Settings → Themes → Browse all themes (#themesall): every theme, searchable, and Suggest a theme
 function themeFinder() {
   const st = display(), { theme, custom } = themeState(st);
