@@ -2,6 +2,7 @@
 // Also the reusable category picker and the edit-case dialog (used by the Logbook screen).
 
 import { BY_CODE, TIPS } from './categories.js';
+import { cleanListFormat } from './list-format.js';
 import { withParents, parseBulk, parseDate, fmtDate, sortCodes, uid, caseParts, caseText, cleanInitials, splitInitials, splitAge, humanAge, nth, weekLead } from './engine.js';
 import { suggest as suggestCodes, bmiAt } from './suggest.js';
 import { apmesShorthand, shorthandTags } from './tags.js';
@@ -1135,7 +1136,7 @@ function renderBulk(card) {
 // suggestions"; and your own tags whose shorthand a row uses (Tag editor) with what they count towards.
 function reviewRows(text) {
   const on = settings().suggestions !== false;
-  return parseBulk(text, on && settings().autoTick ? t => suggest(t) : null, undefined, { labels: labels() }).map(r => {
+  return parseBulk(text, on && settings().autoTick ? t => suggest(t) : null, undefined, { labels: labels(), format: cleanListFormat(settings().listFormat) }).map(r => {
     const tags = on && r.details ? shorthandTags(tagSet(), forTags(r.details)) : [];
     return { ...r, tags, cats: tags.length ? sortCodes(withParents([...r.cats, ...tags.flatMap(tagLinks)])) : r.cats };
   });

@@ -2,7 +2,8 @@
 // "You" card (youCard), used by ui-account.js; the More page's cards are in more-cards.js.
 
 import { YEAR_NAMES, DEFAULT_NAMES, BY_CODE } from './categories.js';
-import { sortCodes, uid, academicYear, withParents, weekStart, humanAge, cleanSkip } from './engine.js';
+import { sortCodes, uid, academicYear, withParents, weekStart, humanAge, cleanSkip, parseBulk } from './engine.js';
+import { cleanListFormat, startUsable } from './list-format.js';
 import { S, h, toast, modal, confirmBox, cloud, catChip, catName, catShort, PICKER_ORDER, settings, patchLogbook, displayName, hooks, rYear, myYearName, fill, PROFILES, profile, facultyRole, shows, setShown, caseShown, setCaseShown, categoryNames, setCategoryNames, catPills, tagSet, resetters, download, fileButton, todayISO, updateMany, updatedToast, UNDO_SECS, rowIcon } from './ui-core.js';
 import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, shorthandOf, DEFAULT_SHORTHAND, cleanTagSet, defaultTagSet, tagTree, flatTree, moveTag, reparentTag, removeTag, newKey, tagSetToCsv, tagSetFromCsv, dropTag, canPlace, placeNewTag } from './tags.js';
 import { pickDialog, CASE_PARTS, AFTER_SAVE, RECENT_COUNTS } from './ui-log.js';
@@ -509,6 +510,42 @@ export function renderMarkdownSettings() {
         h('button', { class: 'small linkish', onclick: reset }, 'Reset to default'))));
 }
 
+// Pasted list format (owner, 19 Oct 2026): for a list that has no empty lines between cases. The start text says where a
+// case begins ({n} a number, {initials}, {date}, {any}); skip and end texts trim each case. "Try it" shows what a pasted
+// sample would become, using the same parser as the List box. Nothing typed in the sample is saved.
+function listFormatCard(st, save) {
+  const fmt = () => cleanListFormat(settings().listFormat) || {};
+  const out = h('div', { class: 'list-format-try', 'aria-live': 'polite' });
+  let sample = '';
+  const paint = () => {
+    const f = cleanListFormat(settings().listFormat);
+    if (!sample.trim()) { fill(out); return; }
+    const rows = parseBulk(sample, null, undefined, { format: f });
+    fill(out, h('p', { class: 'hint' }, rows.length + (rows.length === 1 ? ' case' : ' cases') + ' found.'),
+      rows.slice(0, 20).map((r, i) => h('p', { class: 'hint', style: 'margin:2px 0' }, (i + 1) + '. ' + (r.date ? r.date + ' · ' : '') + (r.initials ? r.initials + ' · ' : '') + r.details.replace(/\s+/g, ' ').slice(0, 70) + (r.details.length > 70 ? '…' : ''))),
+      rows.length > 20 ? h('p', { class: 'hint' }, '…and ' + (rows.length - 20) + ' more.') : null);
+  };
+  const store = (patch, note) => { const f = cleanListFormat({ ...fmt(), ...patch }); return save({ listFormat: f }, note).then(paint); };
+  const warn = h('p', { class: 'hint', style: 'color:var(--err)' });
+  const startIn = h('input', { type: 'text', value: fmt().start || '', placeholder: 'e.g. {n}. === {initials} (', maxlength: '80', autocomplete: 'off', 'aria-describedby': 'lf-help',
+    onchange: e => { warn.textContent = e.target.value.trim() && !startUsable(e.target.value) ? 'Add some fixed text too, such as "===" or "Case"; the start text can’t be only {…} parts.' : ''; if (warn.textContent) return; store({ start: e.target.value }, 'Saved'); } });
+  return h('div', {},
+    h('h3', {}, 'Pasted list format'),
+    h('p', { class: 'hint' }, 'Account settings · follow you between devices.'),
+    help('Only if your list has no empty line between cases. Say how a case starts and the List box splits it there. Leave empty to keep the usual way.'),
+    h('label', { class: 'field' }, 'A case starts with', startIn),
+    h('p', { class: 'hint help', id: 'lf-help' }, '{n} is a number, {initials} and {date} are read into those boxes, {any} is anything else on the same line. Example: "1. === AAB (60/M …" starts with {n}. === {initials} ( . Text before the first start is left out.'),
+    warn,
+    h('label', { class: 'field' }, 'Skip this many characters at the start of each case',
+      h('input', { type: 'number', min: '0', max: '200', inputmode: 'numeric', value: String(fmt().skip || 0), onchange: e => store({ skip: e.target.value }, 'Saved') })),
+    h('label', { class: 'field' }, 'Drop these from the end of each case',
+      h('input', { type: 'text', value: fmt().dropEnd || '', placeholder: 'e.g. ===, --', maxlength: '120', autocomplete: 'off', onchange: e => store({ dropEnd: e.target.value }, 'Saved') })),
+    h('p', { class: 'hint help' }, 'The date is read from the first line as before (or {date} in the start text).'),
+    h('label', { class: 'field' }, 'Try it: paste a sample list',
+      h('textarea', { rows: '4', placeholder: 'Use made-up text, not real patients. Nothing here is saved.', oninput: e => { sample = e.target.value; paint(); } })),
+    out);
+}
+
 const ENTER_MODES = [['newline', 'New line (default)'], ['double', 'Press Enter twice to save'], ['single', 'Enter saves (Shift+Enter for a new line)']];
 export function renderLogging() {
   const st = settings();
@@ -543,6 +580,7 @@ export function renderLogging() {
         h('input', { type: 'text', value: cleanSkip(st.skipStarts).join(', '), placeholder: 'e.g. ===, Pt:', maxlength: '200', autocomplete: 'off', 'aria-describedby': 'skip-help',
           onchange: e => { const list = cleanSkip(e.target.value); e.target.value = list.join(', '); save({ skipStarts: list.length ? list.join(', ') : null }, 'Saved'); } })),
       h('p', { class: 'hint help', id: 'skip-help' }, 'Separated by commas. Dropped from the start of a case before the initials are read, e.g. "=== AB 45F" saves AB and 45F. Not when there are no initials after them.'),
+      listFormatCard(st, save),
       h('h3', {}, 'Start a case'), h('p', { class: 'hint' }, 'Device setting · other devices keep their own style.'),
       toggle('Show common tags first', display().compactTags, v => { setDisplay({ compactTags: v }); paintPreview(); },
         'A shortlist from your recent cases.', 'Off by default. All tags stay searchable and can be expanded.'),
@@ -553,7 +591,7 @@ export function renderLogging() {
       pick('After Save', AFTER_SAVE, st.afterSave || 'next', v => save({ afterSave: v === 'next' ? null : v }, 'Saved'),
         '“Save, keep date” keeps the date either way.', 'Keeping the tags helps with a run of the same kind of case.')),
     h('section', { class: 'card' }, preview, h('button', { onclick: async () => {
-      try { await patchLogbook({ settings: { suggestions: true, autoTick: null, detectAgeSex: true, detectInitials: null, oneLetterInitials: null, skipStarts: null, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
+      try { await patchLogbook({ settings: { suggestions: true, autoTick: null, detectAgeSex: true, detectInitials: null, oneLetterInitials: null, skipStarts: null, listFormat: null, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
     } }, 'Reset these logging defaults'), h('p', { class: 'hint' }, 'Resets only the choices on this page. Advanced logging settings keep their current values.')),
     advancedLink('loggingadv', 'Advanced logging settings', 'The Case tab, the keyboard, search, dates and undo, tips'));
 }

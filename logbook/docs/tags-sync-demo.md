@@ -9,6 +9,12 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md).
   `oneLetterInitials` (a lone capital is initials; I and A still need an age, "/" or "("). `ui-core.settings()` passes
   them into engine.js (`setDetection`), so the box, pastes and spreadsheets read initials alike. The line under the
   Case box shows what was read; a tap keeps it as text for that case only (`draft.noIni`, `draft.noAge`).
+- **Pasted list format** (Settings → Logging; owner, 19 Oct 2026): account setting `listFormat` `{ start, skip, dropEnd }`
+  (`list-format.js`, pure). `start` is plain text with `{n}`, `{initials}`, `{date}`, `{any}` (never a raw regex; only one
+  `{any}` counts, so a pattern can't crawl); `parseBulk(..., { format })` cuts the paste where it appears (text before the
+  first start is left out; none found: empty-line splitting as before), takes captured initials/date, then applies `skip`
+  (characters off the start of each case) and `dropEnd` (texts off its end), which also work with empty-line lists. The
+  settings card has a "Try it" box that runs the same parser. Test: `test/list-format.test.mjs`, `e2e/list-format.mjs`.
 
 - Tag numbers ("16", "20iii") come from the APMES portfolio's Section 4 table and the old Google Form; they stay as
   internal IDs (Section 4 fill, old-form import, CSV IDs) but are never shown: Still needed, Totals, the Excel backup

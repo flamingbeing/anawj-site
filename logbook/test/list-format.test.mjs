@@ -1,0 +1,53 @@
+// Pasted-list format: start text, skip, drop-from-end (list-format.js) through parseBulk. Fake data only.
+import assert from 'node:assert/strict';
+import { cleanListFormat, startRegex, startUsable, splitByStart, trimCase } from '../js/list-format.js';
+import { parseBulk } from '../js/engine.js';
+
+const now = new Date('2026-03-20T12:00:00');
+
+// cleaning
+assert.equal(cleanListFormat(null), null);
+assert.equal(cleanListFormat({ start: '  ', skip: 0, dropEnd: '' }), null);
+assert.deepEqual(cleanListFormat({ start: '{n}.  ===', skip: '5.7', dropEnd: ' ===,,-- ' }), { start: '{n}. ===', skip: 5, dropEnd: '===, --' });
+assert.equal(cleanListFormat({ skip: 9999 }).skip, 200);
+assert.equal(startUsable('{n}{any}'), false);
+assert.equal(startRegex('{initials}'), null);
+assert.ok(startRegex('{n}. === {initials} ('));
+
+// one long line, numbered, wrapped in === (made-up cases)
+const blob = '1. === AAB (60/M, ASA II) ===Op: knee scopeIssue: OA2. === CDE (40/F, ASA I) ===Op: lap cholePlan: GA3. === FGH (7/M) ===Op: circumcision, caudal';
+const fmt = { start: '{n}. === {initials} (' };
+const cut = splitByStart(blob, fmt);
+assert.equal(cut.length, 3);
+assert.deepEqual(cut.map(c => c.initials), ['AAB', 'CDE', 'FGH']);
+const r = parseBulk(blob, null, now, { format: fmt });
+assert.equal(r.length, 3);
+assert.equal(r[1].initials, 'CDE');
+assert.equal(r[1].details, '40/F, ASA I) ===Op: lap cholePlan: GA');
+// no start text found -> the usual empty-line splitting
+assert.equal(parseBulk('AB 45F LSCS\n\nCD 30F hernia', null, now, { format: fmt }).length, 2);
+assert.equal(parseBulk('AB 45F LSCS\n\nCD 30F hernia', null, now).length, 2);
+
+// the date can be captured, or read from the first line as before; the start text can sit on its own line
+const dated = parseBulk('#1 12/3 EF 70F\nTKR spinal\n#2 13/3 GH 50M\nhernia', null, now, { format: { start: '#{n} {date}' } });
+assert.equal(dated.length, 2);
+assert.equal(dated[0].date, '2026-03-12');
+assert.equal(dated[1].date, '2026-03-13');
+assert.equal(dated[0].initials, 'EF');
+assert.equal(dated[0].details, '70F\nTKR spinal');
+const cap = parseBulk('Case 5: IJ 5yo circ\nCase 6: KL 60F THR', null, now, { format: { start: 'Case {n}:' } });
+assert.deepEqual(cap.map(c => c.initials), ['IJ', 'KL']);
+assert.equal(cap[0].date, null);
+
+// skip characters and drop-from-end, with empty-line splitting too
+const sk = parseBulk('>> 12/3 AB 45F LSCS ===\n\n>> CD 30F hernia ===', null, now, { format: { skip: 3, dropEnd: '===' } });
+assert.deepEqual(sk.map(c => [c.date, c.initials, c.details]), [['2026-03-12', 'AB', '45F LSCS'], [null, 'CD', '30F hernia']]);
+assert.equal(trimCase('abc === ===', { dropEnd: '===' }), 'abc');
+assert.equal(trimCase('abc', { skip: 10 }), '');
+
+// an empty or odd start text never hangs or splits on every character
+assert.equal(splitByStart('x y z', { start: '{any}' }), null);
+assert.equal(splitByStart('a b', { start: '   ' }), null);
+const t0 = Date.now(); splitByStart('=== '.repeat(5000), { start: '{any}{any}{any}x' }); assert.ok(Date.now() - t0 < 2000);
+
+console.log('list-format tests passed');

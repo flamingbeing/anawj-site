@@ -120,3 +120,12 @@ console.log('settings-file display keys and profile switches tests passed');
   assert.deepEqual(resetAccountPatch(st, { tags: true }), { tagSet: null, subcats: null, autoTick: null, enterMode: null, markdown: null, detectInitials: null, borders: null });
   assert.deepEqual(resetAccountPatch(null), {});
 }
+
+// Pasted list format travels in a settings file, cleaned
+{
+  
+  const ok = readSettingsFile(JSON.stringify({ kind: 'apmes-logbook-settings', settings: { listFormat: { start: '{n}. ===', skip: 3, dropEnd: '===', evil: 1 } } }));
+  assert.deepEqual(ok.settings.listFormat, { start: '{n}. ===', skip: 3, dropEnd: '===' });
+  assert.equal(readSettingsFile(JSON.stringify({ kind: 'apmes-logbook-settings', settings: { listFormat: 'x' } })).settings.listFormat, null);
+  console.log('list format settings passed');
+}
