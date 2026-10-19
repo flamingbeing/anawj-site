@@ -1,5 +1,5 @@
 // Firebase web app config for team sharing (sign-in and the shared roster in Cloud Firestore).
-// Empty for now: the owner creates the Firebase project "ntf-roster" later. Until apiKey and projectId are filled in,
+// Filled in 19 Oct 2026 (project "ntf-roster" created). Without apiKey and projectId,
 // the app runs without sign-in and everything stays in this browser (move it with Backup).
 //
 // To switch team sharing on:
@@ -12,4 +12,11 @@
 //      .github/workflows/deploy-firestore-rules.yml and the rules deployer has Firebase Rules Admin on it.
 // These values are public by design (they only name the project); access is controlled by firestore.rules and the
 // members list.
-export const FIREBASE_CONFIG = {};
+export const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyC2s1meqHtiUPkxHBzT4bEjA-D4s3c6i48',
+  authDomain: 'ntf-roster.firebaseapp.com',
+  projectId: 'ntf-roster',
+  storageBucket: 'ntf-roster.firebasestorage.app',
+  messagingSenderId: '127001041489',
+  appId: '1:127001041489:web:cdc720b68c50af376af670',
+};
