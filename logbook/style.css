@@ -1233,7 +1233,8 @@ details.an-sec > summary { align-items: flex-start; padding-right: 30px; }
 .refl-guide > summary { font-weight: 600; min-height: 40px; display: flex; align-items: center; }
 .refl-guide ul { font-size: calc(13px * var(--fs, 1)); }
 .settings-search li { display: flex; align-items: center; } .settings-search li > a { flex: 1; min-width: 0; }
-.settings-search .copy-link { flex: none; min-width: 44px; min-height: 44px; background: none; border: 0; font-size: calc(18px * var(--fs, 1)); cursor: pointer; }
+.settings-search .copy-link { flex: none; display: grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0; background: none; border: 0; cursor: pointer; }
+.settings-search .copy-link .ico { width: 20px; height: 20px; stroke: var(--muted); } .settings-search .copy-link:hover .ico { stroke: var(--accent); }
 .settings-search input[type=search] { width: 100%; } .settings-search ul { margin-top: 6px; }
 /* Display preview: a made-up row drawn with the app's own classes, in view while the page scrolls */
 .display-preview { position: sticky; top: var(--pin-top, 0px); z-index: 6; background: var(--panel); border: 1px solid var(--edge, var(--line)); border-radius: var(--radius, calc(14px * var(--round, 1))); padding: 6px 12px 10px; margin-bottom: 12px; box-shadow: 0 8px 12px -12px rgba(0,0,0,.4); pointer-events: none; }
@@ -1695,6 +1696,10 @@ ul.cases li.refl-under button { min-height: 32px; text-align: left; }
 .bulk-acts { flex-wrap: wrap; gap: 6px; }
 .bulk-lines { margin: 4px 0 8px; padding-left: 20px; }
 .bulk-warn { padding: 8px 10px; border-radius: 8px; background: var(--warn-bg); color: var(--ink); }
+/* the warning mark is a stroked triangle in the ink colour (as the tab icons), not the ⚠ emoji */
+.bulk-warn::before { content: ''; display: inline-block; width: 1.1em; height: 1.1em; margin-right: 6px; vertical-align: -0.2em; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat; }
 .bulk-samples { list-style: none; margin: 4px 0 8px; padding: 0; font-size: calc(13px * var(--fs, 1)); }
 .bulk-samples li { padding: 6px 0; border-bottom: 1px solid var(--edge, var(--line)); }
 .bulk-btns { margin-top: 14px; }
