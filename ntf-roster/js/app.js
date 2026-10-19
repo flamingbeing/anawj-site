@@ -345,6 +345,9 @@ async function openCloud() {
   } catch (e) { console.error(e); toast('The cloud panel did not load. Check your connection and reload the page.', { kind: 'error' }); }
 }
 
+// which roster this browser is working on (the header switch): 'junior' or 'senior'
+function viewPool() { const st = app.store && app.store.get(); return st && st.settings && st.settings.pool === 'senior' ? 'senior' : 'junior'; }
+
 function renderHeader() {
   const state = app.store.get();
   const dept = state.settings?.dept || '';
@@ -352,10 +355,11 @@ function renderHeader() {
   const longM = M.fmtMonth(app.month);   // 'October 2026'; phones show 'Oct 2026'
   setHTML($('#month'), `<span class="m-long">${esc(longM)}</span><span class="m-short" aria-hidden="true">${esc(longM.slice(0, 3) + ' ' + app.month.slice(0, 4))}</span>`);
   $('#today').title = 'Go to today (' + M.fmtDay(M.iso(new Date())) + ')';
-  const lk = $('#lockm'), isLocked = M.isMonthLocked(state, app.month);
+  const lk = $('#lockm'), isLocked = M.isMonthLocked(state, app.month), roster = M.POOL_LABEL[viewPool()];
   setHTML(lk, `${icon('lock')}<span class="lk-t">${isLocked ? 'Locked' : 'Lock'}</span>`);
   lk.setAttribute('aria-pressed', String(isLocked));
-  lk.title = isLocked ? `${longM} is locked: nothing in it can change. Press to unlock.` : `Lock ${longM} so nothing in it can be changed by accident`;
+  lk.title = isLocked ? `${longM} is locked for the ${roster}: nothing in it can change. Press to unlock.` : `Lock ${longM} for the ${roster} so nothing in it can be changed by accident`;
+  lk.setAttribute('aria-label', isLocked ? `${longM} locked for the ${roster}. Unlock` : `Lock ${longM} for the ${roster}`);
   document.body.classList.toggle('month-locked', isLocked);
   const u = $('#undo'), r = $('#redo');
   u.disabled = !app.store.canUndo();
@@ -364,9 +368,9 @@ function renderHeader() {
   r.title = app.store.canRedo() ? `Redo ${app.store.redoLabel()} (Ctrl+Shift+Z)` : 'Nothing to redo';
   u.setAttribute('aria-label', app.store.canUndo() ? `Undo ${app.store.undoLabel()}` : 'Undo');
   r.setAttribute('aria-label', app.store.canRedo() ? `Redo ${app.store.redoLabel()}` : 'Redo');
-  const pool = (state.settings && state.settings.pool) || 'all';
-  setHTML($('#poolsw'), [['junior', 'Junior'], ['senior', 'Senior'], ['all', 'All']].map(([k, l]) =>
-    `<button type="button" class="pool-btn" data-pool="${k}" aria-pressed="${pool === k}">${l}</button>`).join(''));
+  const pool = viewPool();
+  setHTML($('#poolsw'), [['junior', 'Junior'], ['senior', 'Senior']].map(([k, l]) =>
+    `<button type="button" class="pool-btn" data-pool="${k}" aria-pressed="${pool === k}" title="Work on the ${k} roster">${l}</button>`).join(''));
   const hasStaff = !!(state.staff || []).length;
   const ev = hasStaff ? evaluation() : EMPTY_EVAL();
   const p = $('#problems');
@@ -683,7 +687,7 @@ function doRedo() {
 }
 
 async function openAutofill() {
-  if (M.isMonthLocked(app.store.get(), app.month)) { toast(`${M.fmtMonth(app.month)} is locked. Unlock it (the padlock at the top) to use Fill.`, { kind: 'warn', ms: 7000 }); return; }
+  if (M.isMonthLocked(app.store.get(), app.month)) { toast(`${M.fmtMonth(app.month)} is locked for the ${M.POOL_LABEL[viewPool()]}. Unlock it (the padlock at the top) to use Fill.`, { kind: 'warn', ms: 7000 }); return; }
   try {
     const mod = await import('./ui-roster.js');
     mod.openAutofill(app);
@@ -738,7 +742,12 @@ async function start() {
     const cloudMod = await import('./cloud.js');
     if (cloudMod.enabled && !demo) CS = await import('./cloudstate.js');
   } catch (e) { console.warn('cloud.js not loaded; no cloud button', e); }
-  app.store.onLocked = months => toast(`${M.fmtMonth(months[0])} is locked, so nothing was changed. Press the padlock at the top to unlock it first.`, { kind: 'warn', ms: 7000 });
+  app.store.onLocked = (months, label, hits) => {
+    const x = (hits && hits[0]) || { m: months[0], pool: viewPool() };
+    toast(x.pool === viewPool()
+      ? `${M.fmtMonth(x.m)} is locked for the ${M.POOL_LABEL[x.pool]}, so nothing was changed. Press the padlock at the top to unlock it first.`
+      : `That would change the ${M.POOL_LABEL[x.pool]}, which is locked for ${M.fmtMonth(x.m)}. Nothing was changed.`, { kind: 'warn', ms: 7000 });
+  };
   if (app.store.damaged) showDamaged();
   if (demo) document.title = 'NTF Roster (practice)';
 
@@ -763,15 +772,16 @@ async function start() {
   // unlocking asks nothing: the toast offers Undo, which locks it again
   $('#lockm').addEventListener('click', () => {
     const st = app.store.get(), m = app.month, locked = M.isMonthLocked(st, m);
-    app.store.commit(`${locked ? 'Unlock' : 'Lock'} ${M.fmtMonth(m)}`, draft => { M.setMonthLocked(draft, m, !locked); });
-    toast(locked ? `${M.fmtMonth(m)} is unlocked.` : `${M.fmtMonth(m)} is locked: nothing in it can change until you unlock it.`, { kind: 'ok', ms: 4000, action: locked ? { label: 'Lock again', fn: () => app.store.undo() } : undefined });
+    const roster = M.POOL_LABEL[viewPool()];
+    app.store.commit(`${locked ? 'Unlock' : 'Lock'} ${M.fmtMonth(m)} (${roster})`, draft => { M.setMonthLocked(draft, m, !locked); });
+    toast(locked ? `${M.fmtMonth(m)} is unlocked for the ${roster}.` : `${M.fmtMonth(m)} is locked for the ${roster}: nothing in it can change until you unlock it. The other roster is not affected.`, { kind: 'ok', ms: 4000, action: locked ? { label: 'Lock again', fn: () => app.store.undo() } : undefined });
   });
   $('#poolsw').addEventListener('click', e => {
     const b = e.target.closest('[data-pool]');
     if (!b || !app.store) return;
     const k = b.dataset.pool;
-    if (((app.store.get().settings || {}).pool || 'all') === k) return;
-    app.store.commit(k === 'all' ? 'Show all staff' : `Show the ${k} pool`, d => { d.settings.pool = k; });
+    if (viewPool() === k) return;
+    app.store.commit(`Work on the ${k} roster`, d => { d.settings.pool = k; });
   });
   $('#autofill').addEventListener('click', openAutofill);
   $('#cloudbtn').addEventListener('click', openCloud);

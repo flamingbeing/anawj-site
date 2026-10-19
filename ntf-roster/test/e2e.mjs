@@ -56,7 +56,7 @@ const M0 = await page.evaluate(() => window.ntfApp.month);
 let s = await page.evaluate(() => window.ntfApp.store.get());   // saved to localStorage on the first change
 ok(s.staff.length >= 60 && s.rules.length >= 15, `demo department loaded (${s.staff.length} staff, ${s.rules.length} rules)`);
 ok(await hard(page) === 0, 'the demo month has no must-fix problems');
-ok(await page.locator('.cell').count() > 1500, 'the grid has a cell per person per day');
+ok(await page.locator('.cell').count() > 900, 'the grid has a cell per junior-roster person per day');
 await shot(page, 'roster');
 await axe(page, 'roster (desktop)');
 
@@ -64,7 +64,7 @@ await axe(page, 'roster (desktop)');
 const pick = await page.evaluate(() => {
   const app = window.ntfApp, M = app.model, st = app.store.get();
   const days = M.monthDays(app.month).filter(d => !M.isWeekend(d) && !M.isHoliday(st, d));
-  for (const p of M.staffInMonth(st, app.month).filter(x => x.group === 'mo')) {
+  for (const p of M.staffInView(st, app.month).filter(x => x.group === 'mo')) {
     const run = days.filter(d => !M.getCell(st, d, p.id) && !M.effectiveCodes(st, d, p.id).length);
     for (let i = 0; i + 2 < run.length; i++) {
       if (M.addDays(run[i], 1) === run[i + 1] && M.addDays(run[i + 1], 1) === run[i + 2]) return { sid: p.id, d: [run[i], run[i + 1], run[i + 2]] };
@@ -134,7 +134,7 @@ ok((await title()) === t0, '] and [ switch months');
 const pair = await page.evaluate(() => {
   const app = window.ntfApp, M = app.model, st = app.store.get();
   for (const d of M.monthDays(app.month)) {
-    const on = M.staffInMonth(st, app.month).filter(p => !['cons', 'ac', 'ext', 'vc'].includes(p.group) && (M.getCell(st, d, p.id)?.a || []).includes('C'));
+    const on = M.staffInView(st, app.month).filter(p => !['cons', 'ac', 'ext', 'vc'].includes(p.group) && (M.getCell(st, d, p.id)?.a || []).includes('C'));
     if (on.length >= 2) return { d, a: on[0].id, b: on[1].id };
   }
   return null;
@@ -310,7 +310,7 @@ await noSideScroll(page, 'roster (phone)');
 const ph = await page.evaluate(() => {
   const app = window.ntfApp, M = app.model, st = app.store.get();
   const d = M.monthDays(app.month).find(x => !M.isWeekend(x) && !M.isHoliday(st, x));
-  const p = M.staffInMonth(st, app.month).find(x => !M.getCell(st, d, x.id) && !M.effectiveCodes(st, d, x.id).length);
+  const p = M.staffInView(st, app.month).find(x => !M.getCell(st, d, x.id) && !M.effectiveCodes(st, d, x.id).length);
   return { d, sid: p.id };
 });
 await page.locator(cellSel(ph.d, ph.sid)).scrollIntoViewIfNeeded();

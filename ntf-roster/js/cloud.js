@@ -16,6 +16,7 @@
 // since, the save stops with a Conflict, like two people editing the same paper roster: look at theirs first.
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
+import * as M from './model.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
@@ -178,9 +179,9 @@ export function layoutFromDoc(v) {
 export function pickMonth(state, m) {
   const cells = {};
   for (const [d, day] of Object.entries(state.cells || {})) if (d.startsWith(m + '-') && day && Object.keys(day).length) cells[d] = day;
-  const meta = (state.months || {})[m] || {};
+  const meta = M.monthMeta((state.months || {})[m]);
   const lay = (state.sheets || {})[m];
-  return plain({ cells, layout: lay && typeof lay === 'object' ? lay : null, meta: { status: meta.status === 'published' ? 'published' : 'draft', publishedAt: meta.publishedAt || '', note: meta.note || '' } });
+  return plain({ cells, layout: lay && typeof lay === 'object' ? lay : null, meta: { status: meta.status, publishedAt: meta.publishedAt || '', note: meta.note || '', locks: meta.locks } });
 }
 
 // A new state with the team document's parts put in (cells and months kept).
@@ -195,6 +196,13 @@ export function mergeTeam(state, doc) {
   return next;
 }
 
+// A month document's status and each roster's lock (a document from an older copy of the app has status only).
+export function monthFromDoc(doc) {
+  const d = doc || {};
+  return M.monthMeta({ status: d.status === 'published' ? 'published' : 'draft', publishedAt: d.publishedAt || '', note: d.note || '',
+    ...(d.locks && typeof d.locks === 'object' ? { locks: { junior: String(d.locks.junior || ''), senior: String(d.locks.senior || '') } } : {}) });
+}
+
 // A new state with month m's days replaced by the month document's (other months kept).
 export function mergeMonth(state, m, doc) {
   const cells = {};
@@ -206,7 +214,7 @@ export function mergeMonth(state, m, doc) {
   const lay = layoutFromDoc(doc && doc.layout);
   const sheets = lay ? { ...(state.sheets || {}), [m]: lay } : state.sheets;
   const months = { ...(state.months || {}) };
-  months[m] = { status: doc && doc.status === 'published' ? 'published' : 'draft', publishedAt: (doc && doc.publishedAt) || '', note: (doc && doc.note) || '' };
+  months[m] = monthFromDoc(doc);
   return sheets ? { ...state, cells, months, sheets } : { ...state, cells, months };
 }
 
@@ -268,6 +276,7 @@ export async function saveAll({ team = null, month = null, months = [] } = {}, {
       month: x.m, cells: JSON.stringify(x.cells || {}),   // one string: as a map, Firestore made an index entry for every field of every cell (over its 40,000 a document)
       ...(x.layout ? { layout: JSON.stringify(x.layout) } : {}),   // only months that were imported from a sheet
       status: meta.status === 'published' ? 'published' : 'draft', publishedAt: meta.publishedAt || '', note: meta.note || '',
+      ...(meta.locks ? { locks: { junior: String(meta.locks.junior || ''), senior: String(meta.locks.senior || '') } } : {}),
       updatedAt: at, updatedBy: by,
     }), `month ${x.m}`) };
   });

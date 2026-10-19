@@ -347,14 +347,50 @@ function pool() {
   let told = null; store.onLocked = m => { told = m; };
   ok(store.commit('edit', d => { M.setCell(d, '2026-11-04', 'z1', { a: ['AL'] }); }) === false && told && told[0] === MONTH, 'a change to a locked month is refused');
   ok(store.commit('next month', d => { M.setCell(d, '2026-12-04', 'z1', { a: ['AL'] }); }) === true, 'another month can still change');
-  ok(store.commit('import', d => { M.setCell(d, '2026-11-05', 'z1', { a: ['AL'] }); }, { unlock: true }) === true && !M.isMonthLocked(store.get(), MONTH) && store.unlocked[0] === MONTH, 'an import unlocks the months it fills');
+  const zp = M.poolOf(store.get(), store.get().staff[0]);
+  ok(store.commit('import', d => { M.setCell(d, '2026-11-05', 'z1', { a: ['AL'] }); }, { unlock: true }) === true && !M.isMonthLocked(store.get(), MONTH, zp) && store.unlocked[0] === MONTH, 'an import unlocks the months it fills');
+  ok(M.isMonthLocked(store.get(), MONTH, zp === 'junior' ? 'senior' : 'junior'), '… for that roster only');
   store.undo();
-  ok(M.isMonthLocked(store.get(), MONTH) && !M.getCell(store.get(), '2026-11-05', 'z1'), 'undo puts the import and the lock back');
-  store.commit('unlock', d => { M.setMonthLocked(d, MONTH, false); });
-  ok(store.ensureLocked(MONTH) === false && !M.isMonthLocked(store.get(), MONTH), 'a month someone unlocked stays open this visit');
-  ok(store.lockAll() === true && M.isMonthLocked(store.get(), MONTH) && M.isMonthLocked(store.get(), '2026-12'), 'closing locks it again, and the month without an entry');
+  ok(M.isMonthLocked(store.get(), MONTH, zp) && !M.getCell(store.get(), '2026-11-05', 'z1'), 'undo puts the import and the lock back');
+  store.commit('unlock', d => { M.setMonthLocked(d, MONTH, false, 'both'); });
+  ok(store.ensureLocked(MONTH) === false && !M.isMonthLocked(store.get(), MONTH, 'junior') && !M.isMonthLocked(store.get(), MONTH, 'senior'), 'a month someone unlocked stays open this visit');
+  ok(store.lockAll() === true && M.isMonthLocked(store.get(), MONTH, 'junior') && M.isMonthLocked(store.get(), MONTH, 'senior') && M.isMonthLocked(store.get(), '2026-12'), 'closing locks it again (both rosters), and the month without an entry');
   const demo = createStore({ demo: true, fallback: () => structuredClone(store.get()) });
   ok(demo.lockAll() === false, 'practice is never locked');
+}
+
+// ---------- each roster locks its own month ----------
+{
+  const s = M.defaultState();
+  s.staff = [{ id: 'j1', name: 'J', group: 'mo', tags: [] }, { id: 's1', name: 'S', group: 'cons', tags: [] }];
+  M.migrate(s);
+  s.settings.pool = 'junior';
+  M.setMonthLocked(s, MONTH, true);
+  ok(M.isMonthLocked(s, MONTH) && M.isMonthLocked(s, MONTH, 'junior') && !M.isMonthLocked(s, MONTH, 'senior'), 'locking locks the roster in view only');
+  eq(s.months[MONTH].status, 'draft', 'status published only when both are locked');
+  M.setMonthLocked(s, MONTH, true, 'senior');
+  eq(s.months[MONTH].status, 'published', 'both locked: published (what older copies read)');
+  M.setMonthLocked(s, MONTH, false, 'senior');
+  const old = M.migrate({ ...M.defaultState(), months: { [MONTH]: { status: 'published', publishedAt: '2026-10-01T00:00:00Z' } } });
+  ok(M.isMonthLocked(old, MONTH, 'junior') && M.isMonthLocked(old, MONTH, 'senior'), 'a month locked before: locked for both');
+  const mem = {};
+  globalThis.localStorage = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: k => { delete mem[k]; } };
+  const { createStore } = await import('../js/store.js');
+  const store = createStore({ demo: false, fallback: () => structuredClone(s) });
+  let hits = null; store.onLocked = (m, label, h) => { hits = h; };
+  ok(store.commit('senior edit', d => { M.setCell(d, '2026-11-04', 's1', { a: ['AL'] }); }) === true, 'the senior roster can still change while the junior one is locked');
+  ok(store.commit('junior edit', d => { M.setCell(d, '2026-11-04', 'j1', { a: ['AL'] }); }) === false && hits && hits[0].pool === 'junior', 'the junior roster cannot');
+  // the cloud: each roster's lock goes up and comes back; a document from an older app (status only) locks both
+  const pm = cloud.pickMonth(store.get(), MONTH);
+  eq(pm.meta.locks.junior !== '' && pm.meta.locks.senior === '', true, 'the month sent up carries each lock');
+  ok(cloud.monthFromDoc({ status: 'published', publishedAt: 'x' }).locks.senior === 'x', 'old document: locked for both');
+  eq(cloud.monthFromDoc({ status: 'draft', locks: { junior: '', senior: 't' } }).locks, { junior: '', senior: 't' }, 'new document: as saved');
+  // merge by pool: my roster's lock, their lock for the other
+  const mine = structuredClone(store.get()), theirs = structuredClone(store.get());
+  M.setMonthLocked(theirs, MONTH, false, 'junior'); M.setMonthLocked(theirs, MONTH, true, 'senior');
+  const docs = [{ month: MONTH, ...cloud.pickMonth(theirs, MONTH).meta, cells: JSON.stringify(cloud.pickMonth(theirs, MONTH).cells) }];
+  const out = J.mergeByPool(mine, cloud.pickTeam(theirs), docs, 'junior', M.poolOf, cloud.cellsFromDoc);
+  ok(out.months[MONTH].locks.junior && out.months[MONTH].locks.senior && out.months[MONTH].status === 'published', 'my junior lock kept, their senior lock taken');
 }
 
 // ---------- senior residents and moving someone by hand ----------

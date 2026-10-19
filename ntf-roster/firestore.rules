@@ -56,7 +56,15 @@ service cloud.firestore {
         && request.resource.data.month == m
         && (request.resource.data.cells is map || (request.resource.data.cells is string && request.resource.data.cells.size() <= 900000))
         && request.resource.data.get('status', 'draft') in ['draft', 'published']
-        && shortText('publishedAt', 40) && shortText('note', 2000);
+        && shortText('publishedAt', 40) && shortText('note', 2000)
+        && validLocks();
+    }
+    // each roster's lock on the month: { junior, senior }, each '' (open) or when it was locked
+    function validLocks() {
+      return !('locks' in request.resource.data)
+        || (request.resource.data.locks is map && request.resource.data.locks.keys().hasOnly(['junior', 'senior'])
+          && request.resource.data.locks.get('junior', '') is string && request.resource.data.locks.get('junior', '').size() <= 40
+          && request.resource.data.locks.get('senior', '') is string && request.resource.data.locks.get('senior', '').size() <= 40);
     }
 
     match /members/{memberEmail} {
@@ -100,14 +108,14 @@ service cloud.firestore {
     match /months/{m} {
       allow read: if member();
       allow create, update: if editor() && validMonth(m) && stampedBy('updatedBy') && notFuture('updatedAt')
-        && request.resource.data.keys().hasOnly(['month', 'cells', 'status', 'publishedAt', 'note', 'updatedAt', 'updatedBy']);
+        && request.resource.data.keys().hasOnly(['month', 'cells', 'status', 'publishedAt', 'note', 'locks', 'updatedAt', 'updatedBy']);
       allow delete: if admin();
 
       // a copy of each save: permanent
       match /versions/{version} {
         allow read: if member();
         allow create: if editor() && validMonth(m) && stampedBy('savedBy') && notFuture('savedAt')
-          && request.resource.data.keys().hasOnly(['month', 'cells', 'status', 'publishedAt', 'note', 'savedAt', 'savedBy']);
+          && request.resource.data.keys().hasOnly(['month', 'cells', 'status', 'publishedAt', 'note', 'locks', 'savedAt', 'savedBy']);
         allow update, delete: if false;
       }
     }

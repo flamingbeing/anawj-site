@@ -425,7 +425,7 @@ function leaveCount(state) {
 // two juniors on call the same night this month (the practice department has them): names for the rule task
 function findPair(state, month) {
   const seniors = new Set((state.groups || []).filter(g => g.kind === 'senior').map(g => g.id));
-  const people = M.staffInMonth(state, month).filter(p => !seniors.has(p.group));
+  const people = M.staffInView(state, month).filter(p => !seniors.has(p.group));
   for (const d of M.monthDays(month)) {
     const on = people.filter(p => ((M.getCell(state, d, p.id) || {}).a || []).includes('C'));
     if (on.length >= 2) return { a: on[0].name, b: on[1].name, day: M.fmtDay(d) };

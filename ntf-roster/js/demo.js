@@ -237,15 +237,15 @@ function fillThisMonth(s, month, rand) {
     if (M.isWeekend(d)) weekend.set(p.id, (weekend.get(p.id) || 0) + 1);
   };
   const baby = p => p.tags.includes('babymo');
-  const pairOk = p => ['sr', 'srp', 'rp'].includes(p.group);
+  const pairOk = p => ['srp', 'rp'].includes(p.group);   // on the junior roster (SRs and ACs are on the senior one)
 
   for (const d of M.monthDays(month)) {
     const sen = choose(seniors, d, () => true);
     if (sen) book(sen, d);
     const j1 = choose(juniors, d, p => !baby(p));
     if (j1) book(j1, d);
-    // A Baby MO only goes on with a senior resident / RP partner (or an AC on call), never with another Baby MO.
-    const j2 = choose(juniors, d, p => !baby(p) || (j1 && pairOk(j1)) || (sen && sen.group === 'ac'));
+    // A Baby MO only goes on with an SRP / RP partner, never with another Baby MO.
+    const j2 = choose(juniors, d, p => !baby(p) || (j1 && pairOk(j1)));
     if (j2) book(j2, d);
     // PM shift on working weekdays; the day shift on public holidays.
     const holiday = M.isHoliday(s, d);

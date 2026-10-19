@@ -201,7 +201,12 @@ export function mergeByPool(mine, team, docs, pool, poolOf, cellsOf = c => c || 
       for (const [sid, c] of Object.entries((mine.cells || {})[day] || {})) if (inPool.has(sid)) out[sid] = c;
       if (Object.keys(out).length) cells[day] = out; else delete cells[day];
     }
-    months[m] = { ...(months[m] || {}), status: d.status === 'published' ? 'published' : 'draft', publishedAt: d.publishedAt || '', note: d.note || '' };
+    // each roster's lock: mine for my pool, theirs for the other (a document from an older app has status only)
+    const locksOf = v => (v && v.locks && typeof v.locks === 'object' ? { junior: String(v.locks.junior || ''), senior: String(v.locks.senior || '') }
+      : v && v.status === 'published' ? { junior: v.publishedAt || 'yes', senior: v.publishedAt || 'yes' } : { junior: '', senior: '' });
+    const locks = { ...locksOf(d), [pool]: locksOf((mine.months || {})[m])[pool] };
+    const both = !!(locks.junior && locks.senior);
+    months[m] = { ...(months[m] || {}), locks, status: both ? 'published' : 'draft', publishedAt: both ? (d.publishedAt || locks.junior) : '', note: d.note || '' };
   }
   next.cells = cells;
   next.months = months;
