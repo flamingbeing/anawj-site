@@ -723,6 +723,15 @@ function renderOne(card) {
     groupSave),
     caseHidden('still') ? null : stillNeeded(),
     savebar);
+  // Native details keep the same fields and handlers; only the chosen layout adds wrappers.
+  if (display().formLayout === 'sections') {
+    card.classList.remove('panes');
+    const left = card.querySelector('.lp-left'), right = card.querySelector('.lp-right');
+    const first = h('details', { class: 'case-section', open: true }, h('summary', {}, 'Case details'), ui.datebar, left);
+    const tags = h('details', { class: 'case-section' }, h('summary', {}, 'Tags'), right);
+    card.insertBefore(first, card.firstChild);
+    first.after(tags);
+  }
   for (const [part] of CASE_PARTS) card.classList.toggle('hide-' + part, caseHidden(part));
   // Tapping a chip, a tag in the list or a button while typing keeps the focus (and the keyboard) in the
   // case box, so the screen doesn't jump as the keyboard drops and comes back. Fields and the date

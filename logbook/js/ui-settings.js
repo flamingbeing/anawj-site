@@ -19,7 +19,7 @@ import { SWITCHES, switchLabel, switchChanges, applyPatch, resetPatch, tabsAfter
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 import { partsSettings } from './ui-parts.js';
 import { labelsOn } from './parts.js';
-import { deviceOn, deviceChanges, deviceReset, DEVICE_SWITCHES } from './device-presets.js';
+import { NAV_STYLES, ROW_LAYOUTS, FORM_LAYOUTS, rowLayoutOf, deviceOn, deviceChanges, deviceReset, DEVICE_SWITCHES } from './device-presets.js';
 import { applyCompact, applyTheme, cachedTheme, TEXT_SIZES, ZOOMS, applyTextSize, applyZoom, applyAccent, display, setDisplay, applyDisplay, LINE_WIDTHS, LINE_HEIGHTS, CONTRASTS, MOTIONS, BUTTON_STYLES, defaultTitle, BORDERS, ROUNDS, roundLevel, BAR_TABS, barTabs, MAX_BAR, arrangeTabs, setTabOnBar, borderLevel, cleanTitle, IPHONE_APP, START_TABS, CARD_STYLES, cardStyle, cardPatch } from './display.js';
 import { resetLink, help, toggle } from './settings-rows.js';
 // (the display helpers are still exported from here: the e2e tests import them from this file)
@@ -70,7 +70,10 @@ function pick(label, opts, cur, set, line, ...more) {
 }
 // a display key as a ✓ list; the default is saved as nothing
 const lookPick = (k, label, opts, dflt, line, ...more) =>
-  pick(label, opts, display()[k] ?? dflt, v => applyDisplay(setDisplay({ [k]: v === dflt ? null : v })), line, ...more);
+  pick(label, opts, k === 'rowLayout' ? rowLayoutOf(display()) : display()[k] ?? dflt, v => {
+    applyDisplay(setDisplay({ [k]: v === dflt ? null : v, ...(k === 'rowLayout' ? { rowShort: null } : {}) }));
+    if (['navStyle', 'rowLayout', 'formLayout'].includes(k)) hooks.render();
+  }, line, ...more);
 const DEVICE_NOTE = () => h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.');
 const THEME_MODES = [['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED (pure black)'], ['auto', 'Auto (match the phone)']];
 const slider = (label, names, level, dflt, onLevel) => {
@@ -167,7 +170,6 @@ export function renderThemes() {
       h('div', { class: 'theme-grid' }, FEATURED.map(id => themeCard(THEMES.find(t => t.id === id), theme, custom))),
       h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('a', { class: 'btn small', href: '#themesall' }, 'Browse all themes'))),
     myThemesCard(st, custom),
-    editColours(st),
     h('section', { class: 'card' },
       h('h2', {}, 'Colour and light'),
       pick('Light or dark', THEME_MODES, cachedTheme(), v => { applyTheme(v); setDisplay({ themeMode: null }); hooks.render(); }),
@@ -193,6 +195,12 @@ export function renderThemes() {
       lookPick('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
       DEVICE_NOTE()),
     h('section', { class: 'card' },
+      h('h2', {}, 'Layout'),
+      lookPick('navStyle', 'Navigation layout', NAV_STYLES, 'tabs', 'The rail appears above 900 px; smaller windows keep tabs.'),
+      lookPick('rowLayout', 'Logbook row layout', ROW_LAYOUTS, 'card'),
+      lookPick('formLayout', 'Case form layout', FORM_LAYOUTS, 'page'),
+      DEVICE_NOTE()),
+    h('section', { class: 'card' },
       h('h2', {}, 'App-style details'),
       help('Finer touches that make the logbook feel like other phone apps. Each is its own setting and off until you choose it.'),
       h('h3', {}, 'Header and tab bar'),
@@ -207,6 +215,7 @@ export function renderThemes() {
       look('switchStyle', 'Switches', SWITCH_STYLES, 'default', 'The on / off switches in Settings.'),
       look('pressStyle', 'When you press', PRESS_STYLES, 'default', 'What buttons and rows do under your finger.'),
       DEVICE_NOTE()),
+    editColours(st),
     resetLink('the theme and every look setting on this page (light, the NUHS colours, lines, corners, fonts and spacing) on this device', () => {
       applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'fontUiName', 'fontLogName'].map(k => [k, null])) }));
     }));
@@ -321,7 +330,7 @@ export function renderDisplayAdvanced() {
       tabArranger(),
       h('h3', {}, 'Logbook rows'),
       toggle('Fewer buttons on Logbook rows (a ⋯ menu)', st.rowMenu, set('rowMenu'), 'Copy and Reflect move into one ⋯ button.', 'A ✓ still shows cases with a reflection.'),
-      toggle('Shorter Logbook rows', st.rowShort, set('rowShort'), 'One line for the case, one grey line of tags, no buttons.', 'The initials and case in bold, the short date at the right. Tap a row to open it; press and hold (Accessibility) for Copy and Reflect.'),
+      toggle('Shorter Logbook rows', rowLayoutOf(st) === 'compact', v => { applyDisplay(setDisplay({ rowShort: v, rowLayout: null })); hooks.render(); }, 'One line for the case, one grey line of tags, no buttons.', 'The initials and case in bold, the short date at the right. Tap a row to open it; press and hold (Accessibility) for Copy and Reflect.'),
       toggle('Copy button on each Logbook row', st.rowCopy, set('rowCopy'), 'Off unless you switch it on.', 'The ⋯ menu, if you use it, still copies one case.'),
       toggle('Copy button for each day', st.dayCopy, set('dayCopy'), 'Beside Share when you pick a day in the calendar.', 'Off unless you switch it on. Share already sends the whole day (or copies it, where sharing isn’t possible).'),
       h('h3', {}, 'Page'),

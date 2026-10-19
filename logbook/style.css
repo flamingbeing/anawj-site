@@ -1789,3 +1789,33 @@ ul.cases li.lb-planned a { display: block; padding: 8px 4px; }
 .fv-opt input { margin-top: 3px; flex: none; }
 .fv-problem { color: var(--err); margin: 8px 0 0; font-size: .9em; }
 .fv-links a { color: var(--accent); }
+
+/* Layout variants (Themes): the usual tabs, cards and Case page remain the defaults. */
+ul.cases .chat-time { display: none; }
+html.rows-chat .lb-wrap > section.card:has(ul.cases) { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+html.rows-chat ul.cases li[data-date] { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; margin: 0; }
+html.rows-chat ul.cases li[data-date] .dt { display: none; }
+html.rows-chat ul.cases li[data-date] .chat-time { display: block; grid-area: dt; color: var(--muted); font-size: calc(12px * var(--fs, 1)); }
+html.rows-chat ul.cases li[data-date] .c-tags { flex-wrap: nowrap; overflow: hidden; }
+html.rows-chat ul.cases li[data-date] .c-tags .flag { background: none; color: var(--muted); border: 0; padding: 0; }
+html.rows-timeline ul.cases { padding-left: 24px; }
+html.rows-timeline ul.cases li[data-date] { position: relative; border: 0; border-left: 1px solid var(--line); border-radius: 0; box-shadow: none; background: transparent; margin: 0; padding-left: 20px; }
+html.rows-timeline ul.cases li[data-date]::before { content: ''; position: absolute; left: -5px; top: 22px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+html.rows-timeline ul.cases .monthhead { margin-left: -24px; }
+html.form-sections .log-card { display: block; }
+html.form-sections .case-section { border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+html.form-sections .case-section > summary { cursor: pointer; font-weight: 600; padding: 12px 0; min-height: 44px; }
+html.form-sections .case-section .lp-left, html.form-sections .case-section .lp-right { display: block; width: auto; max-height: none; overflow: visible; }
+@media (min-width: 901px) {
+  html.nav-rail { --tabbar-h: 0px; --pin-top: 0px; }
+  html.nav-rail body { padding-left: calc(164px / var(--ui-zoom, 1)); }
+  html.nav-rail .tabs { position: fixed; inset: 0 auto 0 0; width: calc(164px / var(--ui-zoom, 1)); display: flex; flex-direction: column; justify-content: flex-start; overflow-y: auto; gap: 4px; padding: 12px 6px; border: 0; border-right: 1px solid var(--line); background: var(--panel); z-index: 30; transform: none; }
+  html.nav-rail .tabs button { flex: 0 0 auto; display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 10px; width: 100%; height: auto; min-height: 48px; padding: 10px; border: 0; border-radius: calc(8px * var(--round, 1)); white-space: normal; text-align: left; }
+  html.nav-rail .tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); border: 0; }
+  html.nav-rail .tabs .ico { display: block; flex: 0 0 22px; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  html.nav-rail .tabs .lbl { display: block; font-size: calc(13px * var(--fs, 1)); }
+  html.nav-rail body.typing-nobar .tabs { display: flex; }
+}
+
+html:is(.rows-chat, .rows-timeline) ul.cases li[data-date]:hover { background: var(--row-alt); }
+html:is(.rows-chat, .rows-timeline) ul.cases li.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }

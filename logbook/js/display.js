@@ -7,6 +7,7 @@ import { DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tab
 import { lookCss } from './themes.js';
 import { checkCss } from './custom-css.js';
 import { applyFonts } from './fonts.js';
+import { rowLayoutOf } from './device-presets.js';
 import { offBar } from './profiles.js';
 
 
@@ -81,7 +82,7 @@ export function cachedCompact() {
 // the light / dark choice. The first time a device opens the app it starts from what the account had (these used to
 // follow the account), so nobody's look changes. Kept at sign-out: they are the device's, and nothing private.
 const DISPLAY_KEY = 'apmes-logbook-display';
-export const DISPLAY_KEYS = ['colours', 'listHeight', 'myThemes', 'pageSize', 'lbGroup', 'lbSort', 'gridLines', 'gridCols', 'calRefl', 'totalsCompact', 'totalsTargets', 'boxHeight', 'boxGrow', 'moreOrder', 'noteToolbar', 'compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy', 'hideTabsTyping',
+export const DISPLAY_KEYS = ['colours', 'listHeight', 'myThemes', 'pageSize', 'lbGroup', 'lbSort', 'gridLines', 'gridCols', 'calRefl', 'totalsCompact', 'totalsTargets', 'boxHeight', 'boxGrow', 'moreOrder', 'noteToolbar', 'compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'navStyle', 'rowLayout', 'formLayout', 'rowHold', 'dayCopy', 'hideTabsTyping',
   'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band', 'barBlur', 'tabActiveLabel', 'listStyle', 'titleAlign', 'switchStyle', 'pressStyle', 'iconWeight', 'typeStyle'];
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
@@ -180,11 +181,20 @@ export function applyLook(d = {}) {
   // icons instead of words, the plain calendar, page titles in the header, shorter Logbook rows, press and hold
   for (const b of BUTTON_STYLES.slice(1)) c.toggle('btn-' + b[0], d.btnStyle === b[0]);
   c.toggle('icon-btns', !!d.iconBtns); c.toggle('cal-plain', !!d.calPlain); c.toggle('page-titles', !!d.pageTitles);
-  c.toggle('rows-short', !!d.rowShort); c.toggle('row-hold', !!d.rowHold);
+  const rows = rowLayoutOf(d);
+  c.toggle('nav-rail', d.navStyle === 'rail'); applyNavOrientation(); c.toggle('form-sections', d.formLayout === 'sections');
+  c.toggle('rows-chat', rows === 'chat'); c.toggle('rows-timeline', rows === 'timeline');
+  c.toggle('rows-short', rows === 'compact' || rows === 'chat'); c.toggle('row-hold', !!d.rowHold);
   // the name in the header and the browser tab (plain text, at most 40 characters)
   paintTitle(d);
   applyCustomCss(d);
 }
+// The same tab list becomes vertical above the rail breakpoint, including after resizing.
+function applyNavOrientation() {
+  const rail = document.documentElement.classList.contains('nav-rail') && window.innerWidth > 900;
+  document.getElementById('tabs')?.setAttribute('aria-orientation', rail ? 'vertical' : 'horizontal');
+}
+if (typeof window !== 'undefined') window.addEventListener('resize', applyNavOrientation);
 export const BUTTON_STYLES = [['outlined', 'Outlined (default)'], ['filled', 'Filled'], ['tinted', 'Tinted'], ['plain', 'Plain']];
 // the header's words: the app's name, or with Page titles the page's ("Logbook"); render() in app.js says which page
 let pageLabel = '';

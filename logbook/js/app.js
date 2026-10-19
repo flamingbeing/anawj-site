@@ -1239,7 +1239,7 @@ function keyboardCheck() {
   document.body.classList.toggle('typing', typing);
   // Accessibility → Hide the tab bar while typing (this device; off unless switched on, on in the Personal profile):
   // the bar at the bottom goes while the keyboard is up, so the box and its Save bar keep that room
-  document.body.classList.toggle('typing-nobar', typing && barAtBottom({ width: window.innerWidth, tabBar: display().tabBar }) && deviceOn(display(), S.logbook ? profile() : '', 'hideTabsTyping'));
+  document.body.classList.toggle('typing-nobar', typing && barAtBottom({ width: window.innerWidth, tabBar: display().tabBar, navStyle: display().navStyle }) && deviceOn(display(), S.logbook ? profile() : '', 'hideTabsTyping'));
   // how far the keyboard covers the bottom of the layout viewport (iOS also scrolls the visible area
   // inside it: offsetTop), and the visible area itself, for dialogs (style.css: --kb, --vvh, --vvt)
   const kb = typing && vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;

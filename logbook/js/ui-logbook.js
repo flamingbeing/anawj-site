@@ -16,6 +16,7 @@ import { flatTree, tagTree } from './tags.js';
 import { editCaseDialog, logOnDate } from './ui-log.js';
 import { reflectOnCase, openReflection } from './ui-reflect.js';
 import { moveToBin } from './bin.js';
+import { rowLayoutOf } from './device-presets.js';
 import { display, setDisplay } from './display.js';
 import { destinations, openSend } from './ui-send.js';
 import { syncButton } from './ui-sync.js';
@@ -362,7 +363,8 @@ function monthHead(label, ul) {
 function listView(rows, flagsOf, repaint) {
   if (!S.cases.length) return emptyState('logbook', 'No cases yet', 'Cases you log show here, newest first.', h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
   if (!rows.length) return emptyState('search', 'No cases match', 'Try fewer words, or clear the filters.');
-  const by = groupBy(display().lbGroup), sort = sortBy(display().lbSort);
+  const timeline = rowLayoutOf(display()) === 'timeline';
+  const by = timeline ? 'day' : groupBy(display().lbGroup), sort = sortBy(display().lbSort);
   const ul = h('ul', { class: 'cases' });
   // the default (Month, Newest): as it always was, with Jump to a date on each month
   if (by === 'month' && sort === 'newest') {
@@ -396,7 +398,7 @@ function groupSelects(repaint) {
   const pick = (label, key, opts, val) => h('select', { 'aria-label': label, onchange: e => { const v = e.target.value; setDisplay({ [key]: v === opts[0][0] ? null : v }); view.page = 0; repaint(); } },
     opts.map(([v, t]) => h('option', { value: v, selected: v === val }, t)));
   const groups = GROUPS.filter(([k]) => !(k === 'year' && basicHides('year')));
-  return [pick('Group by', 'lbGroup', groups, groupBy(display().lbGroup)), pick('Sort', 'lbSort', SORTS, sortBy(display().lbSort))];
+  return [rowLayoutOf(display()) === 'timeline' ? h('span', { class: 'hint' }, 'Timeline groups cases by day') : pick('Group by', 'lbGroup', groups, groupBy(display().lbGroup)), pick('Sort', 'lbSort', SORTS, sortBy(display().lbSort))];
 }
 
 // what the grouping needs from the app: names, residency years, targets and counts, the planned cases
@@ -532,6 +534,7 @@ function caseRow(c, flagsOf) {
         onclick: e => { e.stopPropagation(); toggleSel(c, li, false); } }) : null,
       // the left column: the initials on top, the date on one line under them (like Reflections; owner, 13 Oct 2026)
       h('span', { class: 'd' }, p.initials ? h('b', { class: 'ini' }, p.initials) : null,
+        h('span', { class: 'chat-time', title: 'Logged at' }, Number.isFinite(c.createdAt) ? new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''),
         h('span', { class: 'dt' }, c.date ? [h('span', { class: 'wd' }, weekday(c.date)), ' ', fmtDate(c.date).replace(/ \d{4}$/, '')] : (c.dateText || '—'))),
       h('span', { class: 't' }, (labelsOn(settings()) ? partsText(c, labelsOn(settings())) : p.details) || h('i', { class: 'muted' }, 'no details')),
       // tags on the left (wrapping), Copy and Reflect on the right, the same size whatever they say
