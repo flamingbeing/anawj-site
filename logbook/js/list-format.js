@@ -5,6 +5,8 @@
 //            expression (nobody has to learn one, and a pasted pattern can't hang the page).
 //   skip     characters dropped from the start of each case (after the start text), 0–200
 //   dropEnd  texts dropped from the end of each case, comma separated: "===, --"
+//   remove   texts removed wherever they appear in a case, comma separated: ") ==="
+// A date in the text above the first case ("OR06 - 20 Oct 2026 (Tue)") is the date of every case that has none of its own.
 // With no start text the empty-line splitting is unchanged; skip and dropEnd still apply to each case.
 
 const MAX_START = 80, MAX_SKIP = 200;
@@ -20,8 +22,9 @@ export function cleanListFormat(v) {
   const start = String(v.start || '').replace(/\s+/g, ' ').trim().slice(0, MAX_START);
   const skip = Math.max(0, Math.min(MAX_SKIP, Math.floor(Number(v.skip)) || 0));
   const dropEnd = cleanDropEnd(v.dropEnd).join(', ');
-  if (!start && !skip && !dropEnd) return null;
-  return { ...(start ? { start } : {}), ...(skip ? { skip } : {}), ...(dropEnd ? { dropEnd } : {}) };
+  const remove = cleanDropEnd(v.remove).join(', ');
+  if (!start && !skip && !dropEnd && !remove) return null;
+  return { ...(start ? { start } : {}), ...(skip ? { skip } : {}), ...(dropEnd ? { dropEnd } : {}), ...(remove ? { remove } : {}) };
 }
 
 // A start text needs something fixed in it, or it would match everywhere.
@@ -54,16 +57,24 @@ export function splitByStart(text, fmt) {
   const hits = [...src.matchAll(rx.re)].filter(m => m[0].length);
   if (!hits.length) return null;
   const at = k => rx.groups.indexOf(k) + 1;   // 0: the start text doesn't capture it
-  return hits.map((m, i) => ({
+  const out = hits.map((m, i) => ({
     initials: at('initials') ? m[at('initials')] || '' : '',
     date: at('date') ? m[at('date')] || '' : '',
     body: src.slice(m.index + m[0].length, i + 1 < hits.length ? hits[i + 1].index : src.length),
   }));
+  out.head = src.slice(0, hits[0].index);   // what comes before the first case (a title, the day's date)
+  return out;
 }
+
+// The date tokens in a piece of text, in order of appearance ("OR06 - 20 Oct 2026 (Tue)" -> ["20 Oct 2026"]); the caller
+// keeps the first one that is a real date.
+export const dateTokens = text => [...String(text || '').matchAll(new RegExp('(?<![\\w/.\\-])(?:' + DATE_RE + ')(?![\\w/])', 'gi'))].map(m => m[0]);
 
 // The case text with skip characters off its start and the dropEnd texts off its end (repeatedly, "=== ===" too).
 export function trimCase(s, fmt) {
   let t = String(s || '');
+  for (const r of cleanDropEnd(fmt && fmt.remove)) t = t.replace(new RegExp(r.split(/(\s+)/).map(p => (/^\s+$/.test(p) ? '\\s*' : esc(p))).join(''), 'gi'), ' ');
+  t = t.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+\n/g, '\n');
   const skip = fmt && fmt.skip ? Math.min(MAX_SKIP, Number(fmt.skip) || 0) : 0;
   if (skip) t = t.trimStart().slice(skip);
   t = t.trim();
@@ -78,10 +89,10 @@ export function trimCase(s, fmt) {
 
 // Teach it by example (Settings → Logging → Teach it my format): the resident pastes a sample and marks spans in it,
 // { role, s, e } with s/e offsets into the sample. Roles: 'start' (the text that begins a case, e.g. "1. === AAB ("),
-// 'initials' and 'date' (inside the start span), 'skip' (characters to skip after it) and 'end' (text that ends a case,
-// any number). Numbers in the fixed text become {n}, so "2." and "3." match too.
+// 'initials' and 'date' (inside the start span), 'skip' (characters to skip after it), 'end' (text that ends a case) and 'remove' (text to
+// remove wherever it appears, e.g. a closing ") ==="); end and remove can be marked any number of times. Numbers in the fixed text become {n}, so "2." and "3." match too.
 // -> { format } (cleanListFormat shape) or { error } saying what is missing.
-export const MARK_ROLES = ['start', 'initials', 'date', 'skip', 'end'];
+export const MARK_ROLES = ['start', 'initials', 'date', 'skip', 'end', 'remove'];
 export function learnFormat(sample, marks) {
   const text = String(sample || '');
   const ms = (Array.isArray(marks) ? marks : []).filter(m => m && MARK_ROLES.includes(m.role) && Number.isInteger(m.s) && Number.isInteger(m.e) && m.s >= 0 && m.e <= text.length && m.e > m.s);
@@ -96,6 +107,7 @@ export function learnFormat(sample, marks) {
   if (!startUsable(tpl)) return { error: 'The start needs some fixed text too, such as "===" or "Case", not just a number or the initials.' };
   const sk = ms.find(m => m.role === 'skip');
   const dropEnd = ms.filter(m => m.role === 'end').map(m => text.slice(m.s, m.e).trim());
-  const format = cleanListFormat({ start: tpl, skip: sk ? sk.e - sk.s : 0, dropEnd });
+  const remove = ms.filter(m => m.role === 'remove').map(m => text.slice(m.s, m.e).trim());
+  const format = cleanListFormat({ start: tpl, skip: sk ? sk.e - sk.s : 0, dropEnd, remove });
   return format ? { format } : { error: 'Nothing to learn from those marks.' };
 }

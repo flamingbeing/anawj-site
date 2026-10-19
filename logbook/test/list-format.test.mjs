@@ -66,3 +66,19 @@ console.log('list-format tests passed');
   assert.deepEqual(D.format, { start: '#{n} {date}', skip: 3 });
   console.log('learn format tests passed');
 }
+
+// a premed-style list: a title line with the day's date, "N.=== AB (details) ===" headers, labelled lines (made-up cases)
+{
+  const { learnFormat, dateTokens } = await import('../js/list-format.js');
+  const t = 'OR06 - 20 Oct 2026 (Tue)\n\n1.=== AAB (60/M, ASA II) ===\nOp: knee scope\nIssue: OA\n\n2.=== CDE (40/F, ASA I) ===\nOp: lap chole\n';
+  const f = { start: '{n}.=== {initials} (', remove: ') ===' };
+  const r = parseBulk(t, null, now, { format: f });
+  assert.deepEqual(r.map(c => [c.date, c.initials, c.details]), [['2026-10-20', 'AAB', '60/M, ASA II\nOp: knee scope\nIssue: OA'], ['2026-10-20', 'CDE', '40/F, ASA I\nOp: lap chole']]);
+  assert.deepEqual(dateTokens('OR06 - 20 Oct 2026 (Tue)'), ['20 Oct 2026']);
+  // a case's own date wins over the title's
+  assert.equal(parseBulk('Day 1/2/26\n#1 12/3 EF 70F\nTKR\n#2 GH 50M\nhernia', null, now, { format: { start: '#{n}' } }).map(c => c.date).join(), '2026-03-12,2026-02-01');
+  const t0 = t.indexOf('1.=== AAB ('), t1 = t.indexOf(') ===');
+  const L = learnFormat(t, [{ role: 'start', s: t0, e: t0 + 11 }, { role: 'initials', s: t0 + 6, e: t0 + 9 }, { role: 'remove', s: t1, e: t1 + 5 }]);
+  assert.deepEqual(L.format, f);
+  console.log('premed list tests passed');
+}

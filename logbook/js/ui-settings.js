@@ -540,7 +540,9 @@ function listFormatCard(st, save) {
       h('input', { type: 'number', min: '0', max: '200', inputmode: 'numeric', value: String(fmt().skip || 0), onchange: e => store({ skip: e.target.value }, 'Saved') })),
     h('label', { class: 'field' }, 'Drop these from the end of each case',
       h('input', { type: 'text', value: fmt().dropEnd || '', placeholder: 'e.g. ===, --', maxlength: '120', autocomplete: 'off', onchange: e => store({ dropEnd: e.target.value }, 'Saved') })),
-    h('p', { class: 'hint help' }, 'The date is read from the first line as before (or {date} in the start text).'),
+    h('label', { class: 'field' }, 'Remove these wherever they appear in a case',
+      h('input', { type: 'text', value: fmt().remove || '', placeholder: 'e.g. ) ===', maxlength: '120', autocomplete: 'off', onchange: e => store({ remove: e.target.value }, 'Saved') })),
+    h('p', { class: 'hint help' }, 'A date above the first case (such as “OR06 - 20 Oct 2026”) is used for every case with no date of its own; otherwise the date is read from the case’s first line as before (or {date} in the start text).'),
     h('label', { class: 'field' }, 'Try it: paste a sample list',
       h('textarea', { rows: '4', placeholder: 'Use made-up text, not real patients. Nothing here is saved.', oninput: e => { sample = e.target.value; paint(); } })),
     out);
@@ -549,7 +551,7 @@ function listFormatCard(st, save) {
 // Teach it from an example (owner, 19 Oct 2026): paste a sample, select a piece of it and tap what it is (where a case
 // starts, initials, date, characters to skip, what ends a case). learnFormat() turns the marks into the same
 // listFormat the fields above hold; it is shown on the sample first and saved only on "Use this format".
-const TEACH_ROLES = [['start', 'Case starts here'], ['initials', 'Initials'], ['date', 'Date'], ['skip', 'Skip'], ['end', 'Case ends with']];
+const TEACH_ROLES = [['start', 'Case starts here'], ['initials', 'Initials'], ['date', 'Date'], ['skip', 'Skip'], ['end', 'Case ends with'], ['remove', 'Remove everywhere']];
 function listTeach(save) {
   let marks = [], learned = null;
   const ta = h('textarea', { rows: '5', placeholder: 'Paste one or two cases (made-up text is fine). Then select a piece and tap what it is.', 'aria-label': 'Sample list',
@@ -571,13 +573,13 @@ function listTeach(save) {
     if (!learned) { fill(out, h('p', { class: 'hint', style: 'color:var(--err)' }, r.error)); return; }
     const rows = parseBulk(text, null, undefined, { format: learned });
     fill(out,
-      h('p', { class: 'hint' }, 'Learned: starts with ', h('b', {}, learned.start), learned.skip ? ', skips ' + learned.skip + ' characters' : '', learned.dropEnd ? ', ends with ' + learned.dropEnd : '', ' · ' + rows.length + (rows.length === 1 ? ' case' : ' cases') + ' found in the sample.'),
+      h('p', { class: 'hint' }, 'Learned: starts with ', h('b', {}, learned.start), learned.skip ? ', skips ' + learned.skip + ' characters' : '', learned.dropEnd ? ', ends with ' + learned.dropEnd : '', learned.remove ? ', removes ' + learned.remove : '', ' · ' + rows.length + (rows.length === 1 ? ' case' : ' cases') + ' found in the sample.'),
       rows.slice(0, 5).map((c, i) => h('p', { class: 'hint', style: 'margin:2px 0' }, (i + 1) + '. ' + (c.date ? c.date + ' · ' : '') + (c.initials ? c.initials + ' · ' : '') + c.details.replace(/\s+/g, ' ').slice(0, 60))),
       h('div', { class: 'bar' }, h('button', { type: 'button', class: 'primary', onclick: () => save({ listFormat: learned }, 'Format saved').then(() => hooks.render()) }, 'Use this format')));
   }
   return h('details', { class: 'list-teach', style: 'margin:8px 0' },
     h('summary', {}, 'Teach it from an example'),
-    h('p', { class: 'hint help' }, 'Paste a sample, select the text where a case starts (for example “1. === AB (”) and tap Case starts here. Inside it, select the initials and the date and tap those. Select text that ends a case and tap Case ends with. Numbers are matched for you.'),
+    h('p', { class: 'hint help' }, 'Paste a sample, select the text where a case starts (for example “1. === AB (”) and tap Case starts here. Inside it, select the initials and the date and tap those. Select text that ends a case and tap Case ends with, or text to delete wherever it appears (such as a closing “) ===”) and tap Remove everywhere. Numbers are matched for you.'),
     ta,
     h('div', { class: 'bar', style: 'flex-wrap:wrap;margin-top:6px' }, TEACH_ROLES.map(([role, label]) => h('button', { type: 'button', class: 'small', onclick: () => mark(role) }, label))),
     chips, out);

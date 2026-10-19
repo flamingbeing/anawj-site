@@ -4,7 +4,7 @@
 import { CATEGORIES, BY_CODE, R_YEARS, codeOf, DEFAULT_NAMES } from './categories.js';
 import { KEYWORDS, STOP } from './keywords.js';
 import { labelOf, plainLabels } from './parts.js';
-import { splitByStart, trimCase } from './list-format.js';
+import { splitByStart, trimCase, dateTokens } from './list-format.js';
 const STOP_WORDS = new Set(STOP);
 
 // ---------- ids and dates ----------
@@ -414,11 +414,13 @@ export function parseBulk(text, suggestFn, now = new Date(), { labels = null, fo
   };
   const cut = splitByStart(text, format);
   if (cut) {
+    // a date above the first case ("OR06 - 20 Oct 2026 (Tue)") is the date of every case with none of its own
+    const headDate = dateTokens(cut.head).map(t => (leadingDate(t, now) || {}).date).find(Boolean) || null;
     return cut.map(c => {
       const lines = trimCase(c.body, format).split(/\r?\n/).map(l => l.replace(/\t+/g, ' ').trim()).filter(Boolean);
       let date = c.date ? (leadingDate(c.date, now) || {}).date || null : null, first = lines[0] || '';
       if (!date && first) { const ld = leadingDate(first, now); if (ld) { date = ld.date; first = ld.rest; } }
-      return finish(date, c.initials, [first, ...lines.slice(1)].filter(Boolean).join('\n'));
+      return finish(date || headDate, c.initials, [first, ...lines.slice(1)].filter(Boolean).join('\n'));
     });
   }
   const blocks = [];
@@ -440,7 +442,7 @@ export function parseBulk(text, suggestFn, now = new Date(), { labels = null, fo
   return blocks.map(([first, ...more]) => {
     if (format && format.skip) first = trimCase(first, { skip: format.skip });
     const ld = leadingDate(first, now);
-    const whole = trimCase([(ld ? ld.rest : first).trim(), ...more].filter(Boolean).join('\n'), { dropEnd: format && format.dropEnd });
+    const whole = trimCase([(ld ? ld.rest : first).trim(), ...more].filter(Boolean).join('\n'), { dropEnd: format && format.dropEnd, remove: format && format.remove });
     return finish(ld ? ld.date : null, '', whole);
   });
 }
