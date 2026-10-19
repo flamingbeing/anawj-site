@@ -84,7 +84,7 @@ service cloud.firestore {
     match /team/{doc} {
       allow read: if member();
       allow create, update: if editor() && doc == 'main' && stampedBy('updatedBy') && notFuture('updatedAt')
-        && request.resource.data.keys().hasOnly(['settings', 'groups', 'tags', 'staff', 'duties', 'rules', 'rulesLog', 'updatedAt', 'updatedBy']);
+        && request.resource.data.keys().hasOnly(['settings', 'groups', 'tags', 'staff', 'duties', 'rules', 'rulesLog', 'aps', 'updatedAt', 'updatedBy']);
       allow delete: if false;
 
       // a copy of each save, to go back to: permanent
