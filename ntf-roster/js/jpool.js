@@ -32,12 +32,11 @@ export function tagsFor(tags, level, strength) {
 
 // ---------- the junior rules ----------
 
-const TO_CONFIRM = 'Predicted from the drafted rules: confirm or change.';
 const R = (id, type, name, params, o = {}) => ({
   id, type, name, enabled: true, hard: o.hard !== false, weight: o.weight ?? 10,
   who: { groups: [], tags: [], staff: [], exclude: [], ...(o.who || {}) },
   when: { from: '', to: '', days: [], holidays: 'any', ...(o.when || {}) },
-  params, note: o.note || '',
+  params, note: o.note || '', pool: 'junior',
 });
 const soft = (weight, more = {}) => ({ hard: false, weight, ...more });
 const lim = (codes, max, extra = {}) => ({ codes, period: 'month', window: 7, min: null, max, fte: false, prorate: false, ...extra });
@@ -69,14 +68,14 @@ export const JUNIOR_RULES = [
   // strong and weak: a weak MO2 is never on call with a weak MO1; two strong ones waste manpower
   R('r-jp-weak', 'together', 'A weak MO2 never on call with a weak MO1', { codes: ['C'], other: oth(['mo1weak']), otherCodes: ['C'], mode: 'never', min: 1 }, { who: { tags: ['mo2weak'] } }),
   R('r-jp-strong', 'together', 'Avoid a strong MO2 with a strong MO1 (waste of manpower)', { codes: ['C'], other: oth(['mo1strong']), otherCodes: ['C'], mode: 'never', min: 1 }, soft(15, { who: { tags: ['mo2strong'] } })),
-  // numbers the drafted rules assumed: confirm or change
-  R('r-jp-gap', 'sequence', 'At least 3 days between calls (counting last month)', { ifCodes: ['C'], thenCodes: ['C'], mode: 'forbid', from: 1, to: 2 }, { who: { tags: CALL_TAGS }, note: TO_CONFIRM }),
-  R('r-jp-wkend', 'limit', 'At most 2 weekend duties (calls and half calls) a month', lim(['C', 'HC'], 2), soft(60, { who: { tags: POOL_TAGS }, when: { days: [0, 6] }, note: TO_CONFIRM })),
-  R('r-jp-aps-pre', 'sequence', 'No call the day before the pain service week starts', { ifCodes: ['C'], thenCodes: ['APS'], mode: 'forbid', from: 1, to: 1 }, { who: { tags: POOL_TAGS }, note: TO_CONFIRM }),
-  R('r-jp-fair2', 'spread', 'Share MO2 calls fairly', { codes: ['C'], period: 'month', weekendWeight: 2, holidayWeight: 2, tolerance: 1 }, soft(10, { who: { tags: MO2_TAGS }, note: TO_CONFIRM })),
-  R('r-jp-fair1', 'spread', 'Share MO1 calls fairly', { codes: ['C'], period: 'month', weekendWeight: 2, holidayWeight: 2, tolerance: 1 }, soft(10, { who: { tags: MO1_TAGS }, note: TO_CONFIRM })),
-  R('r-jp-nc-hc', 'requests', 'A no call request also means no half call that day', { request: 'Nc', codes: ['HC'], mode: 'avoid', span: 'day' }, { who: { tags: POOL_TAGS }, note: TO_CONFIRM }),
-  R('r-jp-nc-pm', 'requests', 'A no call request also means no PM shift that day', { request: 'Nc', codes: ['P'], mode: 'avoid', span: 'day' }, { who: { tags: POOL_TAGS }, note: TO_CONFIRM }),
+  // numbers from the drafted rules (all confirmed by the owner, 19 Oct 2026)
+  R('r-jp-gap', 'sequence', 'At least 3 days between calls (counting last month)', { ifCodes: ['C'], thenCodes: ['C'], mode: 'forbid', from: 1, to: 2 }, { who: { tags: CALL_TAGS } }),
+  R('r-jp-wkend', 'limit', 'At most 2 weekend duties (calls and half calls) a month', lim(['C', 'HC'], 2), soft(60, { who: { tags: POOL_TAGS }, when: { days: [0, 6] } })),
+  R('r-jp-aps-pre', 'sequence', 'No call the day before the pain service week starts', { ifCodes: ['C'], thenCodes: ['APS'], mode: 'forbid', from: 1, to: 1 }, { who: { tags: POOL_TAGS } }),
+  R('r-jp-fair2', 'spread', 'Share MO2 calls fairly', { codes: ['C'], period: 'month', weekendWeight: 2, holidayWeight: 2, tolerance: 1 }, soft(10, { who: { tags: MO2_TAGS } })),
+  R('r-jp-fair1', 'spread', 'Share MO1 calls fairly', { codes: ['C'], period: 'month', weekendWeight: 2, holidayWeight: 2, tolerance: 1 }, soft(10, { who: { tags: MO1_TAGS } })),
+  R('r-jp-nc-hc', 'requests', 'A no call request also means no half call that day', { request: 'Nc', codes: ['HC'], mode: 'avoid', span: 'day' }, { who: { tags: POOL_TAGS } }),
+  R('r-jp-nc-pm', 'requests', 'A no call request also means no PM shift that day', { request: 'Nc', codes: ['P'], mode: 'avoid', span: 'day' }, { who: { tags: POOL_TAGS } }),
 ];
 
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -124,19 +123,26 @@ export function poolProblems(state, staff) {
 // Does this person match a rule's `who`? (the same test the rules use, for working out which rules a pool can fill)
 function whoHas(who, p) {
   const w = { groups: [], tags: [], staff: [], exclude: [], ...(who || {}) };
-  if (w.exclude.includes(p.id)) return false;
+  if (w.exclude.includes(p.id) || (w.only && !w.only.includes(p.id))) return false;
   if (!w.groups.length && !w.tags.length && !w.staff.length) return true;
   return w.groups.includes(p.group) || w.staff.includes(p.id) || (p.tags || []).some(t => w.tags.includes(t));
 }
 
-// A copy of the state for checking or auto-filling one pool: the other pool's people are left out, and a rule that
-// is only about them (the consultants' call, say) is switched off, so it is not reported as a gap or filled.
-// 'all' (or anything else) returns the state itself. The copy is read-only: never commit it.
+// A copy of the state for checking or auto-filling one pool: the other pool's people and the other roster's rules
+// are left out (a rule from before rules had a roster is switched off if it is only about the other pool's people).
+// 'all' (or anything else) keeps everyone, but each rule covers only its own roster's people (`who.only`, a list of
+// ids the rules engine honours; the "other people" of a Between-two-people rule may still be anyone).
+// The copy is read-only: never commit it.
 export function scopeToPool(state, pool, poolOf) {
-  if (pool !== 'junior' && pool !== 'senior') return state;
+  if (pool !== 'junior' && pool !== 'senior') {
+    if (!(state.rules || []).some(r => r.pool)) return state;
+    const ids = { junior: [], senior: [] };
+    for (const p of state.staff || []) ids[poolOf(state, p)].push(p.id);
+    return { ...state, rules: state.rules.map(r => (ids[r.pool] ? { ...r, who: { ...(r.who || {}), only: ids[r.pool] } } : r)) };
+  }
   const staff = (state.staff || []).filter(p => poolOf(state, p) === pool);
-  const rules = (state.rules || []).map(r => {
-    if (r.enabled === false) return r;
+  const rules = (state.rules || []).filter(r => !r.pool || r.pool === pool).map(r => {
+    if (r.enabled === false || r.pool) return r;
     const t = r.type;
     const aboutWho = [r.who];
     if (t === 'together') aboutWho.push(r.params && r.params.other);
@@ -146,8 +152,10 @@ export function scopeToPool(state, pool, poolOf) {
   return { ...state, staff, rules };
 }
 
-// Is this rule only about people in one pool? (every person it covers is in it, and it covers someone)
+// Is this rule only about people in one pool? Its roster says so; a rule without one: every person it covers is in
+// it, and it covers someone.
 function onlyAbout(state, r, pool, poolOf) {
+  if (r.pool) return r.pool === pool;
   const whos = [r.who];
   if (r.type === 'together') whos.push(r.params && r.params.other);
   const hit = (state.staff || []).filter(p => whos.some(w => whoHas(w, p)));
@@ -193,7 +201,12 @@ export function mergeByPool(mine, team, docs, pool, poolOf, cellsOf = c => c || 
       for (const [sid, c] of Object.entries((mine.cells || {})[day] || {})) if (inPool.has(sid)) out[sid] = c;
       if (Object.keys(out).length) cells[day] = out; else delete cells[day];
     }
-    months[m] = { ...(months[m] || {}), status: d.status === 'published' ? 'published' : 'draft', publishedAt: d.publishedAt || '', note: d.note || '' };
+    // each roster's lock: mine for my pool, theirs for the other (a document from an older app has status only)
+    const locksOf = v => (v && v.locks && typeof v.locks === 'object' ? { junior: String(v.locks.junior || ''), senior: String(v.locks.senior || '') }
+      : v && v.status === 'published' ? { junior: v.publishedAt || 'yes', senior: v.publishedAt || 'yes' } : { junior: '', senior: '' });
+    const locks = { ...locksOf(d), [pool]: locksOf((mine.months || {})[m])[pool] };
+    const both = !!(locks.junior && locks.senior);
+    months[m] = { ...(months[m] || {}), locks, status: both ? 'published' : 'draft', publishedAt: both ? (d.publishedAt || locks.junior) : '', note: d.note || '' };
   }
   next.cells = cells;
   next.months = months;

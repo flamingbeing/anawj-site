@@ -85,6 +85,11 @@ await t('mistyped role cannot save a month', assertFails(setDoc(doc(odd, 'months
 await t("month save under someone else's name", assertFails(setDoc(doc(ros, 'months', '2026-12'), month('2026-12', ADMIN))));
 await t('the days as one JSON string', assertSucceeds(setDoc(doc(ros, 'months', '2027-02'), month('2027-02', ROSTERER, { cells: JSON.stringify({ '2027-02-03': { s1: { a: ['C'] } } }) }))));
 await t('a JSON string too long', assertFails(setDoc(doc(ros, 'months', '2027-03'), month('2027-03', ROSTERER, { cells: 'x'.repeat(900001) }))));
+await t('each roster locks its own month', assertSucceeds(setDoc(doc(ros, 'months', '2027-04'), month('2027-04', ROSTERER, { locks: { junior: '2026-10-19T10:00:00Z', senior: '' } }))));
+await t('locks: only junior and senior', assertFails(setDoc(doc(ros, 'months', '2027-04'), month('2027-04', ROSTERER, { locks: { junior: '', other: 'x' } }))));
+await t('locks: text only', assertFails(setDoc(doc(ros, 'months', '2027-04'), month('2027-04', ROSTERER, { locks: { junior: true } }))));
+await t('locks: a map', assertFails(setDoc(doc(ros, 'months', '2027-04'), month('2027-04', ROSTERER, { locks: 'junior' }))));
+await t('a version keeps the locks', assertSucceeds(setDoc(doc(ros, 'months', '2027-04', 'versions', 'v9'), { month: '2027-04', cells: '{}', status: 'draft', locks: { junior: 'x', senior: '' }, savedAt: 3, savedBy: by(ROSTERER) })));
 await t('month save with no updatedBy', assertFails(setDoc(doc(ros, 'months', '2026-12'), { month: '2026-12', cells: {} })));
 await t('month field must match the document', assertFails(setDoc(doc(ros, 'months', '2026-12'), month('2026-11', ROSTERER))));
 await t('document id must be a month', assertFails(setDoc(doc(ros, 'months', 'hello'), month('hello', ROSTERER))));

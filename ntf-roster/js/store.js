@@ -90,12 +90,23 @@ export function createStore({ demo = false, fallback } = {}) {
 
     get() { return state; },
 
-    // Months that are locked now and whose days this change would alter (none is allowed to).
+    // Each roster's locked months whose days (for that roster's people) this change would alter (none is allowed to):
+    // [{ m, pool }]. Someone not on the staff list any more counts with the junior roster.
     lockedHit(next) {
       const hit = [];
+      let poolOfId = null;
       for (const m of Object.keys(state.months || {})) {
-        if (!M.isMonthLocked(state, m)) continue;
-        if (M.monthDays(m).some(d => JSON.stringify((state.cells || {})[d] || null) !== JSON.stringify((next.cells || {})[d] || null))) hit.push(m);
+        for (const pool of M.RULE_POOLS) {
+          if (!M.isMonthLocked(state, m, pool)) continue;
+          if (!poolOfId) { const map = new Map((state.staff || []).map(p => [p.id, M.poolOf(state, p)])); poolOfId = id => map.get(id) || 'junior'; }
+          const changed = M.monthDays(m).some(d => {
+            const a = (state.cells || {})[d] || {}, b = (next.cells || {})[d] || {};
+            if (a === b) return false;
+            for (const id of new Set([...Object.keys(a), ...Object.keys(b)])) if (poolOfId(id) === pool && JSON.stringify(a[id] || null) !== JSON.stringify(b[id] || null)) return true;
+            return false;
+          });
+          if (changed) hit.push({ m, pool });
+        }
       }
       return hit;
     },
@@ -108,8 +119,8 @@ export function createStore({ demo = false, fallback } = {}) {
       if (out === false) return false;   // fn can cancel by returning false
       const locked = store.lockedHit(draft);
       store.unlocked = [];
-      if (locked.length && opts.unlock) { for (const m of locked) M.setMonthLocked(draft, m, false); store.unlocked = locked; }
-      else if (locked.length) { if (typeof store.onLocked === 'function') store.onLocked(locked, label); return false; }
+      if (locked.length && opts.unlock) { for (const x of locked) M.setMonthLocked(draft, x.m, false, x.pool); store.unlocked = [...new Set(locked.map(x => x.m))]; }
+      else if (locked.length) { if (typeof store.onLocked === 'function') store.onLocked(locked.map(x => x.m), label, locked); return false; }
       undo.push({ label, state });
       if (undo.length > MAX_UNDO) undo.shift();
       redo = [];
@@ -136,7 +147,8 @@ export function createStore({ demo = false, fallback } = {}) {
     // Unlocking lasts one visit. Quiet like a Getting started tick (not an undo step); never in practice.
     ensureLocked(m) {
       if (store.isDemo || !m || (state.months || {})[m] || !hasDays(state, m)) return false;
-      state = { ...state, months: { ...(state.months || {}), [m]: { status: 'published', publishedAt: new Date().toISOString(), note: '' } } };
+      const at = new Date().toISOString();
+      state = { ...state, months: { ...(state.months || {}), [m]: M.monthMeta({ locks: { junior: at, senior: at }, note: '' }) } };
       store.save();
       notify('Lock ' + m, 'mark');
       return true;
@@ -144,10 +156,10 @@ export function createStore({ demo = false, fallback } = {}) {
     lockAll() {
       if (store.isDemo) return false;
       const all = new Set([...Object.keys(state.months || {}), ...Object.keys(state.cells || {}).map(d => d.slice(0, 7))]);
-      const open = [...all].map(m => [m, (state.months || {})[m]]).filter(([m, v]) => !(v && v.status === 'published') && hasDays(state, m));
+      const open = [...all].map(m => [m, (state.months || {})[m]]).filter(([m, v]) => !(v && M.monthMeta(v).status === 'published') && hasDays(state, m));
       if (!open.length) return false;
-      const months = { ...(state.months || {}) };
-      for (const [m, v] of open) months[m] = { ...(v || {}), status: 'published', publishedAt: new Date().toISOString(), note: (v && v.note) || '' };
+      const months = { ...(state.months || {}) }, at = new Date().toISOString();
+      for (const [m, v] of open) { const x = M.monthMeta(v); months[m] = M.monthMeta({ ...x, locks: { junior: x.locks.junior || at, senior: x.locks.senior || at }, note: x.note || '' }); }
       state = { ...state, months };
       store.save();
       notify('Lock every month', 'mark');

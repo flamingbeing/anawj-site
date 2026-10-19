@@ -13,11 +13,11 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<'
 const key = (d, s) => d + '|' + s;
 
 function loadUi() {
-  const def = { group: '', tag: '', q: '', showReq: true, hi: '', paint: false, paintCode: '' };
+  const def = { group: '', tag: '', q: '', showReq: true, hi: '', paint: false, paintCode: '', other: false };
   try { return { ...def, ...JSON.parse(localStorage.getItem(UI_KEY) || '{}'), q: '', paint: false }; } catch (e) { return def; }
 }
 function saveUi(ui) {
-  try { localStorage.setItem(UI_KEY, JSON.stringify({ group: ui.group, tag: ui.tag, showReq: ui.showReq, hi: ui.hi, paintCode: ui.paintCode })); } catch (e) { /* ignore */ }
+  try { localStorage.setItem(UI_KEY, JSON.stringify({ group: ui.group, tag: ui.tag, showReq: ui.showReq, hi: ui.hi, paintCode: ui.paintCode, other: ui.other })); } catch (e) { /* ignore */ }
 }
 
 // ---------- small shared helpers (also used by ui-day.js) ----------
@@ -119,6 +119,9 @@ export function toggleCode(draft, d, sid, code, on, dmap) {
   M.setCell(draft, d, sid, patch);
 }
 
+// the roster this browser is not working on (shown greyed with the Junior / Senior roster button)
+const otherPool = state => (state && state.settings && state.settings.pool === 'senior' ? 'junior' : 'senior');
+
 function cellHas(state, d, sid, code) {
   const c = state.cells?.[d]?.[sid];
   return !!c && ((c.a || []).includes(code) || (c.r || []).includes(code));
@@ -154,7 +157,11 @@ export function mount(el, app) {
   paintBtn.innerHTML = `${icon('brush')}<span>Paint</span>`;
   // the grid's marks explained (they are small and otherwise unexplained)
   const keyBtn = h('button', { type: 'button', class: 'tbtn', title: 'What the marks in the grid mean', onclick: showKey, 'data-tour': 'layers' }, 'Key');
-  tb.append(paintBtn, searchWrap, groupSel, tagSel, hiSel, reqBtn, keyBtn);
+  // the other roster's rows, greyed and read-only, to see who is on (owner, 19 Oct 2026)
+  const otherBtn = h('button', { type: 'button', class: 'tbtn', 'data-k': 'other', 'aria-pressed': String(!!ui.other),
+    onclick: () => { ui.other = !ui.other; saveUi(ui); otherBtn.setAttribute('aria-pressed', String(ui.other)); renderGrid(); } });
+  const otherLabel = () => { const o = otherPool(app.store.get()); otherBtn.textContent = `${o === 'senior' ? 'Senior' : 'Junior'} roster`; otherBtn.title = `Show the ${o} roster too, greyed: to see who is on. It can only be changed from the ${o} roster (the switch at the top).`; };
+  tb.append(paintBtn, searchWrap, groupSel, tagSel, hiSel, reqBtn, otherBtn, keyBtn);
   function showKey() {
     const row = (mark, text) => h('li', { class: 'gk-row' }, h('span', { class: 'gk-mark', html: mark }), h('span', null, text));
     app.sheet({
@@ -334,6 +341,15 @@ export function mount(el, app) {
     return list;
   }
 
+  // the other roster's people for the greyed rows: the same search, in their own sections
+  function otherStaff(state) {
+    if (!ui.other) return [];
+    const o = otherPool(state);
+    const q = ui.q.trim().toLowerCase();
+    return M.staffInMonth(state, app.month).filter(p => M.poolOf(state, p) === o
+      && (!q || (p.name || '').toLowerCase().includes(q) || (p.short || '').toLowerCase().includes(q)));
+  }
+
   function buildCtx(state) {
     const days = M.monthDays(app.month);
     const dmap = M.dutyMap(state);
@@ -440,7 +456,9 @@ export function mount(el, app) {
     ctx = buildCtx(state);
     const c = ctx;
     dutyStyles(state);
+    otherLabel();
     const staff = filteredStaff(state);
+    const others = otherStaff(state);
     const all = M.staffInView(state, app.month);
     // summary columns: auto codes used this month (C always) + weekend/holiday calls
     const used = new Set();
@@ -481,9 +499,6 @@ export function mount(el, app) {
     const parts = [];  // a person row's cells, one string each (an edit then swaps only the cells that changed)
 
     const groups = state.groups || [];
-    const byGroup = new Map();
-    for (const p of staff) { if (!byGroup.has(p.group)) byGroup.set(p.group, []); byGroup.get(p.group).push(p); }
-    const groupOrder = [...groups.map(g => g.id), ...[...byGroup.keys()].filter(id => !groups.some(g => g.id === id))];
     const tagMap = new Map((state.tags || []).map(t => [t.id, t]));
     // what every row shares (month, today, duty codes, holidays, tag names, summary columns): when it changes, no
     // row's old HTML can be reused
@@ -491,27 +506,35 @@ export function mount(el, app) {
       (state.duties || []).map(d => [d.code, d.name, d.kind]), (state.tags || []).map(t => [t.id, t.name])]);
     if (allKey !== rowCacheKey) { rowCache = new Map(); rowCacheKey = allKey; }
     const nextCache = new Map();
+    // ro: the other roster's rows, greyed and read-only (no cell buttons, so no editing, painting or keyboard stops)
+    const addPeople = (list, ro) => {
+    const byGroup = new Map();
+    for (const p of list) { if (!byGroup.has(p.group)) byGroup.set(p.group, []); byGroup.get(p.group).push(p); }
+    const groupOrder = [...groups.map(g => g.id), ...[...byGroup.keys()].filter(id => !groups.some(g => g.id === id))];
     for (const gid of groupOrder) {
       const people = byGroup.get(gid);
       if (!people || !people.length) continue;
       const g = c.gmap.get(gid);
-      rows.push(`<tr class="grp-row"><th colspan="${nCols}" scope="colgroup" class="grp"><span class="grp-label">${esc(g ? g.name : 'No group')}<span class="grp-n">${people.length}</span></span></th></tr>`);
-      keys.push('g:' + gid); parts.push(null);
+      rows.push(`<tr class="grp-row${ro ? ' ro' : ''}"><th colspan="${nCols}" scope="colgroup" class="grp"><span class="grp-label">${esc(g ? g.name : 'No group')}<span class="grp-n">${people.length}</span></span></th></tr>`);
+      keys.push((ro ? 'og:' : 'g:') + gid); parts.push(null);
       for (const p of people) {
-        const pv = c.personV.get(p.id) || [];
-        const sig = rowSig(c, p, pv, sel && sel.staffId === p.id ? sel.date : '');
-        const hit = rowCache.get(p.id);
-        keys.push(p.id);
-        if (hit && hit.k === sig) { rows.push(hit.html); parts.push(hit.parts); nextCache.set(p.id, hit); continue; }
+        const pv = ro ? [] : (c.personV.get(p.id) || []);
+        const sig = (ro ? 'ro|' : '') + rowSig(c, p, pv, !ro && sel && sel.staffId === p.id ? sel.date : '');
+        const ck = (ro ? 'ro:' : '') + p.id;
+        const hit = rowCache.get(ck);
+        keys.push(ck);
+        if (hit && hit.k === sig) { rows.push(hit.html); parts.push(hit.parts); nextCache.set(ck, hit); continue; }
         const tagTxt = (p.tags || []).map(t => tagMap.get(t)?.name || t);
         const tagBadge = (p.tags || []).includes('babymo') ? '<span class="tagb" title="Baby MO">B</span>' : (p.tags || []).includes('parttime') ? '<span class="tagb tagb-pt" title="Part time">PT</span>' : '';
         const pvTxt = pv.length ? ' · ' + pv.map(v => (v.hard ? '⛔ ' : '⚠ ') + v.msg).join(' · ') : '';
         const pvMark = pv.length ? `<span class="vx-nm ${pv.some(v => v.hard) ? 'vh' : 'vs'}" aria-hidden="true"></span>` : '';
         const cellsOut = [];
-        cellsOut.push(`<th scope="row" class="nm"><button type="button" class="nm-btn" data-p="${esc(p.id)}" title="${esc(p.name + (tagTxt.length ? ' · ' + tagTxt.join(', ') : '') + (p.note ? ' · ' + p.note : '') + pvTxt + '. Open their month')}"${pv.length ? ` aria-label="${esc(`${p.short || p.name}, ${pv.length} problem${pv.length > 1 ? 's' : ''} this month. Open their month`)}"` : ''}><span class="nm-txt">${esc(p.short || p.name)}</span>${tagBadge}${pvMark}</button></th>`);
+        if (ro) cellsOut.push(`<th scope="row" class="nm"><span class="nm-ro" title="${esc(p.name + ' (' + M.POOL_LABEL[otherPool(state)] + ', view only)')}"><span class="nm-txt">${esc(p.short || p.name)}</span>${tagBadge}</span></th>`);
+        else cellsOut.push(`<th scope="row" class="nm"><button type="button" class="nm-btn" data-p="${esc(p.id)}" title="${esc(p.name + (tagTxt.length ? ' · ' + tagTxt.join(', ') : '') + (p.note ? ' · ' + p.note : '') + pvTxt + '. Open their month')}"${pv.length ? ` aria-label="${esc(`${p.short || p.name}, ${pv.length} problem${pv.length > 1 ? 's' : ''} this month. Open their month`)}"` : ''}><span class="nm-txt">${esc(p.short || p.name)}</span>${tagBadge}${pvMark}</button></th>`);
         for (const dm of c.dayMeta) {
           const focusable = sel && sel.staffId === p.id && sel.date === dm.d;
-          cellsOut.push(M.staffActiveOn(p, dm.d) ? cellHtml(c, p, dm, focusable) : `<td class="c off${dm.we ? ' we' : ''}"><span class="sr-only">not in post</span></td>`);
+          const cell = M.staffActiveOn(p, dm.d) ? cellHtml(c, p, dm, focusable && !ro) : `<td class="c off${dm.we ? ' we' : ''}"><span class="sr-only">not in post</span></td>`;
+          cellsOut.push(ro ? cell.replace(/<button class="cell"[^>]*?( aria-label="[^"]*")[^>]*>/, '<span class="cell-ro" role="img"$1>').replace('</button>', '</span>') : cell);
         }
         // counts
         const counts = {};
@@ -524,11 +547,18 @@ export function mount(el, app) {
         }
         sumCodes.forEach((code, i) => { cellsOut.push(`<td class="sc${i ? '' : ' s1'}${counts[code] ? '' : ' zero'}">${counts[code] || 0}</td>`); });
         if (hasC) cellsOut.push(`<td class="sc${sumCodes.length ? '' : ' s1'}${wk ? '' : ' zero'}">${wk}</td>`);
-        html = '<tr>' + cellsOut.join('') + '</tr>';
+        html = (ro ? '<tr class="ro">' : '<tr>') + cellsOut.join('') + '</tr>';
         rows.push(html);
         parts.push(cellsOut);
-        nextCache.set(p.id, { k: sig, html, parts: cellsOut });
+        nextCache.set(ck, { k: sig, html, parts: cellsOut });
       }
+    }
+    };
+    addPeople(staff, false);
+    if (others.length) {
+      rows.push(`<tr class="grp-row ro-head"><th colspan="${nCols}" scope="colgroup" class="grp"><span class="grp-label">${esc(M.POOL_LABEL[otherPool(state)][0].toUpperCase() + M.POOL_LABEL[otherPool(state)].slice(1))}: view only<span class="grp-n">${others.length}</span></span></th></tr>`);
+      keys.push('g:@other'); parts.push(null);
+      addPeople(others, true);
     }
     rowCache = nextCache;
     if (!staff.length) { rows.push(`<tr><td colspan="${nCols}" class="nobody">Nobody matches these filters.</td></tr>`); keys.push(''); parts.push(null); }
@@ -605,7 +635,7 @@ export function mount(el, app) {
         if (trs && prevRender && prevRender.keys && trs.length === prevRender.keys.length && !table.querySelector('tr.r-spacer')) {
           for (let i = 0; i < trs.length; i++) old.set(prevRender.keys[i], trs[i].offsetHeight);
         }
-        const est = i => old.get(keys[i]) || (keys[i].startsWith('g:') ? 25 : 33);
+        const est = i => old.get(keys[i]) || (/^o?g:/.test(keys[i]) ? 25 : 33);
         const view = scroll.clientHeight || 800;
         let y = 0, i = 0;
         while (i < rows.length && y + est(i) <= st - 66) { y += est(i); i++; }   // keep two rows above the window
@@ -632,12 +662,12 @@ export function mount(el, app) {
     // a locked month says so here, with the way out (the padlock in the header does the same)
     const locked = M.isMonthLocked(state, app.month);
     lockNote.hidden = !locked;
-    if (locked && lockNote.dataset.m !== app.month) {
-      lockNote.dataset.m = app.month;
+    if (locked && lockNote.dataset.m !== app.month + otherPool(state)) {
+      lockNote.dataset.m = app.month + otherPool(state);
       lockNote.textContent = '';
       lockNote.title = 'Nothing in a locked month can change, so it cannot be edited by accident.';
       lockNote.setAttribute('aria-description', lockNote.title);
-      lockNote.append(h('span', { class: 'ln-t' }, `${M.fmtMonth(app.month)} is locked`, h('span', { class: 'ln-more' }, ': nothing in it can change, so it cannot be edited by accident.')),
+      lockNote.append(h('span', { class: 'ln-t' }, `${M.fmtMonth(app.month)} is locked for the ${M.POOL_LABEL[otherPool(state) === 'senior' ? 'junior' : 'senior']}`, h('span', { class: 'ln-more' }, ': nothing in it can change, so it cannot be edited by accident.')),
         h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => document.getElementById('lockm').click() }, 'Unlock to edit'));
     }
     // Offer auto-fill in the roster itself when nothing in this month was auto-filled or entered yet.

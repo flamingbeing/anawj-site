@@ -340,3 +340,45 @@ restriction" (same day, following days, between two people, and ready-made ones)
 - The old address `anawj.com/ntf-roster/` (GitHub Pages; not an authorised sign-in domain) forwards to
   ntfroster.anawj.com. A browser with a roster saved there stays and shows a "Moved" bar: Download backup, then Go
   (Restore from a backup at the new address).
+
+## Rules: all confirmed, Priorities sheet (19 Oct 2026)
+
+- The owner confirmed every rule: no "To confirm" tag or Confirm buttons any more. Older saves drop the old
+  "Predicted from the drafted rules" sentence from rule notes once (`settings.rcv`); the junior rules no longer carry it.
+- Rules › Priorities (`ui-ruleprio.js`): every rule as a bar (preferences by priority, then must hold, off greyed).
+  Drag a bar to change one; tick several to set a priority, raise or lower by 10, make must hold or preference, or turn
+  on or off together (`bulkSet`; share-fairly rules stay preferences).
+- Rules can be dragged by their grip (⠿; arrow keys on a focused grip) to reorder them, or between Preferences and
+  Must hold (`placeRule`). A dropped preference keeps its priority if it already fits between its new neighbours,
+  otherwise gets the midpoint; ties are ordered by the rules list, so the rule also moves there (the Rules tab sorts
+  the same way). Drag listens on the window: moving the row in the page drops pointer capture.
+
+## Each roster has its own rules (19 Oct 2026)
+
+- The owner: the junior and senior rosters are different institutions, so their rules are separate. Every rule has
+  `pool` ('junior' or 'senior') and only ever covers that roster's people.
+- Older saves and imported rule files are placed once on load (`M.splitRules`, run by `migrate` for any rule without
+  a roster): the known defaults by id, others by who they name (groups by kind, junior-pool tags, people by their
+  roster). A rule about everyone, or both, becomes two: the junior copy keeps the id, the senior copy gets `<id>-s`.
+- Engine: `scopeToPool` leaves the other roster's rules out of a Junior or Senior check or fill; in All each rule gets
+  `who.only` (its roster's people, honoured by `compileWho`; never saved). The "other people" side of a Between-two-people
+  rule is not narrowed (the Baby MO rule may name seniors).
+- Rules tab and Priorities show the roster picked at the top (All shows both, each with a Junior/Senior roster tag);
+  bulk changes only reach the rules shown. The rule editor has a Roster field; requests take the person's roster.
+- Cloud merge by pool now keeps my roster's rules and takes theirs for the other, by `pool`.
+- The demo no longer puts senior residents on the junior call (they are on the senior roster since 19 Oct).
+
+## One roster at a time (19 Oct 2026)
+
+- The owner: two rosterers share the app and don't edit each other's work. The header switch is Junior | Senior only
+  (no All; `settings.pool`, per browser, defaults to junior). It applies to the whole app: grid, People, Rules,
+  Priorities, checks and Fill show only the roster in view. Both rosters stay editable; the switch picks which.
+- Month lock is per roster: `months[m].locks = { junior, senior }` (each '' or a time). `status` is `published` only
+  when both are locked (older saves: published = both locked; `M.monthMeta`). The padlock and `store.commit` act on
+  the roster in view (`lockedHit` checks only that roster's people); `lockAll`/`ensureLocked` lock both. Firestore
+  allows `locks` on month and version docs (`validLocks`); cloud merge by pool keeps my roster's lock, takes theirs.
+- The grid's "Senior roster" / "Junior roster" toolbar button shows the other roster below, greyed and read-only
+  (`tr.ro`, `.cell-ro`, no editor); kept in the UI settings (`ui.other`).
+- New people start in a group of the roster in view.
+- Limit: a junior-roster check can't see who is on the senior roster, so "Baby MO needs an SRP/RP on call" only counts
+  junior-roster people.

@@ -34,7 +34,7 @@ export function mount(el, app) {
   function renderNav() {
     const st = app.store.get();
     nav.innerHTML = '';
-    for (const [k, l, n] of [['staff', 'Staff', (st.staff || []).length], ['pool', 'Junior pool', (st.staff || []).filter(p => M.poolOf(st, p) === 'junior').length], ['groups', 'Groups', (st.groups || []).length], ['tags', 'Tags', (st.tags || []).length], ['codes', 'Duty codes', (st.duties || []).length]]) {
+    for (const [k, l, n] of [['staff', 'Staff', (st.staff || []).filter(p => M.poolOf(st, p) === (st.settings && st.settings.pool === 'senior' ? 'senior' : 'junior')).length], ['pool', 'Junior pool', (st.staff || []).filter(p => M.poolOf(st, p) === 'junior').length], ['groups', 'Groups', (st.groups || []).length], ['tags', 'Tags', (st.tags || []).length], ['codes', 'Duty codes', (st.duties || []).length]]) {
       nav.append(h('button', { type: 'button', role: 'tab', class: 'bx-tab', 'aria-selected': String(part === k), id: `pv-tab-${k}`,
         onclick: () => { part = k; render(); } }, l, h('span', { class: 'bx-count' }, String(n))));
     }
@@ -62,19 +62,21 @@ export function mount(el, app) {
     const search = h('input', { type: 'search', class: 'bx-search', placeholder: 'Search staff', 'aria-label': 'Search staff', value: q,
       oninput: () => { q = search.value.trim().toLowerCase(); renderStaffList(); } });
     const leftCb = h('input', { type: 'checkbox', checked: showLeft, onchange: () => { showLeft = leftCb.checked; renderStaffList(); } });
-    const leftN = (st.staff || []).filter(hasLeft).length;
+    const leftN = (st.staff || []).filter(p => hasLeft(p) && M.poolOf(st, p) === (st.settings && st.settings.pool === 'senior' ? 'senior' : 'junior')).length;
     body.append(h('div', { class: 'pv-bar' },
       h('div', { class: 'rv-search' }, h('span', { class: 'bx-search-ic', html: app.icon('search') }), search),
       h('button', { type: 'button', class: 'btn btn-primary', onclick: () => editPerson(null), html: `${app.icon('plus')}<span>Add person</span>` }),
       h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => bulkAdd() }, 'Bulk add'),
       leftN ? h('label', { class: 'switch' }, leftCb, h('span', { class: 'sw-track' }), h('span', null, `Show ${leftN} who left`)) : null));
+    const view = st.settings && st.settings.pool === 'senior' ? 'senior' : 'junior';   // the roster picked at the top
+    body.append(h('p', { class: 'bx-help pv-pool' }, `The ${view} roster's people. The ${view === 'junior' ? 'senior' : 'junior'} roster's are under the switch at the top; move someone between them in their details (Roster).`));
     const listBox = h('div', { class: 'pv-list' });
     body.append(listBox);
 
     function renderStaffList() {
       const s = app.store.get();
       listBox.innerHTML = '';
-      const staff = (s.staff || []).filter(p => (showLeft || !hasLeft(p)) && (!q || `${p.name} ${p.short} ${p.note}`.toLowerCase().includes(q)));
+      const staff = (s.staff || []).filter(p => M.poolOf(s, p) === view && (showLeft || !hasLeft(p)) && (!q || `${p.name} ${p.short} ${p.note}`.toLowerCase().includes(q)));
       if (!(s.staff || []).length) {
         listBox.append(h('div', { class: 'card bx-empty' }, h('p', null, 'No staff yet. Add people one by one, paste a list with Bulk add, or import the department Excel sheet (More).'),
           h('button', { type: 'button', class: 'btn btn-primary', onclick: () => bulkAdd() }, 'Bulk add names')));
@@ -154,10 +156,14 @@ export function mount(el, app) {
     app.toast(`Removed ${p.name} and their roster entries`, { action: undoAct });
   }
 
+  // New people start in a group of the roster in view.
+  const inView = (st, g) => (g.kind === 'junior' ? 'junior' : 'senior') === ((st.settings && st.settings.pool) === 'senior' ? 'senior' : 'junior');
+  const firstGroup = st => ((st.groups || []).find(g => inView(st, g)) || (st.groups || [])[0] || {}).id || 'mo';
+
   function editPerson(p, groupId) {
     const st = app.store.get();
     const isNew = !p;
-    const d = p ? structuredClone(p) : { id: M.uid('s'), name: '', short: '', group: groupId || ((st.groups || [])[0] || {}).id || 'mo', tags: [], fte: 1, start: '', end: '', note: '', active: true };
+    const d = p ? structuredClone(p) : { id: M.uid('s'), name: '', short: '', group: groupId || firstGroup(st), tags: [], fte: 1, start: '', end: '', note: '', active: true };
     const ids = { name: fid('pn'), short: fid('ps'), group: fid('pg'), fte: fid('pf'), start: fid('pst'), end: fid('pe'), note: fid('pno') };
     const err = h('p', { class: 'bx-err', role: 'alert' });
     const name = h('input', { type: 'text', id: ids.name, value: d.name, autocomplete: 'off', maxlength: '80', required: true });
@@ -216,7 +222,7 @@ export function mount(el, app) {
     const st = app.store.get();
     const gid = fid('bg'), tid = fid('bt');
     const group = h('select', { id: gid }, (st.groups || []).map(g => h('option', { value: g.id }, g.name)));
-    group.value = ((st.groups || []).find(g => g.id === 'mo') || (st.groups || [])[0] || {}).id || '';
+    group.value = ((st.groups || []).find(g => g.id === 'mo' && inView(st, g)) ? 'mo' : firstGroup(st));
     const tags = [];
     const count = h('p', { class: 'bx-help', 'aria-live': 'polite' }, 'One name per line.');
     const ta = h('textarea', { id: tid, rows: '8', placeholder: 'Alex Tan\nPriya Nair\nNur Aisyah', oninput: () => { const n = names().length; count.textContent = n ? `${n} ${n === 1 ? 'name' : 'names'}` : 'One name per line.'; } });

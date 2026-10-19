@@ -12,6 +12,7 @@ import * as io from '../js/io.js';
 import * as cloud from '../js/cloud.js';
 import { ruleForRequest } from '../js/ui-requests.js';
 import { applyAssignments } from '../js/ui-roster.js';
+import { bulkSet, placeRule } from '../js/ui-ruleprio.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ExcelJS = createRequire(import.meta.url)(path.join(here, '../vendor/exceljs.min.js'));
@@ -64,7 +65,7 @@ function pool() {
   eq(s.rules.find(r => r.id === 'r-phd').enabled, false, 'public holiday day shift off (half calls instead)');
   eq(s.rules.find(r => r.id === 'r-jcall').who.tags, J.CALL_TAGS, 'old junior call rule points at the call list');
   for (const r of s.rules) eq(R.validateRule(r, s), [], 'valid: ' + r.id);
-  ok(J.JUNIOR_RULES.filter(r => /Predicted/.test(r.note)).length >= 6, 'assumed rules are marked To confirm');
+  ok(!J.JUNIOR_RULES.some(r => /Predicted/.test(r.note || '')), 'no rule is marked To confirm');
   ok(M.migrate(JSON.parse(JSON.stringify(s))).rules.length === s.rules.length, 'survives migrate');
 }
 
@@ -83,9 +84,15 @@ function pool() {
   J.installJuniorPool(s);
   const sc = J.scopeToPool(s, 'junior', M.poolOf);
   ok(sc.staff.length === 23, 'scoped staff');
-  eq(sc.rules.find(r => r.id === 'r-scall').enabled, false, 'consultants\' call rule is off when scoped to juniors');
+  ok(!sc.rules.some(r => r.id === 'r-scall' || r.pool === 'senior'), 'the senior roster\'s rules are left out when scoped to juniors');
   eq(sc.rules.find(r => r.id === 'r-jp-mo2').enabled, true, 'junior rule stays on');
-  ok(J.scopeToPool(s, 'all', M.poolOf) === s, 'all = same state');
+  ok(sc.rules.some(r => r.id === 'r-leave') && !sc.rules.some(r => r.id === 'r-leave-s'), 'the junior copy of a rule about everyone');
+  const all = J.scopeToPool(s, 'all', M.poolOf);
+  ok(all.staff === s.staff && all.rules.length === s.rules.length, 'all: everyone, every rule');
+  const lv = all.rules.find(r => r.id === 'r-leave'), lvs = all.rules.find(r => r.id === 'r-leave-s');
+  ok(lv.who.only.length === 23 && lv.who.only.every(id => M.poolOf(s, s.staff.find(p => p.id === id)) === 'junior'), 'all: the junior copy covers only the junior pool');
+  ok(lvs.who.only.length === s.staff.length - 23, 'all: the senior copy covers only the senior pool');
+  ok(!s.rules.some(r => r.who.only), 'the saved rules are not changed');
 }
 
 // ---------- auto-fill on the fake pool ----------
@@ -303,6 +310,29 @@ function pool() {
   ok(threw, 'needs one pool');
 }
 
+// each roster has its own rules: a rule about everyone is split once, and a merge keeps my roster's copy
+{
+  const s = M.defaultState();
+  const n = s.rules.length;
+  eq(M.migrate(s).rules.length, n, 'loading again does not split again');
+  const mine = structuredClone(s), theirs = structuredClone(s);
+  mine.settings.pool = 'junior';
+  mine.rules.find(r => r.id === 'r-gap').weight = 77;      // junior copy, my edit
+  mine.rules.find(r => r.id === 'r-gap-s').weight = 11;    // senior copy, stale
+  theirs.rules.find(r => r.id === 'r-gap').weight = 12;    // junior copy, stale
+  theirs.rules.find(r => r.id === 'r-gap-s').weight = 66;  // senior copy, their edit
+  const out = J.mergeByPool(mine, cloud.pickTeam(theirs), [], 'junior', M.poolOf, cloud.cellsFromDoc);
+  eq([out.rules.find(r => r.id === 'r-gap').weight, out.rules.find(r => r.id === 'r-gap-s').weight], [77, 66], 'my junior copy and their senior copy');
+  eq(out.rules.length, n, 'no rule lost or doubled');
+  // placing rules without a roster: by the people they name
+  const t = M.defaultState();
+  t.staff.push({ id: 'cx', name: 'Con X', group: 'cons', tags: [] }, { id: 'mx', name: 'Mo X', group: 'mo', tags: [] });
+  M.migrate(t);
+  eq(M.guessRulePool(t, { id: 'q1', who: { staff: ['cx'] } }), 'senior', 'a rule naming a consultant: senior');
+  eq(M.guessRulePool(t, { id: 'q2', who: { tags: ['mo2'] } }), 'junior', 'MO2s: junior');
+  eq(M.guessRulePool(t, { id: 'q3', who: { staff: ['cx', 'mx'] } }), '', 'both: split');
+}
+
 // ---------- locking a month (as in NUH junior monthly) ----------
 {
   const mem = {};
@@ -317,14 +347,50 @@ function pool() {
   let told = null; store.onLocked = m => { told = m; };
   ok(store.commit('edit', d => { M.setCell(d, '2026-11-04', 'z1', { a: ['AL'] }); }) === false && told && told[0] === MONTH, 'a change to a locked month is refused');
   ok(store.commit('next month', d => { M.setCell(d, '2026-12-04', 'z1', { a: ['AL'] }); }) === true, 'another month can still change');
-  ok(store.commit('import', d => { M.setCell(d, '2026-11-05', 'z1', { a: ['AL'] }); }, { unlock: true }) === true && !M.isMonthLocked(store.get(), MONTH) && store.unlocked[0] === MONTH, 'an import unlocks the months it fills');
+  const zp = M.poolOf(store.get(), store.get().staff[0]);
+  ok(store.commit('import', d => { M.setCell(d, '2026-11-05', 'z1', { a: ['AL'] }); }, { unlock: true }) === true && !M.isMonthLocked(store.get(), MONTH, zp) && store.unlocked[0] === MONTH, 'an import unlocks the months it fills');
+  ok(M.isMonthLocked(store.get(), MONTH, zp === 'junior' ? 'senior' : 'junior'), '… for that roster only');
   store.undo();
-  ok(M.isMonthLocked(store.get(), MONTH) && !M.getCell(store.get(), '2026-11-05', 'z1'), 'undo puts the import and the lock back');
-  store.commit('unlock', d => { M.setMonthLocked(d, MONTH, false); });
-  ok(store.ensureLocked(MONTH) === false && !M.isMonthLocked(store.get(), MONTH), 'a month someone unlocked stays open this visit');
-  ok(store.lockAll() === true && M.isMonthLocked(store.get(), MONTH) && M.isMonthLocked(store.get(), '2026-12'), 'closing locks it again, and the month without an entry');
+  ok(M.isMonthLocked(store.get(), MONTH, zp) && !M.getCell(store.get(), '2026-11-05', 'z1'), 'undo puts the import and the lock back');
+  store.commit('unlock', d => { M.setMonthLocked(d, MONTH, false, 'both'); });
+  ok(store.ensureLocked(MONTH) === false && !M.isMonthLocked(store.get(), MONTH, 'junior') && !M.isMonthLocked(store.get(), MONTH, 'senior'), 'a month someone unlocked stays open this visit');
+  ok(store.lockAll() === true && M.isMonthLocked(store.get(), MONTH, 'junior') && M.isMonthLocked(store.get(), MONTH, 'senior') && M.isMonthLocked(store.get(), '2026-12'), 'closing locks it again (both rosters), and the month without an entry');
   const demo = createStore({ demo: true, fallback: () => structuredClone(store.get()) });
   ok(demo.lockAll() === false, 'practice is never locked');
+}
+
+// ---------- each roster locks its own month ----------
+{
+  const s = M.defaultState();
+  s.staff = [{ id: 'j1', name: 'J', group: 'mo', tags: [] }, { id: 's1', name: 'S', group: 'cons', tags: [] }];
+  M.migrate(s);
+  s.settings.pool = 'junior';
+  M.setMonthLocked(s, MONTH, true);
+  ok(M.isMonthLocked(s, MONTH) && M.isMonthLocked(s, MONTH, 'junior') && !M.isMonthLocked(s, MONTH, 'senior'), 'locking locks the roster in view only');
+  eq(s.months[MONTH].status, 'draft', 'status published only when both are locked');
+  M.setMonthLocked(s, MONTH, true, 'senior');
+  eq(s.months[MONTH].status, 'published', 'both locked: published (what older copies read)');
+  M.setMonthLocked(s, MONTH, false, 'senior');
+  const old = M.migrate({ ...M.defaultState(), months: { [MONTH]: { status: 'published', publishedAt: '2026-10-01T00:00:00Z' } } });
+  ok(M.isMonthLocked(old, MONTH, 'junior') && M.isMonthLocked(old, MONTH, 'senior'), 'a month locked before: locked for both');
+  const mem = {};
+  globalThis.localStorage = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: k => { delete mem[k]; } };
+  const { createStore } = await import('../js/store.js');
+  const store = createStore({ demo: false, fallback: () => structuredClone(s) });
+  let hits = null; store.onLocked = (m, label, h) => { hits = h; };
+  ok(store.commit('senior edit', d => { M.setCell(d, '2026-11-04', 's1', { a: ['AL'] }); }) === true, 'the senior roster can still change while the junior one is locked');
+  ok(store.commit('junior edit', d => { M.setCell(d, '2026-11-04', 'j1', { a: ['AL'] }); }) === false && hits && hits[0].pool === 'junior', 'the junior roster cannot');
+  // the cloud: each roster's lock goes up and comes back; a document from an older app (status only) locks both
+  const pm = cloud.pickMonth(store.get(), MONTH);
+  eq(pm.meta.locks.junior !== '' && pm.meta.locks.senior === '', true, 'the month sent up carries each lock');
+  ok(cloud.monthFromDoc({ status: 'published', publishedAt: 'x' }).locks.senior === 'x', 'old document: locked for both');
+  eq(cloud.monthFromDoc({ status: 'draft', locks: { junior: '', senior: 't' } }).locks, { junior: '', senior: 't' }, 'new document: as saved');
+  // merge by pool: my roster's lock, their lock for the other
+  const mine = structuredClone(store.get()), theirs = structuredClone(store.get());
+  M.setMonthLocked(theirs, MONTH, false, 'junior'); M.setMonthLocked(theirs, MONTH, true, 'senior');
+  const docs = [{ month: MONTH, ...cloud.pickMonth(theirs, MONTH).meta, cells: JSON.stringify(cloud.pickMonth(theirs, MONTH).cells) }];
+  const out = J.mergeByPool(mine, cloud.pickTeam(theirs), docs, 'junior', M.poolOf, cloud.cellsFromDoc);
+  ok(out.months[MONTH].locks.junior && out.months[MONTH].locks.senior && out.months[MONTH].status === 'published', 'my junior lock kept, their senior lock taken');
 }
 
 // ---------- senior residents and moving someone by hand ----------
@@ -352,6 +418,48 @@ function pool() {
   const parsed = { people: [{ key: 'k3', name: 'Fake Moved', group: 'srp', matchId: 'r3', note: 'R3' }], months: [], cells: [] };
   try { io.applyImport(s, parsed); } catch { /* only the people part matters here */ }
   eq([by('r3').pool, by('r3').note], ['senior', 'R3'], 'reimport keeps the move by hand');
+}
+
+// ---------- rules: no To confirm, priorities in bulk ----------
+{
+  const old = M.defaultState();
+  delete old.settings.rcv;
+  old.rules.push({ ...old.rules[0], id: 'rx', note: 'Keep this. Predicted from the drafted rules: confirm or change.' });
+  const s = M.migrate(old);
+  eq(s.rules.find(r => r.id === 'rx').note, 'Keep this.', 'the old To confirm sentence goes, the rest of the note stays');
+  const soft = s.rules.filter(r => !r.hard).slice(0, 2), hard = s.rules.find(r => r.hard);
+  const spread = s.rules.find(r => r.type === 'spread');
+  const ids = new Set([...soft.map(r => r.id), hard.id]);
+  eq(bulkSet(s, ids, { weight: 70 }) >= 2, true, 'set priority changes the selected rules');
+  eq(soft.map(r => s.rules.find(x => x.id === r.id).weight), [70, 70], 'to 70');
+  ok(s.rules.find(r => r.id === hard.id).hard, 'a must-hold rule stays must hold when given a priority');
+  bulkSet(s, ids, { by: 40 });
+  eq(s.rules.find(r => r.id === soft[0].id).weight, 100, 'raising stops at 100');
+  bulkSet(s, new Set([spread.id]), { hard: true });
+  ok(!s.rules.find(r => r.id === spread.id).hard, 'a share-fairly rule cannot become must hold');
+  bulkSet(s, ids, { enabled: false });
+  ok([...ids].every(id => s.rules.find(r => r.id === id).enabled === false), 'turned off together');
+}
+
+// dragging a rule in Priorities: it lands between its neighbours, ties keep the order it was dropped in
+{
+  const s = { rules: [
+    { id: 'a', type: 'cap', hard: false, weight: 80 }, { id: 'b', type: 'cap', hard: false, weight: 50 },
+    { id: 'c', type: 'cap', hard: false, weight: 50 }, { id: 'd', type: 'cap', hard: true, weight: 50 },
+    { id: 's', type: 'spread', hard: false, weight: 10 }] };
+  const sorted = () => s.rules.filter(r => !r.hard).sort((x, y) => y.weight - x.weight).map(r => r.id);
+  ok(placeRule(s, 's', { hard: false, aboveId: 'a', belowId: 'b' }), 'moved');
+  eq(s.rules.find(r => r.id === 's').weight, 65, 'between 80 and 50 it gets 65');
+  placeRule(s, 'a', { hard: false, aboveId: 'b', belowId: 'c' });
+  eq(sorted(), ['s', 'b', 'a', 'c'], 'between two at 50 it gets 50 and sits between them');
+  placeRule(s, 'c', { hard: false, aboveId: null, belowId: 's' });
+  eq(s.rules.find(r => r.id === 'c').weight, 83, 'to the top: halfway to 100');
+  placeRule(s, 'b', { hard: false, aboveId: 'a', belowId: null });
+  eq(sorted().at(-1), 'b', 'to the bottom');
+  ok(placeRule(s, 'd', { hard: false, aboveId: 'c', belowId: 's' }) && !s.rules.find(r => r.id === 'd').hard, 'a must-hold rule dragged into preferences becomes one');
+  ok(placeRule(s, 'a', { hard: true }) && s.rules.find(r => r.id === 'a').hard, 'dragged into Must hold');
+  eq(placeRule(s, 's', { hard: true }), false, 'a share-fairly rule cannot go into Must hold');
+  eq(placeRule(s, 'c', { hard: false, aboveId: null, belowId: 'd' }), false, 'dropped where it was: nothing changes');
 }
 
 console.log(`junior pool tests: ${n} checks passed`);

@@ -67,7 +67,7 @@ export function renderPool(app, body) {
 
   const problems = poolProblems(state, mine);
   body.append(h('div', { class: 'card jp-status' },
-    problems.length ? h('ul', null, ...problems.map(t => h('li', null, t))) : h('p', null, 'The call list is set. Rules for the junior pool are on the Rules screen; the ones marked To confirm come from the drafted rules.'),
+    problems.length ? h('ul', null, ...problems.map(t => h('li', null, t))) : h('p', null, 'The call list is set. Rules for the junior pool are on the Rules screen.'),
     state.settings && state.settings.jpRules ? null : h('p', { class: 'bx-help' }, 'The junior rules are added when you set the first call level.')));
 
   function save(p, level, strength) {

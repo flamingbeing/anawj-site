@@ -239,7 +239,7 @@ const cell = await page.evaluate(() => {
   const a = window.ntfApp, M = a.model, st = a.store.get();
   for (const d of M.monthDays(a.month)) {
     if (M.isWeekend(d) || M.isHoliday(st, d)) continue;
-    const p = M.staffInMonth(st, a.month).find(x => !M.getCell(st, d, x.id) && !M.effectiveCodes(st, d, x.id).length);
+    const p = M.staffInView(st, a.month).find(x => !M.getCell(st, d, x.id) && !M.effectiveCodes(st, d, x.id).length);
     if (p) return { d, sid: p.id };
   }
 });
@@ -255,7 +255,7 @@ ok(true, 'giving someone leave ticks task 1');
 const pair = await page.evaluate(() => {
   const a = window.ntfApp, M = a.model, st = a.store.get(), m = M.monthOf(M.iso(new Date()));
   const sen = new Set(st.groups.filter(g => g.kind === 'senior').map(g => g.id));
-  const ppl = M.staffInMonth(st, m).filter(p => !sen.has(p.group));
+  const ppl = M.staffInView(st, m).filter(p => !sen.has(p.group));
   for (const d of M.monthDays(m)) { const on = ppl.filter(p => (M.getCell(st, d, p.id)?.a || []).includes('C')); if (on.length >= 2) return [on[0].id, on[1].id]; }
 });
 ok(!!pair, 'the practice month has two juniors on call together');
