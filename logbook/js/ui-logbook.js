@@ -364,7 +364,7 @@ function listView(rows, flagsOf, repaint) {
   if (!S.cases.length) return emptyState('logbook', 'No cases yet', 'Cases you log show here, newest first.', h('a', { class: 'btn primary', href: '#log' }, 'Log your first case'));
   if (!rows.length) return emptyState('search', 'No cases match', 'Try fewer words, or clear the filters.');
   const timeline = rowLayoutOf(display()) === 'timeline';
-  const by = timeline ? 'day' : groupBy(display().lbGroup), sort = timeline ? 'newest' : sortBy(display().lbSort);
+  const by = timeline ? 'day' : groupBy(display().lbGroup), sort = sortBy(display().lbSort);
   const ul = h('ul', { class: 'cases' });
   // the default (Month, Newest): as it always was, with Jump to a date on each month
   if (by === 'month' && sort === 'newest') {
@@ -398,7 +398,7 @@ function groupSelects(repaint) {
   const pick = (label, key, opts, val) => h('select', { 'aria-label': label, onchange: e => { const v = e.target.value; setDisplay({ [key]: v === opts[0][0] ? null : v }); view.page = 0; repaint(); } },
     opts.map(([v, t]) => h('option', { value: v, selected: v === val }, t)));
   const groups = GROUPS.filter(([k]) => !(k === 'year' && basicHides('year')));
-  return [pick('Group by', 'lbGroup', groups, groupBy(display().lbGroup)), pick('Sort', 'lbSort', SORTS, sortBy(display().lbSort))];
+  return [rowLayoutOf(display()) === 'timeline' ? h('span', { class: 'hint' }, 'Timeline groups cases by day') : pick('Group by', 'lbGroup', groups, groupBy(display().lbGroup)), pick('Sort', 'lbSort', SORTS, sortBy(display().lbSort))];
 }
 
 // what the grouping needs from the app: names, residency years, targets and counts, the planned cases

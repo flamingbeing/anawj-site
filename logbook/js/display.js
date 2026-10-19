@@ -182,13 +182,19 @@ export function applyLook(d = {}) {
   for (const b of BUTTON_STYLES.slice(1)) c.toggle('btn-' + b[0], d.btnStyle === b[0]);
   c.toggle('icon-btns', !!d.iconBtns); c.toggle('cal-plain', !!d.calPlain); c.toggle('page-titles', !!d.pageTitles);
   const rows = rowLayoutOf(d);
-  c.toggle('nav-rail', d.navStyle === 'rail'); c.toggle('form-sections', d.formLayout === 'sections');
+  c.toggle('nav-rail', d.navStyle === 'rail'); applyNavOrientation(); c.toggle('form-sections', d.formLayout === 'sections');
   c.toggle('rows-chat', rows === 'chat'); c.toggle('rows-timeline', rows === 'timeline');
   c.toggle('rows-short', rows === 'compact' || rows === 'chat'); c.toggle('row-hold', !!d.rowHold);
   // the name in the header and the browser tab (plain text, at most 40 characters)
   paintTitle(d);
   applyCustomCss(d);
 }
+// The same tab list becomes vertical above the rail breakpoint, including after resizing.
+function applyNavOrientation() {
+  const rail = document.documentElement.classList.contains('nav-rail') && window.innerWidth > 900;
+  document.getElementById('tabs')?.setAttribute('aria-orientation', rail ? 'vertical' : 'horizontal');
+}
+window.addEventListener('resize', applyNavOrientation);
 export const BUTTON_STYLES = [['outlined', 'Outlined (default)'], ['filled', 'Filled'], ['tinted', 'Tinted'], ['plain', 'Plain']];
 // the header's words: the app's name, or with Page titles the page's ("Logbook"); render() in app.js says which page
 let pageLabel = '';

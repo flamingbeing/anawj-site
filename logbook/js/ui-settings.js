@@ -1,4 +1,3 @@
-import { NAV_STYLES, ROW_LAYOUTS, FORM_LAYOUTS, rowLayoutOf } from './device-presets.js';
 // Settings tab (#settings): the Admin entry (admins only), display, logging, templates, recycle bin, privacy. Also the Account tab's
 // "You" card (youCard), used by ui-account.js; the More page's cards are in more-cards.js.
 
@@ -20,7 +19,7 @@ import { SWITCHES, switchLabel, switchChanges, applyPatch, resetPatch, tabsAfter
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 import { partsSettings } from './ui-parts.js';
 import { labelsOn } from './parts.js';
-import { deviceOn, deviceChanges, deviceReset, DEVICE_SWITCHES } from './device-presets.js';
+import { NAV_STYLES, ROW_LAYOUTS, FORM_LAYOUTS, rowLayoutOf, deviceOn, deviceChanges, deviceReset, DEVICE_SWITCHES } from './device-presets.js';
 import { applyCompact, applyTheme, cachedTheme, TEXT_SIZES, ZOOMS, applyTextSize, applyZoom, applyAccent, display, setDisplay, applyDisplay, LINE_WIDTHS, LINE_HEIGHTS, CONTRASTS, MOTIONS, BUTTON_STYLES, defaultTitle, BORDERS, ROUNDS, roundLevel, BAR_TABS, barTabs, MAX_BAR, arrangeTabs, setTabOnBar, borderLevel, cleanTitle, IPHONE_APP, START_TABS, CARD_STYLES, cardStyle, cardPatch } from './display.js';
 import { resetLink, help, toggle } from './settings-rows.js';
 // (the display helpers are still exported from here: the e2e tests import them from this file)
