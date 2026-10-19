@@ -11,6 +11,7 @@ import * as A from '../js/aps.js';
 import * as io from '../js/io.js';
 import * as cloud from '../js/cloud.js';
 import { ruleForRequest } from '../js/ui-requests.js';
+import { applyAssignments } from '../js/ui-roster.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ExcelJS = createRequire(import.meta.url)(path.join(here, '../vendor/exceljs.min.js'));
@@ -248,6 +249,18 @@ function pool() {
   const mine = M.defaultState(); mine.settings.pool = 'senior';
   const m = cloud.mergeTeam(mine, t);
   eq([m.aps, m.settings.pool], [s.aps, 'senior'], 'aps comes in, own pool view kept');
+}
+
+// ---------- auto-filling one pool leaves the other pool's shifts alone ----------
+{
+  const s = M.defaultState();
+  const sg = s.groups.find(g => g.kind !== 'junior').id, jg = s.groups.find(g => g.kind === 'junior').id;
+  s.staff = [{ id: 'sen', name: 'Sen', group: sg, tags: [] }, { id: 'jun', name: 'Jun', group: jg, tags: ['mo1'] }];
+  M.setCell(s, '2026-11-02', 'sen', { a: ['C'], auto: ['C'] });
+  const snap = J.scopeToPool(s, 'junior', M.poolOf);
+  applyAssignments(s, { assignments: { '2026-11-02': { jun: ['C'] } } }, ['2026-11-02'], new Set(snap.staff.map(p => p.id)));
+  eq(M.getCell(s, '2026-11-02', 'sen').a, ['C'], "the senior's auto-filled call stays");
+  eq(M.getCell(s, '2026-11-02', 'jun').auto, ['C'], 'the junior gets the new call');
 }
 
 console.log(`junior pool tests: ${n} checks passed`);

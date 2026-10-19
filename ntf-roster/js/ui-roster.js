@@ -1388,10 +1388,12 @@ export function openAutofill(app) {
 
   function diff(snapshot, result) {
     const asg = result.assignments || {};
+    const inFill = new Set((snapshot.staff || []).map(p => p.id));
     let added = 0, removed = 0;
     for (const d of days) {
       const ids = new Set([...Object.keys(snapshot.cells?.[d] || {}), ...Object.keys(asg[d] || {})]);
       for (const sid of ids) {
+        if (!inFill.has(sid)) continue;
         const cell = snapshot.cells?.[d]?.[sid];
         if (cell?.lock) continue;
         const before = new Set(cell?.auto || []);
@@ -1440,7 +1442,7 @@ export function openAutofill(app) {
       h('button', {
         type: 'button', class: 'btn btn-primary', autofocus: true,
         onclick: () => {
-          app.store.commit(`Auto-fill ${M.fmtMonth(app.month)}`, draft => applyAssignments(draft, result, days));
+          app.store.commit(`Auto-fill ${M.fmtMonth(app.month)}`, draft => applyAssignments(draft, result, days, new Set((snapshot.staff || []).map(p => p.id))));
           close();
           app.toast(`Auto-fill applied: ${changedTxt.toLowerCase()}`, { action: { label: 'Undo', fn: () => app.store.undo() } });
         },
@@ -1458,11 +1460,13 @@ export function openAutofill(app) {
 }
 
 // Set each cell's auto codes from the solver result, keeping every non-auto code. Locked cells are skipped.
-export function applyAssignments(draft, result, days) {
+// `only` (a Set of staff ids): the people the fill covered (one pool); everyone else's cells are left alone.
+export function applyAssignments(draft, result, days, only = null) {
   const asg = result.assignments || {};
   for (const d of days) {
     const ids = new Set([...Object.keys(draft.cells?.[d] || {}), ...Object.keys(asg[d] || {})]);
     for (const sid of ids) {
+      if (only && !only.has(sid)) continue;
       const cell = M.getCell(draft, d, sid);
       if (cell?.lock) continue;
       const oldAuto = cell?.auto || [];
