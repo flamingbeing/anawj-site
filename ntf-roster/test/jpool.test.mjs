@@ -9,6 +9,7 @@ import * as S from '../js/solver.js';
 import * as J from '../js/jpool.js';
 import * as A from '../js/aps.js';
 import * as io from '../js/io.js';
+import * as cloud from '../js/cloud.js';
 import { ruleForRequest } from '../js/ui-requests.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -237,6 +238,16 @@ function pool() {
   eq([w.hard, w.params.min, w.weight], [false, 1, 40], 'a wanted call is a preference');
   const s = M.defaultState(); s.rules.push(r);
   eq(R.validateRule(r, { ...s, staff: [{ id: 'p1', name: 'Pat', group: 'mo', tags: [] }] }), [], 'valid rule');
+}
+
+// ---------- team sharing carries the APS tally, not the pool you are looking at ----------
+{
+  const s = M.defaultState(); s.aps = { base: { p1: 2 }, last: { p1: '2026-10' }, through: '2026-10' }; s.settings.pool = 'junior';
+  const t = cloud.pickTeam(s);
+  eq(t.aps, s.aps, 'aps goes to the team copy'); ok(!('pool' in t.settings), 'the pool view stays local');
+  const mine = M.defaultState(); mine.settings.pool = 'senior';
+  const m = cloud.mergeTeam(mine, t);
+  eq([m.aps, m.settings.pool], [s.aps, 'senior'], 'aps comes in, own pool view kept');
 }
 
 console.log(`junior pool tests: ${n} checks passed`);

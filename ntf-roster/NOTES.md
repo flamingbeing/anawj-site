@@ -219,7 +219,9 @@ the real People app).
   checks nobody else saved since you loaded (conflict: load theirs or save anyway) and keeps a permanent copy
   (`versions`). The rules allow only `{ email, name }` stamps with the saver's own email (the app shows the email
   beside the name) and no save times more than 10 minutes in the future. Members are admin, rosterer (both save) or viewer (reads). Rules tested in the emulator
-  (`tools/test-rules.sh`, project `demo-ntf-roster`).
+  (`tools/test-rules.sh`, project `demo-ntf-roster`). `team/main` also carries `aps` (the APS week tally); the pool you
+  look at (`settings.pool`) stays in each browser. The rules deploy on merge (matrix entry in
+  `deploy-firestore-rules.yml`) once the project `ntf-roster` exists and has Firebase Rules Admin granted.
 - Installable and offline (`sw.js`, `manifest.webmanifest`); More ends with the app version and "Get the latest
   version" (AGENTS.md).
 

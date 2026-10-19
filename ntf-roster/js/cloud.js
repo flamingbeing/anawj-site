@@ -4,7 +4,7 @@
 // Who may read or write what is enforced by firestore.rules (members only); this file just asks.
 //
 // Data (SPEC.md "Team sync"):
-//   team/main                 { settings, groups, tags, staff, duties, rules, rulesLog, updatedAt, updatedBy }
+//   team/main                 { settings, groups, tags, staff, duties, rules, rulesLog, aps, updatedAt, updatedBy }
 //   team/main/versions/*      { team, savedAt, savedBy }                       (a copy of each save, never changed)
 //   months/{YYYY-MM}          { month, cells, status, publishedAt, note, updatedAt, updatedBy }
 //   months/{m}/versions/*     { month, cells, status, publishedAt, note, savedAt, savedBy }   (never changed)
@@ -26,7 +26,9 @@ export const isConfigured = !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIRE
 export const enabled = isConfigured && !isDemo;
 
 // The parts of the state that belong to the whole team (one document); the cells go by month.
-export const TEAM_KEYS = ['settings', 'groups', 'tags', 'staff', 'duties', 'rules', 'rulesLog'];
+export const TEAM_KEYS = ['settings', 'groups', 'tags', 'staff', 'duties', 'rules', 'rulesLog', 'aps'];
+// the parts that are objects, not lists
+const OBJECT_KEYS = ['settings', 'aps'];
 export const ROLES = ['admin', 'rosterer', 'viewer'];
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const MAX_DOC = 900000; // Firestore's limit is 1 MiB a document; stop well before it with a clear message
@@ -138,7 +140,8 @@ export const canEdit = member => !!member && (member.role === 'admin' || member.
 // The team document's data from a state (or from anything with the same keys).
 export function pickTeam(state) {
   const out = {};
-  for (const k of TEAM_KEYS) out[k] = state[k] ?? (k === 'settings' ? {} : []);
+  for (const k of TEAM_KEYS) out[k] = state[k] ?? (OBJECT_KEYS.includes(k) ? {} : []);
+  if (out.settings && typeof out.settings === 'object') { out.settings = { ...out.settings }; delete out.settings.pool; }   // which pool you look at stays in your own browser
   return plain(out);
 }
 
@@ -156,8 +159,9 @@ export function mergeTeam(state, doc) {
   for (const k of TEAM_KEYS) {
     if (!(k in (doc || {}))) continue;
     const v = doc[k];
-    if (k === 'settings' ? (v && typeof v === 'object' && !Array.isArray(v)) : Array.isArray(v)) next[k] = plain(v);
+    if (OBJECT_KEYS.includes(k) ? (v && typeof v === 'object' && !Array.isArray(v)) : Array.isArray(v)) next[k] = plain(v);
   }
+  if (next.settings && state.settings && state.settings.pool) next.settings = { ...next.settings, pool: state.settings.pool };
   return next;
 }
 
