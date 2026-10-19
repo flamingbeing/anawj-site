@@ -52,6 +52,9 @@ assert.deepEqual(resolve('nuhjuniormonthly.anawj.com', '/'), { file: 'nuh-junior
 assert.deepEqual(resolve('nuhjuniormonthly.anawj.com', '/js/sheet.js'), { file: 'nuh-junior-monthly/js/sheet.js' });
 assert.deepEqual(resolve('ntfroster.anawj.com', '/js/app.js'), { file: 'ntf-roster/js/app.js' });
 assert.deepEqual(resolve('ntfroster.anawj.com', '/nuh-roster/'), { file: 'ntf-roster/nuh-roster/' });   // never the NUH roster's files: 404
+assert.deepEqual(resolve('ntfroster.anawj.com', '/__/auth/handler'), { file: '__/auth/handler' });   // Firebase's sign-in helper on this host
+assert.deepEqual(resolve('ntfroster.anawj.com', '/__/firebase/init.json'), { file: 'ntf-auth/firebase/init.json' });
+assert.deepEqual(resolve('ntfroster.anawj.com', '/ntf-auth/firebase/init.json'), { file: 'ntf-roster/ntf-auth/firebase/init.json' });   // only through /__/firebase/
 // ... and never another app's files (only folders under the app's own folder are reachable)
 assert.deepEqual(resolve('prewarmstudy.anawj.com', '/logbook/js/app.js'), { file: 'prewarm/logbook/js/app.js' });   // that file doesn't exist there: 404
 

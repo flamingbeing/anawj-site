@@ -14,7 +14,7 @@
 // members list.
 export const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyC2s1meqHtiUPkxHBzT4bEjA-D4s3c6i48',
-  authDomain: 'ntf-roster.firebaseapp.com',
+  authDomain: 'ntfroster.anawj.com',   // sign-in helper pages served on this host (ntf-auth/, worker/routes.js)
   projectId: 'ntf-roster',
   storageBucket: 'ntf-roster.firebasestorage.app',
   messagingSenderId: '127001041489',
