@@ -329,3 +329,11 @@ restriction" (same day, following days, between two people, and ready-made ones)
   section in the junior pool. Junior pool setup lists who was moved by hand.
 - The Excel export's Seniors / Juniors count rows follow the same split. Default rules still name `sr` where they did
   (e.g. the 2 juniors on call); rule texts say "consultants" for the consultant sections.
+
+## Sign-in on this host (19 Oct 2026)
+
+- `authDomain` is `ntfroster.anawj.com`: the Worker serves Firebase's helper pages at `/__/auth/` (the shared copies)
+  and `/__/firebase/init.json` from `ntf-auth/firebase/` (as apmes does; logbook/README.md, sign-in). The Google
+  sign-in client needs `https://ntfroster.anawj.com/__/auth/handler` in its Authorised redirect URIs.
+- The installed app and Firefox on Android sign in by redirect (a popup there loses its opener); elsewhere the popup,
+  with redirect when a popup is blocked. `watchUser` finishes a redirect with `getRedirectResult`.

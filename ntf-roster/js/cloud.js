@@ -104,14 +104,31 @@ export function friendly(err) {
 export async function watchUser(cb) {
   if (!enabled) return () => {};
   const { auth, A } = await sdk();
+  // finishes a redirect sign-in (below) when the page loads again
+  A.getRedirectResult(auth).catch(e => console.warn('Redirect sign-in failed', e));
   return A.onAuthStateChanged(auth, cb);
 }
 
+// As the logbook: in the installed app (and Firefox on Android) a popup opens without its opener, so Google's handler
+// can't hand the sign-in back; sign in by redirect there, and when a popup is blocked or unsupported. authDomain is
+// this host, so the redirect keeps its storage. Returns the user, or null while the page goes to Google.
+const REDIRECT_CODES = ['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/web-storage-unsupported', 'auth/cancelled-popup-request'];
+export const redirectFirst = ({ standalone = false, ua = '' } = {}) => standalone || (/Android/i.test(ua) && /Firefox\//i.test(ua));
+const installedApp = () => {
+  try { return !!(globalThis.matchMedia?.('(display-mode: standalone)').matches || globalThis.matchMedia?.('(display-mode: fullscreen)').matches || globalThis.navigator?.standalone); } catch { return false; }
+};
 export async function signIn() {
   const { auth, A } = await sdk();
   const provider = new A.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  return (await A.signInWithPopup(auth, provider)).user;
+  if (redirectFirst({ standalone: installedApp(), ua: globalThis.navigator?.userAgent || '' })) { await A.signInWithRedirect(auth, provider); return null; }
+  try {
+    return (await A.signInWithPopup(auth, provider)).user;
+  } catch (e) {
+    if (!REDIRECT_CODES.includes(e && e.code)) throw e;
+    await A.signInWithRedirect(auth, provider);
+    return null;
+  }
 }
 
 export async function signOut() {

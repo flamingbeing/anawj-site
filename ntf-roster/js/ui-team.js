@@ -80,6 +80,7 @@ export async function joinAndLoad(app) {
   try {
     let user = await cloud.currentUser();
     if (!user) user = await cloud.signIn();
+    if (!user) return;   // gone to Google to sign in; tap again when back
     const member = await cloud.myMember();
     if (!member) {
       app.toast(`Signed in as ${user.email}, but that account is not on the members list yet. Cloud in More lets you ask to join.`, { kind: 'warn', ms: 10000 });
