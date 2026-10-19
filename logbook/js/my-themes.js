@@ -12,6 +12,9 @@ const MODES = ['light', 'dark', 'oled', 'auto'];
 const small = v => Number.isInteger(v) && v >= 0 && v <= 9;
 const word = v => typeof v === 'string' && /^[a-z0-9-]{1,30}$/i.test(v);
 const OK = {
+  navStyle: v => ['tabs', 'rail'].includes(v),
+  rowLayout: v => ['card', 'compact', 'chat', 'timeline'].includes(v),
+  formLayout: v => ['page', 'sections'].includes(v),
   accent: v => !!cleanAccent(v), bgTint: v => typeof v === 'string' && Object.hasOwn(TINTS, v),
   borders: small, round: small, flat: v => v === true, shadows: v => v === false,
   colourful: v => v === true || word(v), lineHeight: v => typeof v === 'string' && /^\d(\.\d{1,2})?$/.test(v),

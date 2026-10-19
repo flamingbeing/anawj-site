@@ -1,3 +1,4 @@
+import { NAV_STYLES, ROW_LAYOUTS, FORM_LAYOUTS, rowLayoutOf } from './device-presets.js';
 // Settings tab (#settings): the Admin entry (admins only), display, logging, templates, recycle bin, privacy. Also the Account tab's
 // "You" card (youCard), used by ui-account.js; the More page's cards are in more-cards.js.
 
@@ -70,7 +71,7 @@ function pick(label, opts, cur, set, line, ...more) {
 }
 // a display key as a ✓ list; the default is saved as nothing
 const lookPick = (k, label, opts, dflt, line, ...more) =>
-  pick(label, opts, display()[k] ?? dflt, v => applyDisplay(setDisplay({ [k]: v === dflt ? null : v })), line, ...more);
+  pick(label, opts, k === 'rowLayout' ? rowLayoutOf(display()) : display()[k] ?? dflt, v => applyDisplay(setDisplay({ [k]: v === dflt ? null : v, ...(k === 'rowLayout' ? { rowShort: null } : {}) })), line, ...more);
 const DEVICE_NOTE = () => h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only, so a phone and a computer can each look the way that suits them.');
 const THEME_MODES = [['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED (pure black)'], ['auto', 'Auto (match the phone)']];
 const slider = (label, names, level, dflt, onLevel) => {
@@ -191,6 +192,12 @@ export function renderThemes() {
       fontPicker('ui'),
       fontPicker('log'),
       lookPick('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
+      DEVICE_NOTE()),
+    h('section', { class: 'card' },
+      h('h2', {}, 'Layout'),
+      lookPick('navStyle', 'Navigation layout', NAV_STYLES, 'tabs', 'The rail appears above 900 px; smaller windows keep tabs.'),
+      lookPick('rowLayout', 'Logbook row layout', ROW_LAYOUTS, 'card'),
+      lookPick('formLayout', 'Case form layout', FORM_LAYOUTS, 'page'),
       DEVICE_NOTE()),
     h('section', { class: 'card' },
       h('h2', {}, 'App-style details'),
@@ -321,7 +328,7 @@ export function renderDisplayAdvanced() {
       tabArranger(),
       h('h3', {}, 'Logbook rows'),
       toggle('Fewer buttons on Logbook rows (a ⋯ menu)', st.rowMenu, set('rowMenu'), 'Copy and Reflect move into one ⋯ button.', 'A ✓ still shows cases with a reflection.'),
-      toggle('Shorter Logbook rows', st.rowShort, set('rowShort'), 'One line for the case, one grey line of tags, no buttons.', 'The initials and case in bold, the short date at the right. Tap a row to open it; press and hold (Accessibility) for Copy and Reflect.'),
+      toggle('Shorter Logbook rows', rowLayoutOf(st) === 'compact', v => { applyDisplay(setDisplay({ rowShort: v, rowLayout: null })); hooks.render(); }, 'One line for the case, one grey line of tags, no buttons.', 'The initials and case in bold, the short date at the right. Tap a row to open it; press and hold (Accessibility) for Copy and Reflect.'),
       toggle('Copy button on each Logbook row', st.rowCopy, set('rowCopy'), 'Off unless you switch it on.', 'The ⋯ menu, if you use it, still copies one case.'),
       toggle('Copy button for each day', st.dayCopy, set('dayCopy'), 'Beside Share when you pick a day in the calendar.', 'Off unless you switch it on. Share already sends the whole day (or copies it, where sharing isn’t possible).'),
       h('h3', {}, 'Page'),

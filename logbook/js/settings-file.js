@@ -24,6 +24,9 @@ const SKIP = new Set(['sharedSeen', 'rYear', 'rYearAY', 'importMap', 'cloudBacku
 const str = (v, n = 200) => (typeof v === 'string' ? v.slice(0, n) : '');
 const strs = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string').map(x => x.slice(0, 80)).slice(0, 300) : []);
 const OBJECTS = {
+  navStyle: v => ['tabs', 'rail'].includes(v) ? v : null,
+  rowLayout: v => ['card', 'compact', 'chat', 'timeline'].includes(v) ? v : null,
+  formLayout: v => ['page', 'sections'].includes(v) ? v : null,
   colours: v => { const c = cleanColours(v); return Object.keys(c).length ? c : null; },
   tagSet: v => (v == null ? null : cleanTagSet(v)),
   shareFormat: v => cleanFormat(v),
@@ -54,7 +57,7 @@ const PLAIN = new Set(['dayNoteOnCase', 'pasteClean', 'shareAsk', 'noteToolbar',
   'reflExport', 'reflNotes', 'searchOps', 'startTab', 'suggestions', 'tagEditorView', 'textSize', 'zoom', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'autoFocus', 'appTitle', 'weeklyDigest',
   'basic', 'mode', 'weekStart', 'afterSave', 'undoSecs', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'borders', 'reflPoints', 'round', 'shadows', 'bigTaps', 'swipeTabs', 'rowMenu', 'reflToolbar', 'autoTick', 'recentCount',
   // device keys added later (they were dropped on import until 13 Oct 2026; settings-file.test.mjs checks DISPLAY_KEYS)
-  'rowCopy', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'rowHold', 'dayCopy', 'hideTabsTyping',
+  'rowCopy', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'navStyle', 'rowLayout', 'formLayout', 'rowHold', 'dayCopy', 'hideTabsTyping',
   'labelParts', 'caseTplOn', 'listHeight', 'pageSize', 'lbGroup', 'lbSort', 'gridLines', 'boxHeight', 'boxGrow', 'totalsCompact', 'totalsTargets', 'calRefl', 'detectInitials', 'oneLetterInitials', 'skipStarts', 'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band', 'barBlur', 'tabActiveLabel', 'listStyle', 'titleAlign', 'switchStyle', 'pressStyle', 'iconWeight', 'typeStyle']);
 const MAX_JSON = 400 * 1024;
 
