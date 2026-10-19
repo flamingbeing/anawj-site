@@ -40,3 +40,19 @@ const odd = importText(JSON.stringify({ kind: FILE_KIND, themes: [{ name: 'Fake 
 assert.equal(odd.name, 'Fake bx/b'); assert.deepEqual(odd.look, { round: 2 }, 'unsafe values dropped');
 assert.equal(cleanMine([{ name: 'A' }, { name: 'a' }, null, { name: '' }]).length, 1);
 console.log('my-themes: ok');
+
+// Colour tokens round-trip without retaining unknown keys or non-hex CSS.
+const colours = { light: { bg: '#ffffff', ink: '#112233', accentInk: '#ffffff' }, dark: { line: '#556677' } };
+const saved = saveMine([], 'Fake palette', { colours }, 'auto', 'p1');
+assert.deepEqual(saved[0].look.colours, colours);
+assert.deepEqual(importText(exportText(saved), []).list[0].look.colours, colours);
+assert.deepEqual(minePatch(saved[0]).colours, colours);
+assert.equal(matchMine(saved, { colours: { dark: colours.dark, light: { ink: '#112233', bg: '#ffffff', accentInk: '#ffffff' } } }).name, 'Fake palette');
+assert.deepEqual(lookOf({ colours: { light: { bg: '#FFFFFF', extra: '#123456', panel: 'red' }, unknown: {} } }), { colours: { light: { bg: '#ffffff' } } });
+assert.deepEqual(lookOf({ colours: { light: { bg: '#fff' } } }), {});
+const oldFile = JSON.stringify({ kind: FILE_KIND, version: 1, themes: [{ name: 'Fake legacy', look: { accent: '#123456', bgTint: 'cream' } }] });
+assert.deepEqual(importText(oldFile, []).list[0].look, { accent: '#123456', bgTint: 'cream' });
+const bad = { colours: { light: { ink: '#ffffff' } } };
+assert.throws(() => saveMine([], 'Fake bad', bad), /Light ink on bg/);
+assert.throws(() => importText(JSON.stringify({ kind: FILE_KIND, version: 1, themes: [{ name: 'Fake bad', look: bad }] }), []), /Light ink on bg/);
+console.log('my-themes colours: ok');
