@@ -99,18 +99,20 @@ try {
   await a.click('.list a'); await a.click('.textlinks a[href$="/sheet"]');
   await a.waitForFunction(() => /36\.7/.test(document.querySelector('.sheet')?.textContent || ''), null, { timeout: 15000 });
 
-  // the PACU nurse link: phone A makes it on the PACU page; a phone that joined nothing opens it, fills in PACU, and the
+  // the PACU nurse link: phone A makes it on the Share to PACU page (from the PACU page); a phone that joined nothing opens it, fills in PACU, and the
   // team's phones get it (and the other way); the nurse's phone has nothing else; stopping the link ends access
   await a.goto(BASE + '#/');
   await a.click('.list a');
   await a.click('.links a[href$="/form/pacu"]');
+  await a.click('.paculink a[href$="/pacushare"]');
   await a.waitForSelector('[data-pacu-make]');
   await a.click('[data-pacu-make]');
   await a.waitForSelector('.pacuurl', { timeout: 20000 });
   const nurseLink = await a.inputValue('.pacuurl');
   assert.match(nurseLink, /#\/nurse\/[a-z2-9]{24}$/, 'a long random token in the link');
   assert.ok(await a.$('.paculink svg'), 'and a QR code');
-  if (SHOTS) { await a.evaluate(() => document.querySelector('.paculink').scrollIntoView()); await a.screenshot({ path: SHOTS + '/pacu-link.png' }); }
+  if (SHOTS) await a.screenshot({ path: SHOTS + '/pacu-link.png' });
+  await a.goBack(); await a.waitForSelector('[data-pev="pacu_in"]');
   const nctx = await b.newContext({ viewport: { width: 390, height: 844 } });
   const nu = await nctx.newPage();
   nu.on('pageerror', e => errors.push('nurse: ' + e.message));
@@ -133,6 +135,7 @@ try {
   await nu.goto(BASE + '#/');
   assert.equal(await nu.$('.list a'), null, 'the nurse phone has no patient list');
   // stopping the link ends access
+  await a.click('.paculink a[href$="/pacushare"]');
   a.once('dialog', d => d.accept());
   await a.click('[data-pacu-stop]');
   await a.waitForSelector('[data-pacu-make]', { timeout: 20000 });
@@ -210,7 +213,10 @@ try {
   await ad.click('[data-rmadmin="second@example.com"]');
   await toastSays(ad, /Removed/);
   await ad.waitForFunction(() => !document.querySelector('[data-rmadmin="second@example.com"]'));
-  // the admin uploads the blank Word form (made-up fixture; it isn't the whole form, so they confirm)
+  // the admin uploads the blank Word form on the Export screen (made-up fixture; it isn't the whole form, so they confirm)
+  assert.equal(await ad.$('#blankup'), null, 'not on the admin screen (that is for people’s access)');
+  await ad.evaluate(() => { location.hash = '#/export'; });
+  await ad.waitForSelector('#blankup', { state: 'attached', timeout: 15000 });
   ad.once('dialog', d => d.accept());
   const zip = new JSZip(); for (const [k, v] of Object.entries(fixtureFiles())) zip.file(k, v);
   await ad.setInputFiles('#blankup', { name: 'blank form.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: await zip.generateAsync({ type: 'nodebuffer' }) });
@@ -246,6 +252,31 @@ try {
   await d.fill('#me', 'dd'); await d.click('#joinlink');
   await toastSays(d, /isn’t right for WH/);
   // the admin sees the NUH patient
+  await ad.goto(BASE + '#/');
+  await ad.waitForFunction(() => /SYNC-01/.test(document.querySelector('.list')?.textContent || ''), null, { timeout: 15000 });
+  // Share subject (owner, 19 Oct 2026): the admin's subject link opens SYNC-01 on a new phone, which joins NUH first
+  await ad.click('.list a[href^="#/p/"]:not(.formlink)');
+  await ad.click('.caseshare a[href$="/share"]');
+  await ad.waitForSelector('#suburl', { timeout: 15000 });
+  const subLink = await ad.inputValue('#suburl');
+  assert.match(subLink, /#\/join\/NUH\/NUH-TEST-CODE\/p\/\w+$/, 'the subject link: ' + subLink);
+  assert.ok(await ad.$('.paculink svg'), 'and a QR code');
+  if (SHOTS) await ad.screenshot({ path: SHOTS + '/share-subject.png' });
+  const onSubject = pg => pg.waitForFunction(() => /SYNC-01/.test(document.querySelector('#title')?.textContent || '') && /^#\/p\/\w+$/.test(location.hash), null, { timeout: 25000 });
+  const e = await (await b.newContext({ viewport: { width: 390, height: 844 } })).newPage();
+  e.on('pageerror', x => errors.push('E: ' + x.message));
+  await e.goto(subLink);
+  await e.waitForSelector('body[data-cloud=ready]');
+  await e.waitForSelector('#joinlink');
+  await e.fill('#me', 'ee'); await e.click('#joinlink');
+  await onSubject(e);
+  assert.doesNotMatch(e.url(), /NUH-TEST-CODE/, 'the code leaves the address bar');
+  // a phone already on the team goes straight to it, and a member's own Share subject gives the same link
+  await bb.goto(subLink);
+  await onSubject(bb);
+  await bb.click('.caseshare a[href$="/share"]');
+  await bb.waitForSelector('#suburl', { timeout: 15000 });
+  assert.equal(await bb.inputValue('#suburl'), subLink);
   await ad.goto(BASE + '#/');
   await ad.waitForFunction(() => /SYNC-01/.test(document.querySelector('.list')?.textContent || ''), null, { timeout: 15000 });
   // the admin locks it: phone A sees it locked and can't open it; then the admin unlocks it
@@ -363,7 +394,7 @@ try {
   await bb.waitForSelector('#code', { timeout: 15000 });
 
   assert.deepEqual(errors, []);
-  console.log('prewarm sync: ok (two phones, PACU nurse link, join code, readings both ways, admin email-link and password sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, lock, offline edits heal, open reading asks, reload offline, same reading on both, log out)');
+  console.log('prewarm sync: ok (two phones, PACU nurse link, share subject link, join code, readings both ways, admin email-link and password sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, lock, offline edits heal, open reading asks, reload offline, same reading on both, log out)');
 } finally {
   await b.close();
 }

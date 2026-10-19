@@ -1033,7 +1033,8 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <a href="#/p/${id}/form/pacu"${done('pacu', 'PACU')}>PACU<small>${todo(PACU_Q, 'pacu_in') || 'Temp, NuDESC, delay'}</small></a>
       </nav>
       <nav class="links three" aria-label="Perioperative data">${DATA_PARTS.map(d => `<a href="#/p/${id}/${d.path}"${done(d.sign, d.short)}>${d.short}</a>`).join('')}</nav>
-      <div class="textlinks"><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Sheet view</a></div>`;
+      <div class="textlinks"><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Sheet view</a></div>
+      <div class="sharerow caseshare"><a class="secondary" href="#/p/${id}/share">Share subject</a><a class="secondary" href="#/p/${id}/pacushare">Share to PACU</a></div>`;
   }
   // previous / next timepoint: big buttons either side of the tabs and the timepoint strip
   function navHtml() {
@@ -1623,7 +1624,7 @@ function formPage(id, pg, back) {
       if (group[0] === 'tx') return txTable(p);
       if (group[0] === 'ix') return ixTable(p);
       return group.map(k => fieldHtml(field(k), get)).join('');
-    }).join('')}</div></div>${sl ? sealNote(p, pg) : ''}${signoffHtml(p, pg)}${pg === 'pacu' ? pacuLinkHtml(p) : ''}`);
+    }).join('')}</div></div>${sl ? sealNote(p, pg) : ''}${signoffHtml(p, pg)}${pg === 'pacu' ? `<div class="paculink"><h2>PACU nurse link</h2><a class="secondary" href="#/p/${id}/pacushare">Share to PACU</a></div>` : ''}`);
     disableSealed();
     window.scrollTo(0, y);
   };
@@ -1634,16 +1635,6 @@ function formPage(id, pg, back) {
     const u = e.target.closest('[data-use]');
     if (u) { set(p, u.dataset.use, u.dataset.v); draw(); return; }
     if (e.target.closest('#addix')) { const rows = ixRows(p); rows.push({ time: nowHM() }); set(p, 'io_ix_rows', JSON.stringify(rows)); draw(); return; }
-    if (e.target.closest('[data-pacu-make]')) return void makePacuLink(p).then(draw);
-    if (e.target.closest('[data-pacu-stop]')) {
-      if (confirm('Stop the PACU nurse link?\n\nThe link and its QR code stop working. A new one can be made.')) stopPacuLink(p).then(draw);
-      return;
-    }
-    if (e.target.closest('[data-pacu-copy]')) {
-      const u = pacuUrl(pacuToken(p));
-      (navigator.clipboard?.writeText(u) || Promise.reject()).then(() => toast('Link copied'), () => { view.querySelector('.pacuurl')?.select(); toast('Select the link and copy it'); });
-      return;
-    }
     if (e.target.closest('.sealed') && e.target.closest('button')) return toast(sealedMsg(p, pg));
     const pe = e.target.closest('[data-pev]');
     if (pe) {
@@ -1864,7 +1855,7 @@ async function blankForm() {
 function noBlankNote() {
   if (DEMO) return `<div class="note">Demo: this is a simple version. To see the study’s Word form filled in, choose its blank .docx (kept only in this browser tab).
     <label class="secondary filebtn">Choose the blank form<input type="file" id="blankfile" accept=".docx" hidden></label></div>`;
-  if (shared.admin) return `<p class="note">This is a simple version. Upload the study’s blank Word form on the <a href="#/admin">admin screen</a> to fill in the real form.</p>`;
+  if (shared.admin) return `<p class="note">This is a simple version. Upload the study’s blank Word form on the <a href="#/export">Export screen</a> to fill in the real form.</p>`;
   if (sharing()) return `<p class="note">This is a simple version: your study admin hasn’t uploaded the blank Word form yet.</p>`;
   return `<p class="note">This is a simple version. <a href="#/settings">Join your hospital’s team</a> to fill in the study’s Word form.</p>`;
 }
@@ -2146,13 +2137,14 @@ async function joinTeam(site, code, btn) {
 
 // ---------- join link: #/join/{site}/{code} (after the #, so the code never reaches a server)
 const joinLink = (site, code) => location.origin + location.pathname + (/emulator/.test(location.search) ? '?emulator' : '') + `#/join/${site}/${encodeURIComponent(code)}`;
-route(/^\/join\/([A-Z]+)\/([^/]+)(?:\/(\w{1,6}))?$/, (site, enc, carriedMe) => {
-  const code = decodeURIComponent(enc);
+route(/^\/join\/([A-Z]+)\/([^/]+)(?:\/(\w{1,6}))?$/, (site, enc, carriedMe) => joinPage(site, decodeURIComponent(enc), carriedMe));
+// then: the screen to show once joined (a subject link opens its subject); by default the patient list
+function joinPage(site, code, carriedMe, then = '#/') {
   // the code shouldn't stay in the history or a bookmark
-  const forget = () => history.replaceState(null, '', location.pathname + location.search + '#/');
+  const forget = () => history.replaceState(null, '', location.pathname + location.search + then);
   header('Join the ' + site + ' team', '#/');
   if (!SITES.includes(site) || !cloud.enabled) { forget(); paint(`<p class="note">This join link doesn’t work${cloud.enabled ? '' : ' in demo mode'}.</p>`); return; }
-  if (shared.member?.site === site) { forget(); paint(`<p class="ok-box">This phone is already in the ${site} team.</p><a class="primary big" href="#/">Patients</a>`); return; }
+  if (shared.member?.site === site) { forget(); if (then !== '#/') return render(); paint(`<p class="ok-box">This phone is already in the ${site} team.</p><a class="primary big" href="#/">Patients</a>`); return; }
   paint(`<div class="stack">
     <p>Join the <b>${site}</b> prewarming study team on this phone. You’ll see and enter ${site}’s patients, and they sync when there is signal.</p>
     ${shared.member ? `<p class="note">This phone is in the ${esc(shared.member.site)} team now; joining moves it to ${site}.</p>` : ''}
@@ -2166,6 +2158,78 @@ route(/^\/join\/([A-Z]+)\/([^/]+)(?:\/(\w{1,6}))?$/, (site, enc, carriedMe) => {
     if (await joinTeam(site, code, e.target)) { forget(); render(); }
     else { e.target.disabled = false; e.target.textContent = 'Join ' + site; }
   };
+}
+
+// ---------- share pages (owner, 19 Oct 2026): two buttons at the bottom of every case, each its own link and QR code page.
+// Much of the data is collected by people who aren't study admins (OT juniors, PACU nurses).
+// Share subject: #/join/{site}/{code}/p/{id} opens this subject; a phone not yet on the team joins it first (the join
+// link's code, so no new access and no rules change: once in, the phone sees that hospital's patients like any member).
+const subjectLink = (site, code, id) => joinLink(site, code) + '/p/' + id;
+route(/^\/join\/([A-Z]+)\/([^/]+)\/p\/(\w+)$/, (site, enc, id) => {
+  if (shared.admin && cloud.enabled) { history.replaceState(null, '', location.pathname + location.search + '#/open/' + id); return render(); }
+  joinPage(site, decodeURIComponent(enc), '', '#/open/' + id);
+});
+// the subject may not be on this phone yet (just joined, or a teammate's new patient): wait for the team's data
+route(/^\/open\/(\w+)$/, id => {
+  // replace, not push: the phone's back button shouldn't land here and bounce forward again
+  const show = () => { history.replaceState(history.state, '', location.pathname + location.search + '#/p/' + id); render(); };
+  if (patients[id] && !isGone(patients[id])) return show();
+  header('Opening the subject', '#/');
+  paint(`<p class="muted">Getting the team’s patients…</p>`);
+  const t0 = Date.now(), iv = setInterval(() => {
+    if (patients[id] && !isGone(patients[id])) { clearInterval(iv); show(); }
+    else if (Date.now() - t0 > 20000) {
+      clearInterval(iv);
+      paint(`<div class="stack"><p class="note">This subject isn’t on this phone. It may be locked, from another hospital, or there is no signal yet. Try again with signal, or ask the study team.</p><a class="primary big" href="#/">Patients</a></div>`);
+    }
+  }, 500);
+  cleanup.push(() => clearInterval(iv));
+});
+route(/^\/p\/(\w+)\/share$/, async id => {
+  const p = patients[id]; if (!p) return go('#/');
+  header(sidL(p) + ' · Share subject', '#/p/' + id);
+  const box = body => paint(`<div class="paculink"><h2>Share subject</h2>${body}</div>`);
+  if (!cloud.enabled) return box('<p class="muted small">Not available in demo mode.</p>');
+  if (!sharing()) return box('<p class="muted small">Join your hospital’s team (Settings) to share a subject.</p>');
+  const site = p.site || val(p, 'site') || shared.member?.site;
+  if (!site) return box('<p class="muted small">Set this patient’s hospital first.</p>');
+  let code = shared.member?.site === site ? shared.member.code : null;
+  if (shared.admin) {
+    box('<p class="muted">Loading…</p>');
+    try { code = (await cloud.codes())[site]?.code || null; } catch (e) { return box(`<p class="note">${esc(cloud.friendly(e))}</p>`); }
+    if (location.hash !== '#/p/' + id + '/share') return;
+  }
+  if (!code) return box(`<p class="muted small">${site} has no join code yet. ${shared.admin ? 'Make one on the <a href="#/admin">Study admin</a> screen first.' : 'Ask a study admin.'}</p>`);
+  const url = subjectLink(site, code, id);
+  box(`<div class="qr">${qrSvg(url, 'QR code of the subject link')}</div>
+    <input class="pacuurl" id="suburl" readonly value="${esc(url)}" aria-label="Subject link">
+    <div class="sharerow"><button class="primary" id="subshare">Share link</button><button class="secondary" id="subcopy">Copy link</button></div>
+    <p class="muted small">Opens ${esc(sid(p))} in the app. A phone not on the ${site} team joins it first (it asks for initials) and then sees ${site}’s patients, like the team’s join link. Share it only with people collecting data for this study.</p>`);
+  const copy = () => (navigator.clipboard?.writeText(url) || Promise.reject()).then(() => toast('Link copied'), () => { $('#suburl')?.select(); toast('Select the link and copy it'); });
+  $('#subcopy').onclick = copy;
+  $('#subshare').onclick = async () => {
+    try { if (navigator.share) { await navigator.share({ title: 'Prewarming study: ' + sid(p), text: `Prewarming study: tap to open ${sid(p)}`, url }); return; } } catch (err) { if (err?.name === 'AbortError') return; }
+    copy();
+  };
+});
+// Share to PACU: the PACU nurse link (it used to sit at the bottom of the PACU page)
+route(/^\/p\/(\w+)\/pacushare$/, id => {
+  const p = patients[id]; if (!p) return go('#/');
+  header(sidL(p) + ' · Share to PACU', '#/p/' + id);
+  const draw = () => { paint(pacuLinkHtml(p)); };
+  draw();
+  view.onclick = e => {
+    if (e.target.closest('[data-pacu-make]')) return void makePacuLink(p).then(draw);
+    if (e.target.closest('[data-pacu-stop]')) {
+      if (confirm('Stop the PACU nurse link?\n\nThe link and its QR code stop working. A new one can be made.')) stopPacuLink(p).then(draw);
+      return;
+    }
+    if (e.target.closest('[data-pacu-copy]')) {
+      const u = pacuUrl(pacuToken(p));
+      (navigator.clipboard?.writeText(u) || Promise.reject()).then(() => toast('Link copied'), () => { view.querySelector('.pacuurl')?.select(); toast('Select the link and copy it'); });
+    }
+  };
+  cleanup.push(() => { view.onclick = null; });
 });
 
 function qrSvg(text, label = 'QR code of the join link') {
@@ -2182,8 +2246,8 @@ route(/^\/admin$/, async () => {
   header('Study admin', '#/settings');
   if (!shared.admin) { paint(`<p class="note">Sign in as a study admin from Settings.</p>`); return; }
   paint(`<p class="muted">Loading…</p>`);
-  let codes = {}, people = [], bf = null, admins = [], me = '';
-  try { [codes, people, bf, admins, me] = await Promise.all([cloud.codes(), cloud.members(), cloud.blankForm(), cloud.admins(), cloud.myEmail()]); } catch (e) { paint(`<p class="note">${esc(cloud.friendly(e))}</p>`); return; }
+  let codes = {}, people = [], admins = [], me = '';
+  try { [codes, people, admins, me] = await Promise.all([cloud.codes(), cloud.members(), cloud.admins(), cloud.myEmail()]); } catch (e) { paint(`<p class="note">${esc(cloud.friendly(e))}</p>`); return; }
   paint(`<div class="stack">
 
     <p class="muted small">Send each hospital’s team its join link (or show the QR code): it opens the app ready to join, no typing. Share it only with that team. A new code makes old links stop working for new phones; phones already in stay in.</p>
@@ -2195,22 +2259,11 @@ route(/^\/admin$/, async () => {
         ${who.length ? `<ul class="plain">${who.map(m => `<li>${esc(m.initials || '—')} <small class="muted">joined ${new Date(m.joinedAt).toLocaleDateString()}</small> <button class="link" data-rm="${m.uid}">Remove</button></li>`).join('')}</ul>` : '<small class="muted">No phones yet</small>'}</div>`;
     }).join('')}
     <div class="fld" id="admins"><b>Study admins</b>
-      <small class="muted">Admins see every hospital, make join codes, remove phones, lock patients and upload the form. To add one, type their email: they then open Settings on their phone, tap “Study admin? Sign in by email” and use the emailed link.</small>
+      <small class="muted">Admins see every hospital, make join codes, remove phones, lock patients and upload the blank form (Export). To add one, type their email: they then open Settings on their phone, tap “Study admin? Sign in by email” and use the emailed link.</small>
       <ul class="plain">${admins.sort((a, b) => a.email.localeCompare(b.email)).map(a => `<li>${esc(a.email)}${a.email === me ? ' <small class="muted">(you)</small>' : ''}
         ${a.addedBy ? `<small class="muted">added by ${esc(a.addedBy)}${a.addedAt ? ', ' + new Date(a.addedAt).toLocaleDateString([], { day: 'numeric', month: 'short' }) : ''}</small>` : ''}
         ${a.email === me ? '' : `<button class="link" data-rmadmin="${esc(a.email)}">Remove</button>`}</li>`).join('')}</ul>
-      <form class="addrow" id="addadmin"><input type="email" id="newadmin" placeholder="name@hospital.sg" autocomplete="off" aria-label="New admin’s email" required><button class="secondary">Add admin</button></form></div>
-    <div class="fld"><b>Blank data collection form</b>
-      <small class="muted">${bf ? `${esc(bf.name)}, uploaded ${new Date(bf.setAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} by ${esc(bf.setBy)}.` : 'Not uploaded yet.'} The Form view fills this Word file in for each patient; teams can download it or save it as a PDF. Its file details (author, editor, company) are removed on upload.</small>
-      <label class="secondary filebtn">${bf ? 'Replace' : 'Upload'} the blank form (.docx)<input type="file" id="blankup" accept=".docx" hidden></label></div></div>`);
-  $('#blankup').onchange = async e => {
-    const f = e.target.files[0]; if (!f) return;
-    let r;
-    try { r = await wordview.prepareBlank(f); } catch (err) { toast(err.message); return; }
-    if (r.missed.length && !confirm(`${r.missed.length} place(s) didn’t match the v3.2 form and will stay blank:\n${r.missed.slice(0, 12).join('\n')}${r.missed.length > 12 ? '\n…' : ''}\n\nUpload anyway?`)) return;
-    try { await cloud.setBlankForm(r.b64, f.name, r.size); blankCache = null; toast('Blank form saved'); render(); }
-    catch (err) { toast(cloud.friendly(err)); }
-  };
+      <form class="addrow" id="addadmin"><input type="email" id="newadmin" placeholder="name@hospital.sg" autocomplete="off" aria-label="New admin’s email" required><button class="secondary">Add admin</button></form></div></div>`);
   $('#addadmin').onsubmit = async e => {
     e.preventDefault();
     const em = $('#newadmin').value.trim().toLowerCase();
@@ -2271,9 +2324,28 @@ route(/^\/export$/, () => {
     <p>An Excel file in the study template’s layout: one row per patient, the template’s 572 columns, filled from everything entered here (op day and Perioperative data), so rows paste into the master sheet.</p>
     <ul class="muted small"><li><b>Data Collection</b>: the template sheet</li><li><b>Readings</b>: every reading with the time it was saved and who saved it</li>
     <li><b>Extra</b>: items the template has no column for (transfusion volumes, investigation rows, PACU transfusion, NuDESC items, sign-offs)</li></ul>
-    <button class="primary big" id="xl" ${n ? '' : 'disabled'}>Export ${n} patient${n === 1 ? '' : 's'}</button></div>`);
+    <button class="primary big" id="xl" ${n ? '' : 'disabled'}>Export ${n} patient${n === 1 ? '' : 's'}</button>
+    ${shared.admin ? '<div class="fld" id="blankbox"><b>Blank data collection form</b><small class="muted">Loading…</small></div>' : ''}</div>`);
   $('#xl').onclick = () => downloadWorkbook(Object.values(patients));
+  if (shared.admin) blankFormBox();
 });
+// the blank Word form: admins upload it here, not on the admin screen, which is for people's access (owner, 19 Oct 2026)
+async function blankFormBox() {
+  let bf = null;
+  try { bf = await cloud.blankForm(); } catch (e) { const b = $('#blankbox'); if (b) b.querySelector('small').textContent = cloud.friendly(e); return; }
+  const box = $('#blankbox'); if (!box) return;
+  box.innerHTML = `<b>Blank data collection form</b>
+      <small class="muted">${bf ? `${esc(bf.name)}, uploaded ${new Date(bf.setAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} by ${esc(bf.setBy)}.` : 'Not uploaded yet.'} The Form view fills this Word file in for each patient; teams can download it or save it as a PDF. Its file details (author, editor, company) are removed on upload.</small>
+      <label class="secondary filebtn">${bf ? 'Replace' : 'Upload'} the blank form (.docx)<input type="file" id="blankup" accept=".docx" hidden></label>`;
+  $('#blankup').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    let r;
+    try { r = await wordview.prepareBlank(f); } catch (err) { toast(err.message); return; }
+    if (r.missed.length && !confirm(`${r.missed.length} place(s) didn’t match the v3.2 form and will stay blank:\n${r.missed.slice(0, 12).join('\n')}${r.missed.length > 12 ? '\n…' : ''}\n\nUpload anyway?`)) return;
+    try { await cloud.setBlankForm(r.b64, f.name, r.size); blankCache = null; toast('Blank form saved'); render(); }
+    catch (err) { toast(cloud.friendly(err)); }
+  };
+}
 // the Excel file for the given patients: shared from the phone's share sheet when it can, else downloaded
 async function downloadWorkbook(live) {
   const bytes = workbook(live, []);
