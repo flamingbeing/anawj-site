@@ -13,6 +13,7 @@ import { cleanSync } from './sync-md.js';
 import { cleanMine } from './my-themes.js';
 import { cleanLayout } from './analytics.js';
 import { cleanLabels, cleanCaseTemplate } from './parts.js';
+import { cleanListFormat } from './list-format.js';
 
 export const SETTINGS_KIND = 'apmes-logbook-settings';
 // account-specific bookkeeping that shouldn't travel with the file (your residency year is yours, not a colleague's)
@@ -28,6 +29,7 @@ const OBJECTS = {
   excelExport: v => cleanExportOpts(v),
   destinations: v => cleanDestinations(v),
   sync: v => cleanSync(v),   // where to sync (Settings → Sync); tokens are never in settings
+  listFormat: v => cleanListFormat(v),   // Settings → Logging → Pasted list format
   partLabels: v => (v == null ? null : cleanLabels(v)),
   caseTpl: v => (v == null ? null : cleanCaseTemplate(v)),
   catOrder: strs,

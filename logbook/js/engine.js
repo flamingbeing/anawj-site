@@ -4,6 +4,7 @@
 import { CATEGORIES, BY_CODE, R_YEARS, codeOf, DEFAULT_NAMES } from './categories.js';
 import { KEYWORDS, STOP } from './keywords.js';
 import { labelOf, plainLabels } from './parts.js';
+import { splitByStart, trimCase, dateTokens } from './list-format.js';
 const STOP_WORDS = new Set(STOP);
 
 // ---------- ids and dates ----------
@@ -400,7 +401,28 @@ export const STRONG = 0.5;
 // - a block that starts with a labelled line ("lp: …") after a blank line belongs to the case above, unless the case
 //   above already has that label or the label is dt (case details: a list of "dt: …" blocks is a list of cases)
 // - a bold label ("**Plan:** …") is kept plain ("Plan: …")
-export function parseBulk(text, suggestFn, now = new Date(), { labels = null } = {}) {
+// opts.format (Settings → Logging → Pasted list format, list-format.js): a start text that says where each case begins
+// (for a list with no empty lines between cases; it can also capture the initials and the date), characters to skip at
+// the start of each case and texts to drop from its end. Without it everything above stays exactly as it was.
+export function parseBulk(text, suggestFn, now = new Date(), { labels = null, format = null } = {}) {
+  const finish = (date, ini, whole) => {
+    if (labels && labels.length) whole = plainLabels(whole, labels);
+    const sp = ini ? { initials: cleanInitials(ini), details: whole } : splitInitials(whole);
+    const sugg = typeof suggestFn === 'function' && sp.details ? suggestFn(sp.details) || [] : [];
+    const cats = withParents(sugg.filter(s => s.score >= STRONG).map(s => s.code));
+    return { date, initials: sp.initials, details: sp.details, cats };
+  };
+  const cut = splitByStart(text, format);
+  if (cut) {
+    // a date above the first case ("OR06 - 20 Oct 2026 (Tue)") is the date of every case with none of its own
+    const headDate = dateTokens(cut.head).map(t => (leadingDate(t, now) || {}).date).find(Boolean) || null;
+    return cut.map(c => {
+      const lines = trimCase(c.body, format).split(/\r?\n/).map(l => l.replace(/\t+/g, ' ').trim()).filter(Boolean);
+      let date = c.date ? (leadingDate(c.date, now) || {}).date || null : null, first = lines[0] || '';
+      if (!date && first) { const ld = leadingDate(first, now); if (ld) { date = ld.date; first = ld.rest; } }
+      return finish(date || headDate, c.initials, [first, ...lines.slice(1)].filter(Boolean).join('\n'));
+    });
+  }
   const blocks = [];
   let cur = null, gap = true;
   for (const raw of String(text || '').split(/\r?\n/)) {
@@ -418,13 +440,10 @@ export function parseBulk(text, suggestFn, now = new Date(), { labels = null } =
     gap = false;
   }
   return blocks.map(([first, ...more]) => {
+    if (format && format.skip) first = trimCase(first, { skip: format.skip });
     const ld = leadingDate(first, now);
-    let whole = [(ld ? ld.rest : first).trim(), ...more].filter(Boolean).join('\n');
-    if (labels && labels.length) whole = plainLabels(whole, labels);
-    const { initials, details } = splitInitials(whole);
-    const sugg = typeof suggestFn === 'function' && details ? suggestFn(details) || [] : [];
-    const cats = withParents(sugg.filter(s => s.score >= STRONG).map(s => s.code));
-    return { date: ld ? ld.date : null, initials, details, cats };
+    const whole = trimCase([(ld ? ld.rest : first).trim(), ...more].filter(Boolean).join('\n'), { dropEnd: format && format.dropEnd, remove: format && format.remove });
+    return finish(ld ? ld.date : null, '', whole);
   });
 }
 // "**AB 45F lap chole**" (or __…__) -> the line without the stars; null when the line doesn't start bold, or the bold
