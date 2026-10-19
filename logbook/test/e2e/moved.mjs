@@ -4,6 +4,8 @@
 // Both hosts are answered from the local server (page.route), so no network is needed.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 const port = process.env.PORT || 8080;
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
@@ -74,7 +76,7 @@ try {
     const n = await mk();
     await n.p.goto('https://apmes.anawj.com/logbook/?demo#settings'); await n.p.waitForSelector('textarea.details, h2');
     await n.p.evaluate(() => { location.hash = '#data'; });
-    const tmp = '/tmp/logbook-device-test.json'; fs.writeFileSync(tmp, JSON.stringify(data));
+    const tmp = join(tmpdir(), 'logbook-device-test.json'); fs.writeFileSync(tmp, JSON.stringify(data));
     // the Settings file card lives on the Export / Import page's Advanced area or Settings; find its file input
     await n.p.evaluate(() => { location.hash = '#settings'; });
     const input = n.p.locator('input[type=file][accept*="json"]').first();

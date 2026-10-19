@@ -7,7 +7,8 @@
 // A11Y_ONLY=<words>: only the screens whose name has the words. A11Y_VERBOSE=1: every element, not the first three.
 // axe-core is vendored and pinned in tools/vendor/axe.min.js (MPL-2.0); update it by replacing that file.
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
-const AXE = new URL('../../../tools/vendor/axe.min.js', import.meta.url).pathname;
+const { fileURLToPath } = await import('node:url');
+const AXE = fileURLToPath(new URL('../../../tools/vendor/axe.min.js', import.meta.url));
 const BASE = `http://localhost:${process.env.PORT || 8080}/logbook/`;
 const only = process.argv[2];
 if (only && !['phone', 'desk'].includes(only)) throw new Error('Profile must be phone or desk');

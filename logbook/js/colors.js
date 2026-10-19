@@ -107,3 +107,56 @@ export function tabVarsCss(colours) {
   return [`html.colourful { ${v(c => lightPalette(c))} }`, `html.colourful[data-theme="dark"] { ${dark} }`,
     `@media (prefers-color-scheme: dark) { html.colourful[data-theme="auto"] { ${dark} } }`].join('\n');
 }
+
+// Optional full colour tokens. Only known six-digit hex values reach CSS or a themes file.
+export const COLOUR_TOKENS = ['bg', 'panel', 'ink', 'muted', 'line', 'accent', 'accentInk', 'ok', 'warn', 'err'];
+export function cleanColours(value) {
+  const out = {};
+  for (const side of ['light', 'dark']) {
+    const got = value?.[side];
+    if (!got || typeof got !== 'object' || Array.isArray(got)) continue;
+    const tokens = {};
+    for (const k of COLOUR_TOKENS) if (Object.hasOwn(got, k) && typeof got[k] === 'string' && cleanAccent(got[k])) tokens[k] = cleanAccent(got[k]);
+    if (Object.keys(tokens).length) out[side] = tokens;
+  }
+  return out;
+}
+const colourVars = tokens => Object.fromEntries(Object.entries(tokens).map(([k, v]) => [k === 'accentInk' ? 'accent-ink' : k, v]));
+export function coloursCss(value) {
+  const c = cleanColours(value), out = [];
+  if (c.light) {
+    const vars = decl(colourVars(c.light));
+    out.push(`:root:root:root[data-theme="light"], :root:root:root:not([data-theme]) { ${vars} }`);
+    out.push(`@media (prefers-color-scheme: light) { :root:root:root[data-theme="auto"] { ${vars} } }`);
+  }
+  if (c.dark) {
+    const vars = decl(colourVars(c.dark));
+    out.push(`:root:root:root[data-theme="dark"], :root:root:root[data-theme="dark"][data-oled] { ${vars} }`);
+    out.push(`@media (prefers-color-scheme: dark) { :root:root:root[data-theme="auto"] { ${vars} } }`);
+  }
+  return out.join('\n');
+}
+// The effective editable tokens, including defaults that schemeCss leaves in style.css.
+export function colourPalette(d = {}, side = 'light', tint = {}, oled = false) {
+  const accent = cleanAccent(d.accent) || DEFAULT_ACCENT;
+  const p = side === 'dark' ? darkPalette(accent, oled) : lightPalette(accent);
+  if (side === 'light' && accent === DEFAULT_ACCENT) Object.assign(p, { bg: '#f3f3f3', line: '#dddddd' });
+  const status = side === 'dark' ? { ok: '#74dd90', warn: '#f3c46e', err: '#ff9a8f' } : { ok: '#1a7f37', warn: '#8a5a00', err: '#b42318' };
+  return { ...p, accentInk: p['accent-ink'], ...status, ...(side === 'dark' && oled ? {} : tint[side]), ...cleanColours(d.colours)[side] };
+}
+export function colourChecks(d = {}, tint = {}, oled = false) {
+  const out = [];
+  for (const side of ['light', 'dark']) {
+    const p = colourPalette(d, side, tint, oled), overrides = cleanColours(d.colours)[side] || {};
+    for (const [fg, bg] of [['ink', 'bg'], ['ink', 'panel'], ['muted', 'bg'], ['muted', 'panel'], ['accentInk', 'accent']]) {
+      out.push({ side, fg, bg, ratio: contrast(p[fg], p[bg]), changed: !!(overrides[fg] || overrides[bg]) });
+    }
+  }
+  return out;
+}
+export function checkColours(d = {}, tint = {}) {
+  // Existing looks stay unchanged; full colour looks must pass in both modes, including OLED.
+  if (!Object.keys(cleanColours(d.colours)).length) return;
+  const failed = [...colourChecks(d, tint), ...colourChecks(d, tint, true).filter(p => p.side === 'dark')].find(p => p.ratio < 4.5);
+  if (failed) throw new Error(`${failed.side === 'light' ? 'Light' : 'Dark'} ${failed.fg} on ${failed.bg}: ${failed.ratio.toFixed(2)}:1 (needs 4.5:1)`);
+}

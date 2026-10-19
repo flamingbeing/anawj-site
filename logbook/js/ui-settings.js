@@ -9,7 +9,7 @@ import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, short
 import { pickDialog, CASE_PARTS, AFTER_SAVE, RECENT_COUNTS } from './ui-log.js';
 import { recentCount as snapRecent } from './logging.js';
 import { OPERATOR_HELP } from './search-ops.js';
-import { DEFAULT_ACCENT, cleanAccent, SWATCHES } from './colors.js';
+import { DEFAULT_ACCENT, cleanAccent, SWATCHES, COLOUR_TOKENS, cleanColours, colourPalette, colourChecks, checkColours } from './colors.js';
 import { THEMES, FEATURED, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, SPACINGS, TAB_STYLES, BANDS, HEAD_FONTS, LIST_STYLES, TITLE_ALIGNS, SWITCH_STYLES, PRESS_STYLES, ICON_WEIGHTS, TYPE_STYLES } from './themes.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS, HEAD_STYLES, mdDate, fileDate } from './markdown.js';
 import { checkCss } from './custom-css.js';
@@ -102,9 +102,10 @@ const themeSwatch = t => {
   const band = t.band || (t.look.band === 'none' ? null : ['#e57200', '#e4002b', '#178fd7', '#002f6c']);
   const tint = TINTS[t.look.bgTint] || {};
   const dark = !!t.mode && t.mode !== 'auto';
-  const bg = (dark ? tint.dark?.bg : tint.light?.bg) || (dark ? '#121417' : '#f3f3f3');
-  const panel = (dark ? tint.dark?.panel : tint.light?.panel) || (dark ? '#1b1e23' : '#ffffff');
-  return h('span', { class: 'theme-sw', 'aria-hidden': 'true', style: `--tb:${bg};--tp:${panel};--ta:${t.look.accent || (t.keep ? cleanAccent(display().accent) || DEFAULT_ACCENT : DEFAULT_ACCENT)}` },
+  const colours = cleanColours(t.look.colours)[dark ? 'dark' : 'light'] || {};
+  const bg = colours.bg || (dark ? tint.dark?.bg : tint.light?.bg) || (dark ? '#121417' : '#f3f3f3');
+  const panel = colours.panel || (dark ? tint.dark?.panel : tint.light?.panel) || (dark ? '#1b1e23' : '#ffffff');
+  return h('span', { class: 'theme-sw', 'aria-hidden': 'true', style: `--tb:${bg};--tp:${panel};--ta:${colours.accent || t.look.accent || (t.keep ? cleanAccent(display().accent) || DEFAULT_ACCENT : DEFAULT_ACCENT)}` },
     h('span', { class: 'theme-band' }, (band || [panel, panel, panel, panel]).map(c => h('i', { style: `background:${c}` }))),
     h('span', { class: 'theme-card-in' }, h('i', { class: 'theme-dot' }), h('i', { class: 'theme-line' })));
 };
@@ -166,6 +167,7 @@ export function renderThemes() {
       h('div', { class: 'theme-grid' }, FEATURED.map(id => themeCard(THEMES.find(t => t.id === id), theme, custom))),
       h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('a', { class: 'btn small', href: '#themesall' }, 'Browse all themes'))),
     myThemesCard(st, custom),
+    editColours(st),
     h('section', { class: 'card' },
       h('h2', {}, 'Colour and light'),
       pick('Light or dark', THEME_MODES, cachedTheme(), v => { applyTheme(v); setDisplay({ themeMode: null }); hooks.render(); }),
@@ -211,6 +213,48 @@ export function renderThemes() {
 }
 // Settings → Display → Advanced display settings (#displayadv), under headings (owner, 13 Oct 2026): the header and
 // tab bar, Logbook rows, text, the Case tab layout, then custom CSS
+// Draft both palettes together, so a foreground and background can be changed before checking Save.
+function editColours(st) {
+  let side = 'light', draft = cleanColours(st.colours);
+  const body = h('div', {}), report = h('p', { class: 'hint', role: 'status', 'aria-live': 'polite' });
+  const buttons = {};
+  const state = () => ({ ...st, colours: draft });
+  const tint = TINTS[st.bgTint] || {};
+  const paintReport = () => {
+    const checks = colourChecks(state(), tint).filter(p => p.side === side);
+    report.textContent = checks.map(p => `${p.fg} on ${p.bg}: ${p.ratio.toFixed(2)}:1${p.ratio < 4.5 ? ' (needs 4.5:1)' : ''}`).join('; ');
+  };
+  const paint = () => {
+    for (const mode of ['light', 'dark']) buttons[mode].setAttribute('aria-pressed', String(mode === side));
+    const palette = colourPalette(state(), side, tint);
+    fill(body, COLOUR_TOKENS.map(k => {
+      const picker = h('input', { type: 'color', value: palette[k], 'aria-label': `${side === 'light' ? 'Light' : 'Dark'} ${k}`, oninput: e => {
+        draft[side] = { ...draft[side], [k]: e.target.value }; reset.disabled = false; paintReport();
+      } });
+      const reset = h('button', { type: 'button', class: 'small', disabled: !draft[side]?.[k], 'aria-label': `Reset ${k}`, onclick: () => {
+        delete draft[side][k]; draft = cleanColours(draft); paint();
+      } }, 'Reset');
+      return h('div', { class: 'bar', style: 'margin:8px 0;justify-content:space-between' }, h('label', { class: 'bar' }, k, picker), reset);
+    }));
+    paintReport();
+  };
+  const modes = h('div', { class: 'seg', 'aria-label': 'Palette to edit' }, ['light', 'dark'].map(mode => {
+    buttons[mode] = h('button', { type: 'button', onclick: () => { side = mode; paint(); } }, mode === 'light' ? 'Light' : 'Dark');
+    return buttons[mode];
+  }));
+  const save = () => {
+    try {
+      checkColours(state(), tint);
+      const colours = cleanColours(draft);
+      applyDisplay(setDisplay({ colours: Object.keys(colours).length ? colours : null })); hooks.render(); toast('Colours saved');
+    } catch (err) { report.textContent = `Colours not saved. ${err.message}`; }
+  };
+  paint();
+  return h('section', { class: 'card' }, h('h2', {}, 'Edit colours'),
+    help('Edit light and dark separately. Reset uses the accent and background again. Text needs 4.5:1 contrast; existing colours stay as they are until you save.'),
+    modes, body, report, h('button', { type: 'button', onclick: save }, 'Save colours'));
+}
+
 // Your themes (owner, 16 Oct 2026; my-themes.js): once anything on this page changes the look is Custom, and this card
 // offers to keep it under a name. Saved themes are picked like any other; Export and Import move them as a file.
 function myThemesCard(st, custom) {

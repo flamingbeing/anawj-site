@@ -34,10 +34,10 @@ try { for (const width of [390, 1280]) {
   await p.evaluate(() => { location.hash = '#loggingadv'; });
   await p.getByText(`${kept} px`).waitFor();
   await p.evaluate(() => { location.hash = '#log'; }); await p.waitForSelector('textarea.details');
-  const g2 = await p.locator('.box-grab').boundingBox();
-  await p.mouse.click(g2.x + g2.width / 2, g2.y + g2.height / 2); await p.mouse.click(g2.x + g2.width / 2, g2.y + g2.height / 2);
+  // Locator clicks wait for the returning page's slide to finish before choosing coordinates.
+  await p.locator('.box-grab').click({ clickCount: 2, delay: 80 });
   await p.waitForFunction(async () => !(await import('./js/display.js')).display().boxHeight);
-  assert.ok(Math.abs(await height() - h0) <= 2, 'reset did not bring the default height back');
+  assert.ok(Math.abs(await height() - h0) <= 2, `reset did not bring the default height back: ${h0} -> ${await height()}`);
   // Grow as I type off: the box keeps its height
   await p.evaluate(async () => (await import('./js/display.js')).setDisplay({ boxGrow: false }));
   await box.fill(Array.from({ length: 12 }, (_, i) => `fake line ${i + 1}`).join('\n'));
@@ -57,8 +57,7 @@ try { for (const width of [390, 1280]) {
   await p.reload(); await p.waitForSelector('textarea.details'); await p.waitForTimeout(200);
   if (!(await p.locator('button[data-mode="bulk"][aria-pressed="true"]').count())) await toList();
   assert.ok(Math.abs(await height() - lkept) <= 2, 'list height lost after a reload');
-  const lg2 = await p.locator('.box-grab').boundingBox();
-  await p.mouse.click(lg2.x + lg2.width / 2, lg2.y + lg2.height / 2); await p.mouse.click(lg2.x + lg2.width / 2, lg2.y + lg2.height / 2);
+  await p.locator('.box-grab').click({ clickCount: 2, delay: 80 });
   await p.waitForFunction(async () => !(await import('./js/display.js')).display().listHeight);
   assert.ok(Math.abs(await height() - lh0) <= 2, 'list reset did not bring the default height back');
   await p.locator('button[data-mode="one"]').click();

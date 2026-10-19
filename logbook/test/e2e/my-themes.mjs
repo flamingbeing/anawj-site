@@ -19,6 +19,45 @@ try { for (const width of [390, 1280]) {
   assert.equal(await now(), 'NUHS');
   assert.equal(await card.locator('.tip').count(), 0, 'nothing to save yet');
   assert.equal(await card.getByRole('button', { name: 'Export…' }).count(), 1, 'Export is there before anything is saved (it saves the look you have)');
+  // Full palette editor: live checks reject a failing pair without changing saved settings.
+  const editor = () => p.locator('section.card').filter({ has: p.getByRole('heading', { name: 'Edit colours', exact: true }) });
+  const token = (mode, name) => editor().getByLabel(`${mode} ${name}`, { exact: true });
+  await token('Light', 'ink').fill('#ffffff');
+  assert.match(await editor().getByRole('status').innerText(), /ink on bg: 1\./);
+  await editor().getByRole('button', { name: 'Save colours', exact: true }).click();
+  assert.match(await editor().getByRole('status').innerText(), /Colours not saved.*Light ink on bg/);
+  assert.equal(await p.evaluate(async () => (await import('./js/display.js')).display().colours ?? null), null);
+  await editor().getByRole('button', { name: 'Reset ink', exact: true }).click();
+  await token('Light', 'bg').fill('#ffffff');
+  await editor().getByRole('button', { name: 'Dark', exact: true }).click();
+  await token('Dark', 'line').fill('#556677');
+  await editor().getByRole('button', { name: 'Save colours', exact: true }).click();
+  assert.match(await now(), /Custom/);
+  const palettes = { light: { bg: '#ffffff' }, dark: { line: '#556677' } };
+  assert.deepEqual(await p.evaluate(async () => (await import('./js/display.js')).display().colours), palettes);
+  const cssVar = key => p.evaluate(k => getComputedStyle(document.documentElement).getPropertyValue('--' + k).trim(), key);
+  assert.equal(await cssVar('bg'), '#ffffff');
+  // The cached sheet has the overrides before the app's module code runs on reload.
+  await p.route('**/logbook/js/app.js', route => route.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
+  await p.reload();
+  assert.equal(await cssVar('bg'), '#ffffff');
+  await p.unroute('**/logbook/js/app.js');
+  await p.reload(); await card.waitFor();
+  for (const mode of ['dark', 'oled', 'auto']) {
+    await p.emulateMedia({ colorScheme: 'dark' });
+    await p.evaluate(async mode => (await import('./js/display.js')).applyTheme(mode), mode);
+    assert.equal(await cssVar('line'), '#556677', mode);
+    assert.notEqual(await cssVar('bg'), '#ffffff', 'light bg never leaks into dark');
+  }
+  await p.evaluate(async () => (await import('./js/display.js')).applyTheme('auto'));
+  await p.emulateMedia({ colorScheme: 'light' });
+  assert.equal(await cssVar('bg'), '#ffffff');
+  await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset', exact: true }).click();
+  assert.equal(await now(), 'NUHS');
+  if (width === 390 && process.env.E2E_OUT) {
+    await editor().scrollIntoViewIfNeeded();
+    await p.screenshot({ path: process.env.E2E_OUT + '/colours-phone.png' });
+  }
   // change something: Custom, and the card asks to save it
   await p.locator('input[type=range][aria-label="Corners"]').fill('0');
   await p.getByRole('radio', { name: /Outlined/ }).check({ force: true });
