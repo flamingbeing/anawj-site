@@ -227,6 +227,8 @@ def main(argv=None, reader=None):
     ap.add_argument('--readings2', metavar='FILE', help='a second, independent reading of the same crops: the two are compared and any disagreement is flagged')
     ap.add_argument('--no-read', action='store_true', help='nobody reads the handwriting: ticks are read, every written value is typed in the review screen')
     ap.add_argument('--min-align', type=float, default=MIN_ALIGN, help=f'lowest page alignment score to accept (default {MIN_ALIGN}); lower it only to test a page, and check its crops')
+    ap.add_argument('--reader', choices=['claude', 'ollama'], default='claude', help='who reads the handwriting: Claude through the API (default) or a local vision model through Ollama (nothing leaves this computer)')
+    ap.add_argument('--model', help='model for the reader (default: SCAN_MODEL, else claude-sonnet-5-5 / qwen2.5vl:7b)')
     ap.add_argument('--key-file', metavar='FILE', help='file holding the Anthropic API key, read by this process only (instead of the ANTHROPIC_API_KEY environment variable)')
     ap.add_argument('photos', nargs='+')
     a = ap.parse_args(argv)
@@ -237,7 +239,8 @@ def main(argv=None, reader=None):
     if len(forced) != len(a.photos): ap.error('--pages needs one page number per photo')
     if a.readings2 and not a.readings: ap.error('--readings2 needs --readings')
     reader = reader or (readers.CropExporter(a.export_crops) if a.export_crops else readers.NoReader() if a.no_read
-                        else readers.FileReader(a.readings, a.readings2) if a.readings else readers.AnthropicReader(key_file=a.key_file))
+                        else readers.FileReader(a.readings, a.readings2) if a.readings else readers.OllamaReader(a.model) if a.reader == 'ollama'
+                        else readers.AnthropicReader(a.model, key_file=a.key_file))
     _tables = {}
     tables_of = lambda pg: _tables.setdefault(pg, boxes.tables(f'{a.form_dir}/blank.pdf', pg))
     result, pages = {}, []

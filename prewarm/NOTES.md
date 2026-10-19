@@ -16,7 +16,7 @@ are in the owner's private notes.
 - **Hospitals:** NTF, NUH, SGH, CGH, TTSH, KTPH, WH (`SITES` in `schema.js`). Each phone picks one in Settings; new
   patients record it (`site`, on the Extra sheet). With sharing, the join code will set it.
 - **Scanning old paper forms** (`prewarm/tools/scan/`, README there): phone photo, aligned to the
-  blank v3.2 page; ticks by ink; numbers and times read twice by Claude (crops of de-identified cells only; IDs, dates,
+  blank v3.2 page; ticks by ink; numbers and times read twice by Claude or a local Ollama vision model (`--reader ollama`; crops of de-identified cells only; IDs, dates,
   names and free text are typed by the person scanning); flags; `review.html` where the person confirms every value; then the app's
   own `workbook()`. Field places come from `js/wordform.js` (fill one field, render, diff). Scans, the form and
   `form-data/` stay out of git. Tested on the fake fixture only; the real form, real handwriting and the live reader
