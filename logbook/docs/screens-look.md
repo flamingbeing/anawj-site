@@ -60,6 +60,13 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   dark accent 7:1 on cards, near-white text, neutral grey backgrounds) and writes them into <style id="accent-css">,
   cached for the first paint (index.html). Light / Dark / OLED (pure black: data-oled on top of dark) / Auto is
   separate, per device. (Fixed named themes were tried and dropped: they read as shades of one colour.)
+- **Edit colours** (Themes, per device): `colours: { light: {...}, dark: {...} }` overrides any of `bg`,
+  `panel`, `ink`, `muted`, `line`, `accent`, `accentInk`, `ok`, `warn`, `err` (six-digit hex only). Omitted
+  tokens keep their accent/tint values; old looks are unchanged. The Light / Dark editor drafts both palettes,
+  shows live contrast ratios and resets individual overrides. Save checks ink and muted on bg and panel,
+  and accentInk on accent, at 4.5:1 in light, dark and OLED; failing pairs name their ratio. Any override makes
+  the look Custom. The look CSS cache includes overrides at first paint. Your themes and settings files carry
+  the tokens, sanitised to known names and hex values; old theme files still import.
 - **Zoom and text size** (Display, per device): Interface zoom 80–150% = `body { zoom: var(--ui-zoom) }` (header and
   tab bar too; Ctrl/Cmd + − 0 on a computer, app.js); lengths measured on the real screen (tab bar, keyboard,
   visual viewport) are divided by `--ui-zoom` where used inside. Text size = the words only: every font size in

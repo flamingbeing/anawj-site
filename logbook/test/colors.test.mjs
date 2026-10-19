@@ -37,6 +37,8 @@ assert.equal(colourPalette(look).accent, lightPalette(look.accent).accent);
 assert.equal(colourPalette(look, 'dark').line, '#556677');
 assert.equal(colourPalette({}, 'light', { light: { panel: '#fffdf9' } }).panel, '#fffdf9');
 assert.equal(colourPalette({}, 'dark', {}, true).bg, '#000000');
+assert.equal(colourPalette({}, 'dark', { dark: { bg: '#112233', panel: '#223344' } }, true).panel, '#000000', 'OLED scheme takes precedence over the tint');
+assert.equal(colourPalette({ colours: { dark: { panel: '#223344' } } }, 'dark', {}, true).panel, '#223344');
 assert.equal(coloursCss({}), '');
 const css = coloursCss(look.colours);
 assert.match(css, /prefers-color-scheme: light/);

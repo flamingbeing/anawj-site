@@ -142,7 +142,7 @@ export function colourPalette(d = {}, side = 'light', tint = {}, oled = false) {
   const p = side === 'dark' ? darkPalette(accent, oled) : lightPalette(accent);
   if (side === 'light' && accent === DEFAULT_ACCENT) Object.assign(p, { bg: '#f3f3f3', line: '#dddddd' });
   const status = side === 'dark' ? { ok: '#74dd90', warn: '#f3c46e', err: '#ff9a8f' } : { ok: '#1a7f37', warn: '#8a5a00', err: '#b42318' };
-  return { ...p, accentInk: p['accent-ink'], ...status, ...tint[side], ...cleanColours(d.colours)[side] };
+  return { ...p, accentInk: p['accent-ink'], ...status, ...(side === 'dark' && oled ? {} : tint[side]), ...cleanColours(d.colours)[side] };
 }
 export function colourChecks(d = {}, tint = {}, oled = false) {
   const out = [];
