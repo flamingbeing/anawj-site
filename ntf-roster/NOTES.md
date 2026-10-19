@@ -215,13 +215,19 @@ the real People app).
   meetings for this month and next; this month filled with no must-fix problems, next month left for Auto-fill. It
   never signs in and saves under its own key.
 - Team sharing (`js/cloud.js`, `js/ui-team.js`, `firestore.rules`): off until `js/firebase-config.js` is filled. Then
-  Google sign-in; `team/main` holds staff, codes, rules and settings, `months/{YYYY-MM}` one month's cells; every save
-  checks nobody else saved since you loaded (conflict: load theirs or save anyway) and keeps a permanent copy
+  Google sign-in; `team/main` holds staff, codes, rules and settings, `months/{YYYY-MM}` one month's cells (a JSON
+  string, as in NUH junior monthly: a map of cells can pass Firestore's index-entry limit). Save to cloud sends the team
+  copy and every month whose fingerprint changed, in one transaction; Pull brings every month. The header's cloud button
+  (`js/cloudstate.js`, per device) shows saved, not saved or cloud newer, and opens the panel; a quiet check runs once a
+  minute at most once the cloud has been used here. The pool switch does not count as a change. Every save
+  checks nobody else saved since you loaded (conflict: pull theirs, save anyway, or, when the view is one pool, merge:
+  `J.mergeByPool` keeps this browser's pool's people, shifts and rules only about them, takes theirs for the rest, then
+  saves) and keeps a permanent copy
   (`versions`). The rules allow only `{ email, name }` stamps with the saver's own email (the app shows the email
   beside the name) and no save times more than 10 minutes in the future. Members are admin, rosterer (both save) or viewer (reads). Rules tested in the emulator
   (`tools/test-rules.sh`, project `demo-ntf-roster`). `team/main` also carries `aps` (the APS week tally); the pool you
   look at (`settings.pool`) stays in each browser. The rules deploy on merge (matrix entry in
-  `deploy-firestore-rules.yml`) once the project `ntf-roster` exists and has Firebase Rules Admin granted.
+  `deploy-firestore-rules.yml`).
 - Installable and offline (`sw.js`, `manifest.webmanifest`); More ends with the app version and "Get the latest
   version" (AGENTS.md).
 
@@ -289,4 +295,4 @@ restriction" (same day, following days, between two people, and ready-made ones)
 - The rules log records who changed a rule only when signed in to team sharing.
 - The 2027 dates for Hari Raya Puasa, Hari Raya Haji, Vesak and Deepavali in `demo.js` are from memory: check them
   against the Ministry of Manpower list before relying on them ("Load Singapore public holidays" uses them).
-- Team sharing is untested against a live project (emulator only) until the owner creates it.
+- The cloud's merge by pool is tested in unit tests and the emulator only, not yet with two people saving live.

@@ -6,6 +6,7 @@
 let M = null;      // model.js
 let J = null;      // jpool.js (the junior pool: scoping a check or fill to one pool)
 let R = null;      // rules.js (may be missing while it is being built)
+let CS = null;     // cloudstate.js: what the header's cloud button shows (null while the cloud is off)
 let G = null;      // guide.js: Getting started, Help, the tour (tour.js) and "Try it yourself"
 
 const TABS = {
@@ -22,6 +23,7 @@ const PHONE_MQ = '(max-width: 720px)';
 
 // Line icons (24 px grid, stroke = currentColor). Views get them through app.icon(name).
 const ICON_PATHS = {
+  cloud: '<path d="M7 18.5a4.5 4.5 0 01-.7-8.95A6 6 0 0117.9 10.3 4.1 4.1 0 0117.3 18.5z"/>',
   grid: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9.5h18M3 15h18M9 4v17M15 4v17"/>',
   day: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><rect x="7" y="12" width="4" height="4" rx=".5"/>',
   check: '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
@@ -108,7 +110,7 @@ const app = {
   setMonth, go, toast, scope: (st) => (J ? J.scopeToPool(st, ((st.settings && st.settings.pool) || 'all'), M.poolOf) : st), sheet, confirm: confirmBox, evaluation, isPhone,
   selectCell(date, staffId) { app.selectedCell = date && staffId ? { date, staffId } : null; },
   // first-time help (guide.js, tour.js)
-  onboard, refreshGuide: renderGuide, openAutofill, shortcuts: () => shortcutsSheet(), settled,
+  openCloud, refreshCloud: () => renderCloudBtn(), onboard, refreshGuide: renderGuide, openAutofill, shortcuts: () => shortcutsSheet(), settled,
   model: null,
   rules: null,
 };
@@ -318,6 +320,30 @@ function markTabs() {
 const headerSeen = new WeakMap();
 function setHTML(el, html) { if (headerSeen.get(el) !== html) { el.innerHTML = html; headerSeen.set(el, html); } }
 
+function renderCloudBtn() {
+  const b = $('#cloudbtn');
+  if (!b) return;
+  b.hidden = !CS;
+  if (!CS) return;
+  const st = CS.headerState();
+  b.dataset.state = st.kind;
+  setHTML(b, `${icon('cloud')}<span class="cl-long">${esc(st.label)}</span><span class="cl-short" aria-hidden="true">${esc(st.short)}</span>${st.kind === 'unsaved' || st.kind === 'newer' || st.kind === 'both' ? '<i class="cl-dot" aria-hidden="true"></i>' : ''}`);
+  b.title = st.title;
+  b.setAttribute('aria-label', `Cloud: ${st.label}. ${st.title}`);
+}
+
+// The cloud panel (sign in, Save to cloud, Pull from cloud, who saved last and when, Earlier saves, members)
+async function openCloud() {
+  if (!CS) return;
+  try {
+    const mod = await import('./ui-team.js');
+    const body = h('div');
+    let view = null;
+    sheet({ title: 'Cloud', body, wide: true, actions: [{ label: 'Close', primary: true }], onClose: () => { if (view && view.unmount) view.unmount(); renderCloudBtn(); } });
+    view = mod.mountTeam(body, app, { onChange: renderCloudBtn });
+  } catch (e) { console.error(e); toast('The cloud panel did not load. Check your connection and reload the page.', { kind: 'error' }); }
+}
+
 function renderHeader() {
   const state = app.store.get();
   const dept = state.settings?.dept || '';
@@ -354,6 +380,7 @@ function renderHeader() {
   if (bb) { bb.hidden = !ev.hard; bb.textContent = ev.hard > 99 ? '99+' : String(ev.hard); }
   const bbTab = document.querySelector('.bb-tab[data-tab="check"]');
   if (bbTab) bbTab.setAttribute('aria-label', ev.hard ? `Check, ${ev.hard} problems` : 'Check');
+  renderCloudBtn();
   markTabs();
 }
 
@@ -679,6 +706,11 @@ async function start() {
     fallback: () => (demo && typeof demoState === 'function' ? demoState(M.iso(new Date())) : M.defaultState()),
   });
   app.store.onSaveError = showSaveError;
+  // the cloud button in the header (not in practice, and not until Firebase is set up)
+  try {
+    const cloudMod = await import('./cloud.js');
+    if (cloudMod.enabled && !demo) CS = await import('./cloudstate.js');
+  } catch (e) { console.warn('cloud.js not loaded; no cloud button', e); }
   if (app.store.damaged) showDamaged();
   if (demo) document.title = 'NTF Roster (practice)';
 
@@ -704,6 +736,7 @@ async function start() {
     app.store.commit(k === 'all' ? 'Show all staff' : `Show the ${k} pool`, d => { d.settings.pool = k; });
   });
   $('#autofill').addEventListener('click', openAutofill);
+  $('#cloudbtn').addEventListener('click', openCloud);
   document.addEventListener('keydown', onKeydown);
   window.addEventListener('hashchange', route);
 
@@ -725,6 +758,8 @@ async function start() {
       return;
     }
     evalCache = null;
+    // the pool switch is this browser's own view, not part of the shared roster
+    if (CS && info && info.source !== 'external' && !/^Show (all staff|the \w+ pool)$/.test(info.label || '')) CS.noteChange();
     clearErrorToasts();
     if (info && info.source === 'external') toast(info.label, { kind: /^Not saved/.test(info.label) ? 'error' : 'ok' });
     renderHeader();
@@ -737,6 +772,17 @@ async function start() {
 
   await route();
   document.body.classList.add('ready');
+  // has someone saved to the cloud since this browser last did? (quiet; only once the cloud has been used here)
+  if (CS && CS.read().synced) {
+    let lastCheck = 0;
+    const check = () => {
+      if (Date.now() - lastCheck < 60000) return;
+      lastCheck = Date.now();
+      import('./ui-team.js').then(m => m.checkCloud(app)).then(renderCloudBtn).catch(() => {});
+    };
+    setTimeout(check, 4000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+  }
   window.ntfApp = app;   // handy in the console and for browser tests
 
   // Practice: the tour opens by itself once per device (Not now is right there). Links from your own roster's Help ask

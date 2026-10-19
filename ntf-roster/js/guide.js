@@ -7,6 +7,7 @@
 //    it was done (leave added, a pairing rule added, Auto-fill applied), with "Show me" (tour.js showMe) and Stop.
 // The interface tour itself is tour.js. Nothing here changes the roster except through the person's own taps.
 import * as M from './model.js';
+import * as cloud from './cloud.js';
 import { startTour, tourDone, showMe, hideShowMe, visibleTargets } from './tour.js';
 
 const UI_KEY = 'ntf-roster-guide';   // per device: { collapsed } (the card folded or open)
@@ -154,7 +155,11 @@ export function welcomeScreen(app) {
         h('div', { class: 'empty-ic', html: icon('grid') }),
         h('h2', null, 'Welcome to NTF Roster'),
         h('p', null, 'Plan the monthly calls, PM shifts and clinics together with leave and requests, check them against your rules, and let Auto-fill draft the rest.'),
-        h('p', { class: 'muted' }, 'Everything stays in this browser until team sharing is set up.')),
+        cloud.enabled ? null : h('p', { class: 'muted' }, 'Everything stays in this browser until team sharing is set up.'),
+        // a device with nothing on it yet: sign in and the roster comes down from the cloud
+        cloud.enabled ? h('div', { class: 'welcome-team' },
+          h('p', null, 'Already using this on another device? Sign in and the roster comes down from the cloud.'),
+          h('button', { type: 'button', class: 'btn btn-primary', 'data-gs': 'join', onclick: async e => { const b = e.currentTarget; b.disabled = true; try { await (await import('./ui-team.js')).joinAndLoad(app); } finally { b.disabled = false; } } }, 'Sign in and pull the cloud roster')) : null),
       slot));
   return { el, slot };
 }

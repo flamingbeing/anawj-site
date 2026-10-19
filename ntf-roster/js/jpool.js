@@ -145,3 +145,57 @@ export function scopeToPool(state, pool, poolOf) {
   });
   return { ...state, staff, rules };
 }
+
+// Is this rule only about people in one pool? (every person it covers is in it, and it covers someone)
+function onlyAbout(state, r, pool, poolOf) {
+  const whos = [r.who];
+  if (r.type === 'together') whos.push(r.params && r.params.other);
+  const hit = (state.staff || []).filter(p => whos.some(w => whoHas(w, p)));
+  return hit.length > 0 && hit.every(p => poolOf(state, p) === pool);
+}
+
+// When someone else saved first: keep this browser's own pool and take theirs for the rest. mine: this browser's state;
+// team: their team document (or null); docs: their months ({ month, cells, status, publishedAt, note }); cellsOf turns a
+// month document's cells into an object. People: mine for my pool, theirs for everyone else. Rules: theirs, except rules
+// only about my pool, which are mine. Settings, groups, tags and duty codes: theirs (the pool view stays this browser's).
+// Pain service weeks (aps): mine when my pool is the junior one. Shifts: mine for my pool's people, theirs for the rest,
+// month by month. Returns a new state; nothing is saved.
+export function mergeByPool(mine, team, docs, pool, poolOf, cellsOf = c => c || {}) {
+  if (pool !== 'junior' && pool !== 'senior') throw new Error('Pick the junior or the senior pool first.');
+  const theirs = { ...mine };
+  if (team) for (const k of ['settings', 'groups', 'tags', 'staff', 'duties', 'rules', 'rulesLog', 'aps']) if (k in team) theirs[k] = team[k];
+  const next = { ...theirs, settings: { ...(theirs.settings || {}), pool: (mine.settings || {}).pool } };
+  if (pool === 'junior' && mine.aps) next.aps = mine.aps;
+  // people: their order, mine swapped in or added for my pool
+  const myPeople = (mine.staff || []).filter(p => poolOf(mine, p) === pool);
+  const myIds = new Set(myPeople.map(p => p.id));
+  const staff = (theirs.staff || []).filter(p => !myIds.has(p.id) && poolOf(theirs, p) !== pool);
+  next.staff = [...staff, ...myPeople];
+  const inPool = new Set(next.staff.filter(p => poolOf(next, p) === pool).map(p => p.id));
+  // rules: theirs, minus theirs only about my pool, plus mine only about my pool
+  const mineOnly = (mine.rules || []).filter(r => onlyAbout(mine, r, pool, poolOf));
+  const mineIds = new Set(mineOnly.map(r => r.id));
+  next.rules = [...(theirs.rules || []).filter(r => !mineIds.has(r.id) && !onlyAbout(theirs, r, pool, poolOf)), ...mineOnly];
+  const log = [...(theirs.rulesLog || []), ...(mine.rulesLog || [])];
+  const seenLog = new Set();
+  next.rulesLog = log.filter(x => { const k = JSON.stringify(x); if (seenLog.has(k)) return false; seenLog.add(k); return true; }).slice(-200);
+  // shifts: for each of their months, their cells for everyone else and mine for my pool
+  const cells = { ...(mine.cells || {}) };
+  const months = { ...(mine.months || {}) };
+  for (const d of docs || []) {
+    const m = d.month;
+    const days = new Set([...Object.keys(cells).filter(x => x.startsWith(m + '-')), ...Object.keys(cellsOf(d.cells))]);
+    const their = cellsOf(d.cells);
+    for (const day of days) {
+      if (!day.startsWith(m + '-')) continue;
+      const out = {};
+      for (const [sid, c] of Object.entries(their[day] || {})) if (!inPool.has(sid)) out[sid] = c;
+      for (const [sid, c] of Object.entries((mine.cells || {})[day] || {})) if (inPool.has(sid)) out[sid] = c;
+      if (Object.keys(out).length) cells[day] = out; else delete cells[day];
+    }
+    months[m] = { ...(months[m] || {}), status: d.status === 'published' ? 'published' : 'draft', publishedAt: d.publishedAt || '', note: d.note || '' };
+  }
+  next.cells = cells;
+  next.months = months;
+  return next;
+}
