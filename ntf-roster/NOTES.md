@@ -352,3 +352,18 @@ restriction" (same day, following days, between two people, and ready-made ones)
   Must hold (`placeRule`). A dropped preference keeps its priority if it already fits between its new neighbours,
   otherwise gets the midpoint; ties are ordered by the rules list, so the rule also moves there (the Rules tab sorts
   the same way). Drag listens on the window: moving the row in the page drops pointer capture.
+
+## Each roster has its own rules (19 Oct 2026)
+
+- The owner: the junior and senior rosters are different institutions, so their rules are separate. Every rule has
+  `pool` ('junior' or 'senior') and only ever covers that roster's people.
+- Older saves and imported rule files are placed once on load (`M.splitRules`, run by `migrate` for any rule without
+  a roster): the known defaults by id, others by who they name (groups by kind, junior-pool tags, people by their
+  roster). A rule about everyone, or both, becomes two: the junior copy keeps the id, the senior copy gets `<id>-s`.
+- Engine: `scopeToPool` leaves the other roster's rules out of a Junior or Senior check or fill; in All each rule gets
+  `who.only` (its roster's people, honoured by `compileWho`; never saved). The "other people" side of a Between-two-people
+  rule is not narrowed (the Baby MO rule may name seniors).
+- Rules tab and Priorities show the roster picked at the top (All shows both, each with a Junior/Senior roster tag);
+  bulk changes only reach the rules shown. The rule editor has a Roster field; requests take the person's roster.
+- Cloud merge by pool now keeps my roster's rules and takes theirs for the other, by `pool`.
+- The demo no longer puts senior residents on the junior call (they are on the senior roster since 19 Oct).

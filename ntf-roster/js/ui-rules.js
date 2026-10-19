@@ -29,6 +29,8 @@ const SHOW_IF = {
 
 // Common restrictions, pre-filled. Each makes a fresh rule the owner checks and saves.
 const W = (o = {}) => ({ groups: [], tags: [], staff: [], exclude: [], ...o });
+export const POOL_NAME = { junior: 'Junior roster', senior: 'Senior roster' };
+export const viewPool = state => ((state && state.settings && state.settings.pool) || 'all');
 const WHEN = (o = {}) => ({ from: '', to: '', days: [], holidays: 'any', ...o });
 const kindIds = (state, k) => (state.groups || []).filter(g => g.kind === k).map(g => g.id);
 const TEMPLATES = [
@@ -88,7 +90,8 @@ function how(h) {
     h('ol', { class: 'rv-how-list' },
       li('The sheet comes first.', 'What is already on the roster (leave, requests, calls and shifts you typed) is kept as it is. Rules never rewrite it.'),
       li('Must hold or preference.', 'A "Must hold" rule is never given up if there is any other way. A preference has a priority number: the higher it is, the more it matters. When two preferences clash, the higher number wins.'),
-      li('Every rule is checked all the time.', 'Each rule counts its problems. That is the Check tab, and the "problems" count on each rule below. A rule that is only about the other pool is not counted while you view one pool.'),
+      li('Each roster has its own rules.', 'The junior and senior rosters are run separately: a rule belongs to one of them and only covers its people. The switch at the top (Junior, Senior, All) picks whose rules you see.'),
+      li('Every rule is checked all the time.', 'Each rule counts its problems. That is the Check tab, and the "problems" count on each rule below.'),
       li('Auto-fill makes a draft.', 'It places the hardest days first, then keeps improving by swapping people and days. Where a must-hold rule cannot be met, the day is left short and listed, so you can decide (for example a senior MO stepping down).'),
       li('You decide.', 'Apply the draft, change it by hand, or undo.')),
     h('p', { class: 'bx-help rv-how-note' }, 'Turn a rule off with its switch to see what it was doing.'),
@@ -123,7 +126,8 @@ export function mount(el, app) {
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => importRules(), html: `${app.icon('upload')}<span>Import</span>` }));
   const bar = h('div', { class: 'rv-bar' }, h('div', { class: 'rv-search' }, h('span', { class: 'bx-search-ic', html: app.icon('search') }), search), filters, tools);
   const list = h('div', { class: 'rv-list' });
-  root.append(head, how(h), bar, list);
+  const poolNote = h('p', { class: 'bx-help rv-pool' });
+  root.append(head, how(h), bar, poolNote, list);
   el.append(root);
 
   // ---------- list ----------
@@ -131,7 +135,11 @@ export function mount(el, app) {
     const state = app.store.get();
     const ev = app.evaluation();
     list.innerHTML = '';
-    const rules = state.rules || [];
+    const view = viewPool(state);
+    const rules = (state.rules || []).filter(r => view === 'all' || r.pool === view);
+    poolNote.textContent = view === 'all'
+      ? 'Both rosters\' rules. Each rule says whose it is; pick Junior or Senior at the top to see one roster\'s rules.'
+      : `The ${view} roster's rules. The ${view === 'junior' ? 'senior' : 'junior'} roster has its own: switch at the top.`;
     const count = r => (r.enabled === false ? 0 : ((ev.byRule && ev.byRule.get(r.id)) || []).length);
     const shown = rules.filter(r => {
       const t = RULE_TYPES[r.type];
@@ -190,6 +198,7 @@ export function mount(el, app) {
         r.name ? h('p', { class: 'rv-sent' }, sentence) : null,
         h('p', { class: 'rv-meta' },
           h('span', { class: `bx-badge ${hard ? 'hard' : 'soft'}` }, hard ? 'Must hold' : `Priority ${clampW(r.weight)}`),
+          viewPool(state) === 'all' && r.pool ? h('span', { class: `bx-badge ${r.pool === 'junior' ? 'jun' : 'sen'}` }, POOL_NAME[r.pool]) : null,
           t ? h('span', { class: 'rv-type' }, t.label) : null,
           meta ? h('span', { class: 'rv-who' }, meta) : null),
         r.note ? h('p', { class: 'rv-note' }, r.note) : null),
@@ -314,6 +323,7 @@ export function mount(el, app) {
     if (draft.enabled == null) draft.enabled = true;
     if (t.soft_only) draft.hard = false;
     if (!(Number(draft.weight) >= 1)) draft.weight = 10;
+    if (!M.RULE_POOLS.includes(draft.pool)) { const v = viewPool(state); draft.pool = v !== 'all' ? v : (M.guessRulePool(state, draft) || 'junior'); }
     const startJSON = JSON.stringify(draft);   // closing with changes asks first (Back, Esc, X, tap outside)
     app.onboard?.('rules');   // Getting started: a rule was opened
 
@@ -390,8 +400,14 @@ export function mount(el, app) {
     const noteIn = h('textarea', { id: noteId, rows: '2', placeholder: 'Why this rule exists, who asked for it', oninput: () => { draft.note = noteIn.value; } }, draft.note || '');
     const onIn = h('input', { type: 'checkbox', checked: draft.enabled !== false, onchange: () => { draft.enabled = onIn.checked; } });
 
+    const roster = seg(h, {
+      name: fid('pool'), label: 'Roster', value: draft.pool,
+      options: M.RULE_POOLS.map(k => [k, POOL_NAME[k]]),
+      onChange: v => { draft.pool = v; changed(); },
+    });
     const form = h('div', { class: 'rb-form' },
       hint ? h('p', { class: 'rb-hint' }, hint) : null,
+      section('Roster', h('div', { class: 'rb-fields' }, roster, h('p', { class: 'bx-help' }, 'The rule only covers this roster\'s people, and only its owner\'s auto-fill follows it.'))),
       section('What', what),
       section('Who', whoPicker(app, state, draft.who, changed, { everyoneNote: 'Nobody chosen = everyone' })),
       section('When', whenPicker(app, draft.when, changed)),
@@ -466,9 +482,9 @@ export function mount(el, app) {
     if (!rules) { app.toast('That file has no NTF Roster rules in it.', { kind: 'error' }); return; }
     // cleaned like a backup (lists that are really lists, duty kinds and colours from the fixed set), so one odd rule
     // or code in a file can't break every check or the grid
-    rules = rules.filter(r => r && typeof r === 'object' && !Array.isArray(r) && typeof r.type === 'string').map(M.cleanRule);
-    duties = (Array.isArray(duties) ? duties : []).filter(d => d && typeof d === 'object' && typeof d.code === 'string' && d.code).map(M.cleanDuty);
     const state = app.store.get();
+    rules = M.splitRules(state, rules.filter(r => r && typeof r === 'object' && !Array.isArray(r) && typeof r.type === 'string').map(M.cleanRule));
+    duties = (Array.isArray(duties) ? duties : []).filter(d => d && typeof d === 'object' && typeof d.code === 'string' && d.code).map(M.cleanDuty);
     const cur = new Map((state.rules || []).map(r => [r.id, r]));
     const unknown = rules.filter(r => !r || !RULE_TYPES[r.type]).length;
     const items = rules.filter(r => r && RULE_TYPES[r.type]).map(r => {

@@ -36,7 +36,7 @@ const R = (id, type, name, params, o = {}) => ({
   id, type, name, enabled: true, hard: o.hard !== false, weight: o.weight ?? 10,
   who: { groups: [], tags: [], staff: [], exclude: [], ...(o.who || {}) },
   when: { from: '', to: '', days: [], holidays: 'any', ...(o.when || {}) },
-  params, note: o.note || '',
+  params, note: o.note || '', pool: 'junior',
 });
 const soft = (weight, more = {}) => ({ hard: false, weight, ...more });
 const lim = (codes, max, extra = {}) => ({ codes, period: 'month', window: 7, min: null, max, fte: false, prorate: false, ...extra });
@@ -123,19 +123,26 @@ export function poolProblems(state, staff) {
 // Does this person match a rule's `who`? (the same test the rules use, for working out which rules a pool can fill)
 function whoHas(who, p) {
   const w = { groups: [], tags: [], staff: [], exclude: [], ...(who || {}) };
-  if (w.exclude.includes(p.id)) return false;
+  if (w.exclude.includes(p.id) || (w.only && !w.only.includes(p.id))) return false;
   if (!w.groups.length && !w.tags.length && !w.staff.length) return true;
   return w.groups.includes(p.group) || w.staff.includes(p.id) || (p.tags || []).some(t => w.tags.includes(t));
 }
 
-// A copy of the state for checking or auto-filling one pool: the other pool's people are left out, and a rule that
-// is only about them (the consultants' call, say) is switched off, so it is not reported as a gap or filled.
-// 'all' (or anything else) returns the state itself. The copy is read-only: never commit it.
+// A copy of the state for checking or auto-filling one pool: the other pool's people and the other roster's rules
+// are left out (a rule from before rules had a roster is switched off if it is only about the other pool's people).
+// 'all' (or anything else) keeps everyone, but each rule covers only its own roster's people (`who.only`, a list of
+// ids the rules engine honours; the "other people" of a Between-two-people rule may still be anyone).
+// The copy is read-only: never commit it.
 export function scopeToPool(state, pool, poolOf) {
-  if (pool !== 'junior' && pool !== 'senior') return state;
+  if (pool !== 'junior' && pool !== 'senior') {
+    if (!(state.rules || []).some(r => r.pool)) return state;
+    const ids = { junior: [], senior: [] };
+    for (const p of state.staff || []) ids[poolOf(state, p)].push(p.id);
+    return { ...state, rules: state.rules.map(r => (ids[r.pool] ? { ...r, who: { ...(r.who || {}), only: ids[r.pool] } } : r)) };
+  }
   const staff = (state.staff || []).filter(p => poolOf(state, p) === pool);
-  const rules = (state.rules || []).map(r => {
-    if (r.enabled === false) return r;
+  const rules = (state.rules || []).filter(r => !r.pool || r.pool === pool).map(r => {
+    if (r.enabled === false || r.pool) return r;
     const t = r.type;
     const aboutWho = [r.who];
     if (t === 'together') aboutWho.push(r.params && r.params.other);
@@ -145,8 +152,10 @@ export function scopeToPool(state, pool, poolOf) {
   return { ...state, staff, rules };
 }
 
-// Is this rule only about people in one pool? (every person it covers is in it, and it covers someone)
+// Is this rule only about people in one pool? Its roster says so; a rule without one: every person it covers is in
+// it, and it covers someone.
 function onlyAbout(state, r, pool, poolOf) {
+  if (r.pool) return r.pool === pool;
   const whos = [r.who];
   if (r.type === 'together') whos.push(r.params && r.params.other);
   const hit = (state.staff || []).filter(p => whos.some(w => whoHas(w, p)));

@@ -11,7 +11,7 @@ const KINDS = [
   ['wantcall', 'Wants a call', ['C']],
 ];
 
-export function ruleForRequest({ staffId, name, kind, from, to, hard, note }) {
+export function ruleForRequest({ staffId, name, kind, from, to, hard, note, pool }) {
   const k = KINDS.find(x => x[0] === kind) || KINDS[0];
   const want = kind === 'wantcall';
   const range = from === to ? M.fmtDay(from) : `${M.fmtDay(from)} to ${M.fmtDay(to)}`;
@@ -25,6 +25,7 @@ export function ruleForRequest({ staffId, name, kind, from, to, hard, note }) {
       ? { codes: ['C'], period: 'month', window: 7, min: 1, max: null, fte: false, prorate: false }
       : { codes: [...k[2]], period: 'month', window: 7, min: null, max: 0, fte: false, prorate: false },
     note: String(note || ''),
+    pool: pool === 'senior' ? 'senior' : 'junior',   // the person's roster
   };
 }
 
@@ -56,7 +57,7 @@ export function openRequest(app, staffId) {
       if (!who.value || !a) { app.toast('Choose a person and a date', { kind: 'error' }); return false; }
       if (b < a) { app.toast('The last date is before the first', { kind: 'error' }); return false; }
       const p = people.find(x => x.id === who.value);
-      const rule = ruleForRequest({ staffId: who.value, name: p ? (p.short || p.name) : '', kind: kind.value, from: a, to: b, hard: strict.value === '1', note: note.value });
+      const rule = ruleForRequest({ staffId: who.value, name: p ? (p.short || p.name) : '', kind: kind.value, from: a, to: b, hard: strict.value === '1', note: note.value, pool: p ? M.poolOf(st, p) : 'junior' });
       app.store.commit('Add a request', d => {
         d.rules.push(rule);
         (d.rulesLog = d.rulesLog || []).push({ at: new Date().toISOString(), by: '', action: 'add', ruleId: rule.id, name: rule.name });

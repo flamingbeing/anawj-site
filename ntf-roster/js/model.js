@@ -101,19 +101,20 @@ const R = (id, type, name, params, o = {}) => ({
   id, type, name, enabled: true, hard: o.hard !== false, weight: o.weight ?? 10,
   who: { groups: [], tags: [], staff: [], exclude: [], ...(o.who || {}) },
   when: { from: '', to: '', days: [], holidays: 'any', ...(o.when || {}) },
-  params, note: o.note || '',
+  params, note: o.note || '', ...(o.pool ? { pool: o.pool } : {}),
 });
+const JR = { pool: 'junior' }, SN = { pool: 'senior' };
 const soft = (weight, more = {}) => ({ hard: false, weight, ...more });
 export const DEFAULT_RULES = [
   R('r-leave', 'sameDay', 'No shifts on leave', { codesA: ['@leave'], codesB: ['@shift'], mode: 'forbid' }),
   R('r-postcall', 'sameDay', 'Post call is a day off', { codesA: ['x'], codesB: ['@shift'], mode: 'forbid' }),
-  R('r-jcall', 'cover', '', { codes: ['C'], min: 2, max: 2 }, { who: { groups: JUNIORS } }),
-  R('r-scall', 'cover', '', { codes: ['C'], min: 1, max: 1 }, { who: { groups: SENIORS } }),
+  R('r-jcall', 'cover', '', { codes: ['C'], min: 2, max: 2 }, { who: { groups: JUNIORS }, ...JR }),
+  R('r-scall', 'cover', '', { codes: ['C'], min: 1, max: 1 }, { who: { groups: SENIORS }, ...SN }),
   R('r-gap', 'sequence', 'At least 3 days between calls', { ifCodes: ['C'], thenCodes: ['C'], mode: 'forbid', from: 1, to: 2 }, soft(20)),
-  R('r-maxcall', 'limit', '', { codes: ['C'], period: 'month', window: 7, min: null, max: 7, fte: true, prorate: false }, { who: { groups: JUNIORS } }),
+  R('r-maxcall', 'limit', '', { codes: ['C'], period: 'month', window: 7, min: null, max: 7, fte: true, prorate: false }, { who: { groups: JUNIORS }, ...JR }),
   R('r-wkend', 'limit', 'At most 2 weekend calls a month', { codes: ['C'], period: 'month', window: 7, min: null, max: 2, fte: false, prorate: false }, soft(20, { when: { days: [0, 6] } })),
-  R('r-fair-j', 'spread', '', { codes: ['C'], period: 'month', weekendWeight: 2, holidayWeight: 2, tolerance: 1 }, soft(5, { who: { groups: JUNIORS } })),
-  R('r-fair-s', 'spread', '', { codes: ['C'], period: 'month', weekendWeight: 2, holidayWeight: 2, tolerance: 1 }, soft(5, { who: { groups: SENIORS } })),
+  R('r-fair-j', 'spread', '', { codes: ['C'], period: 'month', weekendWeight: 2, holidayWeight: 2, tolerance: 1 }, soft(5, { who: { groups: JUNIORS }, ...JR })),
+  R('r-fair-s', 'spread', '', { codes: ['C'], period: 'month', weekendWeight: 2, holidayWeight: 2, tolerance: 1 }, soft(5, { who: { groups: SENIORS }, ...SN })),
   R('r-req-cr', 'requests', '', { request: 'Cr', codes: ['C'], mode: 'want', span: 'day' }, soft(10)),
   R('r-req-nc', 'requests', '', { request: 'Nc', codes: ['C'], mode: 'avoid', span: 'day' }),
   R('r-req-wr', 'requests', '', { request: 'Wr', codes: ['@shift'], mode: 'want', span: 'weekend' }, soft(5)),
@@ -122,14 +123,14 @@ export const DEFAULT_RULES = [
   R('r-req-np', 'requests', '', { request: 'NP', codes: ['P'], mode: 'avoid', span: 'day' }),
   R('r-baby', 'together', 'A Baby MO on call needs a senior resident, RP or AC on call',
     { codes: ['C'], other: { groups: ['sr', 'srp', 'rp', 'ac'], tags: [], staff: [], exclude: [] }, otherCodes: ['C'], mode: 'needs', min: 1 },
-    { who: { tags: ['babymo'] } }),
+    { who: { tags: ['babymo'] }, ...JR }),
   R('r-baby2', 'together', 'Two Baby MOs never on call together',
     { codes: ['C'], other: { groups: [], tags: ['babymo'], staff: [], exclude: [] }, otherCodes: ['C'], mode: 'never', min: 1 },
-    { who: { tags: ['babymo'] } }),
+    { who: { tags: ['babymo'] }, ...JR }),
   R('r-preleave', 'sequence', 'No call the night before leave', { ifCodes: ['C'], thenCodes: ['@leave'], mode: 'forbid', from: 1, to: 1 }, soft(10)),
-  R('r-pm', 'cover', '', { codes: ['P'], min: 1, max: 1 }, { who: { groups: JUNIORS }, when: { days: [1, 2, 3, 4, 5], holidays: 'exclude' } }),
-  R('r-otc', 'eligible', '', { codes: ['OTC'] }, { who: { groups: ['cons', 'ac', 'ext', 'vc'] } }),
-  R('r-phd', 'cover', '', { codes: ['PHD'], min: 1, max: 1 }, { who: { groups: JUNIORS }, when: { holidays: 'only' } }),
+  R('r-pm', 'cover', '', { codes: ['P'], min: 1, max: 1 }, { who: { groups: JUNIORS }, when: { days: [1, 2, 3, 4, 5], holidays: 'exclude' }, ...JR }),
+  R('r-otc', 'eligible', '', { codes: ['OTC'] }, { who: { groups: ['cons', 'ac', 'ext', 'vc'] }, ...SN }),
+  R('r-phd', 'cover', '', { codes: ['PHD'], min: 1, max: 1 }, { who: { groups: JUNIORS }, when: { holidays: 'only' }, ...JR }),
 ];
 
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -184,7 +185,40 @@ export function cleanRule(r) {
     params: isObj(r.params) ? r.params : {},
     who: { ...who, ...lists },
     when: { from: '', to: '', holidays: 'any', ...when, days: looseList(when.days).map(Number).filter(x => Number.isInteger(x) && x >= 0 && x <= 6) },
+    ...(RULE_POOLS.includes(r.pool) ? { pool: r.pool } : { pool: undefined }),
   };
+}
+
+// ---------- which roster a rule belongs to ----------
+// The junior and senior rosters are run separately, each with its own rules (owner, 19 Oct 2026). A rule's `pool`
+// says which; it only ever covers that roster's people. Rules from before that, or imported without one, are placed
+// by who they cover; a rule about everyone (or both) becomes two, one per roster, to be tuned apart.
+export const RULE_POOLS = ['junior', 'senior'];
+const JUNIOR_RULE_TAGS = ['jpool', 'mo2', 'mo2strong', 'mo2weak', 'mo1', 'mo1strong', 'mo1weak', 'nocall', 'babymo'];
+export function guessRulePool(state, r) {
+  if (/^r-jp-/.test(r.id || '')) return 'junior';
+  const known = DEFAULT_RULES.find(x => x.id === r.id);
+  if (known && known.pool) return known.pool;
+  const w = isObj(r.who) ? r.who : {}, votes = new Set();
+  const kinds = new Map(((state && state.groups) || []).map(g => [g.id, g.kind]));
+  for (const g of looseList(w.groups)) if (kinds.has(g)) votes.add(kinds.get(g) === 'junior' ? 'junior' : 'senior');
+  for (const t of looseList(w.tags)) { if (JUNIOR_RULE_TAGS.includes(t)) votes.add('junior'); else if (t === 'spool') votes.add('senior'); }
+  for (const id of looseList(w.staff)) { const p = ((state && state.staff) || []).find(x => x.id === id); if (p) votes.add(poolOf(state, p)); }
+  return votes.size === 1 ? [...votes][0] : '';
+}
+// Give every rule a roster: placed by who it covers, or split in two (the senior copy gets the id + "-s").
+export function splitRules(state, rules) {
+  const out = [], ids = new Set(rules.map(r => r.id));
+  for (const r of rules) {
+    if (RULE_POOLS.includes(r.pool)) { out.push(r); continue; }
+    const g = guessRulePool(state, r);
+    if (g) { out.push({ ...r, pool: g }); continue; }
+    let id = `${r.id}-s`;
+    while (ids.has(id)) id += 's';
+    ids.add(id);
+    out.push({ ...r, pool: 'junior' }, { ...clone(r), id, pool: 'senior' });
+  }
+  return out;
 }
 export function migrate(s) {
   if (!isObj(s)) return defaultState();
@@ -234,7 +268,7 @@ export function migrate(s) {
     s.settings.srv = 1;
   }
   if (!Array.isArray(s.rules)) s.rules = clone(DEFAULT_RULES);
-  s.rules = s.rules.filter(r => isObj(r) && typeof r.type === 'string').map(cleanRule);
+  s.rules = splitRules(s, s.rules.filter(r => isObj(r) && typeof r.type === 'string').map(cleanRule));
   // every rule is confirmed (owner, 19 Oct 2026): once, drop the old "Predicted from the drafted rules" note sentence
   if (!s.settings.rcv) {
     for (const r of s.rules) if (typeof r.note === 'string' && /Predicted/.test(r.note)) r.note = r.note.replace(/\s*Predicted[^.]*\.?/g, '').trim();
