@@ -2248,6 +2248,7 @@ route(/^\/admin$/, async () => {
   paint(`<p class="muted">Loading…</p>`);
   let codes = {}, people = [], admins = [], me = '';
   try { [codes, people, admins, me] = await Promise.all([cloud.codes(), cloud.members(), cloud.admins(), cloud.myEmail()]); } catch (e) { paint(`<p class="note">${esc(cloud.friendly(e))}</p>`); return; }
+  if (location.hash !== '#/admin') return; // left while it loaded: don't paint over the next screen
   paint(`<div class="stack">
 
     <p class="muted small">Send each hospital’s team its join link (or show the QR code): it opens the app ready to join, no typing. Share it only with that team. A new code makes old links stop working for new phones; phones already in stay in.</p>

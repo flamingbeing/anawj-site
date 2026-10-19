@@ -216,7 +216,7 @@ try {
   // the admin uploads the blank Word form on the Export screen (made-up fixture; it isn't the whole form, so they confirm)
   assert.equal(await ad.$('#blankup'), null, 'not on the admin screen (that is for people’s access)');
   await ad.evaluate(() => { location.hash = '#/export'; });
-  await ad.waitForSelector('#blankup', { state: 'attached', timeout: 15000 });
+  await ad.waitForSelector('#blankup', { state: 'attached', timeout: 15000 }).catch(async e => { throw new Error('export: ' + ad.url() + ' | ' + (await ad.textContent('main')).replace(/\s+/g, ' ').slice(0, 400)); });
   ad.once('dialog', d => d.accept());
   const zip = new JSZip(); for (const [k, v] of Object.entries(fixtureFiles())) zip.file(k, v);
   await ad.setInputFiles('#blankup', { name: 'blank form.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: await zip.generateAsync({ type: 'nodebuffer' }) });
@@ -228,6 +228,7 @@ try {
   await a.waitForSelector('#doc section.docx', { timeout: 20000 });
   assert.match(await a.textContent('#doc'), /SYNC-01|S\s*Y\s*N\s*C/);
   // QR code and join link for WH
+  await ad.evaluate(() => { location.hash = '#/admin'; });
   await ad.click('[data-qr="WH"]');
   await ad.waitForSelector('#qr-WH svg');
   if (SHOTS) await ad.screenshot({ path: SHOTS + '/admin.png', fullPage: true });
