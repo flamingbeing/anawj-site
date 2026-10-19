@@ -2134,7 +2134,7 @@ async function run(label, ctxOpts) {
     }
     await p.locator('.sugg-row [data-code="20i"]').click();
     await summary.press('Control+Enter'); await until(async () => (await stored()).some(c => c.initials === 'IJ' && c.details === '3mo hernia'), 'explicit initials saved');
-    assert(await initials.evaluate(el => el === document.activeElement), 'save did not return to first field');
+    await until(() => initials.evaluate(el => el === document.activeElement), 'save did not return to first field');
     await tab('logging');
     await p.getByLabel('Autodetect age and gender', { exact: true }).uncheck();
     await setSeparate(false);
