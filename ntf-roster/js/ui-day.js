@@ -61,7 +61,7 @@ export function mount(el, app) {
     const today = M.iso(new Date());
     const ev = app.evaluation();
     const dmap = M.dutyMap(state);
-    const staff = M.staffInMonth(state, app.month).filter(p => M.staffActiveOn(p, day));
+    const staff = M.staffInView(state, app.month).filter(p => M.staffActiveOn(p, day));
     const smap = new Map((state.staff || []).map(p => [p.id, p]));
     const gmap = M.groupMap(state);
     const hasCodes = makeHasCodes(state);

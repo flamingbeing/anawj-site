@@ -63,7 +63,7 @@ function fakeSheet() {
   person('Dr Alicia Wong', { '2026-11-29': 'AL', '2026-12-03': 'AL', '2026-12-04': 'AL', '2026-12-10': 'Cr', '2026-12-15': 'nc' });
   person('A/Prof Bala  Krishnan', { '2026-12-24': 'NC', '2027-01-02': 'AL' });
   section('ASSOCIATE CONSULTANTS');
-  person('Cheng Li Ting', { '2026-12-02': '3-4.30pm', '2026-12-05': 'NUH', '2026-12-09': 'JR', '2026-12-12': 'Clinic UG' });
+  person('Cheng Li Ting', { '2026-12-02': '3-4.30pm', '2026-12-05': 'NUH', '2026-12-09': 'JX', '2026-12-12': 'Clinic UG' });
   section('SENIOR RESIDENTS');
   person('Daniel Marsh (R4-SR1  24/8/26-13/12/26)', { '2026-12-07': 'CR', '2026-12-08': 'x', '2026-12-10': 'AL (AM)' });
   section('SENIOR RESIDENT PHYSICIAN');
@@ -71,7 +71,7 @@ function fakeSheet() {
   section('RESIDENT PHYSICIANS');
   person('Farhan Idris', { '2026-12-16': { richText: [{ text: 'T' }, { text: 'L' }] } });
   section('JUNIOR RESIDENTS');
-  person('Gina Tan (R1-JR 7/9/26-27/12/26)', { '2026-12-20': 'jr', '2026-12-21': 'bcls-pm' });
+  person('Gina Tan (R1-JR 7/9/26-27/12/26)', { '2026-12-20': 'jx', '2026-12-21': 'bcls-pm' });
   section('LOCUM');
   person('Hakim Noor', { '2026-12-31': 'C' });
   section('MEDICAL OFFICERS');
@@ -123,7 +123,7 @@ function startState() {
   eq(io.parseCellText('AL / cr', s), { a: ['AL'], r: ['Cr'], note: '', u: [] }, 'split on slash, case-insensitive');
   eq(io.parseCellText('x', s), { a: [], r: [], note: '', u: [] }, 'x ignored');
   eq(io.parseCellText('Clinic UG', s), { a: ['Clinic'], r: [], note: 'UG', u: [] }, 'words beside a code are a note');
-  eq(io.parseCellText('JR', s).u, ['JR'], 'one unknown word is an unknown code');
+  eq(io.parseCellText('JX', s).u, ['JX'], 'one unknown word is an unknown code');
 }
 
 // ---------- parse the fake sheet ----------
@@ -158,7 +158,7 @@ const parsed = await io.parseDeptWorkbook(fakeSheet(), state0);
   eq(C('Bala Krishnan', '2027-01-02').a, ['AL'], 'JAN column read');
   eq(C('Cheng Li Ting', '2026-12-02').note, '3-4.30pm', 'time goes to the note');
   eq(C('Cheng Li Ting', '2026-12-05').a, ['NUH'], 'other code');
-  eq(C('Cheng Li Ting', '2026-12-09').u, ['JR'], 'unknown code kept aside');
+  eq(C('Cheng Li Ting', '2026-12-09').u, ['JX'], 'unknown code kept aside');
   eq([C('Cheng Li Ting', '2026-12-12').a, C('Cheng Li Ting', '2026-12-12').note], [['Clinic'], 'UG'], 'Clinic UG');
   eq(C('Daniel Marsh', '2026-12-07').r, ['Cr'], 'CR -> Cr');
   eq(C('Daniel Marsh', '2026-12-08'), undefined, 'x alone gives no cell');
@@ -168,7 +168,7 @@ const parsed = await io.parseDeptWorkbook(fakeSheet(), state0);
   eq(C('Gina Tan', '2026-12-21').note, 'bcls-pm', 'bcls-pm is a note');
   eq([C('Ivan Petrov', '2026-12-17').r, C('Ivan Petrov', '2026-12-17').a], [['Nc', 'Pr'], []], 'two requests in one cell');
   eq(C('Kumar Rajan', '2026-12-18').a, ['MC'], 'second locum section read');
-  eq(parsed.unknownCodes, { JR: 2, NS: 1 }, 'unknown codes counted case-insensitively');
+  eq(parsed.unknownCodes, { JX: 2, NS: 1 }, 'unknown codes counted case-insensitively');
   eq(parsed.months[0].people, 11, 'people counted per month');
   eq(parsed.meetings.length, 1, 'one meeting request');
   eq([parsed.meetings[0].date, parsed.meetings[0].matchKey], ['2026-12-02', P['Cheng Li Ting'].key], 'meeting date and person');
@@ -185,18 +185,18 @@ const parsed = await io.parseDeptWorkbook(fakeSheet(), state0);
 
 // ---------- apply ----------
 const draft = structuredClone(state0);
-const sum = io.applyImport(draft, parsed, { unknown: { JR: 'code', NS: 'note' } });
+const sum = io.applyImport(draft, parsed, { unknown: { JX: 'code', NS: 'note' } });
 {
   const byName = n => draft.staff.find(p => p.name === n);
   eq([sum.added, sum.matched, sum.skipped], [9, 2, 0], 'nine added, two matched');
   eq(draft.staff.length, 11, 'staff count after import');
-  eq(sum.codesAdded, ['JR'], 'JR added as a code');
-  const jr = draft.duties.find(d => d.code === 'JR');
+  eq(sum.codesAdded, ['JX'], 'JX added as a code');
+  const jr = draft.duties.find(d => d.code === 'JX');
   eq([jr.kind, jr.auto], ['other', false], 'new code is kind other');
   const cheng = byName('Cheng Li Ting').id, ivan = byName('Ivan Petrov').id, alicia = byName('Alicia Wong').id;
   eq(byName('Daniel Marsh').group, 'sr', 'group from the section');
   eq([byName('Daniel Marsh').start, byName('Daniel Marsh').end, byName('Daniel Marsh').note], ['2026-08-24', '2026-12-13', 'R4-SR1'], 'posting dates kept on the person');
-  eq(M.getCell(draft, '2026-12-09', cheng).a, ['JR'], 'unknown code written as a code');
+  eq(M.getCell(draft, '2026-12-09', cheng).a, ['JX'], 'unknown code written as a code');
   eq(M.getCell(draft, '2026-12-14', ivan).note, 'NS', 'unknown code kept as a note');
   eq(M.getCell(draft, '2026-12-02', cheng).note, '3-4.30pm; Meeting Faculty meeting 1.30-5.30pm', 'meeting added as a note');
   eq(M.getCell(draft, '2026-11-29', alicia).a, ['AL'], 'neighbour-month date fills an empty cell');

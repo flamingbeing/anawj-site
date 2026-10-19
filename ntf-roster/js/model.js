@@ -18,13 +18,30 @@ export const DEFAULT_GROUPS = [
   { id: 'jr', name: 'Junior residents', kind: 'junior' },
   { id: 'locum', name: 'Locums', kind: 'junior' },
   { id: 'mo', name: 'Medical officers', kind: 'junior' },
+  { id: 'nurse', name: 'Nurses (PACU / pain APN)', kind: 'other' },
 ];
 
+// Junior pool tags (jpool.js sets them from the Junior pool setup screen): the call level (MO2 = the senior MO on call,
+// MO1 = the junior MO on call) with a strong or weak mark, 'nocall' (never on call), and which pool a person is in.
+function POOL_TAGS_DEFS() {
+  return [
+    { id: 'mo2strong', name: 'Strong MO2', help: 'Senior MO on call, strong' },
+    { id: 'mo2weak', name: 'Weak MO2', help: 'Senior MO on call, still learning: not with a weak MO1' },
+    { id: 'mo2', name: 'MO2', help: 'Senior MO on call, strong or weak not set' },
+    { id: 'mo1strong', name: 'Strong MO1', help: 'Junior MO on call, strong' },
+    { id: 'mo1weak', name: 'Weak MO1', help: 'Junior MO on call, still learning: not with a weak MO2' },
+    { id: 'mo1', name: 'MO1', help: 'Junior MO on call, strong or weak not set' },
+    { id: 'nocall', name: 'No calls', help: 'In the pool but never on call (PM shifts and a last-resort half call only)' },
+    { id: 'jpool', name: 'Junior pool', help: 'Rostered by the junior roster owner' },
+    { id: 'spool', name: 'Senior pool', help: 'Rostered with the seniors, even if in a junior section' },
+  ];
+}
 export const DEFAULT_TAGS = [
   { id: 'babymo', name: 'Baby MO', help: 'New MO, never on call alone' },
   { id: 'parttime', name: 'Part time', help: 'Works part time: set their FTE' },
   { id: 'pain', name: 'Pain (APS)', help: 'Does acute pain service weeks' },
   { id: 'icu', name: 'ICU', help: 'ICU posting or ICU trained' },
+  ...POOL_TAGS_DEFS(),
 ];
 
 const duty = (code, name, kind, color, ink, extra = {}) =>
@@ -45,6 +62,7 @@ export const DEFAULT_DUTIES = [
   shift('APS', 'Acute pain service', '#2e7d32'),
   shift('Clinic', 'Clinic', '#558b2f', { hours: 4 }),
   shift('Inj', 'Injection list', '#827717', { hours: 4 }),
+  shift('HC', 'Half call (10am to 7pm)', '#8e24aa', { auto: true, hours: 9 }),
   leave('AL', 'Annual leave', '#f8c9cf'),
   leave('AAL', 'Advance annual leave'),
   leave('CL', 'Conference/training leave'),
@@ -59,6 +77,7 @@ export const DEFAULT_DUTIES = [
   leave('FCL', 'Family care leave'),
   leave('CCL', 'Childcare leave'),
   leave('SPL', 'Special leave'),
+  leave('ACLS', 'ACLS / BCLS course'),
   request('Cr', 'Call request'),
   request('Nc', 'No call'),
   request('Wr', 'Weekend shift request'),
@@ -70,6 +89,7 @@ export const DEFAULT_DUTIES = [
   other('LT', 'Liver transplant'),
   other('Mtg', 'Meeting'),
   other('Teach', 'Teaching'),
+  other('JR', 'Junior residency teaching (away from 12pm)'),
   duty('x', 'Post call', 'derived', '#eeeeee', '#555'),
 ];
 
@@ -187,6 +207,14 @@ export function migrate(s) {
   if (!s.duties.length) s.duties = clone(DEFAULT_DUTIES);
   s.duties = s.duties.map(cleanDuty);
   if (!s.duties.some(d => d.code === 'x')) s.duties.push(clone(DEFAULT_DUTIES.find(d => d.code === 'x')));
+  // the junior pool arrived later: older saves get its codes, tags and nurse section once (never overwriting their own)
+  if (!s.settings.jpv) {
+    for (const c of ['HC', 'ACLS', 'JR']) if (!s.duties.some(d => d.code === c)) s.duties.push(clone(DEFAULT_DUTIES.find(d => d.code === c)));
+    for (const t of POOL_TAGS_DEFS()) if (!s.tags.some(x => x.id === t.id)) s.tags.push(t);
+    if (!s.groups.some(g => g.id === 'nurse')) s.groups.push(clone(DEFAULT_GROUPS.find(g => g.id === 'nurse')));
+    s.settings.jpv = 1;
+  }
+  if (!['all', 'junior', 'senior'].includes(s.settings.pool)) s.settings.pool = 'all';
   s.staff = byId(s.staff).map(p => ({
     short: '', group: 'mo', tags: [], fte: 1, start: '', end: '', note: '', active: true, ...p,
     name: str(p.name, p.id), short: str(p.short), group: str(p.group, 'mo'), note: str(p.note),
@@ -197,6 +225,11 @@ export function migrate(s) {
   if (!Array.isArray(s.rulesLog)) s.rulesLog = [];
   s.rulesLog = s.rulesLog.filter(isObj);
   if (s.rulesLog.length > 200) s.rulesLog = s.rulesLog.slice(-200);
+  if (isObj(s.aps)) {   // pain service weeks done before the roster: { base: { id: n }, last: { id: 'YYYY-MM' }, through: 'YYYY-MM' }
+    const num = o => Object.fromEntries(Object.entries(isObj(o) ? o : {}).map(([k, v]) => [k, Math.max(0, Math.round(Number(v) || 0))]).filter(([, v]) => v));
+    const mon = o => Object.fromEntries(Object.entries(isObj(o) ? o : {}).filter(([, v]) => /^\d{4}-\d{2}$/.test(v)));
+    s.aps = { base: num(s.aps.base), last: mon(s.aps.last), through: /^\d{4}-\d{2}$/.test(s.aps.through) ? s.aps.through : '' };
+  } else delete s.aps;
   if (!isObj(s.months)) s.months = {};
   if (!isObj(s.cells)) s.cells = {};
   // cells: { date: { staffId: { a: [], r: [], auto: [], note, lock } } }; drop anything else
@@ -206,6 +239,7 @@ export function migrate(s) {
       if (!isObj(c)) { delete day[id]; continue; }
       for (const k of ['a', 'r', 'auto']) if (c[k] !== undefined) c[k] = strList(c[k]);
       if (c.note !== undefined && typeof c.note !== 'string') c.note = str(c.note);
+      if (c.ap !== undefined) c.ap = !!c.ap;
     }
   }
   return s;
@@ -294,6 +328,21 @@ export function staffInMonth(state, m) {
     .map(({ p }) => p);
 }
 
+// Which roster a person belongs to: the pool tags win, else their section (junior sections are the junior pool).
+export function poolOf(state, p) {
+  const t = (p && p.tags) || [];
+  if (t.includes('jpool')) return 'junior';
+  if (t.includes('spool')) return 'senior';
+  const g = ((state && state.groups) || []).find(x => x.id === (p && p.group));
+  return g && g.kind === 'junior' ? 'junior' : 'senior';
+}
+// staffInMonth narrowed by the pool switch at the top of the app (settings.pool: all, junior, senior).
+export function staffInView(state, m) {
+  const pool = (state.settings && state.settings.pool) || 'all';
+  const all = staffInMonth(state, m);
+  return pool === 'all' ? all : all.filter(p => poolOf(state, p) === pool);
+}
+
 // ---------- cells ----------
 
 const EMPTY = Object.freeze([]);
@@ -313,6 +362,7 @@ export function setCell(draft, s, staffId, patch) {
   const next = { ...cur, ...patch };
   const a = uniq(next.a);
   const cell = { a, r: uniq(next.r), auto: uniq(next.auto).filter(c => a.includes(c)), note: String(next.note || ''), lock: !!next.lock };
+  if (next.ap) cell.ap = true;   // leave the department has approved (blue in the sheet); white leave is still a request
   if (!cell.a.length && !cell.r.length && !cell.note && !cell.lock) delete day[staffId];
   else day[staffId] = cell;
   if (!Object.keys(day).length) delete draft.cells[s];

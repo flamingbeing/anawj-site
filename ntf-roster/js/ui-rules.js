@@ -5,6 +5,7 @@
 // A few small helpers at the bottom are exported for the People and Check screens (same author, same styles).
 
 import * as M from './model.js';
+import { openRequest } from './ui-requests.js';
 import { RULE_TYPES, describeRule, validateRule, evaluateRule, newRule } from './rules.js';
 
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -18,7 +19,7 @@ const TOKEN_HELP = {
   x: 'The day after an overnight shift', '@any': 'Any code at all',
 };
 const KIND_LABEL = { shift: 'Shifts', leave: 'Leave', request: 'Requests', other: 'Other', derived: 'Worked out' };
-const LOG_WORDS = { add: 'Added', edit: 'Changed', delete: 'Deleted', enable: 'Turned on', disable: 'Turned off' };
+const LOG_WORDS = { add: 'Added', edit: 'Changed', delete: 'Deleted', enable: 'Turned on', disable: 'Turned off', confirm: 'Confirmed' };
 
 // Params shown only when they matter (a ParamSpec.showIf in rules.js, if one is ever added, wins).
 const SHOW_IF = {
@@ -79,6 +80,25 @@ const COMBO_TEMPLATES = [
 let nid = 0;
 const fid = p => `${p}-${++nid}`;
 
+// A rule marked "Predicted from the drafted rules: confirm or change" carries a To confirm tag until the rosterer
+// confirms it (Confirm on the rule, or Confirm all). Confirming drops that sentence from the note; other note text stays.
+export const isPredicted = r => /Predicted/.test((r && r.note) || '');
+export const confirmedNote = note => String(note || '').replace(/\s*Predicted[^.]*\.?/g, '').trim();
+
+// The short "how it works" panel at the top: the order things happen in. Keep in step with solver.js and rules.js.
+function how(h) {
+  const li = (t, d) => h('li', null, h('strong', null, t), ' ', d);
+  return h('details', { class: 'card rv-how' },
+    h('summary', null, 'How the rules work, in order'),
+    h('ol', { class: 'rv-how-list' },
+      li('The sheet comes first.', 'What is already on the roster (leave, requests, calls and shifts you typed) is kept as it is. Rules never rewrite it.'),
+      li('Must hold or preference.', 'A "Must hold" rule is never given up if there is any other way. A preference has a priority number: the higher it is, the more it matters. When two preferences clash, the higher number wins.'),
+      li('Every rule is checked all the time.', 'Each rule counts its problems. That is the Check tab, and the "problems" count on each rule below. A rule that is only about the other pool is not counted while you view one pool.'),
+      li('Auto-fill makes a draft.', 'It places the hardest days first, then keeps improving by swapping people and days. Where a must-hold rule cannot be met, the day is left short and listed, so you can decide (for example a senior MO stepping down).'),
+      li('You decide.', 'Apply the draft, change it by hand, or undo.')),
+    h('p', { class: 'bx-help rv-how-note' }, 'Turn a rule off with its switch to see what it was doing. "To confirm" rules come from the drafted rules: confirm them, or change them.'));
+}
+
 export function mount(el, app) {
   const { h } = app;
   let q = '';
@@ -98,13 +118,15 @@ export function mount(el, app) {
     options: [['all', 'All'], ['hard', 'Must hold'], ['soft', 'Preferences'], ['bad', 'Problems'], ['off', 'Off']],
     onChange: v => { filter = v; renderList(); },
   });
-  const tools = h('div', { class: 'rv-tools' },
+  const confirmAll = h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': 'confirm-all', onclick: () => confirmRules((app.store.get().rules || []).filter(isPredicted).map(r => r.id)) });
+  const tools = h('div', { class: 'rv-tools' }, confirmAll,
+    h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => openRequest(app), html: `${app.icon('plus')}<span>Add a request</span>` }),
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => openLog(), html: `${app.icon('list')}<span>Rules log</span>` }),
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => exportRules(), html: `${dlIcon()}<span>Export</span>` }),
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => importRules(), html: `${app.icon('upload')}<span>Import</span>` }));
   const bar = h('div', { class: 'rv-bar' }, h('div', { class: 'rv-search' }, h('span', { class: 'bx-search-ic', html: app.icon('search') }), search), filters, tools);
   const list = h('div', { class: 'rv-list' });
-  root.append(head, bar, list);
+  root.append(head, how(h), bar, list);
   el.append(root);
 
   // ---------- list ----------
@@ -113,6 +135,9 @@ export function mount(el, app) {
     const ev = app.evaluation();
     list.innerHTML = '';
     const rules = state.rules || [];
+    const nPred = rules.filter(isPredicted).length;
+    confirmAll.hidden = nPred < 2;
+    confirmAll.textContent = `Confirm all ${nPred} to-confirm rules`;
     const count = r => (r.enabled === false ? 0 : ((ev.byRule && ev.byRule.get(r.id)) || []).length);
     const shown = rules.filter(r => {
       const t = RULE_TYPES[r.type];
@@ -137,7 +162,7 @@ export function mount(el, app) {
     const isHard = r => r.hard && !(RULE_TYPES[r.type] && RULE_TYPES[r.type].soft_only);
     const groups = [
       ['Must hold', 'Hard rules: auto-fill never breaks them if it can help it.', shown.filter(isHard)],
-      ['Preferences', 'Soft rules: weighed against each other; a higher weight matters more.', shown.filter(r => !isHard(r))],
+      ['Preferences', 'Soft rules, highest priority first: weighed against each other; a higher number matters more.', shown.filter(r => !isHard(r)).sort((a, b) => Number(b.weight) - Number(a.weight))],
     ];
     for (const [title, sub, rs] of groups) {
       if (!rs.length) continue;
@@ -170,17 +195,34 @@ export function mount(el, app) {
         h('h4', { class: 'rv-title' }, h('button', { type: 'button', class: 'rv-open', onclick: () => openBuilder(r) }, title)),
         r.name ? h('p', { class: 'rv-sent' }, sentence) : null,
         h('p', { class: 'rv-meta' },
-          h('span', { class: `bx-badge ${hard ? 'hard' : 'soft'}` }, hard ? 'Must hold' : `Preference · ${clampW(r.weight)}`),
+          h('span', { class: `bx-badge ${hard ? 'hard' : 'soft'}` }, hard ? 'Must hold' : `Priority ${clampW(r.weight)}`),
+          isPredicted(r) ? h('span', { class: 'bx-badge soft', title: r.note }, 'To confirm') : null,
           t ? h('span', { class: 'rv-type' }, t.label) : null,
           meta ? h('span', { class: 'rv-who' }, meta) : null),
         r.note ? h('p', { class: 'rv-note' }, r.note) : null),
       h('div', { class: 'rv-side' },
         countEl,
         h('div', { class: 'rv-acts' },
+          isPredicted(r) ? h('button', { type: 'button', class: 'btn btn-sm', onclick: () => confirmRules([r.id]), title: 'Take off the To confirm tag: this rule is right as it is', 'aria-label': `Confirm: ${title}` }, 'Confirm') : null,
           h('label', { class: 'switch rv-sw', title: off ? 'Turn on' : 'Turn off' }, sw, h('span', { class: 'sw-track' }), h('span', { class: 'sr-only' }, 'On')),
           h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => openBuilder(r), 'aria-label': `Edit: ${title}` }, 'Edit'),
           h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => duplicate(r), 'aria-label': `Duplicate (copy): ${title}` }, h('span', { class: 'rv-long' }, 'Duplicate'), h('span', { class: 'rv-short', 'aria-hidden': 'true' }, 'Copy')),
           h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm', onclick: () => removeRule(r), 'aria-label': `Delete: ${title}` }, 'Delete'))));
+  }
+
+  function confirmRules(ids) {
+    let n = 0;
+    app.store.commit(ids.length > 1 ? 'Confirm the predicted rules' : 'Confirm rule', d => {
+      for (const id of ids) {
+        const r = d.rules.find(x => x.id === id);
+        if (!r || !isPredicted(r)) continue;
+        r.note = confirmedNote(r.note);
+        log(d, 'confirm', r);
+        n++;
+      }
+      if (!n) return false;
+    });
+    if (n) app.toast(n === 1 ? 'Confirmed' : `Confirmed ${n} rules`, { action: undoAct, ms: 4000 });
   }
 
   // ---------- changes ----------

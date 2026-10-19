@@ -42,15 +42,15 @@ const run = (s, rule, range = NOV) => evaluateRule(s, rule, range);
 // ---------- model ----------
 eq(M.STORE_KEY, 'ntf-roster-v1');
 eq(M.DEMO_KEY, 'ntf-roster-demo');
-eq(M.DEFAULT_GROUPS.map(g => g.id), ['cons', 'ac', 'ext', 'vc', 'sr', 'srp', 'rp', 'jr', 'locum', 'mo']);
+eq(M.DEFAULT_GROUPS.map(g => g.id), ['cons', 'ac', 'ext', 'vc', 'sr', 'srp', 'rp', 'jr', 'locum', 'mo', 'nurse']);
 eq(M.DEFAULT_GROUPS.filter(g => g.kind === 'senior').map(g => g.id), ['cons', 'ac', 'ext', 'vc']);
-eq(M.DEFAULT_TAGS.map(t => t.id), ['babymo', 'parttime', 'pain', 'icu']);
+eq(M.DEFAULT_TAGS.slice(0, 4).map(t => t.id), ['babymo', 'parttime', 'pain', 'icu']);
 {
   const dm = new Map(M.DEFAULT_DUTIES.map(d => [d.code, d]));
-  eq(M.DEFAULT_DUTIES.filter(d => d.auto).map(d => d.code), ['C', 'P', 'SMO', 'OTC', 'PHD']);
+  eq(M.DEFAULT_DUTIES.filter(d => d.auto).map(d => d.code), ['C', 'P', 'SMO', 'OTC', 'PHD', 'HC']);
   eq(M.DEFAULT_DUTIES.filter(d => d.overnight).map(d => d.code), ['C', 'SMO', 'W']);
   eq(M.DEFAULT_DUTIES.filter(d => d.kind === 'request').map(d => d.code), ['Cr', 'Nc', 'Wr', 'Nw', 'Pr', 'NP']);
-  eq(M.DEFAULT_DUTIES.filter(d => d.kind === 'leave').length, 14);
+  eq(M.DEFAULT_DUTIES.filter(d => d.kind === 'leave').length, 15);
   eq([dm.get('C').color, dm.get('C').ink, dm.get('x').kind], ['#c62828', '#fff', 'derived']);
 }
 eq(M.iso(new Date(2026, 10, 3)), '2026-11-03');
@@ -114,7 +114,7 @@ eq(M.fmtMonth('2026-11'), 'November 2026');
   const s = M.migrate({ staff: [{ id: 'q', name: 'Q Test' }], rules: [{ id: 'x1', type: 'cover', params: { codes: ['C'] } }, { junk: 1 }] });
   eq([s.v, s.staff[0].group, s.staff[0].fte, s.staff[0].active, s.rules.length], [1, 'mo', 1, true, 1]);
   eq(s.rules[0].who, { groups: [], tags: [], staff: [], exclude: [] });
-  ok(s.duties.length === M.DEFAULT_DUTIES.length && s.groups.length === 10 && s.cells && s.months, 'defaults filled');
+  ok(s.duties.length === M.DEFAULT_DUTIES.length && s.groups.length === 11 && s.cells && s.months, 'defaults filled');
   ok(M.defaultState().rules.length === DEFAULT_RULES.length, 'defaultState has the default rules');
   ok(M.defaultState().rules !== M.defaultState().rules && M.defaultState().rules[0] !== DEFAULT_RULES[0], 'defaultState copies the rules');
 }

@@ -38,6 +38,8 @@ export function mount(el, app) {
     return out;
   };
 
+  let lastBook = null;   // the last sheet imported or chosen: { name, buf }, not saved anywhere
+
   // ---------- Import ----------
   const importSec = section('more-import', 'Import the department sheet',
     'The monthly "ALL STAFF LEAVE REQUEST" Excel file (.xlsx). You see what was found before anything changes.',
@@ -55,7 +57,9 @@ export function mount(el, app) {
     const done = () => { if (typeof closeReading === 'function') closeReading(); };
     try {
       await io.loadExcelJS();
-      const parsed = await io.parseDeptWorkbook(await file.arrayBuffer(), store.get());
+      const buf = await file.arrayBuffer();
+      const parsed = await io.parseDeptWorkbook(buf.slice(0), store.get());
+      lastBook = { name: file.name, buf };   // kept in memory so the filled sheet can go back in the same file
       done();
       if (!parsed.months.length) { app.toast(parsed.warnings[0] || 'No month sheet found in this file.', { kind: 'error', ms: 7000 }); return; }
       reviewImport(parsed, file.name);
@@ -196,7 +200,7 @@ export function mount(el, app) {
     const state = store.get();
     const keep = personSel.value;
     personSel.innerHTML = '';
-    const people = M.staffInMonth(state, app.month);
+    const people = M.staffInView(state, app.month);
     for (const p of people) personSel.append(h('option', { value: p.id, selected: p.id === keep }, p.name));
     if (!people.length) personSel.append(h('option', { value: '' }, 'Nobody in post this month'));
   }
@@ -212,6 +216,20 @@ export function mount(el, app) {
       app.toast(`Downloaded ${name}`);
     });
   }
+  async function fillSheet(book, button) {
+    await busy(button, async () => {
+      await io.loadExcelJS();
+      const out = await io.fillDeptWorkbook(book.buf.slice(0), store.get(), app.month);
+      const name = `${book.name.replace(/\.xlsx$/i, '')} (filled).xlsx`;
+      io.download(out.blob, name);
+      app.onboard?.('shared');
+      app.toast(`Downloaded ${name}: ${out.changed} cell${out.changed === 1 ? '' : 's'} written${out.missing.length ? `. Not found in the sheet: ${out.missing.slice(0, 4).join(', ')}${out.missing.length > 4 ? '…' : ''}` : ''}`, { ms: 9000 });
+    });
+  }
+  const fillBtn = btn('Fill the sheet I imported', () => (lastBook ? fillSheet(lastBook, fillBtn) : app.toast('Import the sheet first, or choose it below.', { kind: 'error' })), 'btn btn-primary');
+  const fillPick = fileButton('Choose the sheet to fill', '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', async file => {
+    try { await fillSheet({ name: file.name, buf: await file.arrayBuffer() }, null); } catch (e) { console.error(e); app.toast(e.message || 'Could not fill that file.', { kind: 'error', ms: 9000 }); }
+  }, 'upload', 'btn');
   const xlThis = btn('Download this month', () => exportExcel([app.month], xlThis), 'btn btn-primary');
   const xlRange = btn('Download these months', () => {
     let a = fromSel.value, b = toSel.value;
@@ -233,6 +251,9 @@ export function mount(el, app) {
   }
 
   const exportSec = section('more-export', 'Export', null,
+    h('h3', { class: 'more-sub' }, 'Back into the sheet you were sent'),
+    h('p', { class: 'more-p' }, 'Writes the calls (C), PM shifts (P), half calls (HC) and pain service weeks (green) into the same Excel file, and changes nothing else in it: colours, leave, formulas and counts stay as they were. Send the downloaded file back.'),
+    h('div', { class: 'more-row' }, fillBtn, fillPick),
     h('h3', { class: 'more-sub' }, 'Excel (department sheet layout)'),
     h('p', { class: 'more-p' }, 'Same layout as the department sheet: sections, coloured codes, x after calls, weekends and holidays shaded, counts and a legend.'),
     h('div', { class: 'more-row' }, xlThis),
