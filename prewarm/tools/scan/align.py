@@ -32,6 +32,28 @@ def find_sheet(gray):
     return None
 
 
+def find_sheet_colour(bgr):
+    """Second guess at the paper's corners from colour: white, unsaturated pixels (the table, a hand or a shadow's edge
+    do not fool it the way brightness alone can). Returns the corners of the convex hull's four-sided fit, or None."""
+    small = cv2.resize(bgr, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
+    hsv = cv2.cvtColor(cv2.GaussianBlur(small, (7, 7), 0), cv2.COLOR_BGR2HSV)
+    m = ((hsv[..., 1] < 70) & (hsv[..., 2] > 120)).astype(np.uint8) * 255
+    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((9, 9), np.uint8))
+    cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not cs:
+        return None
+    c = max(cs, key=cv2.contourArea)
+    if cv2.contourArea(c) < 0.25 * m.shape[0] * m.shape[1]:
+        return None
+    hull = cv2.convexHull(c)
+    for eps in (0.02, 0.03, 0.05, 0.08):
+        q = cv2.approxPolyDP(hull, eps * cv2.arcLength(hull, True), True)
+        if len(q) == 4:
+            return _order(q) * 4
+    return None
+
+
 def flatten_illumination(gray):
     """Divide out shadows and uneven light so paper is ~255 everywhere."""
     bg = cv2.medianBlur(cv2.dilate(gray, np.ones((15, 15), np.uint8)), 51)
@@ -50,10 +72,10 @@ def line_score(aligned_gray, template_gray, box=None):
     return float((t & hit).sum() / max(1, t.sum()))
 
 
-def align_page(photo_bgr, template_gray):
+def _align_from(gray, quad, template_gray):
+    """Flatten onto the template using the sheet corners `quad` (None: the photo is already cropped to the page), refine with
+    ECC, and return (aligned page, score)."""
     h, w = template_gray.shape
-    gray = cv2.cvtColor(photo_bgr, cv2.COLOR_BGR2GRAY)
-    quad = find_sheet(gray)
     if quad is not None:
         M = cv2.getPerspectiveTransform(quad, np.array([[0, 0], [w, 0], [w, h], [0, h]], np.float32))
         flat = cv2.warpPerspective(gray, M, (w, h), flags=cv2.INTER_AREA, borderValue=255)
@@ -74,8 +96,21 @@ def align_page(photo_bgr, template_gray):
         W[:2, 2] /= scale; W[2, :2] *= scale; warp = W
     fine = cv2.warpPerspective(flat, warp, (w, h), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP, borderValue=255)
     s0, s1 = line_score(flat, template_gray), line_score(fine, template_gray)
-    out, score = (fine, s1) if s1 >= s0 else (flat, s0)
-    return out, score
+    return (fine, s1) if s1 >= s0 else (flat, s0)
+
+
+def align_page(photo_bgr, template_gray):
+    """Try each guess at the sheet (brightness corners, colour corners, the whole photo as already cropped) and keep the
+    best-aligned. A shadow or a hand can fool one guess (a shaded edge cuts a corner off); rarely all of them."""
+    gray = cv2.cvtColor(photo_bgr, cv2.COLOR_BGR2GRAY)
+    best = None
+    for quad in (find_sheet(gray), find_sheet_colour(photo_bgr), None):
+        out, score = _align_from(gray, quad, template_gray)
+        if best is None or score > best[1]:
+            best = (out, score)
+        if score >= 0.9:
+            break
+    return best
 
 
 def ink_layer(aligned_gray, template_gray):
