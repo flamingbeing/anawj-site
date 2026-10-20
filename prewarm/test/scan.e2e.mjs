@@ -34,12 +34,18 @@ try {
   ok(await pg.$eval('#scact', e => e.hidden), 'no photo buttons before a Subject ID');
   await pg.fill('#scsub', 'DEMO-01');
   ok(!(await pg.$eval('#scact', e => e.hidden)), 'photo buttons after a Subject ID');
-  ok(/Take page 1/.test(await pg.textContent('#scshottxt')), 'camera button names page 1');
+  ok(await pg.isChecked('#scburst'), 'several pages in a row is on by default');
+  await pg.uncheck('#scburst'); // one page at a time here; bursts and the grid have their own test (scan-burst.e2e.mjs)
+  ok(/Take page 1/.test(await pg.textContent('#scshottxt')), 'one page at a time: camera button names page 1');
   await pg.check('#sccamapp'); // this test feeds files to the camera-app input; the live camera has its own test (scan-live.e2e.mjs)
 
-  // photo -> crop step with a guessed page, a corner nudged, flattened, lit, accepted
+  // photo -> the page was found clearly, so straight to the flat page (one tap "Looks right"); Adjust corners for the crop step
   await give('#scshot', 'p1.jpg');
-  await pg.waitForSelector('#scedit:not([hidden]) #sccrop:not([hidden])');
+  await pg.waitForSelector('#scedit:not([hidden]) #screv:not([hidden])');
+  ok(/^Check the page$/.test(await pg.textContent('#scstep')) && /Page found and flattened/.test(await pg.textContent('#schint')), 'sure outline skips the corners: ' + await pg.textContent('#schint'));
+  ok(/Looks right/.test(await pg.textContent('#scok')), 'one-tap Looks right');
+  await pg.click('#scback');
+  await pg.waitForSelector('#sccrop:not([hidden])');
   const box = await pg.$eval('#sccrop', c => { const r = c.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
   ok(box[2] > 300 && Math.abs(box[2] / box[3] - 4 / 3) < 0.02, 'crop view shows the whole photo, got ' + box);
   // the guess should have put the first corner near the page's top-left (380,120 of 1600x1200): nudge it by dragging, loupe shows
@@ -70,7 +76,7 @@ try {
   // skip page 2 and 3: choose 4; the next offer is 5
   await pg.selectOption('#scnum', '4');
   await give('#scshot', 'p4.jpg');
-  await pg.waitForSelector('#sccrop:not([hidden])'); await pg.click('#scflat'); await pg.waitForSelector('#screv:not([hidden])');
+  await pg.waitForSelector('#screv:not([hidden])');
   await pg.click('[data-mode="color"]'); await pg.click('#scback'); await pg.waitForSelector('#sccrop:not([hidden])');
   await pg.click('#scrot'); await pg.click('#scrot'); await pg.click('#scrot'); await pg.click('#scrot'); // a full turn: back where it was
   await pg.click('#scflat'); await pg.waitForSelector('#screv:not([hidden])');
@@ -89,7 +95,7 @@ try {
   const ch2 = pg.waitForEvent('filechooser', { timeout: 5000 });
   await pg.click('#scretake'); await ch2;
   await give('#scshot', 'p1b.jpg');
-  await pg.waitForSelector('#sccrop:not([hidden])'); await pg.click('#scflat'); await pg.waitForSelector('#screv:not([hidden])');
+  await pg.waitForSelector('#screv:not([hidden])');
   await pg.click('#scok'); await pg.waitForFunction(() => document.querySelector('#scedit').hidden);
   await pg.waitForTimeout(500);
   ok((await pg.$$('#sclist figure')).length === 2, 'retake replaced page 1, did not add a third');
@@ -103,7 +109,7 @@ try {
   // "Choose from photos" goes through the same crop step; Save tidied pages is offered
   ok(!(await pg.$eval('#scsave', e => e.hidden)), 'Save tidied pages offered');
   await give('#scpick', 'pick.jpg');
-  await pg.waitForSelector('#sccrop:not([hidden])'); await pg.click('#scflat'); await pg.waitForSelector('#screv:not([hidden])');
+  await pg.waitForSelector('#screv:not([hidden])');
   await pg.click('#scok'); await pg.waitForFunction(() => document.querySelectorAll('#sclist figure').length === 3);
   // delete one
   await pg.click('[data-open]'); await pg.waitForSelector('dialog[open]'); await pg.click('#scdel'); await pg.waitForTimeout(300);
@@ -114,8 +120,8 @@ try {
   ok(await pg.$eval('#scselbar', e => e.hidden), 'selection bar hidden at first');
   await hold(0); await pg.waitForTimeout(100);
   ok(!(await pg.$eval('#scselbar', e => e.hidden)) && await picked() === 1 && (await pg.$$('dialog[open]')).length === 0, 'press and hold starts selecting without opening the page');
-  await pg.click('#sclist figure:nth-child(2) img'); ok(await picked() === 2, 'tap adds a photo');
-  await pg.click('#sclist figure:nth-child(2) img'); ok(await picked() === 1, 'tap removes a photo');
+  await pg.locator('#sclist figure img').nth(1).click(); ok(await picked() === 2, 'tap adds a photo');
+  await pg.locator('#sclist figure img').nth(1).click(); ok(await picked() === 1, 'tap removes a photo');
   await pg.click('#scselnone'); ok(await picked() === 0 && await pg.$eval('#scseldel', e => e.disabled), 'None clears; Delete disabled');
   await pg.click('#scselall'); ok(await picked() === 2, 'All picks every photo');
   await pg.click('#scselcancel'); ok(await pg.$eval('#scselbar', e => e.hidden) && await picked() === 0, 'Cancel leaves selecting');
@@ -124,7 +130,7 @@ try {
   await pg.click('#scseldel'); await pg.waitForFunction(() => document.querySelectorAll('#sclist figure').length === 1);
   ok(await pg.$eval('#scselbar', e => e.hidden), 'bar closes after deleting');
   await give('#scpick', 'pick.jpg');
-  await pg.waitForSelector('#sccrop:not([hidden])'); await pg.click('#scflat'); await pg.waitForSelector('#screv:not([hidden])');
+  await pg.waitForSelector('#screv:not([hidden])');
   await pg.click('#scok'); await pg.waitForFunction(() => document.querySelectorAll('#sclist figure').length === 2);
 
   // sending: only on the real address (here: localhost with ?scantest), Access and the study computer stood in for
@@ -141,7 +147,7 @@ try {
   });
   await pg.goto('http://localhost:8080/prewarm/?demo&scantest#/scan'); await pg.waitForSelector('#scsub');
   await pg.fill('#scsub', 'DEMO-02');
-  const addPage = async () => { await give('#scpick', 'x.jpg'); await pg.waitForSelector('#sccrop:not([hidden])'); await pg.click('#scflat'); await pg.waitForSelector('#screv:not([hidden])'); await pg.click('#scok'); await pg.waitForFunction(() => document.querySelector('#scedit').hidden); await pg.waitForTimeout(400); };
+  const addPage = async () => { await give('#scpick', 'x.jpg'); await pg.waitForSelector('#screv:not([hidden])'); await pg.click('#scok'); await pg.waitForFunction(() => document.querySelector('#scedit').hidden); await pg.waitForTimeout(400); };
   await addPage();
   await pg.selectOption('#scnum', '7'); await addPage();
   await pg.waitForFunction(() => document.querySelectorAll('#sclist figure').length === 2);

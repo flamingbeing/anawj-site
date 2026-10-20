@@ -25,7 +25,17 @@ are in the owner's private notes.
   notes). The live API reader has never run (shelved): its accuracy is unmeasured. Key: `--key-file`, never an env var.
 - **Scan pages screen** (`js/scan.js`, route `#/scan`, Settings › Scan pages (beta), off by default): scanner-style capture (live camera by default: page outline on the video, coach line, auto photo once the page is found and still (off after 20 s, or by a per-phone switch), shutter button, torch where the phone has one, full-resolution still via ImageCapture else the biggest video frame (size shown and kept with the page), blur and dark check after each camera shot with Retake; per-phone "Use phone camera app" switch, also offered when the camera will not open; test `test/scan-live.e2e.mjs` with a fake camera. Or the photo picker. Then four draggable
   corners with a loupe, perspective flatten to 1800x2400, shadow removal, Auto / Black and white / Colour; maths in `js/scan-geom.js`, plain canvas code;
-  original kept beside the tidied copy; press and hold a thumbnail to select several, then All / None / Delete / Cancel), page numbers 1–14 that move on by themselves, held in IndexedDB on that phone. **Send to the study computer** (only on
+  original kept beside the tidied copy; press and hold a page to select several, then All / None / Delete / Cancel), page numbers 1–14 that move on by themselves, held in IndexedDB on that phone.
+  Tidy + pages (owner, 20 Oct 2026): when the outline is sure (whole sheet found, clear of the photo's edges) the corners step is skipped and the flat page shows with one tap **Looks right**
+  (Adjust corners for the crop step); corner handles 44 px plus side handles (move a whole side), both snap onto the paper's corner or edge on letting go (`edgeInfo`,
+  `snapCorner`, `snapSide`); the lighting style is remembered on the phone; output always portrait 1800x2400; **auto-rotate upright** (`uprightScore`: print has more
+  strokes above the letters' middle band than below; table rules left out; turns only on clear evidence, 12+ line pieces and score below -0.2; never after a manual
+  Rotate). Benchmarked on made-up printed pages (240 synthetic photos): no upright page ever turned, about 3 in 4 upside-down pages turned, the rest left as photographed;
+  tune `UPRIGHT_*` from real pages. **Several pages in a row** (per-phone switch, on by default): pick a range ("3 to 7"), each shot takes the next number, the live
+  camera stays open and waits for the sheet to change; pages are tidied beside it with the remembered style and marked **Check** (`needs`: blurry, dark, corners
+  guessed); with the camera app each tap takes the next page; from the gallery the picked photos take the range in order. **14-slot grid**: empty (tap to take just
+  that page), Tidying…, taken, sent, Check; tap a taken page for Retake / Choose from gallery / Delete, Adjust corners, page number, and Looks right on a Check page.
+  Tests: `test/scan-burst.e2e.mjs` (fake camera shared in `test/fake-camera.mjs`). **Send to the study computer** (only on
   prewarmstudy.anawj.com, not demo) uploads the tidied copies to `/scan-api/` (`worker/scan.js`): Cloudflare Access on that path
   (email allowlist, one-time PIN), the Worker re-checks the Access token, then passes the photo on to the study computer's `tools/scan/inbox.py`
   with a service token only the Worker holds; nothing is stored in Cloudflare. The service worker never caches `/scan-api/`. Worker settings

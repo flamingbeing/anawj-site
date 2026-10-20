@@ -252,3 +252,112 @@ export function photoCheck(data, w, h, quad) {
   const sharp = s2 / n - (s / n) ** 2, light = lit / n;
   return { sharp: Math.round(sharp), light: Math.round(light), blurry: sharp < BLUR_MIN, dark: light < DARK_MIN };
 }
+
+// ---------- snapping and turning upright (owner, 20 Oct 2026)
+// Edges of a small copy of the photo (about 800 px long): Sobel gradient size per pixel and a Harris corner response
+// (structure tensor over a 5x5 box), so a dragged corner can snap onto the paper's corner and a dragged side onto its edge.
+export function edgeInfo(data, w, h) {
+  const n = w * h, g = new Float32Array(n), mag = new Float32Array(n), R = new Float32Array(n);
+  for (let i = 0; i < n; i++) g[i] = (data[i * 4] * 77 + data[i * 4 + 1] * 150 + data[i * 4 + 2] * 29) >> 8;
+  const xx = new Float32Array(n), yy = new Float32Array(n), xy = new Float32Array(n);
+  let maxMag = 0, maxR = 0;
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x;
+    const gx = g[i - w + 1] + 2 * g[i + 1] + g[i + w + 1] - g[i - w - 1] - 2 * g[i - 1] - g[i + w - 1];
+    const gy = g[i + w - 1] + 2 * g[i + w] + g[i + w + 1] - g[i - w - 1] - 2 * g[i - w] - g[i - w + 1];
+    mag[i] = Math.hypot(gx, gy); if (mag[i] > maxMag) maxMag = mag[i];
+    xx[i] = gx * gx; yy[i] = gy * gy; xy[i] = gx * gy;
+  }
+  const box = a => { // 5x5 box sum, separable
+    const t = new Float32Array(n), o = new Float32Array(n);
+    for (let y = 0; y < h; y++) for (let x = 2; x < w - 2; x++) { const i = y * w + x; t[i] = a[i - 2] + a[i - 1] + a[i] + a[i + 1] + a[i + 2]; }
+    for (let y = 2; y < h - 2; y++) for (let x = 0; x < w; x++) { const i = y * w + x; o[i] = t[i - 2 * w] + t[i - w] + t[i] + t[i + w] + t[i + 2 * w]; }
+    return o;
+  };
+  const sx = box(xx), sy = box(yy), sxy = box(xy);
+  for (let i = 0; i < n; i++) { const r = sx[i] * sy[i] - sxy[i] * sxy[i] - 0.05 * (sx[i] + sy[i]) ** 2; R[i] = r; if (r > maxR) maxR = r; }
+  return { w, h, mag, R, maxMag, maxR };
+}
+
+// The strongest corner within r px of p (small-copy px), or null when nothing there looks like a corner.
+export function snapCorner(e, p, r) {
+  let best = 0, at = null;
+  const x0 = Math.max(2, Math.round(p.x - r)), x1 = Math.min(e.w - 3, Math.round(p.x + r));
+  const y0 = Math.max(2, Math.round(p.y - r)), y1 = Math.min(e.h - 3, Math.round(p.y + r));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    if ((x - p.x) ** 2 + (y - p.y) ** 2 > r * r) continue;
+    const v = e.R[y * e.w + x]; if (v > best) { best = v; at = { x, y }; }
+  }
+  return at && best >= e.maxR * 0.02 ? at : null;
+}
+
+// How far to move the side a-b (along its normal, up to r px) to lie on the strongest straight edge near it:
+// {dx, dy}, or null when no edge there is clearly stronger. Only the middle 80 % of the side is sampled (corners vary).
+export function snapSide(e, a, b, r) {
+  const len = Math.hypot(b.x - a.x, b.y - a.y); if (len < 4) return null;
+  const nx = -(b.y - a.y) / len, ny = (b.x - a.x) / len, steps = Math.max(8, Math.round(len / 2));
+  const along = off => {
+    let s = 0, c = 0;
+    for (let i = 0; i <= steps; i++) {
+      const t = 0.1 + 0.8 * i / steps, x = Math.round(a.x + (b.x - a.x) * t + nx * off), y = Math.round(a.y + (b.y - a.y) * t + ny * off);
+      if (x < 1 || y < 1 || x >= e.w - 1 || y >= e.h - 1) continue;
+      s += e.mag[y * e.w + x]; c++;
+    }
+    return c > steps / 2 ? s / c : 0;
+  };
+  let best = along(0), bo = 0;
+  for (let o = -Math.round(r); o <= r; o++) { const v = along(o); if (v > best) { best = v; bo = o; } }
+  return bo && best >= e.maxMag * 0.2 ? { dx: nx * bo, dy: ny * bo } : null;
+}
+
+// Is the flat page upside down? Printed English has many more strokes above the letters' middle band (capitals, b d f h k l
+// t) than below it (g j p q y). Ink pixels in long straight runs (table rules, boxes) are left out; the page is cut into
+// 6 strips so a slight slant or two columns still give level lines. Each text line's middle band is the rows at least half
+// as inked as its busiest row; ink above it counts up, ink below counts down. Returns { score (-1..1, plus = upright),
+// lines, flip } where flip is set only when the evidence is clear (enough lines and a clearly negative score).
+export const UPRIGHT_LINES = 12, UPRIGHT_FLIP = -0.2;
+export function uprightScore(data, w, h) {
+  const n = w * h, ink = new Uint8Array(n);
+  for (let i = 0; i < n; i++) ink[i] = ((data[i * 4] * 77 + data[i * 4 + 1] * 150 + data[i * 4 + 2] * 29) >> 8) < 140 ? 1 : 0;
+  // long straight runs (gaps up to 3 px bridged, so a slightly slanted or broken rule still counts), widened 2 px across
+  const longH = Math.round(w / 15), longV = Math.round(h / 40), rule = new Uint8Array(n), gap = 3, wide = 2;
+  const runs = (len, cnt, at, min, mark) => { // walk each row (or column) a; mark runs of at least min px
+    for (let a = 0; a < cnt; a++) {
+      let s = -1, last = -1;
+      for (let b = 0; b <= len; b++) {
+        if (b < len && ink[at(a, b)]) { if (s < 0) s = b; last = b; }
+        if (s >= 0 && (b === len || b - last > gap)) { if (last - s + 1 >= min) mark(a, s, last); s = -1; }
+      }
+    }
+  };
+  runs(w, h, (y, x) => y * w + x, longH, (y, s, e) => { for (let k = Math.max(0, y - wide); k <= Math.min(h - 1, y + wide); k++) rule.fill(1, k * w + s, k * w + e + 1); });
+  runs(h, w, (x, y) => y * w + x, longV, (x, s, e) => { for (let y = s; y <= e; y++) for (let k = Math.max(0, x - wide); k <= Math.min(w - 1, x + wide); k++) rule[y * w + k] = 1; });
+  const keep = new Uint8Array(n); for (let i = 0; i < n; i++) keep[i] = ink[i] && !rule[i] ? 1 : 0;
+  const strips = 6, sw = Math.floor(w / strips), minH = Math.max(4, Math.round(h / 300)), maxH = Math.round(h / 30);
+  let up = 0, down = 0, lines = 0;
+  for (let s = 0; s < strips; s++) {
+    const prof = new Float32Array(h);
+    for (let y = 0; y < h; y++) { let c = 0; for (let x = s * sw; x < (s + 1) * sw; x++) c += keep[y * w + x]; prof[y] = c; }
+    const floor = Math.max(1, sw * 0.004);
+    for (let y = 0; y < h;) {
+      if (prof[y] < floor) { y++; continue; }
+      let e = y; while (e < h && prof[e] >= floor) e++;
+      const lh = e - y;
+      if (lh >= minH && lh <= maxH) {
+        let peak = 0, tot = 0; for (let k = y; k < e; k++) { peak = Math.max(peak, prof[k]); tot += prof[k]; }
+        if (tot > sw * 0.15) { // enough ink to be a line of letters, not a stray speck
+          let c0 = y; while (prof[c0] < peak / 2) c0++;
+          let c1 = e - 1; while (prof[c1] < peak / 2) c1--;
+          let a = 0, b = 0; for (let k = y; k < c0; k++) a += prof[k]; for (let k = c1 + 1; k < e; k++) b += prof[k];
+          up += a; down += b; lines++;
+        }
+      }
+      y = e;
+    }
+  }
+  const score = up + down ? (up - down) / (up + down) : 0;
+  return { score: +score.toFixed(3), lines, flip: lines >= UPRIGHT_LINES && score < UPRIGHT_FLIP };
+}
+
+// turn an RGBA image half a turn, in place
+export function rotate180(data) { new Uint32Array(data.buffer, data.byteOffset, data.length >> 2).reverse(); return data; }
