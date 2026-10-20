@@ -14,10 +14,12 @@ export const PAGES = {
   'edit/': '/edit/?page=/privacy/', 'nuhsdesign/': '/logbook/?demo', 'index.html': '/',
 };
 const MAX = 6;
+// files that never change what a page shows: notes, tests, local tools, session status
+const UNSEEN = /(\.md$|(^|\/)(test|tools|status)\/)/;
 
 export function pagesFor(files, body = '') {
   const out = [];
-  for (const f of files) {
+  for (const f of files.filter(f => !UNSEEN.test(f))) {
     const key = Object.keys(PAGES).find(k => k.endsWith('/') ? f.startsWith(k) : f === k);
     if (key && !out.includes(PAGES[key])) out.push(PAGES[key]);
   }

@@ -50,15 +50,15 @@ Hosts: [SUBDOMAINS.md](SUBDOMAINS.md). Security: [OPERATIONS.md](OPERATIONS.md).
 - **Blocked by the cloud environment** (no Google Cloud sign-in, real documents, a secret)? Ask the owner to pass it to
   the owner's private helper. No secrets or patient data in a request. Firebase and Cloudflare tools only with the
   owner's approval in that session (`CLAUDE.md`).
-- **Vital apps** (`prewarm/`, live study data; `logbook/`): full tests before merging, preview links for the owner, and
-  nothing merged into prewarm while the owner says a case is being collected.
+- **Vital apps** (`prewarm/`, live study data; `logbook/`): full tests before merging, and nothing
+  merged into prewarm while the owner says a case is being collected.
 
 ## Before merging
 
 GitHub runs these on every PR ("Checks"; red means don't merge). Merge your own PRs once they pass, by the number the
 PR creation returned (never a guess), and report with the link. Handover PRs wait for the owner's approval.
-Once beta is set up (PREVIEWS.md, "Beta"), PRs that change the logbook or evals wait too: point `beta` at the
-branch, send the owner the beta link, and merge on his "ship it". Docs-only PRs still merge themselves.
+Beta (PREVIEWS.md, "Beta") is opt-in: only when the owner asks for it, or for sign-in or Firestore-rules changes,
+point `beta` at the branch, send him the beta link and merge on his "ship it". Otherwise PRs merge once Checks pass.
 
 ```
 node tools/check.mjs
@@ -74,9 +74,9 @@ Per app, as well (only the touched app while iterating):
 
 ## Showing and saving work
 
-- **Show it:** 390 px screenshots of UI changes (one, viewport-sized) plus the PR preview link
-  ([PREVIEWS.md](PREVIEWS.md)), e.g. `<preview>/logbook/?demo#notes`. Every PR gets an automatic before-and-after
-  comment; add `Screens: /logbook/?demo#notes` to the PR body for more. Previews can't sign in, by design.
+- **Show it:** every PR that changes a page gets an automatic before-and-after screenshot comment; add
+  `Screens: /logbook/?demo#notes` to the PR body for more. Don't take or send your own screenshots or preview links
+  unless the owner asks ([PREVIEWS.md](PREVIEWS.md)). Previews can't sign in, by design.
 - **Build minutes are limited:** every push to a branch with a PR starts a Cloudflare build. Push once per finished
   step, not to save work in progress.
 - **Status:** update the app's `STATUS.md` when a task finishes or a decision is made, and before compacting or ending
