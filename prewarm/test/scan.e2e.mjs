@@ -6,7 +6,8 @@ const fails = [];
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
 const pg = await ctx.newPage();
 pg.on('pageerror', e => fails.push('page error: ' + e.message));
-pg.on('dialog', d => d.accept());
+let refuse = false;
+pg.on('dialog', d => { if (refuse) { refuse = false; return d.dismiss(); } return d.accept(); });
 const ok = (c, m) => { if (!c) fails.push(m); };
 try {
   // a fake photo: a tilted white page with dark lines and a shadow across its right half, on dark "carpet"
@@ -106,6 +107,24 @@ try {
   // delete one
   await pg.click('[data-open]'); await pg.waitForSelector('dialog[open]'); await pg.click('#scdel'); await pg.waitForTimeout(300);
   ok((await pg.$$('#sclist figure')).length === 2, 'photo deleted');
+  // press and hold selects; tap toggles; All / None / Cancel; Delete removes the picked ones
+  const hold = async i => { const b = await (await pg.$$('#sclist img'))[i].boundingBox(); await pg.mouse.move(b.x + 20, b.y + 20); await pg.mouse.down(); await pg.waitForTimeout(700); await pg.mouse.up(); };
+  const picked = () => pg.$$eval('#sclist figure.picked', e => e.length);
+  ok(await pg.$eval('#scselbar', e => e.hidden), 'selection bar hidden at first');
+  await hold(0); await pg.waitForTimeout(100);
+  ok(!(await pg.$eval('#scselbar', e => e.hidden)) && await picked() === 1 && (await pg.$$('dialog[open]')).length === 0, 'press and hold starts selecting without opening the page');
+  await pg.click('#sclist figure:nth-child(2) img'); ok(await picked() === 2, 'tap adds a photo');
+  await pg.click('#sclist figure:nth-child(2) img'); ok(await picked() === 1, 'tap removes a photo');
+  await pg.click('#scselnone'); ok(await picked() === 0 && await pg.$eval('#scseldel', e => e.disabled), 'None clears; Delete disabled');
+  await pg.click('#scselall'); ok(await picked() === 2, 'All picks every photo');
+  await pg.click('#scselcancel'); ok(await pg.$eval('#scselbar', e => e.hidden) && await picked() === 0, 'Cancel leaves selecting');
+  await hold(0); refuse = true; await pg.click('#scseldel'); await pg.waitForTimeout(200);
+  ok((await pg.$$('#sclist figure')).length === 2, 'declining the question deletes nothing');
+  await pg.click('#scseldel'); await pg.waitForFunction(() => document.querySelectorAll('#sclist figure').length === 1);
+  ok(await pg.$eval('#scselbar', e => e.hidden), 'bar closes after deleting');
+  await give('#scpick', 'pick.jpg');
+  await pg.waitForSelector('#sccrop:not([hidden])'); await pg.click('#scflat'); await pg.waitForSelector('#screv:not([hidden])');
+  await pg.click('#scok'); await pg.waitForFunction(() => document.querySelectorAll('#sclist figure').length === 2);
 
   // sending: only on the real address (here: localhost with ?scantest), Access and the study computer stood in for
   await pg.goto('http://localhost:8080/prewarm/?demo#/scan'); await pg.waitForSelector('#scsub');

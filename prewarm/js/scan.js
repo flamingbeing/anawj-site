@@ -43,7 +43,7 @@ const tick = () => new Promise(r => setTimeout(r, 30)); // let the screen repain
 
 // deps: { view, esc, toast, subjects: () => [Subject IDs on this phone] }
 export function mount({ view, esc, toast, subjects }) {
-  let subject = '', urls = [], num = '1', ed = null, queue = [], saving = Promise.resolve(), scanId = '';
+  let subject = '', sel = null, urls = [], num = '1', ed = null, queue = [], saving = Promise.resolve(), scanId = '';
   const failed = new Map(); // page id -> why it was not sent (until the next try)
   const url = b => { const u = URL.createObjectURL(b); urls.push(u); return u; };
   const free = () => { urls.forEach(URL.revokeObjectURL); urls = []; };
@@ -57,6 +57,7 @@ export function mount({ view, esc, toast, subjects }) {
       <label class="primary filebtn scbig" id="scshotlbl"><span id="scshottxt">📷 Take page 1</span><input id="scshot" type="file" accept="image/*" capture="environment" hidden></label>
       <label class="secondary filebtn">Choose from photos<input id="scpick" type="file" accept="image/*" multiple hidden></label>
     </div>
+    <div id="scselbar" class="scselbar" hidden><strong id="scselcount" role="status"></strong><button class="secondary" id="scselall">All</button><button class="secondary" id="scselnone">None</button><button class="secondary scseldel" id="scseldel">Delete</button><button class="secondary" id="scselcancel">Cancel</button></div>
     <div id="sclist" class="scstrip"></div>
     <div id="scsend" hidden><button class="primary" id="scup">Send to the study computer</button><p id="scmsg" class="muted small" role="status"></p></div>
     <div id="scsave" hidden><button class="secondary" id="scdl">Save tidied pages to this phone</button></div>
@@ -92,9 +93,10 @@ export function mount({ view, esc, toast, subjects }) {
     $$('#scsave').hidden = !pages.length;
     $$('#scsend').hidden = !pages.length || !CAN_SEND;
     $$('#sclist').innerHTML = pages.map(p => `<figure data-id="${p.id}">
-      <img src="${url(p.clean)}" alt="Page ${esc(p.label || 'not labelled')}" data-open="${p.id}"><b class="scnum">${esc(p.label || '?')}</b>
+      <img src="${url(p.clean)}" alt="Page ${esc(p.label || 'not labelled')}" data-open="${p.id}" draggable="false"><b class="scnum">${esc(p.label || '?')}</b><span class="sccheck" aria-hidden="true">✓</span>
       ${p.sentAt ? '<span class="scsent">✓</span>' : failed.has(p.id) ? `<button class="scretry" data-retry="${p.id}" title="${esc(failed.get(p.id))}">Retry</button>` : ''}</figure>`).join('') || (ok ? '<p class="muted small">No pages yet for this Subject ID.</p>' : '');
     setNum(num);
+    paintSel();
   }
 
   // ---------- the capture editor: crop, then flatten and light
@@ -238,7 +240,46 @@ export function mount({ view, esc, toast, subjects }) {
 
   // ---------- thumbnails, a page's own dialog, saving to the phone
   const show = id => view._pages.find(p => p.id === id);
+  // Press and hold a photo to start selecting; then tap to add or remove, and use the bar to select all, none, delete or cancel.
+  function paintSel() {
+    if (sel) { const ids = new Set((view._pages || []).map(p => p.id)); sel = new Set([...sel].filter(id => ids.has(id))); }
+    const on = !!sel;
+    $$('#sclist').classList.toggle('selecting', on);
+    $$('#scselbar').hidden = !on;
+    $$('#sclist').querySelectorAll('figure').forEach(f => f.classList.toggle('picked', on && sel.has(f.dataset.id)));
+    if (on) {
+      $$('#scselcount').textContent = `${sel.size} selected`;
+      $$('#scseldel').disabled = !sel.size;
+    }
+  }
+  let holdTimer = 0, held = false, holdAt = null;
+  const stopHold = () => { clearTimeout(holdTimer); holdTimer = 0; };
+  $$('#sclist').addEventListener('pointerdown', e => {
+    held = false; stopHold();
+    const f = e.target.closest('figure');
+    if (!f || e.target.closest('[data-retry]')) return;
+    holdAt = [e.clientX, e.clientY];
+    holdTimer = setTimeout(() => {
+      held = true; sel = sel || new Set(); sel.add(f.dataset.id); navigator.vibrate?.(30); paintSel();
+    }, 500);
+  });
+  $$('#sclist').addEventListener('pointermove', e => { if (holdTimer && Math.hypot(e.clientX - holdAt[0], e.clientY - holdAt[1]) > 10) stopHold(); });
+  for (const t of ['pointerup', 'pointercancel', 'pointerleave']) $$('#sclist').addEventListener(t, stopHold);
+  $$('#sclist').addEventListener('contextmenu', e => e.preventDefault());
+  $$('#scselall').onclick = () => { sel = new Set((view._pages || []).map(p => p.id)); paintSel(); };
+  $$('#scselnone').onclick = () => { sel = new Set(); paintSel(); };
+  $$('#scselcancel').onclick = () => { sel = null; paintSel(); };
+  $$('#scseldel').onclick = async () => {
+    const ids = [...(sel || [])]; if (!ids.length || !confirm(`Delete ${ids.length} photo${ids.length > 1 ? 's' : ''} (originals and tidied copies)?`)) return;
+    for (const id of ids) await delPage(id);
+    sel = null; toast(`Deleted ${ids.length}`); await draw();
+  };
   $$('#sclist').onclick = async e => {
+    if (held) { held = false; return; }
+    if (sel) {
+      const f = e.target.closest('figure'); if (!f) return;
+      sel.has(f.dataset.id) ? sel.delete(f.dataset.id) : sel.add(f.dataset.id); return paintSel();
+    }
     const r = e.target.closest('[data-retry]');
     if (r) return send([show(r.dataset.retry)]);
     const o = e.target.closest('[data-open]');
