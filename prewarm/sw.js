@@ -49,7 +49,9 @@ self.addEventListener('fetch', e => {
   }
   if (url.origin !== self.location.origin || NEVER.test(url.hostname)) return;
   if (url.pathname.includes('/__/')) return; // Firebase auth helper pages
-  if (url.pathname.startsWith('/scan-api/')) return; // the scan upload (Access sign-in and uploads): always the network, never saved
+  // the scan upload and Cloudflare Access's sign-in steps (/cdn-cgi/access/...: its return page was shown as the app's home
+  // page by the saved shell): always the network, never saved
+  if (url.pathname.startsWith('/scan-api/') || url.pathname.startsWith('/cdn-cgi/')) return;
   if (url.pathname.endsWith('/update.html')) return; // the update helper must come from the network, not the saved shell
   e.respondWith((async () => {
     const cache = await caches.open(VERSION);
