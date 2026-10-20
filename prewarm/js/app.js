@@ -734,7 +734,7 @@ function nextDue(p, s) {
 }
 // the reading due most recently (until the next one is due), else the next one coming up
 function duePick(p, s) {
-  if (sealedBy(p, s)) return null; // marked complete: nothing more is asked for
+  if (sealedBy(p, s) || (s === 'prewarm' && noWarming(p))) return null; // marked complete, or no pre-warming: nothing is asked for
   const now = nowFor(p, s);
   const timed = pointsFor(p, s).map(x => ({ x, due: dueOf(p, s, x) })).filter(t => t.due != null && expected(p, s, t.due)).sort((a, b) => a.due - b.due);
   const cur = timed.filter(t => t.due <= now).pop(), up = timed.find(t => t.due > now && !savedAt(p, s, t.x.key));

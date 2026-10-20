@@ -484,6 +484,7 @@ jobs.push(() => tryit(async () => {
   const nopwUrl = pg.url();
   log(/Pre-warming/.test(await pg.textContent('.tabs2 [aria-selected="true"]')), 'no pre-warming opens on Pre-warming until comfort is answered');
   log(/No pre-warming/.test(await pg.textContent('.nopw')) && !await pg.$('#save'), 'Pre-warming tab says no pre-warming, nothing to save');
+  log(!/Prewarm|Temp Prewarm/.test(await pg.textContent('.next').catch(() => '')), 'no pre-warming: no pre-warming countdown in the top bar');
   await pg.click('.chip[data-sat="sat_pre"][data-v="2"]'); await pg.waitForTimeout(100);
   await pg.goto(nopwUrl.split('#')[0] + '#/'); await pg.goto(nopwUrl); await pg.waitForSelector('.tabs2');
   log(/Intra-op/.test(await pg.textContent('.tabs2 [aria-selected="true"]')), 'no pre-warming opens on Intra-op once comfort is answered');
