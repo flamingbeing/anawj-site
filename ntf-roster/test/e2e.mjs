@@ -234,6 +234,42 @@ ok(await hard(page) === 0, 'no must-fix problems once it is off');
   await page.evaluate(() => window.ntfApp.store.undo());
 }
 
+// the rule builder's sentence with blanks: change the number and a switch in the sentence, the form follows
+{
+  await go(page, '#rules?edit=r-maxcall');
+  await page.waitForSelector('.rs-line');
+  ok(/at most/.test(await page.textContent('.rs-line')) && /scaled by FTE/.test(await page.textContent('.rs-line')), 'the builder shows the rule as a sentence');
+  ok(!(await page.isVisible('.rb-adv-body')), 'every field is under Advanced, closed');
+  await page.fill('.rs-line input[aria-label="At most"]', '6');
+  await page.locator('.rs-flag:has-text("scaled by FTE") input').uncheck();
+  await page.click('.rs-blank[aria-label^="When"]');
+  await page.click('.rs-panel .bx-pill:has-text("Weekends")');
+  ok(/weekends/i.test(await page.textContent('.rs-line')), 'the When blank picks days');
+  await page.click('.rb-adv > summary');
+  await page.waitForTimeout(150);   // the toggle event redraws the fields
+  ok(await page.inputValue('.rb-adv [data-key="max"] input') === '6', 'Advanced shows the number set in the sentence');
+  await axe(page, 'rule builder sentence');
+  await shot(page, 'rule-sentence');
+  await page.click('.sheet-foot .btn-primary');
+  await page.waitForTimeout(250);
+  s = await stored(page);
+  const mc = s.rules.find(r => r.id === 'r-maxcall');
+  ok(mc.params.max === 6 && mc.params.fte === false && mc.when.days.join() === '0,6', 'saved from the sentence');
+  await page.evaluate(() => window.ntfApp.store.undo());
+}
+// every kind of rule draws its sentence (one rule of each type the practice roster has, plus a new one of each type)
+{
+  const ids = await page.evaluate(() => { const seen = {}; for (const r of window.ntfApp.store.get().rules) if (r.pool === 'junior' || !r.pool) seen[r.type] ||= r.id; return Object.values(seen); });
+  for (const id of ids) {
+    await go(page, `#rules?edit=${id}`);
+    await page.waitForSelector('.rs-line');
+    ok((await page.textContent('.rs-line')).trim().length > 10, `sentence for ${id}`);
+    await page.click('.sheet-foot .btn:has-text("Cancel")');
+    await page.waitForSelector('.rs-line', { state: 'detached' });
+  }
+  ok(ids.length >= 7, `${ids.length} rule types drawn`);
+}
+
 // people and more tabs
 await go(page, '#people');
 await page.waitForSelector('.pv-row');

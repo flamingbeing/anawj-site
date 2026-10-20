@@ -379,6 +379,10 @@ read back as the very same rule (`test/rules-text.test.mjs` checks every default
 - **Readable file** (Rules › Export as text): one block per rule, `- name:` then `strength`, `on`, `roster`, `who`,
   `rule`, `when`, `note` (more lines indented four spaces), `id`; a rule that can't be written gets a `json:` field.
   Paste / import reads this file, rule lines, or JSON (`looksLikeRulesFile`, then lines starting with MUST/PREF).
+- **Rule builder** (`sentenceEditor` in `ui-rules.js`): the rule at the top as the same sentence with blanks. Who, codes
+  and when open their picker below the sentence; numbers, choices (exactly / at least / at most / between, per week…)
+  and switches (scaled by FTE) are edited in place. Every field is under "Advanced: every field" (open when a template
+  asks to pick people); each side redraws the other. Drawn from `TEXT_FORMS`, so a new type gets its sentence there.
 - JSON copy, export and the Guide for Claude are unchanged.
 
 ## Rules: all confirmed, Priorities sheet (19 Oct 2026)
