@@ -8,6 +8,7 @@ import * as M from './model.js';
 import { openRequest } from './ui-requests.js';
 import { RULE_TYPES, describeRule, validateRule, evaluateRule, newRule } from './rules.js';
 import { rulesToText, parseRulesText, rulesGuide } from './rules-share.js';
+import { rulesToLines, parseRuleLines, rulesToFile, parseRulesFile, looksLikeRulesFile, textExamples } from './rules-text.js';
 
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_TINY = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -121,12 +122,14 @@ export function mount(el, app) {
   const openPrio = async () => (await import('./ui-ruleprio.js')).openRulePriorities(app);
   const tools = h('div', { class: 'rv-tools' },
     h('button', { type: 'button', class: 'btn btn-sm', 'data-k': 'priorities', onclick: openPrio, html: `${app.icon('list')}<span>Priorities</span>` }),
+    h('button', { type: 'button', class: 'btn btn-sm', 'data-k': 'text', onclick: () => editAsText(), html: `${app.icon('list')}<span>Edit as text</span>` }),
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => openRequest(app), html: `${app.icon('plus')}<span>Add a request</span>` }),
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => openLog(), html: `${app.icon('list')}<span>Rules log</span>` }),
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': 'copy', onclick: () => copyRules(), html: `${app.icon('list')}<span>Copy</span>` }),
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': 'paste', onclick: () => importRules(), html: `${app.icon('upload')}<span>Paste / import</span>` }),
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': 'guide', onclick: () => copyGuide(), html: `${app.icon('spark')}<span>Guide for Claude</span>` }),
-    h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => exportRules(), html: `${dlIcon()}<span>Export file</span>` }));
+    h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => exportRules(), html: `${dlIcon()}<span>Export file</span>` }),
+    h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': 'export-text', onclick: () => exportRulesText(), html: `${dlIcon()}<span>Export as text</span>` }));
   const bar = h('div', { class: 'rv-bar' }, h('div', { class: 'rv-search' }, h('span', { class: 'bx-search-ic', html: app.icon('search') }), search), filters, tools);
   const list = h('div', { class: 'rv-list' });
   const poolNote = h('p', { class: 'bx-help rv-pool' });
@@ -474,6 +477,66 @@ export function mount(el, app) {
     app.toast(`Exported ${(state.rules || []).length} rules`);
   }
 
+  // The readable rules file (rules-text.js): one block of "key: value" lines per rule. Paste / import reads it back.
+  function exportRulesText() {
+    const state = app.store.get();
+    const blob = new Blob([rulesToFile(state)], { type: 'text/plain' });
+    const a = h('a', { href: URL.createObjectURL(blob), download: `ntf-roster-rules-${M.iso(new Date())}.txt` });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    app.toast(`Exported ${(state.rules || []).length} rules as text`);
+  }
+
+  // Every rule of the roster in view as one plain sentence a line. Edit the words, add or remove lines, then the same
+  // review as an import (with deletes for removed lines). A line that can't be read stops the review and is named.
+  function editAsText() {
+    const state = app.store.get();
+    const view = viewPool(state);
+    const pool = view === 'senior' ? 'senior' : 'junior';
+    const mine = (state.rules || []).filter(r => view === 'all' || r.pool === view);
+    const start = rulesToLines(state, mine);
+    const ta = h('textarea', { class: 'ri-text rt-text', rows: '16', spellcheck: 'false', autocapitalize: 'off', 'aria-label': 'Rules, one per line' }, start);
+    const msg = h('div', { class: 'warn-box', hidden: true, role: 'alert' });
+    const addLine = line => {
+      const v = ta.value.replace(/\s*$/, '');
+      ta.value = `${v}\n${line.replace(/\s+\[[^\]]+\]$/, '')}\n`;
+      ta.focus(); ta.setSelectionRange(ta.value.length - 1, ta.value.length - 1);
+    };
+    const examples = h('details', { class: 'rt-ex' },
+      h('summary', null, 'Examples (one of each kind of rule)'),
+      h('ul', { class: 'rt-ex-list' }, textExamples(state).map(e => h('li', null,
+        h('span', { class: 'muted' }, `${e.label}: `), h('code', null, e.line),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'aria-label': `Add an example ${e.label} rule`, onclick: () => addLine(e.line) }, 'Add')))),
+      h('p', { class: 'bx-help' }, 'Who goes before a colon ("Juniors:", "Baby MO:", a person\'s name; leave it out for everyone). When goes in brackets at the end: (weekends), (Mon, Wed), (weekdays, except public holidays), (public holidays only), (from 2026-11-01 until 2026-11-30). Codes are the roster\'s own (C, P, AL…) or: any shift, leave, away, at work, post call, other duty, a request, anything.'));
+    const body = h('div', { class: 'ri rt' },
+      h('p', { class: 'bx-help' }, `${POOL_NAME[pool] || 'Both rosters'}: ${mine.length} rules, one per line. Change the words or numbers, add a line for a new rule, or remove a line to delete one. Review shows every change before anything is saved.`),
+      ta, msg, examples);
+    const close = app.sheet({
+      title: 'Edit rules as text', body, wide: true,
+      beforeClose: () => ta.value === start || app.confirm('Close without using your changes to the text?', { ok: 'Discard', danger: true }),
+      actions: [{ label: 'Cancel' }, {
+        label: 'Review', primary: true,
+        fn: () => {
+          const st = app.store.get();
+          const res = parseRuleLines(ta.value, st, { rules: mine, pool });
+          if (res.problems.length) {
+            msg.hidden = false; msg.innerHTML = '';
+            msg.append(h('p', null, `${res.problems.length === 1 ? 'One line needs' : `${res.problems.length} lines need`} fixing first (nothing is guessed):`),
+              ...res.problems.map(t => h('div', null, t)));
+            return false;
+          }
+          const changes = res.removed.length + res.rules.filter(r => !mine.includes(r)).length;
+          if (!changes) { app.toast('No changes'); return undefined; }
+          ta.value = start;   // closing the editor after Review asks nothing
+          reviewImport({ rules: res.rules, duties: [], problems: [] }, 'Your text', { removed: res.removed, edit: true });
+          return undefined;
+        },
+      }],
+    });
+    void close;
+    setTimeout(() => ta.focus(), 50);
+  }
+
   async function copyText(text, what) {
     try { await navigator.clipboard.writeText(text); app.toast(`${what} copied`); return true; } catch (e) { /* no clipboard access */ }
     const ta = h('textarea', { class: 'ri-text', readonly: true, rows: '10', 'aria-label': what }, text);
@@ -489,13 +552,19 @@ export function mount(el, app) {
     const ta = h('textarea', { class: 'ri-text', rows: '9', placeholder: 'Paste rules here: copied from another roster, or a reply from Claude', 'aria-label': 'Rules to paste' });
     const msg = h('p', { class: 'warn-box', hidden: true });
     const go = (text, label) => {
-      const r = parseRulesText(text);
+      const st = app.store.get();
+      const pool = viewPool(st) === 'senior' ? 'senior' : 'junior';
+      const json = /^\s*[[{]/.test(text) || /```/.test(text);
+      const r = !json && looksLikeRulesFile(text) ? { duties: [], ...parseRulesFile(text, st, { rules: st.rules || [] }) }
+        : !json && /^\s*(off\s+)?(must|pref)\b/im.test(text) ? { duties: [], ...parseRuleLines(text, st, { rules: st.rules || [], pool }) }
+          : parseRulesText(text);
+      if (r.rules && !r.rules.length && r.problems.length) r.rules = null;
       if (!r.rules) { msg.hidden = false; msg.textContent = r.problems[0]; return false; }
       reviewImport(r, label);
       return true;
     };
     const body = h('div', { class: 'ri' },
-      h('p', { class: 'bx-help' }, 'Tip: Guide for Claude copies a description of every rule type and this roster\'s codes. Paste it into a Claude chat, say what you want, then paste the rules it gives you here.'),
+      h('p', { class: 'bx-help' }, 'Takes copied rules, an exported file (JSON or text), or rule lines like those in Edit as text. Tip: Guide for Claude copies a description of every rule type and this roster\'s codes. Paste it into a Claude chat, say what you want, then paste the rules it gives you here.'),
       ta, msg,
       h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: async () => {
         const file = await pickFile('.json,application/json,.txt');
@@ -510,7 +579,7 @@ export function mount(el, app) {
     setTimeout(() => ta.focus(), 50);
   }
 
-  function reviewImport(parsed, label) {
+  function reviewImport(parsed, label, { removed = [], edit = false } = {}) {
     let rules = parsed.rules, duties = parsed.duties;
     // cleaned like a backup (lists that are really lists, duty kinds and colours from the fixed set), so one odd rule
     // or code in a file can't break every check or the grid
@@ -545,21 +614,31 @@ export function mount(el, app) {
           it.bad.length ? h('span', { class: 'ri-bad' }, ' ' + it.bad.join('; ')) : null)));
     };
     const fresh = items.filter(i => i.status === 'new'), changedItems = items.filter(i => i.status === 'changed'), same = items.filter(i => i.status === 'same');
+    const dels = removed.map(r => ({ rule: r, on: true }));
+    const delRow = it => {
+      const cb = h('input', { type: 'checkbox', checked: true, onchange: () => { it.on = cb.checked; } });
+      return h('li', null, h('label', { class: 'ri-row' }, cb, h('span', { class: 'bx-tag bad' }, 'Delete'), h('span', null, it.rule.name || describeRule(it.rule, state))));
+    };
     const body = h('div', { class: 'ri' },
-      h('p', null, `${label}: ${items.length} rule${items.length === 1 ? '' : 's'}. ${fresh.length} new, ${changedItems.length} changed, ${same.length} the same as here.`),
-      fresh.length || changedItems.length ? h('ul', { class: 'ri-list' }, [...fresh, ...changedItems].map(row)) : h('p', { class: 'ok-box' }, 'Nothing new: every rule in the file is already here.'),
+      h('p', null, `${label}: ${items.length} rule${items.length === 1 ? '' : 's'}. ${fresh.length} new, ${changedItems.length} changed, ${same.length} the same as here${dels.length ? `, ${dels.length} to delete` : ''}.`),
+      fresh.length || changedItems.length || dels.length ? h('ul', { class: 'ri-list' }, [...fresh, ...changedItems].map(row), dels.map(delRow)) : h('p', { class: 'ok-box' }, 'Nothing new: every rule in the file is already here.'),
       missing.length ? h('label', { class: 'ri-row ri-codes' }, h('input', { type: 'checkbox', checked: true, onchange: e => { addCodes = e.target.checked; } }),
         h('span', null, `Also add ${missing.length} duty ${missing.length === 1 ? 'code' : 'codes'} these rules use: ${missing.map(d => d.code).join(', ')}`)) : null,
       unknown ? h('div', { class: 'warn-box' }, parsed.problems.map(t => h('div', null, t))) : null,
-      h('p', { class: 'bx-help' }, 'Rules you have here and the file doesn\'t are kept. Import is one step you can undo.'));
+      h('p', { class: 'bx-help' }, edit ? 'Saving is one step you can undo.' : 'Rules you have here and the file doesn\'t are kept. Import is one step you can undo.'));
     app.sheet({
-      title: 'Import rules', body,
+      title: edit ? 'Review your changes' : 'Import rules', body,
       actions: [{ label: 'Cancel' }, {
-        label: 'Import', primary: true,
+        label: edit ? 'Save' : 'Import', primary: true,
         fn: () => {
           const pick = items.filter(i => i.status !== 'same' && i.on);
-          if (!pick.length && !(addCodes && missing.length)) { app.toast('Nothing chosen to import'); return; }
-          app.store.commit('Import rules', d => {
+          const drop = dels.filter(i => i.on);
+          if (!pick.length && !drop.length && !(addCodes && missing.length)) { app.toast('Nothing chosen to import'); return; }
+          app.store.commit(edit ? 'Edit rules as text' : 'Import rules', d => {
+            for (const it of drop) {
+              const i = d.rules.findIndex(x => x.id === it.rule.id);
+              if (i >= 0) { d.rules.splice(i, 1); log(d, 'delete', it.rule); }
+            }
             if (addCodes) for (const du of missing) if (!d.duties.some(x => x.code === du.code)) d.duties.push({ ...du });
             for (const it of pick) {
               const i = d.rules.findIndex(x => x.id === it.rule.id);
@@ -567,7 +646,7 @@ export function mount(el, app) {
               log(d, i >= 0 ? 'edit' : 'add', it.rule);
             }
           });
-          app.toast(`Imported ${pick.length} ${pick.length === 1 ? 'rule' : 'rules'}`, { action: undoAct });
+          app.toast(edit ? `Saved: ${pick.length} added or changed, ${drop.length} deleted` : `Imported ${pick.length} ${pick.length === 1 ? 'rule' : 'rules'}`, { action: undoAct });
         },
       }],
     });
