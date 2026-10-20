@@ -156,6 +156,27 @@ await t('another hospital cannot delete the link', assertFails(deleteDoc(doc(c, 
 await t('the member stops the link', assertSucceeds(deleteDoc(doc(a, 'pacu', TK))));
 await t('a stopped link is gone', assertSucceeds(getDoc(doc(nurse, 'pacu', TK)).then(s => { if (s.exists()) throw new Error('still there'); })));
 
+// scan imports (Firetop writes them with its own sign-in, which bypasses rules; the app only reads and approves)
+await env.withSecurityRulesDisabled(async ctx => {
+  await setDoc(doc(ctx.firestore(), 'scanImports', 'scan1'), { scan: 'scan1', createdAt: 1, status: 'pending', pages: [], fields: { age: { v: '67', flags: [] } } });
+});
+const review = (db, extra = {}) => updateDoc(doc(db, 'scanImports', 'scan1'), { status: 'approved', reviewedBy: ADMIN, reviewedAt: 5, ...extra });
+await t('admin reads scan imports', assertSucceeds(getDocs(collection(adm, 'scanImports'))));
+await t('member cannot read scan imports', assertFails(getDoc(doc(a, 'scanImports', 'scan1'))));
+await t('stranger cannot read scan imports', assertFails(getDoc(doc(stranger, 'scanImports', 'scan1'))));
+await t('unverified admin email cannot read scan imports', assertFails(getDoc(doc(unv, 'scanImports', 'scan1'))));
+await t('nobody signed out reads scan imports', assertFails(getDoc(doc(nobody, 'scanImports', 'scan1'))));
+await t('admin cannot create a scan import', assertFails(setDoc(doc(adm, 'scanImports', 'scan2'), { scan: 'scan2', createdAt: 1, status: 'pending', fields: {} })));
+await t('member cannot create a scan import', assertFails(setDoc(doc(a, 'scanImports', 'scan2'), { scan: 'scan2', createdAt: 1, status: 'pending', fields: {} })));
+await t('admin cannot change the scanned values', assertFails(updateDoc(doc(adm, 'scanImports', 'scan1'), { fields: { age: { v: '99', flags: [] } } })));
+await t('admin cannot approve in someone else’s name', assertFails(review(adm, { reviewedBy: 'other@example.com' })));
+await t('admin cannot set another status', assertFails(review(adm, { status: 'pending' })));
+await t('member cannot approve', assertFails(review(a)));
+await t('admin approves a pending import', assertSucceeds(review(adm)));
+await t('an approved import cannot be changed again', assertFails(review(adm, { status: 'rejected' })));
+await t('admin deletes an import', assertSucceeds(deleteDoc(doc(adm, 'scanImports', 'scan1'))));
+await t('member cannot delete an import', assertFails(deleteDoc(doc(a, 'scanImports', 'scan1'))));
+
 await env.cleanup();
 console.log(`prewarm rules: ${n - fail}/${n} checks passed`);
 process.exit(fail ? 1 : 0);

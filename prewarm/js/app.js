@@ -7,6 +7,7 @@ import * as cloud from './cloud.js';
 import { qrcode } from './vendor/qrcode.js';
 import * as wordview from './wordview.js';
 import * as scan from './scan.js';
+import * as scanImports from './scan-imports.js';
 
 const DEMO = new URLSearchParams(location.search).has('demo');
 const NS = DEMO ? 'prewarm-demo:' : 'prewarm:';
@@ -2012,6 +2013,12 @@ route(/^\/scan$/, () => {
   paint('');
   scan.mount({ view, esc, toast, subjects: () => Object.values(patients).filter(p => !isGone(p)).map(sid) });
 });
+route(/^\/scanimports$/, () => {
+  header('Scan imports', '#/settings');
+  if (!shared.admin) return paint('<p class="note">Sign in as a study admin from Settings.</p>');
+  paint('');
+  scanImports.mount({ view, esc, toast, cloud, patients: () => patients, sid, val, setField: set });
+});
 route(/^\/settings$/, () => {
   header('Settings', '#/');
   const tog = (grp, k, l, d = '') => `<label class="tog"><input type="checkbox" data-g="${grp}" data-k="${k}" ${grp === 'hide' ? (settings.hide[k] ? '' : 'checked') : settings[grp][k] ? 'checked' : ''}><span>${l}${d ? `<small>${d}</small>` : ''}</span></label>`;
@@ -2035,6 +2042,7 @@ route(/^\/settings$/, () => {
     <h2>Scan pages (beta)</h2>
     <label class="tog"><input type="checkbox" id="scanon" ${settings.scan ? 'checked' : ''}><span>Show Scan pages<small>Photograph the paper form’s pages. Pages stay on this phone for now.</small></span></label>
     ${settings.scan ? '<a class="secondary" href="#/scan">Scan pages</a>' : ''}
+    ${settings.scan && shared.admin ? '<a class="secondary" href="#/scanimports">Scan imports (approve)</a>' : ''}
     <h2>Participants</h2>
     <a class="secondary" href="#/delete">Delete participants</a></div>`);
   wireRefresh();
