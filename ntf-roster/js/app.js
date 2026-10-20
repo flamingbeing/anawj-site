@@ -753,7 +753,10 @@ async function start() {
 
   // Month on screen: the hash (?m=), else this month.
   const hp = parseHash().params;
-  app.month = monthFromParams(hp) || thisMonth();
+  // last month seen on this device (owner, 20 Oct 2026), else this month
+  let seen = '';
+  try { const o = JSON.parse(localStorage.getItem('ntf-roster-ui-month') || 'null'); if (o && validMonth(o.m)) seen = o.m; } catch (e) { /* none */ }
+  app.month = monthFromParams(hp) || seen || thisMonth();
   app.store.lockAll();
   // closing the app locks everything again (a reopened phone app may not reload the page, so this also runs as it goes away)
   window.addEventListener('pagehide', () => { try { app.store.lockAll(); } catch (e) { /* closing anyway */ } });

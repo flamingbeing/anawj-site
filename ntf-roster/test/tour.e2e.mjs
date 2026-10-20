@@ -146,8 +146,9 @@ ok(await page.isVisible('.view-roster .gs'), 'Undo brings it back');
 await page.click('#autofill');
 await page.waitForSelector('.af-actions .btn-primary:has-text("Start")');
 await page.click('.af-actions .btn-primary:has-text("Start")');
-await page.waitForSelector('.af-actions .btn-primary:has-text("Apply")', { timeout: 20000 });
-await page.click('.af-actions .btn-primary:has-text("Apply")');
+// (Apply when done is on by default: the fill applies itself when every rule is met)
+await page.waitForFunction(() => /5 of 6 done/.test(document.querySelector('.gs-sub')?.textContent || '') || document.querySelector('.af-actions .btn-primary'), null, { timeout: 20000 });
+if (await page.isVisible('.af-actions .btn-primary:has-text("Apply")')) await page.click('.af-actions .btn-primary:has-text("Apply")');   // it stops to show a result when a rule is unmet
 await page.waitForTimeout(300);
 ok(/5 of 6 done/.test(await sub(page)), 'applying Auto-fill ticks step 5');
 // a backup: step 6, then "All set" and the card goes
@@ -281,8 +282,6 @@ await page.click('#nextm');
 await page.waitForTimeout(300);
 await page.click('#autofill');
 await page.click('.af-actions .btn-primary:has-text("Start")');
-await page.waitForSelector('.af-actions .btn-primary:has-text("Apply")', { timeout: 20000 });
-await page.click('.af-actions .btn-primary:has-text("Apply")');
 await page.waitForFunction(() => /All three done/.test(document.querySelector('.task-title')?.textContent || ''), null, { timeout: 12000 });
 ok(true, 'applying Auto-fill ticks task 3 and finishes');
 await page.click('.task-stop');

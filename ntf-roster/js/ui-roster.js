@@ -3,6 +3,7 @@
 // The grid is built as one HTML string per render from lookup maps made once, so 80 people x 31 days stays fast.
 import * as M from './model.js';
 import { priorityRow } from './ui-reqprio.js';
+import { suggestMonth, setWeek } from './aps.js';
 
 const WD = ['Su', 'M', 'Tu', 'W', 'Th', 'F', 'Sa'];
 const KIND_ORDER = [['shift', 'Shifts'], ['leave', 'Leave'], ['request', 'Requests'], ['other', 'Other']];
@@ -685,7 +686,7 @@ export function mount(el, app) {
     banner.append(
       h('span', { class: 'rb-ic', html: icon('spark') }),
       h('span', { class: 'rb-text' }, h('strong', null, `No calls or shifts in ${M.fmtMonth(app.month)} yet. `), 'Enter leave and requests first, then let Fill draft the calls and PM shifts around them.'),
-      h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => openAutofill(app) }, 'Fill this month'));
+      h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => openAutofill(app, { quick: true }) }, 'Fill this month'));
   }
 
   // Bring a day's column into view (only scrolls when it is hidden behind the name column or off the right edge).
@@ -1284,7 +1285,7 @@ export function chipVars(du) {
 // ---------- Auto-fill dialog ----------
 let runCount = 0;
 
-export function openAutofill(app) {
+export function openAutofill(app, { quick = false } = {}) {
   const { h } = app;
   const state = app.store.get();
   if (!(state.staff || []).length) { app.toast('Add staff first: People, or import the Excel sheet.', { kind: 'warn' }); return; }
@@ -1295,6 +1296,12 @@ export function openAutofill(app) {
   let worker = null, stopped = false, t0 = 0, tick = 0;
   let timeMs = 6000;
   try { timeMs = +localStorage.getItem('ntf-roster-af-time') || 6000; } catch (e) { /* ignore */ }
+  // what to fill, remembered on this device: codes (null = all), also assign the free APS weeks, apply when done
+  let pref = { codes: null, aps: true, auto: true };
+  try { pref = { ...pref, ...JSON.parse(localStorage.getItem('ntf-roster-af-pref') || '{}') }; } catch (e) { /* ignore */ }
+  const savePref = () => { try { localStorage.setItem('ntf-roster-af-pref', JSON.stringify(pref)); } catch (e) { /* ignore */ } };
+  const chosenCodes = () => { const all = autoDuties.map(d => d.code); const c = Array.isArray(pref.codes) ? all.filter(x => pref.codes.includes(x)) : all; return c.length ? c : all; };
+  const apsOpen = () => (state.settings && state.settings.pool) !== 'senior' ? suggestMonth(state, app.month).filter(w => !w.holder && w.pick) : [];
 
   const close = app.sheet({
     title: `Auto-fill ${M.fmtMonth(app.month)}`, body: wrap, className: 'af-sheet',
@@ -1338,6 +1345,24 @@ export function openAutofill(app) {
         n.auto ? h('li', null, `${n.auto} earlier auto-filled shift${n.auto > 1 ? 's' : ''} may change.`) : null,
         h('li', null, 'Nothing changes until you press Apply, and Apply can be undone.')));
     // upper bounds: the search usually ends sooner, once it stops finding a better roster
+    const chosen = new Set(chosenCodes());
+    const cs = h('fieldset', { class: 'af-time' }, h('legend', null, 'Fill these'));
+    for (const d of autoDuties) {
+      const id = 'af-c-' + d.code;
+      const cb = h('input', { type: 'checkbox', id, checked: chosen.has(d.code) });
+      cb.addEventListener('change', () => { const on = autoDuties.map(x => x.code).filter(c => wrap.querySelector('#af-c-' + c)?.checked); pref.codes = on; savePref(); });
+      cs.append(h('label', { class: 'af-opt', for: id }, cb, h('span', { class: 'af-opt-l' }, d.code), h('span', { class: 'af-opt-s' }, d.name || '')));
+    }
+    wrap.append(cs);
+    const nAps = apsOpen().length;
+    if (nAps) {
+      const cb = h('input', { type: 'checkbox', id: 'af-aps', checked: !!pref.aps });
+      cb.addEventListener('change', () => { pref.aps = cb.checked; savePref(); });
+      wrap.append(h('label', { class: 'af-opt', for: 'af-aps' }, cb, h('span', { class: 'af-opt-l' }, `Also assign the ${nAps} free APS week${nAps > 1 ? 's' : ''}`), h('span', { class: 'af-opt-s' }, 'suggested people, fewest weeks first')));
+    }
+    const ca = h('input', { type: 'checkbox', id: 'af-auto', checked: !!pref.auto });
+    ca.addEventListener('change', () => { pref.auto = ca.checked; savePref(); });
+    wrap.append(h('label', { class: 'af-opt', for: 'af-auto' }, ca, h('span', { class: 'af-opt-l' }, 'Apply when done'), h('span', { class: 'af-opt-s' }, 'you can Undo; stops to show you if rules are unmet')));
     const times = [[3000, 'Quick', '3 s'], [6000, 'Normal', '6 s'], [15000, 'Thorough', '15 s']];
     const fs = h('fieldset', { class: 'af-time' }, h('legend', null, 'Search for at most'));
     for (const [ms, label, sub] of times) {
@@ -1374,6 +1399,7 @@ export function openAutofill(app) {
     }, 250);
   }
 
+  let apsPicks = [];
   let shownPct = 0;   // the bar only moves forward (the clock and the solver's own count both feed it)
   function setPct(pct) {
     const bar = wrap.querySelector('.af-bar');
@@ -1394,9 +1420,12 @@ export function openAutofill(app) {
   function run() {
     runCount++;
     const seed = runCount;
-    const snapshot = app.scope(app.store.get());   // the pool in view only: the other pool's people and rules are left out
+    let snapshot = app.scope(app.store.get());   // the pool in view only: the other pool's people and rules are left out
+    apsPicks = pref.aps ? apsOpen().map(w => [w.monday, w.pick]) : [];
+    if (apsPicks.length) { snapshot = structuredClone(snapshot); for (const [m, id] of apsPicks) setWeek(snapshot, m, id); }   // fill the calls around them
     stageProgress();
-    const opts = { from, to, seed, timeMs };
+    const codes = chosenCodes();
+    const opts = { from, to, seed, timeMs, codes: codes.length < autoDuties.length ? codes : null };
     let fellBack = false;
     const fallback = async (why) => {
       if (fellBack || stopped) return;
@@ -1442,7 +1471,8 @@ export function openAutofill(app) {
         if (!inFill.has(sid)) continue;
         const cell = snapshot.cells?.[d]?.[sid];
         if (cell?.lock) continue;
-        const before = new Set(cell?.auto || []);
+        const sel = result.codes ? new Set(result.codes) : null;
+        const before = new Set((cell?.auto || []).filter(c => !sel || sel.has(c)));
         const manual = (cell?.a || []).filter(c => !before.has(c));
         const after = new Set((asg[d]?.[sid] || []).filter(c => !manual.includes(c)));
         for (const c of after) if (!before.has(c)) added++;
@@ -1467,6 +1497,12 @@ export function openAutofill(app) {
         cmp('Must-fix problems', now.hard, after.hard),
         cmp('To improve (soft)', now.soft, after.soft)));
     const unf = result.unfilled || [];
+    const applyIt = () => {
+      app.store.commit(`Auto-fill ${M.fmtMonth(app.month)}`, draft => { for (const [m, id] of apsPicks) setWeek(draft, m, id); applyAssignments(draft, result, days, new Set((snapshot.staff || []).map(p => p.id))); });
+      close();
+      app.toast(`Auto-fill applied: ${changedTxt.toLowerCase()}${apsPicks.length ? `; ${apsPicks.length} APS week${apsPicks.length > 1 ? 's' : ''} assigned` : ''}`, { action: { label: 'Undo', fn: () => app.store.undo() } });
+    };
+    if (pref.auto && !unf.length && after.hard === 0) { applyIt(); return; }
     if (unf.length) {
       wrap.append(h('div', { class: 'af-unf' },
         h('h3', null, `Still short on ${unf.length} day${unf.length === 1 ? '' : 's'}`),
@@ -1487,11 +1523,7 @@ export function openAutofill(app) {
       h('button', { type: 'button', class: 'btn btn-ghost', onclick: run }, 'Try again'),
       h('button', {
         type: 'button', class: 'btn btn-primary', autofocus: true,
-        onclick: () => {
-          app.store.commit(`Auto-fill ${M.fmtMonth(app.month)}`, draft => applyAssignments(draft, result, days, new Set((snapshot.staff || []).map(p => p.id))));
-          close();
-          app.toast(`Auto-fill applied: ${changedTxt.toLowerCase()}`, { action: { label: 'Undo', fn: () => app.store.undo() } });
-        },
+        onclick: applyIt,
       }, 'Apply')));
     wrap.querySelector('.btn-primary')?.focus();
   }
@@ -1503,6 +1535,7 @@ export function openAutofill(app) {
   }
 
   stageOptions();
+  if (quick && autoDuties.length) run();
 }
 
 // Set each cell's auto codes from the solver result, keeping every non-auto code. Locked cells are skipped.
@@ -1515,11 +1548,13 @@ export function applyAssignments(draft, result, days, only = null) {
       if (only && !only.has(sid)) continue;
       const cell = M.getCell(draft, d, sid);
       if (cell?.lock) continue;
-      const oldAuto = cell?.auto || [];
+      const oldAll = cell?.auto || [];
+      const oldAuto = result.codes ? oldAll.filter(c => result.codes.includes(c)) : oldAll;   // only the codes this run filled
+      const other = oldAll.filter(c => !oldAuto.includes(c));
       const keep = (cell?.a || []).filter(c => !oldAuto.includes(c));
       const newAuto = (asg[d]?.[sid] || []).filter(c => !keep.includes(c));
       if (!cell && !newAuto.length) continue;
-      M.setCell(draft, d, sid, { a: [...keep, ...newAuto], auto: newAuto });
+      M.setCell(draft, d, sid, { a: [...keep, ...newAuto], auto: [...other, ...newAuto] });
     }
   }
 }

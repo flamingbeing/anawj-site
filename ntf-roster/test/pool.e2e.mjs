@@ -200,6 +200,25 @@ for (const [hash, label] of [['#people?s=pool', 'pool setup'], ['#check?v=aps', 
   ok(w[0] <= w[1] + 1, `${label}: no sideways scroll on a phone (${w[0]} > ${w[1]})`);
   await shot(phone, `phone-${label.replace(/ /g, '-')}`);
 }
+// Auto-fill: choose the codes, free APS weeks offered, applies itself; the last month seen comes back
+{
+  const pg = await open({ width: 1300, height: 900 });
+  await pg.goto(`${BASE}?demo#roster`);
+  await pg.waitForSelector('#nextm', { timeout: 15000 });
+  await pg.click('#nextm'); await pg.waitForTimeout(400);
+  const month = await pg.evaluate(() => window.ntfApp.month);
+  await pg.goto(`${BASE}?demo#roster`); await pg.waitForSelector('#nextm', { timeout: 15000 });
+  ok(await pg.evaluate(() => window.ntfApp.month) === month, 'the roster opens on the last month seen on this device');
+  await pg.click('#autofill'); await pg.waitForSelector('.af');
+  ok((await pg.locator('.af input[type=checkbox][id^="af-c-"]').count()) >= 2, 'Auto-fill lists the codes to fill');
+  ok((await pg.locator('#af-auto').isChecked()), 'Apply when done is on by default');
+  await pg.click('label[for="af-c-P"]');   // leave the PM shifts out
+  await pg.click('.af-actions .btn-primary:has-text("Start")');
+  await pg.waitForFunction(() => !document.querySelector('.af'), null, { timeout: 30000 }).catch(() => {});
+  const cells = await pg.evaluate((m) => { const st = window.ntfApp.store.get(); const k = {}; for (const [d, day] of Object.entries(st.cells)) if (d.startsWith(m)) for (const c of Object.values(day)) for (const x of (c.auto || [])) k[x] = (k[x] || 0) + 1; return k; }, month);
+  ok(!cells.P, `PM shifts were left out (${JSON.stringify(cells)})`);
+  await pg.context().close();
+}
 await b.close();
 ok(!errors.length, 'no page errors: ' + errors.join(' | '));
 console.log(`ntf-roster pool e2e: ${checks} checks passed`);

@@ -275,6 +275,15 @@ export function migrate(s) {
     for (const r of s.rules) if (typeof r.note === 'string' && /Predicted/.test(r.note)) r.note = r.note.replace(/\s*Predicted[^.]*\.?/g, '').trim();
     s.settings.rcv = 1;
   }
+  // owner, 20 Oct 2026: a half call for the No calls people is a preference, not a must-hold limit of one a month
+  if (!s.settings.jpNch) {
+    const old = s.rules.find(r => r.id === 'r-jp-nocall-hc');
+    if (old) {
+      s.rules = s.rules.filter(r => r.id !== 'r-jp-nocall-hc0');
+      Object.assign(old, { name: 'No calls people: avoid half calls (only if the day cannot be filled any other way)', hard: false, weight: 90, params: { ...old.params, codes: ['HC'], max: 0 } });
+    }
+    s.settings.jpNch = 1;
+  }
   if (!Array.isArray(s.rulesLog)) s.rulesLog = [];
   s.rulesLog = s.rulesLog.filter(isObj);
   if (s.rulesLog.length > 200) s.rulesLog = s.rulesLog.slice(-200);

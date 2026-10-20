@@ -265,4 +265,20 @@ ok(progress.every(p => p.best && typeof p.best.hard === 'number' && typeof p.pct
   eq(Object.values(r.assignments[TO]).filter(c => c.includes('C')).length, 0, 'nobody on call on 30 Nov before the 1 Dec clinics');
 }
 
+{
+  // opts.codes: fill only these codes; earlier auto-filled shifts of the other codes stay as they are
+  const s = M.defaultState();
+  s.staff = ['a', 'b', 'c', 'd'].map(id => ({ id, name: `Made-up ${id.toUpperCase()}`, short: '', group: 'cons', tags: [], fte: 1, start: '', end: '', note: '', active: true }));
+  const codes = s.duties.filter(d => d.auto && d.kind === 'shift').map(d => d.code);
+  ok(codes.length >= 2, 'at least two auto codes in the default duties');
+  const keepCode = codes[1], fillCode = codes[0];
+  M.setCell(s, '2026-11-03', 'a', { a: [keepCode], auto: [keepCode] });
+  const r = solve(s, { from: FROM, to: TO, seed: 1, timeMs: 1e9, iterations: 3000, codes: [fillCode] });
+  eq(r.codes, [fillCode], 'the result names the codes it filled');
+  ok(Object.values(r.assignments).every(row => Object.values(row).every(c => c.every(x => x === fillCode))), 'only the chosen code is placed');
+  applyAssignments(s, r.assignments, r.codes);
+  eq(M.getCell(s, '2026-11-03', 'a').a.includes(keepCode), true, 'an earlier auto-filled shift of another code stays');
+  eq(M.getCell(s, '2026-11-03', 'a').auto.includes(keepCode), true, 'and is still marked auto-filled');
+}
+
 console.log(`solver tests: ${checks} checks passed`);

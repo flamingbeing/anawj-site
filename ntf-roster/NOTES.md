@@ -151,6 +151,11 @@ Nothing else changes: the checker, the builder, Check and the solver all read `R
 A pure function run in a Web Worker (the page stays responsive; it falls back to the page if the worker fails). It
 places only duties marked `auto` (default C, P, SMO, OTC, PHD), never touches locked cells, manual codes, leave or
 requests, and clears only its own earlier codes in the month. Demand comes from `cover` rules on auto codes.
+`opts.codes` fills only some codes (the result's `codes` says which; `applyAssignments` then leaves other auto codes
+alone). The dialog remembers (per device, `ntf-roster-af-pref`) which codes, whether to assign the free APS weeks first
+(written in the same undo step as the fill), and "Apply when done" (on by default: it applies itself only when no rule
+is unmet and nothing is short; otherwise it shows the result). The month last seen on a device is reopened
+(`ntf-roster-ui-month`); the Junior/Senior choice already lives in the device's own state.
 Greedy construction (hardest slots first), then simulated annealing with incremental scoring (moves, swaps, add and
 drop), then it drops any duty no rule needs. Hard problems always come first: a move's hard change is scaled far
 above any soft change, and the best roster is the one with the fewest hard points, then the fewest soft, so no
