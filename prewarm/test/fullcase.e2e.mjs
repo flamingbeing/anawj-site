@@ -36,7 +36,7 @@ await Promise.all(['1', '2', '3'].map(async ARM => {
   // PACU in / To ward are logged on the PACU page (owner, 13 Oct 2026)
   const pacuTime = async (id, label) => { await pg.goto(`${BASE}?demo#/p/${pid}/form/pacu`); await pg.waitForSelector('#f-pacu_temp'); await pg.click(`[data-pev="${id}"]`); await pg.click('.kp [data-now]'); await pg.waitForTimeout(800); return label; }; // the tap guard ignores taps near the last one for 0.7 s
   async function temps(series, key) {
-    await pg.goto(`${BASE}?demo#/p/${pid}/${series}/${key}`); await pg.waitForSelector('#save');
+    await pg.goto(`${BASE}?demo#/p/${pid}/${series}/${key}`); await pg.waitForSelector('#save'); await pg.clock.fastForward(800); // the tap guard ignores taps near the last one for 0.7 s
     for (const c of ['core', 'chest', 'arm', 'thigh', 'calf', 'room']) if (await pg.$(`.card[data-fill="${c}"]`)) await pg.click(`.card[data-fill="${c}"] .clab`);
     // carried-over (grey) values are not saved unless confirmed (14 Oct 2026): tap each one and OK, as a user would
     for (let i = 0; i < 12; i++) { const n = await pg.$('.card.dflt .num'); if (!n) break; await n.click(); await pg.waitForSelector('dialog.kp[open]'); await pg.click('.kp [data-a="ok"]'); await pg.waitForTimeout(150); }
@@ -86,9 +86,9 @@ await Promise.all(['1', '2', '3'].map(async ARM => {
   for (const f of ['pacu_shiver', 'pacu_ponv', 'pacu_hypot', 'pacu_tx', 'pacu_delay']) await pg.click(`.chip[data-f="${f}"][data-v="0"]`);
   await pg.click('.chip[data-f="pacu_pain"][data-v="3"]');
   for (const f of ['nd_dis', 'nd_beh', 'nd_com', 'nd_ill', 'nd_psy']) await pg.click(`.chip[data-f="${f}"][data-v="0"]`);
-  await pg.goto(`${BASE}?demo#/p/${pid}`); await pg.waitForSelector('.times');
-  await pg.click('.chip[data-sat="sat_pre"][data-v="1"]'); await pg.waitForTimeout(100);
   await pg.click('.chip[data-sat="sat_post"][data-v="1"]'); await pg.waitForTimeout(100);
+  await pg.goto(`${BASE}?demo#/p/${pid}/prewarm`); await pg.waitForSelector('.times');
+  await pg.click('.chip[data-sat="sat_pre"][data-v="1"]'); await pg.waitForTimeout(100);
   await adv(60); steps.push(await pacuTime('pacu_out', 'To ward'));
   await pg.goto(`${BASE}?demo#/p/${pid}`); await pg.waitForSelector('.times'); await pg.waitForTimeout(1500);
 
