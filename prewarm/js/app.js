@@ -423,8 +423,10 @@ function nowFor(p, s) {
   return r == null ? n : n + 1440 * Math.round((r - n) / 1440);
 }
 // readings due after that stage ended (into OT for pre-warming, surgery end for intra-op) aren't expected
+// the End reading, once saved, is the last temperature: nothing later is due, even if Surgery end wasn't logged (owner, 20 Oct 2026)
 function expected(p, s, due) {
   let end = toMin(val(p, s === 'prewarm' ? 'ev_ot' : 'io_done'));
+  if (end == null && s === 'iotemp') end = toMin(savedAt(p, s, 'end'));
   const r = refOf(p, s);
   if (end == null || r == null) return true;
   while (end < r) end += 1440;
