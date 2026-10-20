@@ -3,8 +3,11 @@
 // is checked again here (the Access token's signature and audience), then passed on to the study computer's own address, which
 // Access guards with a service token only this Worker holds. The Worker stores nothing.
 //   GET  /scan-api/whoami                       -> {email}              (is this browser signed in?)
-//   POST /scan-api/upload/<scan>/<page>         one JPEG or PNG, page 1-14 or x   -> {ok, pages}
-//   GET  /scan-api/status/<scan>                -> {scan, pages, state}
+//   POST /scan-api/upload/<scan>/<page>         one JPEG or PNG, page 1-14 or x; X-Scan-Subject: the Subject ID typed on the
+//                                               phone (optional, passed on)   -> {ok, pages}
+//   GET  /scan-api/status/<scan>                -> {scan, pages, state, page: {<page>: {state, page?, score?, values?, flagged?, why?}}}
+//                                               (the study computer's reading of each page: received, read, retake, approved;
+//                                               numbers and states only, never values)
 // Set in Cloudflare (never in this repo): ACCESS_TEAM (already there), SCAN_ACCESS_AUD (the AUD tag of the Access app for this
 // path), SCAN_ORIGIN (the study computer's address, https), SCAN_CLIENT_ID and SCAN_CLIENT_SECRET (a service token for it).
 // Without them it answers 503 and names the missing one.
@@ -13,7 +16,7 @@ import { verifyAccess } from './ask.js';
 export const SCAN_HOST = 'prewarmstudy.anawj.com';
 export const SCAN_PREFIX = '/scan-api/';
 export const MAX_PHOTO = 12 * 1024 * 1024;
-const SCAN_ID = /^[A-Za-z0-9-]{8,64}$/, PAGE = /^(?:[1-9]|1[0-4]|x)$/;
+const SCAN_ID = /^[A-Za-z0-9-]{8,64}$/, PAGE = /^(?:[1-9]|1[0-4]|x)$/, SUBJECT = /^[A-Za-z0-9][A-Za-z0-9 _./-]{0,39}$/;
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' } });
 
@@ -35,7 +38,9 @@ export async function handleScan(request, env, fetchImpl = fetch) {
     const body = await request.arrayBuffer();
     if (!body.byteLength) return json({ error: 'Empty photo.' }, 400);
     if (body.byteLength > MAX_PHOTO) return json({ error: 'That photo is too big (12 MB at most).' }, 413);
-    return pass(fetchImpl, env, `upload/${parts[1]}/${parts[2]}`, { method: 'POST', body, headers: { 'Content-Type': type } }, email);
+    const subject = (request.headers.get('X-Scan-Subject') || '').trim();
+    if (subject && !SUBJECT.test(subject)) return json({ error: 'The Subject ID can only have letters, numbers, spaces and - _ . /' }, 400);
+    return pass(fetchImpl, env, `upload/${parts[1]}/${parts[2]}`, { method: 'POST', body, headers: { 'Content-Type': type, ...(subject && { 'X-Scan-Subject': subject }) } }, email);
   } else return json({ error: 'Not found.' }, 404);
   return pass(fetchImpl, env, path, { method: 'GET' }, email);
 }

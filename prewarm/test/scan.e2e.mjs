@@ -137,37 +137,75 @@ try {
   await pg.goto('http://localhost:8080/prewarm/?demo#/scan'); await pg.waitForSelector('#scsub');
   await pg.fill('#scsub', 'DEMO-01');
   ok(await pg.$eval('#scsend', e => e.hidden), 'no Send button in demo mode');
-  const sent = [];
-  let signedIn = false, failPage = '';
+  ok(await pg.$eval('#scsign', e => e.hidden) && await pg.$eval('#scautosendlbl', e => e.hidden), 'no sign-in note or auto-send switch in demo mode');
+  const sent = [], others = [];
+  let signedIn = false, failPage = '', status = null;
   await pg.route('**/scan-api/**', async route => {
     const rq = route.request(), u = new URL(rq.url());
     if (u.pathname.endsWith('/whoami')) return signedIn ? route.fulfill({ json: { email: 'member@example.com' } }) : route.fulfill({ status: 302, headers: { Location: 'https://team.cloudflareaccess.com/login' } });
+    if (u.pathname.includes('/status/')) return status ? route.fulfill({ json: { scan: u.pathname.split('/').pop(), ...status } }) : route.fulfill({ status: 404, json: { error: 'No such scan.' } });
     if (failPage && u.pathname.endsWith('/' + failPage)) return route.fulfill({ status: 500, json: { error: 'the study computer is busy' } });
-    sent.push(u.pathname); return route.fulfill({ json: { ok: true, pages: ['1'] } });
+    if (rq.headers()['x-scan-subject'] === 'DEMO-02') sent.push(u.pathname); else others.push(u.pathname);
+    return route.fulfill({ json: { ok: true, pages: ['1'] } });
   });
   await pg.goto('http://localhost:8080/prewarm/?demo&scantest#/scan'); await pg.waitForSelector('#scsub');
+  await pg.waitForSelector('#scsign:not([hidden])');
+  ok(true, 'the sign-in note shows as the screen opens, before any photo');
   await pg.fill('#scsub', 'DEMO-02');
+  ok(await pg.isChecked('#scautosend'), 'send each page when ready: on by default');
   const addPage = async () => { await give('#scpick', 'x.jpg'); await pg.waitForSelector('#screv:not([hidden])'); await pg.click('#scok'); await pg.waitForFunction(() => document.querySelector('#scedit').hidden); await pg.waitForTimeout(400); };
+  const stateOf = l => pg.$$eval('#sclist figure', (fs, l) => fs.find(f => f.querySelector('.scnum').textContent === l)?.querySelector('.scst')?.textContent || '', l);
   await addPage();
-  await pg.selectOption('#scnum', '7'); await addPage();
-  await pg.waitForFunction(() => document.querySelectorAll('#sclist figure').length === 2);
-  ok(!(await pg.$eval('#scsend', e => e.hidden)), 'Send button on the real address');
-  await pg.click('#scup');
-  await pg.waitForFunction(() => /Sign in once/.test(document.querySelector('#scmsg').textContent));
+  await pg.waitForFunction(() => /sign in first/.test(document.querySelector('#scmsg').textContent));
   ok(sent.length === 0, 'nothing uploaded while signed out');
-  signedIn = true; failPage = '7';
-  await pg.click('#scup');
+  ok(await stateOf('1') === 'On phone', 'page 1 waits on the phone: ' + await stateOf('1'));
+  signedIn = true;
+  await pg.click('#scsignchk');
+  await pg.waitForFunction(() => document.querySelectorAll('.scsent').length === 1);
+  ok(await pg.$eval('#scsign', e => e.hidden), 'sign-in note gone once signed in');
+  ok(sent.length === 1 && sent[0].endsWith('/1'), 'page 1 sent by itself with the Subject ID: ' + sent);
+  ok(others.length === 2 && new Set(others.map(p => p.split('/')[3])).size === 1 && others[0].split('/')[3] !== sent[0].split('/')[3], 'the earlier subject\'s unsent pages went too, under their own scan: ' + others);
+  ok(await stateOf('1') === 'Sent', 'page 1 shows Sent');
+  ok(await pg.$eval('#scup', e => e.hidden), 'no Send now button when nothing waits');
+  failPage = '7';
+  await pg.selectOption('#scnum', '7'); await addPage();
   await pg.waitForFunction(() => /Not sent/.test(document.querySelector('#scmsg').textContent));
   ok(/the study computer is busy/.test(await pg.textContent('#scmsg')), 'the failure reason is shown');
-  ok(sent.length === 1 && sent[0].endsWith('/1'), 'page 1 sent although page 7 failed: ' + sent);
-  ok((await pg.$$('.scsent')).length === 1, 'one tick');
   ok((await pg.$$('[data-retry]')).length === 1 && await pg.$eval('[data-retry]', b => b.closest('figure').querySelector('.scnum').textContent) === '7', 'Retry only on page 7');
+  ok(/Send now \(1 waiting\)/.test(await pg.textContent('#scup')), 'Send now names what waits');
   failPage = '';
+  // the study computer has read both: page 1 gave 12 values (2 flagged); the photo sent as page 7 is really page 8
+  status = { pages: ['1', '7'], state: 'read', page: { 1: { state: 'read', page: 1, values: 12, flagged: 2 }, 7: { state: 'read', page: 8, values: 3, flagged: 0 } } };
   await pg.click('[data-retry]');
   await pg.waitForFunction(() => document.querySelectorAll('.scsent').length === 2);
   ok(sent.length === 2 && new Set(sent.map(p => p.split('/')[3])).size === 1, 'both pages sent under one scan id: ' + sent);
   ok(!(await pg.$('[data-retry]')), 'no Retry once sent');
-  await pg.click('#scup'); ok(/already sent/.test(await pg.textContent('#scmsg')) && sent.length === 2, 'no second upload of sent pages');
+  await pg.waitForFunction(() => [...document.querySelectorAll('#sclist .scnum')].some(b => b.textContent === '8'));
+  ok(await stateOf('1') === 'Read · 12 · 2 flags', 'page 1 read, with its counts: ' + await stateOf('1'));
+  ok(/was 7/.test(await stateOf('8')) && !(await stateOf('7')), 'the page moved to slot 8 and says it was 7');
+  ok(/matched the photo sent as page 7 to page 8/.test(await pg.textContent('#scburstmsg')), 'the move is said in words');
+  ok(/2 sent · 2 read/.test(await pg.textContent('#scprog')), 'progress counts sent and read: ' + await pg.textContent('#scprog'));
+  // a retake request: one tap on the slot's Retake goes straight to the camera for that page, and the new photo is sent
+  status = { pages: ['1', '7'], state: 'read', page: { 1: { state: 'retake', page: 1, why: 'Did not line up with the form (score 0.41).' }, 7: { state: 'read', page: 8, values: 3, flagged: 0 } } };
+  await pg.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await pg.waitForSelector('[data-retake]');
+  ok(/Did not line up/.test(await pg.getAttribute('[data-retake]', 'aria-label')), 'the Retake button says why');
+  status.page[1] = { state: 'received' }; // what the study computer says once the new photo is in
+  await pg.click('[data-retake]');
+  await give('#scshot', 'retake.jpg');
+  await pg.waitForSelector('#screv:not([hidden])'); await pg.click('#scok');
+  await pg.waitForFunction(() => document.querySelectorAll('.scsent').length === 2 && !document.querySelector('[data-retake]'));
+  ok(sent.length === 3 && sent[2].endsWith('/1') && sent[2].split('/')[3] === sent[0].split('/')[3], 'the retake went to page 1 of the same scan: ' + sent);
+  // both approved: safe to clear, and clearing empties the phone
+  status = { pages: ['1', '7'], state: 'approved', page: { 1: { state: 'approved', page: 1 }, 7: { state: 'approved', page: 8 } } };
+  await pg.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  ok(!(await pg.$eval('#scclear', e => e.hidden)) && /keep them until the import is approved/.test(await pg.textContent('#scclearmsg')), 'all on the study computer: safe to clear, with the keep note');
+  await pg.waitForFunction(() => [...document.querySelectorAll('.scst')].every(e => e.textContent.startsWith('Approved')));
+  ok(await stateOf('1') === 'Approved', 'approved shows on the slot');
+  ok(/safe to clear/.test(await pg.textContent('#scclearmsg')) && !/keep them/.test(await pg.textContent('#scclearmsg')), 'safe to clear, no keep note once approved');
+  await pg.click('#scclearbtn');
+  await pg.waitForFunction(() => !document.querySelectorAll('#sclist figure').length);
+  ok(await pg.$eval('#scclear', e => e.hidden), 'nothing left to clear');
 
   // approving a scan import (admin screen mounted with a stand-in cloud and one demo patient; fake values only)
   await pg.goto('http://localhost:8080/prewarm/?demo#/settings'); await pg.waitForTimeout(500);

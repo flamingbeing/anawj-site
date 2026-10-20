@@ -518,6 +518,17 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 .scdlg .row { display: flex; gap: 8px; margin-top: 8px; }
 .scdlg .row > * { flex: 1; }
 .scsent { position: absolute; bottom: 3px; right: 3px; background: var(--navy); color: #fff; font-size: .8rem; padding: 1px 6px; border-radius: 10px; }
+.scst { display: block; margin-top: 2px; font-size: .72rem; line-height: 1.2; text-align: center; color: var(--muted); overflow-wrap: anywhere; }
+.scst i { font-style: normal; display: block; }
+.scst-read, .scst-approved { color: var(--ok); font-weight: 600; }
+.scst-failed, .scst-rejected { color: #b3261e; font-weight: 600; }
+button.scst-retake { width: 100%; min-height: var(--tap); margin-top: 4px; background: #b3261e; color: #fff; border: 0; border-radius: 6px; font-size: .85rem; font-weight: 700; }
+.scgrid figure.scretake img { outline: 3px solid #b3261e; outline-offset: -3px; }
+.scsign p { margin: 0 0 8px; }
+.scsign .row { display: flex; gap: 8px; }
+.scsign .row > * { flex: 1; min-height: var(--tap); display: flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; }
+.scclear p { margin: 0 0 8px; font-weight: 400; }
+.scclear button { width: 100%; min-height: var(--tap); }
 
 .scedit { position: fixed; inset: 0; z-index: 50; background: #111; color: #fff; display: flex; flex-direction: column; gap: 8px; padding: 8px; }
 .scedit[hidden] { display: none; }

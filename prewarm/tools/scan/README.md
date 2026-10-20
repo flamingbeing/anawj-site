@@ -101,13 +101,18 @@ Still to prove: a "No pre-warming" patient's page 4 (the option whose tick also 
 
 ## Receiving phone uploads (study computer)
 
-`python inbox.py` (bound to 127.0.0.1; `SCAN_INBOX` folder, `SCAN_PORT` default 8788) receives the photos the app's **Send to the
-study computer** button uploads through the Worker (`worker/scan.js`) and Cloudflare's tunnel: `SCAN_INBOX/<scan>/page-<n>.jpg|png`
-plus `meta.json` (who, when). It reads nothing and sends nothing on.
+`python inbox.py` (bound to 127.0.0.1; `SCAN_INBOX` folder, `SCAN_PORT` default 8788) receives the photos the app's Scan pages
+screen sends through the Worker (`worker/scan.js`) and Cloudflare's tunnel: `SCAN_INBOX/<scan>/page-<n>.jpg|png` plus `meta.json`
+(who, when, the Subject ID typed on the phone). A new photo removes `import-error.txt` so the reader tries again. Its status
+route answers the phone from `status.json` (below): per page received / reading / read / retake (why) / approved / rejected,
+the page the study computer found it to be, its score and value and flag counts; numbers and states only, never values.
 
 `python watch.py` (also on the study computer; needs Ollama, `gcloud` signed in as the owner, and `SCAN_FORM_DIR` from `setup-form.sh`) waits until a received
 folder has been quiet for `SCAN_QUIET` seconds (90), runs `scan.py --reader ollama` on it, and files the values and flags (no photos, crops or labels)
-as `scanImports/<scan>` in `prewarm-study` with status `pending`, using gcloud's token (so no app user can create one). Then `imported.json` is
-written in the folder; three failures write `import-error.txt` (delete it to retry). An admin approves it in the app (Settings › Scan imports):
+as `scanImports/<scan>` in `prewarm-study` with status `pending`, using gcloud's token (so no app user can create one). The phone's page
+numbers go in as `--hint-pages`: kept unless another page lines up clearly better, so a page shot out of order is put right (and the
+phone moves it to its slot). Photos that arrive after a read (a retake, a late page) are read on their own and filed as `<scan>-2`, `-3`...;
+an import is never overwritten. `status.json` in the folder records each photo's result (and, every 5 minutes for 14 days, the review state of
+each pending import); `imported.json` notes the last import; three failures on the same photos write `import-error.txt` (a new upload, or deleting it, retries). An admin approves it in the app (Settings › Scan imports):
 choose the patient, tick the values to save; flagged values and ones that would replace a saved value start unticked. `python3 watch_test.py` checks it on fake data.
 `python3 inbox_test.py` checks its rules on fake photos. The inbox folder stays out of git.

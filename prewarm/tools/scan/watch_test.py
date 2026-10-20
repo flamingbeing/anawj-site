@@ -36,4 +36,35 @@ def boom(*a): raise RuntimeError('ollama down')
 try: watch.process(g, 'b1b2c3d4-e5f6', 'forms', 'proj', read=boom); assert False
 except RuntimeError: pass
 assert watch.ready(g, now + 1000, 90) and not os.path.exists(os.path.join(g, 'imported.json'))
+
+# rounds: a photo sent after the read (a retake) is read on its own and filed as <scan>-2; the first import is left alone
+time.sleep(0.01); open(os.path.join(f, 'page-7.jpg'), 'wb').write(b'retake')
+assert [l for l, _ in watch.unread(f)] == ['7'] and watch.ready(f, time.time() + 100, 90)
+got = []
+sj2 = {'pages': [{'photo': 'page-7.jpg', 'page': 7, 'accepted': True, 'score': 0.88}], 'fields': {'t': {'value': '36.5', 'flags': [], 'page': 7}}}
+watch.process(f, S, 'forms', 'proj', read=lambda folder, form, model, todo: got.append([l for l, _ in todo]) or sj2,
+              send=lambda p, s, doc, t: sent.append(s) or 'created', get_token=lambda: 'tok')
+assert got == [['7']] and sent[-1] == S + '-2', (got, sent)
+st = json.load(open(os.path.join(f, 'status.json')))
+assert st['state'] == 'read' and [i['id'] for i in st['imports']] == [S, S + '-2']
+assert st['pages']['7']['accepted'] and st['pages']['7']['import'] == S + '-2' and st['pages']['2']['import'] == S
+assert not watch.ready(f, time.time() + 1000, 90)
+# review state: pending imports are looked up; a deleted one counts as rejected by inbox.py
+looked = []
+watch.reviews(f, 'proj', get=lambda p, i, t: looked.append(i) or ('approved' if i == S else 'pending'), get_token=lambda: 'tok')
+watch.reviews(f, 'proj', get=lambda p, i, t: looked.append(i) or 'deleted', get_token=lambda: 'tok')
+assert looked == [S, S + '-2', S + '-2'], looked
+assert [i['review'] for i in json.load(open(os.path.join(f, 'status.json')))['imports']] == ['approved', 'deleted']
+# a failed read leaves the folder waiting, not "reading"
+time.sleep(0.01); open(os.path.join(f, 'page-2.jpg'), 'wb').write(b'again')
+try: watch.process(f, S, 'forms', 'proj', read=boom); assert False
+except RuntimeError: pass
+assert json.load(open(os.path.join(f, 'status.json')))['state'] == 'received' and watch.unread(f)
+# a folder imported before rounds existed counts as read
+h = os.path.join(d, 'c1b2c3d4-e5f6'); os.makedirs(h); open(os.path.join(h, 'page-1.jpg'), 'wb').write(b'x'); open(os.path.join(h, 'imported.json'), 'w').write('{}')
+assert not watch.ready(h, time.time() + 1000, 90) and watch.load_status(h)['imports'][0]['id'] == 'c1b2c3d4-e5f6'
+# two photos found to be the same page: the weaker one is asked about
+ps = watch.page_status({'pages': [{'photo': 'a.jpg', 'page': 4, 'accepted': True, 'score': 0.95}, {'photo': 'b.jpg', 'page': 4, 'accepted': True, 'score': 0.85}], 'fields': {}},
+                       [('4', '/x/a.jpg'), ('5', '/x/b.jpg')], 'imp', {'4': 1, '5': 2})
+assert 'why' not in ps['4'] and 'page 4 again' in ps['5']['why'] and ps['5']['page'] == 4
 print('watch tests passed')

@@ -1,8 +1,10 @@
 // Scan pages (owner, 20 Oct 2026): scanner-style capture of the paper form's pages. Photo, then crop (four corners, magnifier),
 // flatten to a portrait page, take out shadows, set the contrast, accept, next page. Everything runs on the phone in plain canvas
-// code (js/scan-geom.js). Pages are kept on this phone (IndexedDB), the original photo beside the tidied copy. "Send" uploads
-// the tidied copies through the Worker's /scan-api/ (behind Cloudflare Access; worker/scan.js) to the study computer, only on
-// prewarmstudy.anawj.com. Nothing here touches patient records or sync. Alignment and reading stay on the study computer.
+// code (js/scan-geom.js). Pages are kept on this phone (IndexedDB), the original photo beside the tidied copy. Each page is sent
+// as soon as it is ready (a queue that retries and waits out no signal; pages marked Check wait for a look) through the Worker's
+// /scan-api/ (behind Cloudflare Access; worker/scan.js) to the study computer, only on prewarmstudy.anawj.com, with the Subject
+// ID. Its status route says per page: received, read (values, flags), retake (why), approved; a page the study computer
+// matched to another page number moves to that slot. Nothing here touches patient records or sync.
 import { MAX_EDGE, PAGE_W, PAGE_H, fitSize, autoLevels, guessCorners, isConvex, rotateCorners, flattenPage, setContrast, coachFor, quadMove, photoCheck, edgeInfo, snapCorner, snapSide, uprightScore, rotate180 } from './scan-geom.js';
 export { MAX_EDGE, fitSize, autoLevels };
 export const PAGE_LABELS = Array.from({ length: 14 }, (_, i) => String(i + 1));
@@ -38,6 +40,8 @@ const open = () => new Promise((ok, no) => {
 });
 const tx = async (mode, f) => { const db = await open(); return new Promise((ok, no) => { const t = db.transaction('pages', mode); const out = f(t.objectStore('pages')); t.oncomplete = () => { db.close(); ok(out.result); }; t.onerror = () => no(t.error); t.onabort = () => no(t.error); }); };
 export const listPages = subject => tx('readonly', s => s.index('subject').getAll(subject)).then(a => a.sort((x, y) => x.at - y.at));
+const allPages = () => tx('readonly', s => s.getAll());
+const getPage = id => tx('readonly', s => s.get(id));
 export const putPage = p => tx('readwrite', s => s.put(p));
 export const delPage = id => tx('readwrite', s => s.delete(id));
 
@@ -46,9 +50,35 @@ export const delPage = id => tx('readwrite', s => s.delete(id));
 export const CAN_SEND = typeof location !== 'undefined' && (location.hostname === 'prewarmstudy.anawj.com' && !/[?&]demo\b/.test(location.search)
   || location.hostname === 'localhost' && /[?&]scantest\b/.test(location.search));
 const API = '/scan-api/';
+const SUBJECT = /^[A-Za-z0-9][A-Za-z0-9 _./-]{0,39}$/; // the Subject IDs the Worker takes (sent with each page)
 const signedIn = async () => {
-  try { const r = await fetch(API + 'whoami', { redirect: 'manual', cache: 'no-store' }); return r.ok && (await r.json()).email; } catch { return false; }
+  try { const r = await fetch(API + 'whoami', { redirect: 'manual', cache: 'no-store' }); return r.ok && (await r.json()).email; } catch { return null; } // null: no signal
 };
+// a page's place on the way: on the phone, sending, not sent (failed), then the study computer's word on it
+export const STATES = { phone: 'On phone', sending: 'Sending…', failed: 'Not sent', received: 'Sent', reading: 'Reading…', read: 'Read', retake: 'Retake', approved: 'Approved', rejected: 'Rejected' };
+const DONE = new Set(['approved', 'rejected']);
+export const KEEP_DAYS = 7; // pages approved (or rejected) this long ago are cleared from the phone by themselves
+const RETRY = [15, 60, 300]; // seconds before a failed send is tried again (then every 5 minutes)
+export function stateOf(p, sending, failed) {
+  if (!p.sentAt) return sending?.has(p.id) ? 'sending' : failed?.has(p.id) ? 'failed' : 'phone';
+  return STATES[p.server?.state] ? p.server.state : 'received';
+}
+// the study computer's status of a scan onto this phone's pages: which change, and which move to the page the study computer
+// matched them to (only into a free slot, and once: a person's own relabel after that stands)
+export function applyStatus(pages, st, now = Date.now()) {
+  const changed = [], moved = [];
+  for (const p of pages) {
+    const e = p.scan === st.scan && p.sentAt ? st.page?.[p.sentAs || p.label] : null;
+    if (!e || JSON.stringify(e) === JSON.stringify(p.server)) continue;
+    p.server = e; if (DONE.has(e.state) && !p.doneAt) p.doneAt = now;
+    const to = e.page != null ? String(e.page) : '';
+    if (to && to !== p.label && e.state !== 'retake' && !p.from && PAGE_LABELS.includes(to) && !pages.some(q => q !== p && q.subject === p.subject && q.label === to)) {
+      moved.push([p.label, to]); p.from = p.label; p.label = to;
+    }
+    changed.push(p);
+  }
+  return { changed, moved };
+}
 
 const fileName = (p, orig) => `${p.subject.replace(/[^\w-]+/g, '_')}-page-${p.label || 'x'}${orig ? '-original' : ''}.jpg`;
 
@@ -58,9 +88,10 @@ const tick = () => new Promise(r => setTimeout(r, 30)); // let the screen repain
 
 // deps: { view, esc, toast, subjects: () => [Subject IDs on this phone] }
 export function mount({ view, esc, toast, subjects }) {
-  let subject = '', sel = null, urls = [], num = '1', ed = null, queue = [], saving = Promise.resolve(), scanId = '';
+  let subject = '', sel = null, urls = [], num = '1', ed = null, queue = [], saving = Promise.resolve(), auth = null, pumping = false, again = false, retryT = 0, pollT = 0, gone = false;
   let run = null, one = null; // run: a burst under way { labels, i }; one: the next shot is just this page { label } (a slot, Retake)
   const failed = new Map(); // page id -> why it was not sent (until the next try)
+  const sending = new Set(), tries = new Map(), scans = new Map(); // pages going now; failed tries per page; subject -> scan id
   const tidying = new Set(); // page numbers being tidied beside the camera (a burst)
   const url = b => { const u = URL.createObjectURL(b); urls.push(u); return u; };
   const free = () => { urls.forEach(URL.revokeObjectURL); urls = []; };
@@ -69,6 +100,8 @@ export function mount({ view, esc, toast, subjects }) {
     <p class="muted small">Lay the sheet on a darker surface and hold the phone over it, whole page in view: the camera takes the photo by itself once the page is found and still. The page is flattened, turned upright and the shadows taken out; a page that needs a look is marked Check in the grid. Pages stay on this phone; the original photo is kept beside the tidied copy.</p>
     <label class="lab" for="scsub">Subject ID</label>
     <input id="scsub" list="scsubs" autocomplete="off" autocapitalize="characters" placeholder="e.g. DEMO-01"><datalist id="scsubs">${subjects().map(s => `<option value="${esc(s)}">`).join('')}</datalist>
+    <div id="scsign" class="note scsign" hidden><p>Sign in once before taking photos, so each page goes to the study computer as soon as it is ready.</p>
+      <div class="row"><a class="primary" id="scsignlink" href="${API}whoami" target="_blank" rel="noopener">Sign in</a><button class="secondary" id="scsignchk">I have signed in</button></div><p id="scsignmsg" class="small" role="status"></p></div>
     <div id="scact" hidden>
       <label class="tog"><input type="checkbox" id="scburst"><span>Several pages in a row<small>Shoot the pages back to back with no check in between; each is tidied by itself. Look at the ones marked Check after.</small></span></label>
       <div id="scrange" class="scrange"><label for="scfrom">Pages</label><select id="scfrom" aria-label="First page">${opts}</select><span>to</span><select id="scto" aria-label="Last page">${opts}</select></div>
@@ -79,12 +112,14 @@ export function mount({ view, esc, toast, subjects }) {
       <button class="secondary" id="scstop" hidden>Stop the burst here</button>
       <label class="secondary filebtn">Choose from photos<input id="scpick" type="file" accept="image/*" multiple hidden></label>
       <label class="tog"><input type="checkbox" id="sccamapp"><span>Use phone camera app<small>Instead of the live camera here, on this phone only. For a phone where the live camera is poor.</small></span></label>
+      <label class="tog" id="scautosendlbl" hidden><input type="checkbox" id="scautosend"><span>Send each page when it is ready<small>To the study computer, in the background; with no signal they wait and go later. Pages marked Check wait for a look.</small></span></label>
     </div>
     <p id="scburstmsg" class="small scburstmsg" role="status" hidden></p>
     <div id="scselbar" class="scselbar" hidden><strong id="scselcount" role="status"></strong><button class="secondary" id="scselall">All</button><button class="secondary" id="scselnone">None</button><button class="secondary scseldel" id="scseldel">Delete</button><button class="secondary" id="scselcancel">Cancel</button></div>
     <p id="scprog" class="small" hidden></p>
     <div id="sclist" class="scgrid"></div>
     <div id="scsend" hidden><button class="primary" id="scup">Send to the study computer</button><p id="scmsg" class="muted small" role="status"></p></div>
+    <div id="scclear" class="ok-box scclear" hidden><p id="scclearmsg"></p><button class="secondary" id="scclearbtn">Clear these pages from this phone</button></div>
     <div id="scsave" hidden><button class="secondary" id="scdl">Save tidied pages to this phone</button></div>
     <dialog id="scdlg" class="scdlg"><img alt="Scanned page" id="scimg"><p id="scdlgwhy" class="scdlgwhy" hidden></p>
       <div class="row"><button class="secondary" id="scorig">Show original</button><button class="secondary" id="scadjust">Adjust corners</button><button class="primary" id="scdlgok" hidden>Looks right</button></div>
@@ -131,27 +166,45 @@ export function mount({ view, esc, toast, subjects }) {
   }
   const burstMsg = t => { $$('#scburstmsg').hidden = !t; $$('#scburstmsg').textContent = t || ''; };
 
-  // the 14 slots: empty (tap to take that page), tidying, taken (tap for the page's own screen), sent, needs a look
-  const slot = p => `<figure data-id="${p.id}" class="${p.needs ? 'scneeds' : ''}">
+  // the 14 slots: empty (tap to take that page), tidying, taken (tap for the page's own screen); under each its state on the
+  // way to the study computer, a Retake button when the study computer asks for one
+  const stLine = p => {
+    const st = stateOf(p, sending, failed), e = p.server || {};
+    if (st === 'retake') return `<button class="scst scst-retake" data-retake="${p.id}" aria-label="Retake page ${esc(p.label)}: ${esc(e.why || 'the study computer asks')}">Retake</button>`;
+    const t = st === 'read' ? `Read · ${e.values ?? 0}${e.flagged ? ` · ${e.flagged} flag${e.flagged > 1 ? 's' : ''}` : ''}` : STATES[st];
+    return `<span class="scst scst-${st}">${esc(t)}${p.from ? ` <i>was ${esc(p.from)}</i>` : ''}</span>`;
+  };
+  const slot = p => `<figure data-id="${p.id}" class="${p.needs ? 'scneeds' : ''}${p.server?.state === 'retake' ? ' scretake' : ''}">
       <img src="${url(p.clean)}" alt="Page ${esc(p.label || 'not labelled')}${p.needs ? ', needs a look' : ''}" data-open="${p.id}" draggable="false"><b class="scnum">${esc(p.label || '?')}</b><span class="sccheck" aria-hidden="true">✓</span>
       ${p.needs ? '<span class="scflag">Check</span>' : ''}
-      ${p.sentAt ? '<span class="scsent">✓</span>' : failed.has(p.id) ? `<button class="scretry" data-retry="${p.id}" title="${esc(failed.get(p.id))}">Retry</button>` : ''}</figure>`;
+      ${p.sentAt ? '<span class="scsent">✓</span>' : failed.has(p.id) ? `<button class="scretry" data-retry="${p.id}" title="${esc(failed.get(p.id))}">Retry</button>` : ''}
+      ${CAN_SEND ? stLine(p) : ''}</figure>`;
   async function draw() {
+    if (gone) return; // a save or a send that finished after the screen was left
     free();
     const ok = !!subject;
     $$('#scact').hidden = !ok;
     const pages = ok ? (await listPages(subject)).sort((a, b) => (Number(a.label) || 99) - (Number(b.label) || 99) || a.at - b.at) : [];
+    if (gone) return;
     view._pages = pages;
-    if (!scanId) scanId = pages.find(p => p.scan)?.scan || '';
     $$('#scsave').hidden = !pages.length;
     $$('#scsend').hidden = !pages.length || !CAN_SEND;
+    const unsent = pages.filter(p => !p.sentAt).length;
+    $$('#scup').hidden = !unsent; $$('#scup').textContent = autoSend() ? `Send now (${unsent} waiting)` : 'Send to the study computer';
+    const states = pages.map(p => stateOf(p, sending, failed)), count = s => states.filter(x => x === s).length;
+    const onPc = pages.length && states.every(s => !['phone', 'sending', 'failed'].includes(s));
+    $$('#scclear').hidden = !CAN_SEND || !onPc;
+    if (onPc) $$('#scclearmsg').textContent = `All ${pages.length} page${pages.length > 1 ? 's are' : ' is'} on the study computer: safe to clear from this phone.`
+      + (states.every(s => DONE.has(s)) ? '' : ` The photo beside each value in Scan imports comes from this phone, so keep them until the import is approved; approved pages clear by themselves after ${KEEP_DAYS} days.`);
     const by = new Map(), extra = [];
     for (const p of pages) PAGE_LABELS.includes(p.label) && !by.has(p.label) ? by.set(p.label, p) : extra.push(p);
     $$('#sclist').innerHTML = !ok ? '' : PAGE_LABELS.map(l => tidying.has(l) ? `<div class="scslot sctidy" data-tidy="${l}"><b>${l}</b><span>Tidying…</span></div>`
       : by.has(l) ? slot(by.get(l)) : `<button class="scslot" data-shoot="${l}" aria-label="Take page ${l}"><b>${l}</b><span>Take</span></button>`).join('') + extra.map(slot).join('');
     const check = pages.filter(p => p.needs).length;
     $$('#scprog').hidden = !ok;
-    $$('#scprog').textContent = `${by.size} of 14 pages` + (check ? ` · ${check} to check` : '') + (tidying.size ? ` · tidying ${tidying.size}` : '');
+    const sentN = pages.filter(p => p.sentAt).length, redo = count('retake'), readN = count('read') + count('approved');
+    $$('#scprog').textContent = `${by.size} of 14 pages` + (check ? ` · ${check} to check` : '') + (tidying.size ? ` · tidying ${tidying.size}` : '')
+      + (CAN_SEND && sentN ? ` · ${sentN} sent` + (readN ? ` · ${readN} read` : '') + (redo ? ` · ${redo} to retake` : '') : '');
     setNum(num);
     paintSel();
   }
@@ -208,7 +261,7 @@ export function mount({ view, esc, toast, subjects }) {
       await store(label, null, { original: file, clean: await toJpeg(cv), corners: norm(f.quad, pr.sw, pr.sh), mode, used, still: { ...pr.still, how }, check, needs, flipped: f.flipped || undefined });
     };
     saving = saving.then(job).catch(err => burstMsg(`Page ${label} could not be tidied (${err.message}): tap its slot to take it again.`))
-      .then(() => { tidying.delete(label); return draw(); });
+      .then(() => { tidying.delete(label); return draw(); }).then(() => pump());
   }
 
   // ---------- the capture editor: one look at the flat page when the outline is sure, else the corners first
@@ -345,7 +398,7 @@ export function mount({ view, esc, toast, subjects }) {
   function accept() {
     const e = ed, label = e.label;
     const done = toJpeg($$('#screv')).then(clean => store(label, e.replace, { original: e.file, clean, corners: norm(e.quad, e.sw, e.sh), mode: e.mode, used: e.used, still: e.still, check: e.check, needs: '', flipped: e.flipped || undefined }));
-    saving = saving.then(() => done).catch(err => toast('Could not save the page: ' + err.message)).then(draw);
+    saving = saving.then(() => done).catch(err => toast('Could not save the page: ' + err.message)).then(draw).then(() => pump());
     const after = nextLabel(taken().concat(label), label);
     closeEditor(); setNum(after);
     if (queue.length) nextInQueue(); else if (e.camera && !e.one) shoot();
@@ -370,7 +423,7 @@ export function mount({ view, esc, toast, subjects }) {
     const n = r.i; burstMsg(n ? `${t || `Burst stopped after ${n} page${n > 1 ? 's' : ''}.`} Pages marked Check need a look; tap any page to retake it.` : '');
   }
 
-  $$('#scsub').oninput = e => { subject = e.target.value.trim().toUpperCase(); scanId = ''; num = '1'; run = null; one = null; burstMsg(''); draw().then(() => { setNum(nextLabel(taken())); $$('#scfrom').value = nextLabel(taken()); $$('#scto').value = '14'; paintShot(); }); };
+  $$('#scsub').oninput = e => { subject = e.target.value.trim().toUpperCase(); num = '1'; run = null; one = null; burstMsg(''); draw().then(() => { setNum(nextLabel(taken())); $$('#scfrom').value = nextLabel(taken()); $$('#scto').value = '14'; paintShot(); poll(); }); };
   $$('#scnum').onchange = e => setNum(e.target.value);
   $$('#scburst').checked = pref('burst', true);
   $$('#scburst').onchange = e => { setPref('burst', e.target.checked); run = null; paintShot(); };
@@ -545,7 +598,7 @@ export function mount({ view, esc, toast, subjects }) {
   $$('#sclist').addEventListener('pointerdown', e => {
     held = false; stopHold();
     const f = e.target.closest('figure');
-    if (!f || e.target.closest('[data-retry]')) return;
+    if (!f || e.target.closest('[data-retry], [data-retake]')) return;
     holdAt = [e.clientX, e.clientY];
     holdTimer = setTimeout(() => {
       held = true; sel = sel || new Set(); sel.add(f.dataset.id); navigator.vibrate?.(30); paintSel();
@@ -569,7 +622,9 @@ export function mount({ view, esc, toast, subjects }) {
       sel.has(f.dataset.id) ? sel.delete(f.dataset.id) : sel.add(f.dataset.id); return paintSel();
     }
     const r = e.target.closest('[data-retry]');
-    if (r) return send([show(r.dataset.retry)]);
+    if (r) { tries.delete(r.dataset.retry); return send([show(r.dataset.retry)], true); }
+    const rt = e.target.closest('[data-retake]');
+    if (rt) { const p = show(rt.dataset.retake); $$('#scshot').dataset.replace = p.id; num = p.label || num; setNum(num); one = { label: num }; return shoot(); } // the study computer asked: straight to the camera
     const t = e.target.closest('[data-shoot]');
     if (t) { one = { label: t.dataset.shoot }; setNum(t.dataset.shoot); return shoot(); } // an empty slot: take just that page
     const o = e.target.closest('[data-open]');
@@ -577,13 +632,14 @@ export function mount({ view, esc, toast, subjects }) {
       const p = show(o.dataset.open); let orig = false; view._open = p;
       const sh = () => { $$('#scimg').src = url(orig ? p.original : p.clean); $$('#scorig').textContent = orig ? 'Show tidied' : 'Show original'; };
       $$('#scdlgnum').innerHTML = `<option value="">Which page?</option>` + PAGE_LABELS.map(l => `<option ${p.label === l ? 'selected' : ''}>${l}</option>`).join('');
-      $$('#scdlgwhy').hidden = $$('#scdlgok').hidden = !p.needs; $$('#scdlgwhy').textContent = NEEDS[p.needs] || '';
+      const why = NEEDS[p.needs] || (p.server?.state === 'retake' ? 'Study computer: ' + (p.server.why || 'retake this page.') : p.from ? `The study computer matched this photo to page ${p.label} (it was sent as page ${p.from}).` : '');
+      $$('#scdlgok').hidden = !p.needs; $$('#scdlgwhy').hidden = !why; $$('#scdlgwhy').textContent = why;
       $$('#scorig').onclick = () => { orig = !orig; sh(); }; sh(); $$('#scdlg').showModal();
     }
   };
   // a taken page: it looks fine after all, adjust its corners, or a new photo from the gallery (one screen at a time: the dialog
   // closes before the editor opens)
-  $$('#scdlgok').onclick = async () => { const p = view._open; $$('#scdlg').close(); if (!p) return; p.needs = ''; await putPage(p); await draw(); };
+  $$('#scdlgok').onclick = async () => { const p = view._open; $$('#scdlg').close(); if (!p) return; p.needs = ''; await putPage(p); await draw(); pump(); };
   $$('#scadjust').onclick = () => {
     const p = view._open; $$('#scdlg').close(); if (!p) return;
     startFile(p.original, false, p.id, '', { label: p.label || num, one: true, corners: p.corners, mode: p.mode, still: p.still });
@@ -593,7 +649,7 @@ export function mount({ view, esc, toast, subjects }) {
     startFile(f, false, p.id, 'file', { label: p.label || num, one: true });
   };
   $$('#scdlgnum').onchange = async e => {
-    const p = view._open; if (!p) return; p.label = e.target.value; await putPage(p); toast(p.label ? `Page ${p.label}` : 'Label cleared'); await draw();
+    const p = view._open; if (!p) return; p.label = e.target.value; if (p.sentAt) p.from = p.from || p.sentAs; await putPage(p); toast(p.label ? `Page ${p.label}` : 'Label cleared'); await draw(); pump();
   };
   $$('#scdel').onclick = async () => {
     const p = view._open; if (!p || !confirm('Delete this photo (original and tidied copy)?')) return;
@@ -602,40 +658,138 @@ export function mount({ view, esc, toast, subjects }) {
   $$('#scretake').onclick = () => { const p = view._open; $$('#scdlg').close(); if (!p) return; $$('#scshot').dataset.replace = p.id; num = p.label || num; setNum(num); one = { label: num }; shoot(); };
   $$('#scclose').onclick = () => $$('#scdlg').close();
 
-  // ---------- sending: all pages not yet sent at once; a page that fails shows Retry on its own
-  async function send(todo) {
-    const msg = t => { $$('#scmsg').innerHTML = t; };
-    todo = todo.filter(p => p && !p.sentAt);
-    if (!todo.length) return msg('Everything is already sent.');
-    if (todo.some(p => !p.label)) return msg('Choose a page number for every photo first.');
-    const labels = (view._pages || []).filter(p => !p.sentAt || todo.includes(p)).map(p => p.label), dup = labels.find((l, i) => labels.indexOf(l) !== i);
-    if (dup) return msg(`Two photos are labelled page ${esc(dup)}: delete one, or fix its number.`);
-    $$('#scup').disabled = true; msg('Checking sign-in…');
-    try {
-      if (!await signedIn()) return msg(`Sign in once: <a href="${API}whoami" target="_blank" rel="noopener">open the sign-in page</a>, enter your email, then the code it sends, then come back here and tap Send again.`);
-      const scan = view._pages.find(p => p.scan)?.scan || scanId || (scanId = crypto.randomUUID());
-      let n = 0, good = 0; const bad = [];
-      for (const p of todo) {
-        msg(`Sending page ${esc(p.label)} (${++n} of ${todo.length})…`);
-        try {
-          const r = await fetch(`${API}upload/${scan}/${p.label}`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: p.clean, redirect: 'manual' });
-          if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.error || `error ${r.status}`); }
-          p.scan = scan; p.sentAt = Date.now(); failed.delete(p.id); await putPage(p); good++;
-        } catch (err) { failed.set(p.id, err.message); bad.push(`page ${esc(p.label)}: ${esc(err.message)}`); }
-      }
-      msg(bad.length ? `${good ? good + ' sent. ' : ''}Not sent: ${bad.join('; ')}. Your photos are still on this phone; tap Retry on the page.`
-        : `${good} page${good > 1 ? 's' : ''} sent. They stay on this phone too.`);
-      await draw();
-    } catch (err) { msg('Not sent: ' + esc(err.message) + '. Your photos are still on this phone; try again.'); }
-    finally { $$('#scup').disabled = false; }
+  // ---------- sending (owner, 20 Oct 2026): a queue. Each page goes when it is ready, every subject's unsent pages in turn, one
+  // at a time; a failure is tried again after 15 s, 1 min, then every 5 min, and at once when the signal comes back. Pages
+  // marked Check wait for a look (Looks right, Retake) unless sent by hand (Send now, Retry). The sign-in is checked when the
+  // screen opens: until it is done, the note at the top says so and nothing is tried.
+  const autoSend = () => pref('autosend', true);
+  const msg = t => { if (!gone) $$('#scmsg').innerHTML = t; };
+  const signNote = () => { if (!gone) $$('#scsign').hidden = auth !== false; };
+  const wanted = new Set(), waitTill = new Map(); // pages picked by hand; page id -> no new try before
+  const later = ms => { clearTimeout(retryT); retryT = setTimeout(pump, Math.max(1000, ms)); };
+  async function checkSign() {
+    if (!CAN_SEND) return false;
+    const got = await signedIn(); if (got !== null) auth = !!got; // no signal: keep what was known
+    signNote();
+    return auth;
   }
-  $$('#scup').onclick = () => send(view._pages.filter(p => !p.sentAt));
+  const scanOf = (p, all) => p.scan || all.find(q => q.subject === p.subject && q.scan)?.scan || scans.get(p.subject) || scans.set(p.subject, crypto.randomUUID()).get(p.subject);
+  async function pump() {
+    if (gone || !CAN_SEND) return;
+    if (pumping) { again = true; return; }
+    pumping = true; clearTimeout(retryT);
+    try {
+      do {
+        again = false;
+        const all = await allPages(), now = Date.now(), unsent = all.filter(p => !p.sentAt);
+        for (const id of waitTill.keys()) if (!unsent.some(p => p.id === id)) waitTill.delete(id);
+        const todo = unsent.filter(p => wanted.has(p.id) || autoSend() && !p.needs && (waitTill.get(p.id) || 0) <= now);
+        // a page number used twice for one subject, or none: that page waits until it is fixed
+        const n = new Map(), key = p => p.subject + '\n' + p.label; unsent.forEach(p => n.set(key(p), (n.get(key(p)) || 0) + 1));
+        const stuck = todo.filter(p => !p.label || n.get(key(p)) > 1), go = todo.filter(p => !stuck.includes(p));
+        stuck.forEach(p => wanted.delete(p.id));
+        const mine = stuck.find(p => p.subject === subject);
+        if (mine) msg(mine.label ? `Two photos are labelled page ${esc(mine.label)}: delete one, or fix its number. The others are sent.` : 'Choose a page number for every photo first.');
+        if (!go.length) break;
+        if (!navigator.onLine) { msg(`No signal: ${go.length} page${go.length > 1 ? 's' : ''} will go when the phone is back online. They are kept on this phone.`); break; }
+        if (!await checkSign()) {
+          msg(auth === false ? 'Not sent yet: sign in first (the note at the top).' : 'The study computer could not be reached: trying again in a minute.');
+          if (auth !== false) later(60000);
+          break;
+        }
+        let k = 0, good = 0; const bad = [];
+        for (const p of go) {
+          msg(`Sending page ${esc(p.label)}${p.subject !== subject ? ` of ${esc(p.subject)}` : ''} (${++k} of ${go.length})…`);
+          sending.add(p.id); if (p.subject === subject) await draw();
+          try {
+            const scan = scanOf(p, all);
+            const r = await fetch(`${API}upload/${scan}/${p.label}`, { method: 'POST', redirect: 'manual', body: p.clean,
+              headers: { 'Content-Type': 'image/jpeg', ...(SUBJECT.test(p.subject) && { 'X-Scan-Subject': p.subject }) } });
+            if (r.status === 401 || r.type === 'opaqueredirect') { auth = false; signNote(); throw new Error('sign in first'); }
+            if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.error || `error ${r.status}`); }
+            const cur = await getPage(p.id); // deleted or replaced meanwhile: nothing to mark
+            if (cur) { Object.assign(cur, { scan, sentAt: Date.now(), sentAs: p.label }); delete cur.server; delete cur.from; delete cur.doneAt; await putPage(cur); }
+            p.scan = scan; failed.delete(p.id); tries.delete(p.id); waitTill.delete(p.id); good++;
+          } catch (err) {
+            const t = (tries.get(p.id) || 0) + 1; tries.set(p.id, t);
+            failed.set(p.id, err.message); waitTill.set(p.id, Date.now() + RETRY[Math.min(t, RETRY.length) - 1] * 1000);
+            bad.push(`page ${esc(p.label)}: ${esc(err.message)}`);
+          } finally { sending.delete(p.id); wanted.delete(p.id); }
+          if (auth === false || gone) break; // the rest wait for the next time this screen is open
+        }
+        msg(bad.length ? `${good ? good + ' sent. ' : ''}Not sent: ${bad.join('; ')}. The photos are still on this phone; ${auth === false ? 'sign in, then they go' : 'trying again by itself, or tap Retry on the page'}.`
+          : `${good} page${good > 1 ? 's' : ''} sent. They stay on this phone too.`);
+        await draw();
+        if (good) poll();
+      } while (again && !gone);
+      const next = Math.min(...waitTill.values());
+      if (isFinite(next) && autoSend() && auth !== false) later(next - Date.now());
+    } finally { pumping = false; }
+  }
+  const send = (pages, hand) => { pages.filter(p => p && !p.sentAt).forEach(p => { wanted.add(p.id); waitTill.delete(p.id); }); if (hand && !pages.some(p => p && !p.sentAt)) msg('Everything is already sent.'); return pump(); };
+  $$('#scup').onclick = () => send(view._pages, true);
+
+  // the study computer's word on each sent page, every 20 s while one is waiting to be read, else every 2 min, while this
+  // screen is open and the phone awake; stops once every sent page is approved or rejected
+  let polling = false, pollAgain = false;
+  async function poll() {
+    if (polling) { pollAgain = true; return; } // one at a time, so an older answer never lands after a newer one
+    polling = true;
+    try { do { pollAgain = false; await pollOnce(); } while (pollAgain); } finally { polling = false; }
+  }
+  async function pollOnce() {
+    clearTimeout(pollT);
+    if (gone || !CAN_SEND || document.hidden || auth === false) return;
+    const all = await allPages(), open = all.filter(p => p.sentAt && p.scan && !DONE.has(p.server?.state));
+    if (!open.length) return;
+    let busy = false, mineChanged = false;
+    for (const id of new Set(open.map(p => p.scan))) {
+      try {
+        const r = await fetch(`${API}status/${id}`, { cache: 'no-store', redirect: 'manual' });
+        if (!r.ok) continue;
+        const st = await r.json(), sub = all.find(p => p.scan === id).subject;
+        if (gone) return;
+        const { changed, moved } = applyStatus(all.filter(p => p.subject === sub), st);
+        for (const p of changed) { const cur = await getPage(p.id); if (cur) await putPage({ ...cur, label: p.label, from: p.from, server: p.server, doneAt: p.doneAt }); }
+        if (sub === subject && changed.length) mineChanged = true;
+        if (sub === subject && moved.length) burstMsg(moved.map(([a, b]) => `The study computer matched the photo sent as page ${a} to page ${b}: it is in slot ${b} now.`).join(' '));
+        if (Object.values(st.page || {}).some(e => e.state === 'received' || e.state === 'reading')) busy = true;
+      } catch { busy = true; /* no signal: try again soon */ }
+    }
+    if (mineChanged) await draw();
+    pollT = setTimeout(poll, busy ? 20000 : 120000);
+  }
+  // safe to clear: every page of this subject is on the study computer
+  $$('#scclearbtn').onclick = async () => {
+    const pages = view._pages || [];
+    if (!pages.length || !confirm(`Clear ${pages.length} page${pages.length > 1 ? 's' : ''} of ${subject} from this phone (originals and tidied copies)? The study computer keeps its copies.`)) return;
+    for (const p of pages) await delPage(p.id);
+    toast(`Cleared ${pages.length} from this phone`); await draw();
+  };
+  // pages approved or rejected over KEEP_DAYS ago are cleared by themselves
+  async function autoClear() {
+    const old = (await allPages()).filter(p => p.doneAt && DONE.has(p.server?.state) && Date.now() - p.doneAt > KEEP_DAYS * 864e5);
+    for (const p of old) await delPage(p.id);
+    if (old.length) toast(`Cleared ${old.length} page${old.length > 1 ? 's' : ''} reviewed over ${KEEP_DAYS} days ago from this phone`);
+  }
+  $$('#scsignchk').onclick = async () => {
+    const ok = await checkSign();
+    $$('#scsignmsg').textContent = ok ? '' : ok === false ? 'Not signed in yet: tap Sign in, enter your email, then the code it sends, then come back here.' : 'No signal: try again in a moment.';
+    if (ok) { pump(); poll(); }
+  };
+  $$('#scautosendlbl').hidden = !CAN_SEND;
+  $$('#scautosend').checked = autoSend();
+  $$('#scautosend').onchange = e => { setPref('autosend', e.target.checked); draw(); if (e.target.checked) pump(); };
+  const online = () => { waitTill.clear(); pump(); };
+  addEventListener('online', online);
   $$('#scdl').onclick = () => {
     for (const p of view._pages) { const a = document.createElement('a'); a.href = url(p.clean); a.download = fileName(p); a.click(); }
     toast('Saved to this phone’s downloads');
   };
-  const hide = () => { if (document.hidden) closeLive(); }; // the phone locked or another app opened: camera off
+  // the phone locked or another app opened: camera off; back (perhaps from the sign-in page): check the sign-in, send, look
+  const hide = () => { if (document.hidden) return closeLive(); if (CAN_SEND) checkSign().then(ok => { if (ok) { pump(); poll(); } }); };
   document.addEventListener('visibilitychange', hide);
   draw();
-  return () => { document.removeEventListener('visibilitychange', hide); closeLive(); free(); };
+  if (CAN_SEND) checkSign().then(ok => { autoClear().then(draw); if (ok) { pump(); poll(); } });
+  return () => { gone = true; document.removeEventListener('visibilitychange', hide); removeEventListener('online', online); clearTimeout(retryT); clearTimeout(pollT); closeLive(); free(); };
 }
