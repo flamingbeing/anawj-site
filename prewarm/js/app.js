@@ -6,6 +6,7 @@ import { workbook } from './export.js';
 import * as cloud from './cloud.js';
 import { qrcode } from './vendor/qrcode.js';
 import * as wordview from './wordview.js';
+import * as scan from './scan.js';
 
 const DEMO = new URLSearchParams(location.search).has('demo');
 const NS = DEMO ? 'prewarm-demo:' : 'prewarm:';
@@ -49,7 +50,7 @@ window.addEventListener('storage', e => {
   }
   if (changed) { shared.stale = true; const b = document.getElementById('fresh'); if (b) b.hidden = false; }
 });
-const settings = Object.assign({ me: '', site: '', hide: { skin: false, set: false, ts: false, warm: false, room: false, haemo15: false, bis: false },
+const settings = Object.assign({ me: '', site: '', scan: false, hide: { skin: false, set: false, ts: false, warm: false, room: false, haemo15: false, bis: false },
   remind: { vibrate: true, beep: true, banner: true, awake: true, haemo: false } }, read('settings', {}));
 const saveAll = () => write('patients', patients);
 const saveSettings = () => write('settings', settings);
@@ -1995,6 +1996,12 @@ function readyHtml() {
   return `<h2>Ready for a case?</h2><ul class="ready" role="list" aria-label="Checks before a case">${rows.map(([l, ok, fix]) => `<li class="${ok ? 'ok' : 'no'}"><span aria-hidden="true">${ok ? '✓' : '✗'}</span><span><b>${esc(l)}</b>${ok ? '' : `<small>${esc(fix)}</small>`}</span></li>`).join('')}</ul>
     <small class="muted">${bad ? `${bad} to fix before a case.` : 'All good.'} Also make a fresh PACU link per patient and test it once on a phone that is not on the team.</small>`;
 }
+route(/^\/scan$/, () => {
+  header('Scan pages', '#/settings');
+  if (!settings.scan) return paint('<p class="note">Turn on Scan pages in <a href="#/settings">Settings</a> first.</p>');
+  paint('');
+  scan.mount({ view, esc, toast, subjects: () => Object.values(patients).filter(p => !isGone(p)).map(sid) });
+});
 route(/^\/settings$/, () => {
   header('Settings', '#/');
   const tog = (grp, k, l, d = '') => `<label class="tog"><input type="checkbox" data-g="${grp}" data-k="${k}" ${grp === 'hide' ? (settings.hide[k] ? '' : 'checked') : settings[grp][k] ? 'checked' : ''}><span>${l}${d ? `<small>${d}</small>` : ''}</span></label>`;
@@ -2015,9 +2022,13 @@ route(/^\/settings$/, () => {
     <button class="secondary" id="test">Test the alert</button>
     <h2>Export</h2>
     <a class="secondary" href="#/export">Export Excel</a>
+    <h2>Scan pages (beta)</h2>
+    <label class="tog"><input type="checkbox" id="scanon" ${settings.scan ? 'checked' : ''}><span>Show Scan pages<small>Photograph the paper form’s pages. Pages stay on this phone for now.</small></span></label>
+    ${settings.scan ? '<a class="secondary" href="#/scan">Scan pages</a>' : ''}
     <h2>Participants</h2>
     <a class="secondary" href="#/delete">Delete participants</a></div>`);
   wireRefresh();
+  $('#scanon').onchange = e => { settings.scan = e.target.checked; saveSettings(); render(); };
   view.querySelectorAll('[data-zoom]').forEach(b => b.onclick = () => {
     settings.zoom = b.dataset.zoom; saveSettings(); applySize(settings.zoom);
     view.querySelectorAll('[data-zoom]').forEach(x => x.setAttribute('aria-pressed', x === b));

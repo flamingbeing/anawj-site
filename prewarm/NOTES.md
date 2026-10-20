@@ -23,6 +23,9 @@ are in the owner's private notes.
   still need a dry run at home.
   Status 15 Oct 2026: tried on real pages with a stand-in reader, with good results (details in the owner's private
   notes). The live API reader has never run (shelved): its accuracy is unmeasured. Key: `--key-file`, never an env var.
+- **Scan pages screen** (`js/scan.js`, route `#/scan`, Settings › Scan pages (beta), off by default): camera or photo picker, on-phone contrast
+  stretch (original kept beside the tidied copy), page labels 1–9, held in IndexedDB on that phone. Step 1 only: no upload yet, no records
+  touched. Next: upload through a Cloudflare Access path to the study computer, and a scan-import list an admin approves.
 - **Blinding:** the randomisation group shows only on the pre-warming screen (and when the patient is created).
 - **Columns:** `schema.js` lists fields in template column order; field n is column n. `test/prewarm.test.mjs` pins
   anchor columns. Never insert a template field out of order. Items with no template column go in `EXTRA` (exported
