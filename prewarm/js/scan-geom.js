@@ -216,3 +216,39 @@ export function flattenPage(src, sw, sh, quad, dw = PAGE_W, dh = PAGE_H) {
   if (flat) removeShadow(flat, dw, dh);
   return flat;
 }
+
+// ---------- live camera and photo checks (owner, 20 Oct 2026)
+// What to tell the person holding the phone, from guessCorners on a small live frame (w x h): { ok, say }.
+// ok means the whole page is in view and big enough; the screen then waits for it to be held still.
+export function coachFor(g, w, h) {
+  if (!g.found) return { ok: false, say: 'Looking for the page: whole sheet in view, on a darker surface' };
+  const m = Math.min(w, h) * 0.02;
+  if (g.corners.some(p => p.x < m || p.y < m || p.x > w - 1 - m || p.y > h - 1 - m)) return { ok: false, say: 'Move back: a corner is cut off' };
+  if (quadArea(g.corners) < w * h * 0.25) return { ok: false, say: 'Move closer' };
+  return { ok: true, say: 'Hold steady' };
+}
+
+// how far the outline moved between two frames: the biggest corner move as a share of the frame's diagonal
+export const quadMove = (a, b, w, h) => Math.max(...a.map((p, i) => Math.hypot(p.x - b[i].x, p.y - b[i].y))) / Math.hypot(w, h);
+
+// Right after a shot (blur cannot be fixed later): sharpness is the variance of the 4-neighbour Laplacian of brightness,
+// light the mean brightness, both inside the page (the quad's box less a tenth each side). Measure on a copy about
+// 1000 px long so the numbers compare between phones. Thresholds are a first guess (the browser tests' fake page scores
+// about 1300, and a 5 px blur of it is flagged); change them here if real pages say otherwise.
+export const BLUR_MIN = 60, DARK_MIN = 70;
+export function photoCheck(data, w, h, quad) {
+  const xs = quad.map(p => p.x), ys = quad.map(p => p.y);
+  let x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const mx = (x1 - x0) / 10, my = (y1 - y0) / 10;
+  x0 = Math.max(1, Math.round(x0 + mx)); x1 = Math.min(w - 2, Math.round(x1 - mx));
+  y0 = Math.max(1, Math.round(y0 + my)); y1 = Math.min(h - 2, Math.round(y1 - my));
+  const g = i => (data[i * 4] * 77 + data[i * 4 + 1] * 150 + data[i * 4 + 2] * 29) >> 8;
+  let n = 0, s = 0, s2 = 0, lit = 0;
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const i = y * w + x, c = g(i), l = g(i - 1) + g(i + 1) + g(i - w) + g(i + w) - 4 * c;
+    n++; s += l; s2 += l * l; lit += c;
+  }
+  if (!n) return { sharp: 0, light: 0, blurry: false, dark: false };
+  const sharp = s2 / n - (s / n) ** 2, light = lit / n;
+  return { sharp: Math.round(sharp), light: Math.round(light), blurry: sharp < BLUR_MIN, dark: light < DARK_MIN };
+}

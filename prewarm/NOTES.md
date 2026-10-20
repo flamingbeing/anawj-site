@@ -23,7 +23,7 @@ are in the owner's private notes.
   still need a dry run at home.
   Status 15 Oct 2026: tried on real pages with a stand-in reader, with good results (details in the owner's private
   notes). The live API reader has never run (shelved): its accuracy is unmeasured. Key: `--key-file`, never an env var.
-- **Scan pages screen** (`js/scan.js`, route `#/scan`, Settings › Scan pages (beta), off by default): scanner-style capture (camera or photo picker, then four draggable
+- **Scan pages screen** (`js/scan.js`, route `#/scan`, Settings › Scan pages (beta), off by default): scanner-style capture (live camera by default: page outline on the video, coach line, auto photo once the page is found and still (off after 20 s, or by a per-phone switch), shutter button, torch where the phone has one, full-resolution still via ImageCapture else the biggest video frame (size shown and kept with the page), blur and dark check after each camera shot with Retake; per-phone "Use phone camera app" switch, also offered when the camera will not open; test `test/scan-live.e2e.mjs` with a fake camera. Or the photo picker. Then four draggable
   corners with a loupe, perspective flatten to 1800x2400, shadow removal, Auto / Black and white / Colour; maths in `js/scan-geom.js`, plain canvas code;
   original kept beside the tidied copy; press and hold a thumbnail to select several, then All / None / Delete / Cancel), page numbers 1–14 that move on by themselves, held in IndexedDB on that phone. **Send to the study computer** (only on
   prewarmstudy.anawj.com, not demo) uploads the tidied copies to `/scan-api/` (`worker/scan.js`): Cloudflare Access on that path

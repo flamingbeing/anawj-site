@@ -35,6 +35,7 @@ try {
   await pg.fill('#scsub', 'DEMO-01');
   ok(!(await pg.$eval('#scact', e => e.hidden)), 'photo buttons after a Subject ID');
   ok(/Take page 1/.test(await pg.textContent('#scshottxt')), 'camera button names page 1');
+  await pg.check('#sccamapp'); // this test feeds files to the camera-app input; the live camera has its own test (scan-live.e2e.mjs)
 
   // photo -> crop step with a guessed page, a corner nudged, flattened, lit, accepted
   await give('#scshot', 'p1.jpg');
