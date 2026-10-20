@@ -487,3 +487,14 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
   .stack:has(> .fld) > .fld.short > .seg, .stack:has(> .fld) > .fld:has(> .seg > .chip:nth-child(2):last-child):not(.longopt) > .seg { grid-column: 2; grid-row: 1 / span 2; min-width: 0; }
   .stack:has(> .fld) > .fld > .seg .chip { min-height: 42px; }
 }
+
+/* Scan pages */
+.scgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.scgrid figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 6px; display: grid; gap: 6px; }
+.scgrid img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 4px; cursor: pointer; }
+.scgrid figcaption { display: flex; gap: 6px; align-items: center; }
+.scgrid select { flex: 1; min-height: var(--tap); }
+.scdlg { width: min(96vw, 700px); max-height: 94vh; padding: 8px; border: 1px solid var(--line); border-radius: var(--r); }
+.scdlg img { width: 100%; max-height: 74vh; object-fit: contain; }
+.scdlg .row { display: flex; gap: 8px; margin-top: 8px; }
+.scdlg .row > * { flex: 1; }
