@@ -23,7 +23,8 @@ assert r('POST', f'/scan-api/upload/{ID}/1', b'')[0] == 400
 assert r('POST', f'/scan-api/upload/{ID}/1', b'GIF89a....')[0] == 415
 assert r('POST', f'/scan-api/upload/{ID}/1', JPG + b'0' * inbox.MAX_PHOTO)[0] == 413
 assert r('POST', f'/scan-api/upload/{ID}/0', JPG)[0] == 404
-assert r('POST', f'/scan-api/upload/{ID}/10', JPG)[0] == 404
+assert r('POST', f'/scan-api/upload/{ID}/15', JPG)[0] == 404
+assert r('POST', f'/scan-api/upload/{ID}/010', JPG)[0] == 404
 assert r('POST', '/scan-api/upload/short/1', JPG)[0] == 404
 assert r('POST', '/scan-api/upload/..%2f..%2fx/1', JPG)[0] == 404
 assert r('POST', f'/scan-api/upload/{ID}/../1', JPG)[0] == 404
@@ -32,8 +33,8 @@ assert r('GET', '/other')[0] == 404
 assert not os.path.exists(os.path.join(d, 'short'))
 # no more than MAX_PAGES files per scan
 ID2 = 'b1b2c3d4-e5f6-7890-abcd-ef1234567890'
-for p in '123456789x': r('POST', f'/scan-api/upload/{ID2}/{p}', JPG)
-assert len(inbox.pages_of(os.path.join(d, ID2))) == 10
+for p in [*map(str, range(1, 15)), 'x']: assert r('POST', f'/scan-api/upload/{ID2}/{p}', JPG)[0] == 200, p
+assert len(inbox.pages_of(os.path.join(d, ID2))) == 15
 # over a real connection
 srv = ThreadingHTTPServer(('127.0.0.1', 0), inbox.make_handler(d)); threading.Thread(target=srv.serve_forever, daemon=True).start()
 u = f'http://127.0.0.1:{srv.server_address[1]}/scan-api'

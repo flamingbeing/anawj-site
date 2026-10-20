@@ -15,14 +15,14 @@ not made: delete the file to try again). Nothing here is run on a phone or in th
 import json, os, re, subprocess, sys, time, urllib.error, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PAGE = re.compile(r'^page-([1-9x])\.(jpg|png)$')
+PAGE = re.compile(r'^page-([1-9]|1[0-4]|x)\.(jpg|png)$')
 MAX_TRIES = 3
 
 
 def photos(folder):
     """-> [(label, path)] sorted by label (x last)"""
     out = [(m.group(1), os.path.join(folder, f)) for f in os.listdir(folder) if (m := PAGE.match(f))]
-    return sorted(out, key=lambda x: (x[0] == 'x', x[0]))
+    return sorted(out, key=lambda x: (x[0] == 'x', int(x[0]) if x[0] != 'x' else 0))
 
 
 def ready(folder, now, quiet):

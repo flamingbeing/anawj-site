@@ -4,7 +4,7 @@ The Worker (worker/scan.js) passes the phones' photos here through Cloudflare's 
 Worker's service token. Photos are written to SCAN_INBOX/<scan>/page-<n>.jpg (or .png) with a meta.json (who sent, when).
 Nothing is read, aligned or sent anywhere from here: the scan tool is run on a folder by a later step.
 
-  POST /scan-api/upload/<scan>/<page>   body = the photo (JPEG or PNG), page 1-9 or x     -> {"ok": true, "pages": [...]}
+  POST /scan-api/upload/<scan>/<page>   body = the photo (JPEG or PNG), page 1-14 or x     -> {"ok": true, "pages": [...]}
   GET  /scan-api/status/<scan>                                                            -> {"scan", "pages", "state"}
 
 Settings (environment): SCAN_INBOX (folder, default ./inbox), SCAN_PORT (default 8788).
@@ -14,9 +14,9 @@ import json, os, re, sys, tempfile, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MAX_PHOTO = 12 * 1024 * 1024
-MAX_PAGES = 12            # files in one scan (pages 1-9 and x, either format, with room for a retake)
+MAX_PAGES = 20            # files in one scan (pages 1-14 and x, either format, with room for retakes)
 SCAN_ID = re.compile(r'^[A-Za-z0-9-]{8,64}$')
-PAGE = re.compile(r'^[1-9x]$')
+PAGE = re.compile(r'^(?:[1-9]|1[0-4]|x)$')
 
 
 def kind(body):
@@ -28,7 +28,7 @@ def kind(body):
 def pages_of(folder):
     out = []
     for f in sorted(os.listdir(folder)) if os.path.isdir(folder) else []:
-        m = re.fullmatch(r'page-([1-9x])\.(jpg|png)', f)
+        m = re.fullmatch(r'page-([1-9]|1[0-4]|x)\.(jpg|png)', f)
         if m: out.append(m.group(1))
     return out
 

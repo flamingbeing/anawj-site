@@ -66,7 +66,8 @@ const up = (o, path = `/scan-api/upload/${ID}/1`) => handleScan(req(path, { meth
 assert.equal((await up({ origin: 'https://evil.example' })).status, 403);
 assert.equal((await up({ type: 'text/html' })).status, 415);
 assert.equal((await up({}, `/scan-api/upload/${ID}/0`)).status, 404);
-assert.equal((await up({}, `/scan-api/upload/${ID}/10`)).status, 404);
+assert.equal((await up({}, `/scan-api/upload/${ID}/15`)).status, 404);
+assert.equal((await up({}, `/scan-api/upload/${ID}/010`)).status, 404);
 assert.equal((await up({}, '/scan-api/upload/short/1')).status, 404);
 assert.equal((await up({}, `/scan-api/upload/${ID}/../1`)).status, 404);
 assert.equal((await handleScan(req(`/scan-api/upload/${ID}/1`, { method: 'POST', jwt: good, body: new Uint8Array(0) }), env, fake(ok))).status, 400);

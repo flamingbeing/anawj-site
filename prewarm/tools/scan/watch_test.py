@@ -5,8 +5,10 @@ import watch
 d = tempfile.mkdtemp(); S = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
 f = os.path.join(d, S); os.makedirs(f)
 assert not watch.ready(f, time.time(), 90), 'no photos yet'
-open(os.path.join(f, 'page-7.jpg'), 'wb').write(b'x'); open(os.path.join(f, 'page-x.png'), 'wb').write(b'y'); open(os.path.join(f, 'page-2.jpg'), 'wb').write(b'z')
-assert [l for l, _ in watch.photos(f)] == ['2', '7', 'x'], 'sorted, x last'
+open(os.path.join(f, 'page-7.jpg'), 'wb').write(b'x'); open(os.path.join(f, 'page-x.png'), 'wb').write(b'y'); open(os.path.join(f, 'page-2.jpg'), 'wb').write(b'z'); open(os.path.join(f, 'page-12.jpg'), 'wb').write(b'w')
+assert [l for l, _ in watch.photos(f)] == ['2', '7', '12', 'x'], 'sorted by number, x last'
+os.remove(os.path.join(f, 'page-12.jpg'))
+assert [l for l, _ in watch.photos(f)] == ['2', '7', 'x']
 now = time.time()
 assert not watch.ready(f, now, 90), 'a page just arrived: wait for the rest'
 assert watch.ready(f, now + 100, 90)

@@ -3,7 +3,7 @@
 // the tidied copies through the Worker's /scan-api/ (behind Cloudflare Access; worker/scan.js) to the study computer, only on
 // prewarmstudy.anawj.com. Nothing here touches patient records or sync. Alignment and reading stay on the study computer.
 export const MAX_EDGE = 2400;
-export const PAGE_LABELS = Array.from({ length: 9 }, (_, i) => String(i + 1));
+export const PAGE_LABELS = Array.from({ length: 14 }, (_, i) => String(i + 1));
 
 // Stretch the contrast so the paper is white and the pen is dark: one gain and offset for all channels (keeps colour),
 // from the 1st percentile of brightness (ink) to the 70th (paper is most of a page). Changes `data` (RGBA) in place.
