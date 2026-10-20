@@ -4,6 +4,7 @@
 //   members/{uid}  { site, initials, code, joinedAt }       codes/{site}  { code, setAt, setBy }   (admins only)
 //   admins/{email} {}                                       patients/{id} { site, created, deleted?, lock?, f: { id: {v,t,by} } }
 //   pacu/{token}   { site, pid, sid, created, f }      (the PACU nurse's link: the token is the secret; see firestore.rules)
+//   scanImports/{id} { scan, createdAt, status, pages, fields: { id: { v, flags } }, reviewedBy?, reviewedAt? }  (Firetop writes, admins read and approve)
 //   forms/blank    { b64, name, size, setAt, setBy }        (the blank paper form, .docx; admins upload, members read)
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
@@ -219,6 +220,16 @@ export async function addAdmin(email) {
 export async function removeAdmin(email) {
   const { db, F } = await sdk();
   await F.deleteDoc(F.doc(db, 'admins', email));
+}
+// scan imports (owner, 20 Oct 2026): Firetop's reading of a received scan; an admin approves it before anything reaches a patient
+export async function scanImports() {
+  const { db, F } = await sdk();
+  const s = await F.getDocs(F.collection(db, 'scanImports'));
+  return s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+export async function reviewScanImport(id, status) {
+  const { auth, db, F } = await sdk();
+  await F.updateDoc(F.doc(db, 'scanImports', id), { status, reviewedBy: auth.currentUser.email.toLowerCase(), reviewedAt: Date.now() });
 }
 export async function myEmail() {
   const { auth } = await sdk();

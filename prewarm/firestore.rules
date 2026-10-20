@@ -21,6 +21,12 @@ rules_version = '2';
 //                   the PACU fields listed below. Nobody lists tokens (admins aside).
 //   forms/blank     the blank paper data collection form (.docx, base64), uploaded by an admin:
 //                   { b64, name, size, setAt, setBy }; members and admins read it (the Form view fills it in).
+//   scanImports/{id}  Firetop's reading of one received scan, waiting for an admin:
+//                   { scan, createdAt, status: 'pending'|'approved'|'rejected', pages, fields: { fieldId: { v, flags } },
+//                   reviewedBy?, reviewedAt? }. Values only, no photos or crops.
+//                   No app user can create one: Firetop writes them with its own Google sign-in. Admins read them and can only
+//                   mark a pending one approved or rejected (nothing else in it changes). Approving copies values into a
+//                   patient through the patients rules below.
 service cloud.firestore {
   match /databases/{database}/documents {
     function sites() { return ['NTF', 'NUH', 'SGH', 'CGH', 'TTSH', 'KTPH', 'WH']; }
@@ -76,6 +82,14 @@ service cloud.firestore {
         && request.resource.data.b64 is string && request.resource.data.b64.size() < 1000000
         && request.resource.data.name is string && request.resource.data.name.size() <= 200;
       allow delete: if admin();
+    }
+
+    match /scanImports/{id} {
+      allow read, delete: if admin();
+      allow update: if admin() && resource.data.status == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt'])
+        && request.resource.data.status in ['approved', 'rejected']
+        && request.resource.data.reviewedBy == email() && request.resource.data.reviewedAt is number;
     }
 
     match /pacu/{token} {

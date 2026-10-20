@@ -28,8 +28,10 @@ are in the owner's private notes.
   prewarmstudy.anawj.com, not demo) uploads the tidied copies to `/scan-api/` (`worker/scan.js`): Cloudflare Access on that path
   (email allowlist, one-time PIN), the Worker re-checks the Access token, then passes the photo on to the study computer's `tools/scan/inbox.py`
   with a service token only the Worker holds; nothing is stored in Cloudflare. The service worker never caches `/scan-api/`. Worker settings
-  are listed at the top of `worker/scan.js`; without them the route answers 503. Next: Firetop reads each received scan, and an admin
-  approves a scan import before anything reaches patient records.
+  are listed at the top of `worker/scan.js`; without them the route answers 503. **Scan imports** (PR C, 20 Oct): `tools/scan/watch.py` on Firetop reads each received scan with the local model and files values and flags in
+  `scanImports/{scan}` (rules: admins read and approve only; Firetop creates with its own token). Admin screen `js/scan-imports.js`, route
+  `#/scanimports` (Settings › Scan imports, admins, with Scan pages on): pick the patient, tick values, Approve; nothing reaches a patient before that.
+  Next (owner's call): in-app email allowlist (PB2).
 - **Blinding:** the randomisation group shows only on the pre-warming screen (and when the patient is created).
 - **Columns:** `schema.js` lists fields in template column order; field n is column n. `test/prewarm.test.mjs` pins
   anchor columns. Never insert a template field out of order. Items with no template column go in `EXTRA` (exported

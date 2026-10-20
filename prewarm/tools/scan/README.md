@@ -103,5 +103,11 @@ Still to prove: a "No pre-warming" patient's page 4 (the option whose tick also 
 
 `python inbox.py` (bound to 127.0.0.1; `SCAN_INBOX` folder, `SCAN_PORT` default 8788) receives the photos the app's **Send to the
 study computer** button uploads through the Worker (`worker/scan.js`) and Cloudflare's tunnel: `SCAN_INBOX/<scan>/page-<n>.jpg|png`
-plus `meta.json` (who, when). It reads nothing and sends nothing on; run `scan.py` on a received folder yourself for now.
+plus `meta.json` (who, when). It reads nothing and sends nothing on.
+
+`python watch.py` (also on the study computer; needs Ollama, `gcloud` signed in as the owner, and `SCAN_FORM_DIR` from `setup-form.sh`) waits until a received
+folder has been quiet for `SCAN_QUIET` seconds (90), runs `scan.py --reader ollama` on it, and files the values and flags (no photos, crops or labels)
+as `scanImports/<scan>` in `prewarm-study` with status `pending`, using gcloud's token (so no app user can create one). Then `imported.json` is
+written in the folder; three failures write `import-error.txt` (delete it to retry). An admin approves it in the app (Settings › Scan imports):
+choose the patient, tick the values to save; flagged values and ones that would replace a saved value start unticked. `python3 watch_test.py` checks it on fake data.
 `python3 inbox_test.py` checks its rules on fake photos. The inbox folder stays out of git.

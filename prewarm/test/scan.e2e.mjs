@@ -81,6 +81,36 @@ try {
   ok(sent.some(p => p.endsWith('/3')) && sent.some(p => p.endsWith('/7')), 'sent under their page numbers');
   ok((await pg.$$('.scsent')).length === 2, 'Sent marks shown');
   await pg.click('#scup'); ok(/already sent/.test(await pg.textContent('#scmsg')) && sent.length === 2, 'no second upload of sent pages');
+
+  // approving a scan import (admin screen mounted with a stand-in cloud and one demo patient; fake values only)
+  await pg.goto('http://localhost:8080/prewarm/?demo#/settings'); await pg.waitForTimeout(500);
+  const res = await pg.evaluate(async () => {
+    const m = await import('./js/scan-imports.js');
+    const div = document.createElement('div'); div.id = 'siview'; document.body.append(div);
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const saved = [], reviewed = [];
+    const imp = { id: 'scan1', status: 'pending', createdAt: Date.now(), pages: [], fields: { age: { v: '67', flags: [] }, pw_gown: { v: '07:05', flags: ['hard to read'] }, wt: { v: '70', flags: [] } } };
+    const cloud = { scanImports: async () => [imp], reviewScanImport: async (id, st) => { reviewed.push([id, st]); }, friendly: e => String(e) };
+    const pt = { id: 'p1', site: 'NUH', f: { enrol_id: { v: 'S-01' }, wt: { v: 65 } } };
+    window.confirm = () => true;
+    m.mount({ view: div, esc, toast() {}, cloud, patients: () => ({ p1: pt }), sid: p => p.f.enrol_id.v, val: (p, id) => p.f[id]?.v ?? null, setField: (p, id, v) => saved.push([id, v]) });
+    const wait = () => new Promise(r => setTimeout(r, 50));
+    await wait();
+    div.querySelector('[data-open]').click(); await wait();
+    const out = { approveDisabled: div.querySelector('#siok').disabled };
+    const sel = div.querySelector('#sipt'); sel.value = 'p1'; sel.onchange(); await wait();
+    out.ticks = [...div.querySelectorAll('[data-use]')].map(c => c.checked);
+    out.firstFlagged = /hard to read/.test(div.querySelector('li').textContent);
+    out.replaceNote = /Now saved: 65/.test(div.textContent);
+    div.querySelector('#siok').click(); await wait();
+    return { ...out, saved, reviewed };
+  });
+  ok(res.approveDisabled, 'Approve disabled until a patient is chosen');
+  ok(res.firstFlagged, 'flagged value listed first');
+  ok(JSON.stringify(res.ticks) === '[false,true,false]', 'flagged and replacing values start unticked: ' + res.ticks);
+  ok(res.replaceNote, 'a value that replaces a saved one says so');
+  ok(JSON.stringify(res.saved) === '[["age",67]]', 'only the ticked value is saved: ' + JSON.stringify(res.saved));
+  ok(JSON.stringify(res.reviewed) === '[["scan1","approved"]]', 'the import is marked approved');
 } catch (e) { fails.push('error: ' + e.message.split('\n')[0]); }
 await b.close();
 console.log(fails.length ? 'FAIL scan e2e:\n' + fails.join('\n') : 'scan e2e passed');
