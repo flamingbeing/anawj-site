@@ -101,6 +101,7 @@ srv = http.server.HTTPServer(('127.0.0.1', 0), Fake); threading.Thread(target=sr
 r = readers.OllamaReader('test-model', f'127.0.0.1:{srv.server_port}')
 fcore = G('prewarm_0_core', 'num', label='Core temp', unit='°C')
 assert r.read(b'png', fcore, 0) == {'text': '36.4', 'legible': True}
+assert seen[0]['think'] is False and seen[0]['options']['num_predict'] == 64
 assert seen[0]['model'] == 'test-model' and seen[0]['messages'][0]['images'] and 'Core temp' in seen[0]['messages'][0]['content']
 assert r.read(b'png', fcore, 1) == {'text': '', 'legible': False}      # a reply that isn't JSON is "can't read", never a guess
 srv.shutdown()

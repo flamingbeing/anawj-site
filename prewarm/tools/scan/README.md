@@ -47,7 +47,9 @@ own) and the page scores 0.70 or better; it is marked `check_alignment`. `--min-
 
 **Local model, no Claude** (`--reader ollama`): the crops go to a vision model in [Ollama](https://ollama.com) on the
 same computer, so nothing leaves it. Same two reads and agreement rule; `--model` (or `SCAN_MODEL`) picks the model, which
-must accept images (`ollama show <model>` lists "vision"; default `gemma4:12b`). Measure it before trusting it:
+must accept images (`ollama show <model>` lists "vision"; default `gemma4:12b`, about 1.5 s per cell on a 16 GB Radeon
+with thinking switched off, as the reader does; a model that ignores `think: false`, such as the thinking build of
+`qwen3-vl:8b`, is slow). Measure it before trusting it:
 `python3 bench.py --form-dir form-data --crops crops/ --truth pt01.reviewed.json --model <model>` reads crops exported with
 `--export-crops` whose values a person has confirmed, and prints how many were right, flagged (sent to the person) and
 WRONG (unflagged and wrong: the number that matters). It prints counts and field ids only.
