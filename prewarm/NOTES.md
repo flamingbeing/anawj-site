@@ -25,7 +25,7 @@ are in the owner's private notes.
   notes). The live API reader has never run (shelved): its accuracy is unmeasured. Key: `--key-file`, never an env var.
 - **Scan pages screen** (`js/scan.js`, route `#/scan`, Settings › Scan pages (beta), off by default): scanner-style capture (camera or photo picker, then four draggable
   corners with a loupe, perspective flatten to 1800x2400, shadow removal, Auto / Black and white / Colour; maths in `js/scan-geom.js`, plain canvas code;
-  original kept beside the tidied copy), page numbers 1–14 that move on by themselves, held in IndexedDB on that phone. **Send to the study computer** (only on
+  original kept beside the tidied copy; press and hold a thumbnail to select several, then All / None / Delete / Cancel), page numbers 1–14 that move on by themselves, held in IndexedDB on that phone. **Send to the study computer** (only on
   prewarmstudy.anawj.com, not demo) uploads the tidied copies to `/scan-api/` (`worker/scan.js`): Cloudflare Access on that path
   (email allowlist, one-time PIN), the Worker re-checks the Access token, then passes the photo on to the study computer's `tools/scan/inbox.py`
   with a service token only the Worker holds; nothing is stored in Cloudflare. The service worker never caches `/scan-api/`. Worker settings
