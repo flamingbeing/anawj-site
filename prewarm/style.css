@@ -489,14 +489,28 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 }
 
 /* Scan pages */
-.scgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.scgrid figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 6px; display: grid; gap: 6px; }
-.scgrid img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 4px; cursor: pointer; }
-.scgrid figcaption { display: flex; gap: 6px; align-items: center; }
-.scgrid select { flex: 1; min-height: var(--tap); }
+.scstrip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.scstrip figure { position: relative; flex: 0 0 76px; margin: 0; }
+.scstrip img { width: 76px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); cursor: pointer; display: block; }
+.scstrip .scnum { position: absolute; top: 3px; left: 3px; background: rgba(0,0,0,.65); color: #fff; font-size: .75rem; min-width: 1.4em; text-align: center; border-radius: 10px; padding: 1px 4px; }
+.scstrip .scretry { position: absolute; left: 3px; right: 3px; bottom: 3px; background: #b3261e; color: #fff; border: 0; border-radius: 6px; font-size: .8rem; min-height: 32px; }
+.scbig { font-size: 1.2rem; min-height: 72px; display: flex; align-items: center; justify-content: center; text-align: center; }
 .scdlg { width: min(96vw, 700px); max-height: 94vh; padding: 8px; border: 1px solid var(--line); border-radius: var(--r); }
 .scdlg img { width: 100%; max-height: 74vh; object-fit: contain; }
 .scdlg .row { display: flex; gap: 8px; margin-top: 8px; }
 .scdlg .row > * { flex: 1; }
-.scgrid figure { position: relative; }
-.scsent { position: absolute; top: 10px; left: 10px; background: var(--navy); color: #fff; font-size: .75rem; padding: 2px 6px; border-radius: 10px; }
+.scsent { position: absolute; bottom: 3px; right: 3px; background: var(--navy); color: #fff; font-size: .8rem; padding: 1px 6px; border-radius: 10px; }
+
+.scedit { position: fixed; inset: 0; z-index: 50; background: #111; color: #fff; display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+.scedit[hidden] { display: none; }
+.schead { display: flex; justify-content: space-between; align-items: baseline; }
+.scstage { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.scstage canvas { max-width: 100%; max-height: 100%; touch-action: none; }
+#screv { background: #fff; }
+.scloupe { position: absolute; width: 120px; height: 120px; border-radius: 50%; border: 3px solid #fff; pointer-events: none; z-index: 2; }
+.scwork { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.6); font-size: 1.1rem; z-index: 3; }
+.scedithint { margin: 0; color: #ccc; }
+.scmodes, .scbar { display: flex; gap: 8px; }
+.scmodes > *, .scbar > * { flex: 1; min-height: var(--tap); }
+.scmodes [aria-pressed="true"] { outline: 3px solid #ffd400; }
+.scbar .primary { flex: 2; }
