@@ -1,0 +1,218 @@
+// Scan pages: the picture maths, in plain code on RGBA pixel arrays (no DOM, no libraries; fake pixels only in tests).
+// Used by scan.js: guess the page corners, flatten the page with a perspective warp, take out shadows, set the contrast.
+export const MAX_EDGE = 2400;
+export const PAGE_W = 1800, PAGE_H = 2400; // the flat portrait page that goes to the study computer
+
+// size after scaling the long edge down to `max` (never up)
+export function fitSize(w, h, max = MAX_EDGE) { const k = Math.min(1, max / Math.max(w, h)); return [Math.round(w * k), Math.round(h * k)]; }
+
+// Stretch the contrast so the paper is white and the pen is dark: one gain and offset for all channels (keeps colour),
+// from the 1st percentile of brightness (ink) to the 70th (paper is most of a page). Changes `data` (RGBA) in place.
+// A nearly flat image (blank or very dark) is left alone. Returns the levels used.
+export function autoLevels(data) {
+  const hist = new Uint32Array(256), n = data.length >> 2;
+  for (let i = 0; i < data.length; i += 4) hist[(data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8]++;
+  const at = q => { let s = 0; for (let v = 0; v < 256; v++) { s += hist[v]; if (s >= q * n) return v; } return 255; };
+  const lo = at(0.01), hi = at(0.7);
+  if (hi - lo < 30) return { lo, hi, changed: false };
+  const gain = 255 / (hi - lo);
+  for (let i = 0; i < data.length; i += 4) for (let c = 0; c < 3; c++) data[i + c] = Math.max(0, Math.min(255, (data[i + c] - lo) * gain));
+  return { lo, hi, changed: true };
+}
+
+// ---------- corners
+// Corners as [{x, y} ×4] in the order top-left, top-right, bottom-right, bottom-left.
+export function orderCorners(pts) {
+  const by = f => [...pts].sort((a, b) => f(a) - f(b));
+  const s = by(p => p.x + p.y), d = by(p => p.y - p.x);
+  return [s[0], d[0], s[3], d[3]];
+}
+
+// the next corner round the quad: turns the page a quarter (what "Rotate" does)
+export const rotateCorners = q => [q[1], q[2], q[3], q[0]];
+
+// A quad can be warped only if it is convex and not collapsed (all turns the same way).
+export function isConvex(q) {
+  let sign = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = q[i], b = q[(i + 1) % 4], c = q[(i + 2) % 4];
+    const z = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    if (Math.abs(z) < 1e-6) return false;
+    if (!sign) sign = Math.sign(z); else if (Math.sign(z) !== sign) return false;
+  }
+  return true;
+}
+
+export const quadArea = q => Math.abs(q.reduce((s, p, i) => s + p.x * q[(i + 1) % 4].y - q[(i + 1) % 4].x * p.y, 0)) / 2;
+
+// Otsu's threshold from a 256-bin histogram
+function otsu(hist, n) {
+  let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+  let wb = 0, sb = 0, best = 0, t = 128;
+  for (let i = 0; i < 256; i++) {
+    wb += hist[i]; if (!wb) continue;
+    const wf = n - wb; if (!wf) break;
+    sb += i * hist[i];
+    const mb = sb / wb, mf = (sum - sb) / wf, v = wb * wf * (mb - mf) * (mb - mf);
+    if (v > best) { best = v; t = i; }
+  }
+  return t;
+}
+
+// Guess the page: the largest bright blob (Otsu threshold on brightness), then its four extreme points.
+// Works on a small copy of the photo (about 300 px is plenty). Returns { corners, found }; when no blob is big enough
+// the corners are the whole frame less a margin and found is false.
+export function guessCorners(data, w, h) {
+  const n = w * h, gray = new Uint8Array(n), hist = new Uint32Array(256);
+  for (let i = 0; i < n; i++) { const g = (data[i * 4] * 77 + data[i * 4 + 1] * 150 + data[i * 4 + 2] * 29) >> 8; gray[i] = g; hist[g]++; }
+  const t = otsu(hist, n), lab = new Int32Array(n), stack = new Int32Array(n);
+  let best = 0, bestId = 0, id = 0;
+  for (let s = 0; s < n; s++) {
+    if (gray[s] <= t || lab[s]) continue;
+    id++; let sp = 0, area = 0; stack[sp++] = s; lab[s] = id;
+    while (sp) {
+      const p = stack[--sp]; area++;
+      const x = p % w, y = (p - x) / w;
+      if (x > 0 && gray[p - 1] > t && !lab[p - 1]) { lab[p - 1] = id; stack[sp++] = p - 1; }
+      if (x < w - 1 && gray[p + 1] > t && !lab[p + 1]) { lab[p + 1] = id; stack[sp++] = p + 1; }
+      if (y > 0 && gray[p - w] > t && !lab[p - w]) { lab[p - w] = id; stack[sp++] = p - w; }
+      if (y < h - 1 && gray[p + w] > t && !lab[p + w]) { lab[p + w] = id; stack[sp++] = p + w; }
+    }
+    if (area > best) { best = area; bestId = id; }
+  }
+  const m = 0.06, fallback = [{ x: w * m, y: h * m }, { x: w * (1 - m), y: h * m }, { x: w * (1 - m), y: h * (1 - m) }, { x: w * m, y: h * (1 - m) }];
+  if (!bestId || best < n * 0.12) return { corners: fallback, found: false };
+  let tl, br, tr, bl; // extremes of x+y and y-x
+  let minS = Infinity, maxS = -Infinity, minD = Infinity, maxD = -Infinity;
+  for (let p = 0; p < n; p++) {
+    if (lab[p] !== bestId) continue;
+    const x = p % w, y = (p - x) / w, s = x + y, d = y - x;
+    if (s < minS) { minS = s; tl = { x, y }; } if (s > maxS) { maxS = s; br = { x, y }; }
+    if (d < minD) { minD = d; tr = { x, y }; } if (d > maxD) { maxD = d; bl = { x, y }; }
+  }
+  const corners = [tl, tr, br, bl];
+  if (!isConvex(corners) || quadArea(corners) < n * 0.1) return { corners: fallback, found: false };
+  return { corners, found: true };
+}
+
+// ---------- perspective
+// Solve the 3x3 projective map taking the 4 points `from` to the 4 points `to`: returns [h0..h7] (h8 is 1), or null.
+export function solveHomography(from, to) {
+  const A = [];
+  for (let i = 0; i < 4; i++) {
+    const { x, y } = from[i], u = to[i].x, v = to[i].y;
+    A.push([x, y, 1, 0, 0, 0, -u * x, -u * y, u], [0, 0, 0, x, y, 1, -v * x, -v * y, v]);
+  }
+  for (let c = 0; c < 8; c++) {
+    let p = c; for (let r = c + 1; r < 8; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+    if (Math.abs(A[p][c]) < 1e-12) return null;
+    [A[c], A[p]] = [A[p], A[c]];
+    for (let r = 0; r < 8; r++) {
+      if (r === c) continue;
+      const f = A[r][c] / A[c][c]; if (!f) continue;
+      for (let k = c; k < 9; k++) A[r][k] -= f * A[c][k];
+    }
+  }
+  return A.map((row, i) => row[8] / row[i]);
+}
+export function applyH(H, x, y) { const d = H[6] * x + H[7] * y + 1; return { x: (H[0] * x + H[1] * y + H[2]) / d, y: (H[3] * x + H[4] * y + H[5]) / d }; }
+
+// Cut the quad out of the photo (RGBA `src`, sw x sh) and stretch it flat into a dw x dh page (bilinear). Returns RGBA, or null.
+export function warpPage(src, sw, sh, quad, dw = PAGE_W, dh = PAGE_H) {
+  const H = solveHomography([{ x: 0, y: 0 }, { x: dw - 1, y: 0 }, { x: dw - 1, y: dh - 1 }, { x: 0, y: dh - 1 }], quad);
+  if (!H) return null;
+  const out = new Uint8ClampedArray(dw * dh * 4), mx = sw - 1, my = sh - 1;
+  for (let y = 0; y < dh; y++) {
+    for (let x = 0; x < dw; x++) {
+      const d = H[6] * x + H[7] * y + 1;
+      let sx = (H[0] * x + H[1] * y + H[2]) / d, sy = (H[3] * x + H[4] * y + H[5]) / d;
+      sx = sx < 0 ? 0 : sx > mx ? mx : sx; sy = sy < 0 ? 0 : sy > my ? my : sy;
+      const x0 = sx | 0, y0 = sy | 0, x1 = x0 < mx ? x0 + 1 : x0, y1 = y0 < my ? y0 + 1 : y0, fx = sx - x0, fy = sy - y0;
+      const a = (y0 * sw + x0) * 4, b = (y0 * sw + x1) * 4, c = (y1 * sw + x0) * 4, e = (y1 * sw + x1) * 4, o = (y * dw + x) * 4;
+      const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
+      out[o] = src[a] * w00 + src[b] * w10 + src[c] * w01 + src[e] * w11;
+      out[o + 1] = src[a + 1] * w00 + src[b + 1] * w10 + src[c + 1] * w01 + src[e + 1] * w11;
+      out[o + 2] = src[a + 2] * w00 + src[b + 2] * w10 + src[c + 2] * w01 + src[e + 2] * w11;
+      out[o + 3] = 255;
+    }
+  }
+  return out;
+}
+
+// ---------- lighting
+// Shadow removal: estimate how the light falls on the paper, then divide it out. The estimate is made on a coarse grid
+// (block averages per channel), widened with a max filter so pen strokes and print don't count as "dark light", smoothed
+// with a box blur, and read back with bilinear interpolation. Pixel = pixel / background * 255, per channel (this also
+// evens out a coloured light; ink keeps its hue relative to the paper). Changes `data` (RGBA) in place.
+export function backgroundGrid(data, w, h, cell, grow = 3, soften = 2) {
+  const gw = Math.ceil(w / cell), gh = Math.ceil(h / cell), g = [0, 1, 2].map(() => new Float32Array(gw * gh));
+  const cnt = new Float32Array(gw * gh);
+  for (let y = 0; y < h; y++) {
+    const gy = (y / cell) | 0;
+    for (let x = 0; x < w; x++) {
+      const gi = gy * gw + ((x / cell) | 0), i = (y * w + x) * 4;
+      g[0][gi] += data[i]; g[1][gi] += data[i + 1]; g[2][gi] += data[i + 2]; cnt[gi]++;
+    }
+  }
+  const maxf = (a, r) => { // separable max filter, radius r cells
+    const t = new Float32Array(a.length), o = new Float32Array(a.length);
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { let m = 0; for (let k = Math.max(0, x - r); k <= Math.min(gw - 1, x + r); k++) m = Math.max(m, a[y * gw + k]); t[y * gw + x] = m; }
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { let m = 0; for (let k = Math.max(0, y - r); k <= Math.min(gh - 1, y + r); k++) m = Math.max(m, t[k * gw + x]); o[y * gw + x] = m; }
+    return o;
+  };
+  const blur = (a, r) => {
+    const t = new Float32Array(a.length), o = new Float32Array(a.length);
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { let s = 0, c = 0; for (let k = Math.max(0, x - r); k <= Math.min(gw - 1, x + r); k++) { s += a[y * gw + k]; c++; } t[y * gw + x] = s / c; }
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { let s = 0, c = 0; for (let k = Math.max(0, y - r); k <= Math.min(gh - 1, y + r); k++) { s += t[k * gw + x]; c++; } o[y * gw + x] = s / c; }
+    return o;
+  };
+  const chans = g.map(a => { for (let i = 0; i < a.length; i++) a[i] /= cnt[i] || 1; return blur(maxf(a, grow), soften); });
+  return { gw, gh, cell, chans };
+}
+
+export function removeShadow(data, w, h, opt = {}) {
+  const cell = opt.cell || Math.max(4, Math.round(Math.max(w, h) / 200)), floor = opt.floor || 24;
+  const bg = backgroundGrid(data, w, h, cell, opt.grow || 3, opt.soften || 2), { gw, gh, chans } = bg;
+  for (let y = 0; y < h; y++) {
+    const fy = Math.max(0, Math.min(gh - 1, y / cell - 0.5)), y0 = fy | 0, y1 = Math.min(gh - 1, y0 + 1), ty = fy - y0;
+    for (let x = 0; x < w; x++) {
+      const fx = Math.max(0, Math.min(gw - 1, x / cell - 0.5)), x0 = fx | 0, x1 = Math.min(gw - 1, x0 + 1), tx = fx - x0, i = (y * w + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        const a = chans[c];
+        const b = (a[y0 * gw + x0] * (1 - tx) + a[y0 * gw + x1] * tx) * (1 - ty) + (a[y1 * gw + x0] * (1 - tx) + a[y1 * gw + x1] * tx) * ty;
+        const v = data[i + c] * 255 / Math.max(b, floor);
+        data[i + c] = v > 255 ? 255 : v;
+      }
+    }
+  }
+  return bg;
+}
+
+// Auto: Colour when there is a fair amount of coloured ink (blue pen, a stamp), else Black and white.
+export function autoMode(data) {
+  let ink = 0; const n = data.length >> 2;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    if (mx - mn > 50 && mx < 215) ink++;
+  }
+  return ink / n > 0.0015 ? 'color' : 'bw';
+}
+
+// Contrast for a shadow-free page. 'color' keeps the ink colour (one gain for all channels); 'bw' goes to grey, paper white,
+// ink dark; 'auto' picks one of the two. Changes `data` in place and returns the mode used.
+export function setContrast(data, mode = 'auto') {
+  const use = mode === 'auto' ? autoMode(data) : mode;
+  if (use === 'bw') {
+    for (let i = 0; i < data.length; i += 4) { const g = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8; data[i] = data[i + 1] = data[i + 2] = g; }
+    autoLevels(data);
+    for (let i = 0; i < data.length; i += 4) { const v = (data[i] - 50) * 255 / 160; data[i] = data[i + 1] = data[i + 2] = v < 0 ? 0 : v > 255 ? 255 : v; }
+  } else autoLevels(data);
+  return use;
+}
+
+// The whole thing from a photo to the page that is sent: flat RGBA (dw x dh) with the shadow taken out, not yet contrasted.
+export function flattenPage(src, sw, sh, quad, dw = PAGE_W, dh = PAGE_H) {
+  const flat = warpPage(src, sw, sh, quad, dw, dh);
+  if (flat) removeShadow(flat, dw, dh);
+  return flat;
+}
