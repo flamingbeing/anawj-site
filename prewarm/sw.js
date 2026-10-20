@@ -49,6 +49,7 @@ self.addEventListener('fetch', e => {
   }
   if (url.origin !== self.location.origin || NEVER.test(url.hostname)) return;
   if (url.pathname.includes('/__/')) return; // Firebase auth helper pages
+  if (url.pathname.startsWith('/scan-api/')) return; // the scan upload (Access sign-in and uploads): always the network, never saved
   if (url.pathname.endsWith('/update.html')) return; // the update helper must come from the network, not the saved shell
   e.respondWith((async () => {
     const cache = await caches.open(VERSION);
