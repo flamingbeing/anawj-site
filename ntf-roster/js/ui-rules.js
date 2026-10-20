@@ -8,7 +8,7 @@ import * as M from './model.js';
 import { openRequest } from './ui-requests.js';
 import { RULE_TYPES, describeRule, validateRule, evaluateRule, newRule } from './rules.js';
 import { rulesToText, parseRulesText, rulesGuide } from './rules-share.js';
-import { rulesToLines, parseRuleLines, rulesToFile, parseRulesFile, looksLikeRulesFile, textExamples } from './rules-text.js';
+import { rulesToLines, parseRuleLines, rulesToFile, parseRulesFile, looksLikeRulesFile, textExamples, textKit, TEXT_FORMS, whenText as whenWords, rangeText } from './rules-text.js';
 
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_TINY = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -370,14 +370,35 @@ export function mount(el, app) {
       }
     }
 
-    // What: the type's own params
-    const paramFields = [];
-    const what = h('div', { class: 'rb-fields' });
-    for (const spec of t.params) {
-      const f = paramField(app, state, spec, draft.params, () => { refreshVisible(); changed(); }, src.type);
-      f.dataset.key = spec.key;
-      paramFields.push([spec, f]);
-      what.append(f);
+    // The rule as a sentence with blanks (rules-text.js TEXT_FORMS): the quick way to change it. Every field is under
+    // Advanced (open when a template asks to pick people); each side redraws the other after a change.
+    const sentence = sentenceEditor(app, state, draft, () => { if (adv.open) buildAdvanced(); else advStale = true; changed(); });
+    const fromForm = () => { sentence.render(); changed(); };
+    let paramFields = [], advStale = false;
+    const advBody = h('div', { class: 'rb-adv-body' });
+    const adv = h('details', { class: 'rb-adv', open: hint ? true : null }, h('summary', null, 'Advanced: every field'), advBody);
+    adv.addEventListener('toggle', () => { if (adv.open && advStale) buildAdvanced(); });
+    function buildAdvanced() {
+      paramFields = [];
+      const what = h('div', { class: 'rb-fields' });
+      for (const spec of t.params) {
+        const f = paramField(app, state, spec, draft.params, () => { refreshVisible(); fromForm(); }, src.type);
+        f.dataset.key = spec.key;
+        paramFields.push([spec, f]);
+        what.append(f);
+      }
+      refreshVisible();
+      const roster = seg(h, {
+        name: fid('pool'), label: 'Roster', value: draft.pool,
+        options: M.RULE_POOLS.map(k => [k, POOL_NAME[k]]),
+        onChange: v => { draft.pool = v; changed(); },
+      });
+      advBody.replaceChildren(
+        section('Roster', h('div', { class: 'rb-fields' }, roster, h('p', { class: 'bx-help' }, 'The rule only covers this roster\'s people, and only its owner\'s auto-fill follows it.'))),
+        section('What', what),
+        section('Who', whoPicker(app, state, draft.who, fromForm, { everyoneNote: 'Nobody chosen = everyone' })),
+        section('When', whenPicker(app, draft.when, fromForm)));
+      advStale = false;
     }
     function refreshVisible() {
       for (const [spec, f] of paramFields) {
@@ -385,7 +406,7 @@ export function mount(el, app) {
         f.hidden = fn ? !fn(draft.params) : false;
       }
     }
-    refreshVisible();
+    buildAdvanced();
 
     // Strength: hard / soft + weight
     const wOut = h('output', { class: 'rb-wout' }, String(clampW(draft.weight)));
@@ -406,23 +427,16 @@ export function mount(el, app) {
     const noteIn = h('textarea', { id: noteId, rows: '2', placeholder: 'Why this rule exists, who asked for it', oninput: () => { draft.note = noteIn.value; } }, draft.note || '');
     const onIn = h('input', { type: 'checkbox', checked: draft.enabled !== false, onchange: () => { draft.enabled = onIn.checked; } });
 
-    const roster = seg(h, {
-      name: fid('pool'), label: 'Roster', value: draft.pool,
-      options: M.RULE_POOLS.map(k => [k, POOL_NAME[k]]),
-      onChange: v => { draft.pool = v; changed(); },
-    });
     const form = h('div', { class: 'rb-form' },
       hint ? h('p', { class: 'rb-hint' }, hint) : null,
-      section('Roster', h('div', { class: 'rb-fields' }, roster, h('p', { class: 'bx-help' }, 'The rule only covers this roster\'s people, and only its owner\'s auto-fill follows it.'))),
-      section('What', what),
-      section('Who', whoPicker(app, state, draft.who, changed, { everyoneNote: 'Nobody chosen = everyone' })),
-      section('When', whenPicker(app, draft.when, changed)),
+      sentence.el.hidden ? null : section('Rule', sentence.el),
       section('How strict', h('div', { class: 'rb-fields' }, strength, wRow,
         h('p', { class: 'bx-help' }, 'Must hold: auto-fill keeps to it whenever it can, and Check lists it as a problem. Preference: weighed; higher weight matters more.'))),
       section('Name and note', h('div', { class: 'rb-fields' },
         h('div', { class: 'bx-field' }, h('label', { for: nameId }, 'Name (optional)'), nameIn),
         h('div', { class: 'bx-field' }, h('label', { for: noteId }, 'Note (optional)'), noteIn),
-        h('label', { class: 'switch' }, onIn, h('span', { class: 'sw-track' }), h('span', null, 'Rule on')))));
+        h('label', { class: 'switch' }, onIn, h('span', { class: 'sw-track' }), h('span', null, 'Rule on')))),
+      adv);
 
     const body = h('div', { class: 'rb' }, pv, form);
     const actions = [{ label: 'Cancel' }];
@@ -681,6 +695,123 @@ function warnings(r, state) {
 // ---------- form pieces (exported for the People screen) ----------
 
 // One field for a ParamSpec. Mutates params[spec.key] and calls onChange.
+// The rule as a sentence with blanks: who, codes and when open a picker below the sentence; numbers, choices and
+// switches are edited in place. Drawn from TEXT_FORMS, so a new rule type gets its sentence there. Mutates draft.
+export function sentenceEditor(app, state, draft, onChange) {
+  const { h } = app;
+  const K = textKit(state);
+  const form = TEXT_FORMS[draft.type];
+  const line = h('p', { class: 'rs-line' });
+  const panel = h('div', { class: 'rs-panel', hidden: true });
+  const el = h('div', { class: 'rs', hidden: !form || null }, line, panel);
+  let openKey = null;
+  const p = draft.params;
+  const changed = () => { render(); onChange(); };
+  const num = (key, label, optional = false) => h('input', {
+    type: 'number', class: 'rs-num', inputmode: 'decimal', step: 'any', value: p[key] == null ? '' : String(p[key]), 'aria-label': label,
+    oninput: e => { p[key] = e.target.value === '' ? (optional ? null : '') : Number(e.target.value); onChange(); },
+    onchange: () => render(),
+  });
+  // a span with the button role, so a long blank (a list of groups) wraps with the sentence like words do
+  const blank = (key, text, label, build) => h('span', {
+    role: 'button', tabindex: '0', class: `rs-blank${text ? '' : ' is-empty'}`, 'aria-expanded': String(openKey === key), 'aria-label': `${label}: ${text || 'not chosen'}. Change`,
+    onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } },
+    onclick: () => {
+      if (openKey === key) { openKey = null; panel.hidden = true; render(); return; }
+      openKey = key;
+      panel.replaceChildren(h('div', { class: 'rs-panel-h' }, h('span', null, label),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { openKey = null; panel.hidden = true; render(); } }, 'Done')), build());
+      panel.hidden = false;
+      render();
+    },
+  }, text || 'choose…');
+  const sel = (label, options, value, set) => {
+    const s = h('select', { class: 'rs-sel', 'aria-label': label, onchange: () => { set(s.value); changed(); } }, options.map(([v, l]) => h('option', { value: v }, l)));
+    s.value = value;
+    return s;
+  };
+  const whoBlank = (key, who, label) => blank(key, K.whoText(who) || '', label, () => whoPicker(app, state, who, () => changed(), { everyoneNote: 'Nobody chosen = everyone' }));
+  function slot(part, out) {
+    if (typeof part === 'string') { out.push([part.startsWith(','), part]); return; }
+    const k = part.k;
+    switch (part.s) {
+      case 'amount': {
+        const [mn, mx] = part.k, a = p[mn] == null || p[mn] === '' ? null : Number(p[mn]), b = p[mx] == null || p[mx] === '' ? null : Number(p[mx]);
+        const mode = a != null && b != null ? (a === b ? 'eq' : 'between') : a != null ? 'ge' : b != null ? 'le' : 'any';
+        out.push([false, sel('How many', [['eq', 'exactly'], ['ge', 'at least'], ['le', 'at most'], ['between', 'between'], ['any', 'any number of']], mode, v => {
+          const n = b ?? a ?? 1;
+          if (v === 'eq') { p[mn] = n; p[mx] = n; } else if (v === 'ge') { p[mn] = a ?? n; p[mx] = null; } else if (v === 'le') { p[mn] = null; p[mx] = b ?? n; }
+          else if (v === 'between') { p[mn] = a ?? 0; p[mx] = b ?? (a ?? 0) + 1; } else { p[mn] = null; p[mx] = null; }
+        })]);
+        if (mode === 'eq') {
+          out.push([false, h('input', { type: 'number', class: 'rs-num', inputmode: 'decimal', step: 'any', value: String(a), 'aria-label': 'Exactly how many',
+            oninput: e => { const v = e.target.value === '' ? null : Number(e.target.value); p[mn] = v; p[mx] = v; onChange(); }, onchange: () => render() })]);
+        } else if (mode === 'ge') out.push([false, num(mn, 'At least', true)]);
+        else if (mode === 'le') out.push([false, num(mx, 'At most', true)]);
+        else if (mode === 'between') out.push([false, num(mn, 'From', true)], [false, 'and'], [false, num(mx, 'To', true)]);
+        return;
+      }
+      case 'codes': {
+        const v = Array.isArray(p[k]) ? p[k] : [];
+        const label = (RULE_TYPES[draft.type].params.find(x => x.key === k) || {}).label || 'Codes';
+        if (part.on) out.push([false, 'on']);
+        out.push([false, blank(k, K.codesText(v) || '', label, () => codePicker(app, state, v, nv => { p[k] = nv; changed(); }))]);
+        return;
+      }
+      case 'code': {
+        const duties = (state.duties || []).filter(d => d.kind === 'request');
+        const opts = duties.map(d => [d.code, `${d.code} (${d.name})`]);
+        if (!duties.some(d => d.code === p[k])) opts.unshift([p[k] || '', p[k] || 'Choose…']);
+        out.push([false, sel('Request code', opts, p[k] || '', v => { p[k] = v; })]);
+        return;
+      }
+      case 'num': out.push([false, num(k, (RULE_TYPES[draft.type].params.find(x => x.key === k) || {}).label || k)]); return;
+      case 'who': out.push([false, whoBlank(k, p[k], (RULE_TYPES[draft.type].params.find(x => x.key === k) || {}).label || 'People')]); return;
+      case 'choice': {
+        const label = (RULE_TYPES[draft.type].params.find(x => x.key === k) || {}).label || k;
+        out.push([false, sel(label, part.o.map(([v, w]) => [v, typeof w === 'string' ? w : w[0]]), p[k], v => { p[k] = v; })]);
+        const o = part.o.find(x => x[0] === p[k]);
+        if (o && typeof o[1] !== 'string') for (const q of o[1].slice(1)) out.push([false, typeof q === 'string' ? q : num(q.k, (RULE_TYPES[draft.type].params.find(x => x.key === q.k) || {}).label || q.k)]);
+        return;
+      }
+      case 'flag': {
+        const cb = h('input', { type: 'checkbox', checked: !!p[k], onchange: () => { p[k] = cb.checked; changed(); } });
+        out.push([true, h('label', { class: `rs-flag${p[k] ? ' is-on' : ''}` }, cb, h('span', null, part.t))]);
+        return;
+      }
+      case 'opt': {
+        const [a, b] = part.t.split('#');
+        out.push([true, ','], [false, a.trim()], [false, num(k, part.t.replace('#', 'how much').trim())]);
+        if (b && b.trim()) out.push([false, b.trim()]);
+        return;
+      }
+      case 'range': {
+        const [kf, kt] = part.k;
+        out.push([false, 'on day'], [false, num(kf, 'From day (1 = the next day, -1 = the day before)')], [false, 'to'], [false, num(kt, 'To day')]);
+        const r = rangeText(p[kf], p[kt]);
+        if (r) out.push([false, h('span', { class: 'rs-hint muted' }, `(${r.replace(/^on /, '')})`)]);
+        return;
+      }
+      default: return;
+    }
+  }
+  function render() {
+    if (!form) return;
+    const out = [];
+    out.push([false, whoBlank('who', draft.who, 'Who')], [true, ':']);
+    for (const part of form) slot(part, out);
+    out.push([false, blank('when', `(${whenWords(draft.when) || 'every day'})`, 'When', () => whenPicker(app, draft.when, () => changed()))]);
+    const nodes = [];
+    out.forEach(([glue, n], i) => {
+      if (i && !glue) nodes.push(' ');
+      nodes.push(typeof n === 'string' ? h('span', { class: 'rs-w' }, n) : n);
+    });
+    line.replaceChildren(...nodes);
+  }
+  render();
+  return { el, render };
+}
+
 function paramField(app, state, spec, params, onChange, type) {
   const { h } = app;
   const id = fid('p');

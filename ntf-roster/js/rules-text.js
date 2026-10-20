@@ -218,7 +218,7 @@ function amountText(min, max) {
   if (b != null) return `at most ${b}`;
   return 'any number of';
 }
-function rangeText(from, to) {
+export function rangeText(from, to) {
   const f = Number(from), t = Number(to);
   if (!Number.isInteger(f) || !Number.isInteger(t)) return null;
   if (f === 1 && t === 1) return 'on the next day';
@@ -601,6 +601,8 @@ function finishFile(items, opts, problems) {
   }
   return { ...res, rules: [...res.rules, ...json.map(x => x.json)] };
 }
+
+export { kit as textKit };
 
 // One example sentence per rule type, using this roster's codes (for the help under Edit as text).
 export function textExamples(state) {

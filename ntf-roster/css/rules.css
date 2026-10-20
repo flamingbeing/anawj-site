@@ -384,3 +384,21 @@ button.bx-pill:hover { border-color: var(--navy); }
 .rv-how summary { cursor: pointer; font-weight: 600; color: var(--navy, #002f6c); }
 .rv-how-list { margin: 10px 0 6px; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
 .rv-how-note { margin: 6px 0 0; }
+
+/* the rule as a sentence with blanks (sentenceEditor) */
+.rs-line { margin: 0; font-size: 16px; line-height: 2.3; }
+.rs-w { white-space: normal; }
+.rs-blank { font: inherit; font-weight: 600; color: var(--navy, #002f6c); background: var(--surface-2, #eef3f9); border: 0; border-bottom: 2px solid currentColor;
+  border-radius: 6px 6px 0 0; padding: 3px 4px; cursor: pointer; display: inline; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.rs-blank[aria-expanded="true"] { background: #dbe7f5; }
+.rs-blank:focus-visible { outline: 3px solid #e57200; outline-offset: 1px; }
+.rs-blank.is-empty { color: var(--bad, #b3261e); }
+.rs .rs-sel { width: auto; min-width: 0; font: inherit; font-weight: 600; min-height: 32px; padding: 2px 4px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface, #fff); color: inherit; max-width: 100%; }
+.rs .rs-num { font: inherit; font-weight: 600; width: 4.2em; min-width: 0; flex: none; min-height: 32px; padding: 2px 6px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface, #fff); color: inherit; }
+.rs-flag { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0 8px; border: 1px dashed var(--line-strong); border-radius: 16px; cursor: pointer; }
+.rs-flag.is-on { border-style: solid; font-weight: 600; }
+.rs-hint { font-size: 13px; }
+.rs-panel { margin-top: 10px; padding: 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm, 8px); }
+.rs-panel-h { display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 6px; }
+.rb-adv { padding: 12px 0; }
+.rb-adv > summary { cursor: pointer; font-weight: 700; min-height: 32px; display: list-item; }
