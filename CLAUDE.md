@@ -23,8 +23,3 @@ Commands that sign in, deploy or talk to `apmes-logbook` / `nuh-roster` need the
 
 The site's Workers deploy only through Workers Builds on merge (PREVIEWS.md); never deploy or change Cloudflare settings
 without the owner's OK.
-
-## context-nudge mod
-
-Cloud sessions install `tools/context-nudge` (via `.claude/hooks/session-start.sh`). It reminds the owner to run
-`/save-state`, then `/compact`, as context fills. It only reminds; never compact without being asked.
