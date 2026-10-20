@@ -96,7 +96,7 @@ service cloud.firestore {
       // the PACU page's fields and its complete tick (kept in step with PACU_KEYS in js/schema.js by a unit test)
       function pacuKeys() {
         return ['pacu_in', 'pacu_out', 'pacu_temp', 'pacu_shiver', 'pacu_ponv', 'pacu_hypot', 'pacu_tx', 'pacu_pain',
-          'nd_dis', 'nd_beh', 'nd_com', 'nd_ill', 'nd_psy', 'pacu_nudesc', 'pacu_delay', 'pacu_delay1h', 'pacu_delay_why', 'sign_pacu'];
+          'nd_dis', 'nd_beh', 'nd_com', 'nd_ill', 'nd_psy', 'pacu_nudesc', 'pacu_delay', 'pacu_delay1h', 'pacu_delay_why', 'sat_post', 'sign_pacu'];
       }
       function pshape(d) {
         return d.keys().hasOnly(['site', 'pid', 'sid', 'created', 'f'])

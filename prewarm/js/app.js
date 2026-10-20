@@ -822,12 +822,12 @@ function comfortHtml(p, id, label) {
     <div class="seg comfort5">${COMFORT.map(([ov, ol]) => `<button class="chip" data-sat="${id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${ol.replace('omfortable', 'omfort&shy;able')}</button>`).join('')}</div></div>`;
 }
 // true when the tap was a comfort answer, Change or Clear
-function comfortTap(p, t, draw) {
+function comfortTap(p, t, draw, put = (k, v) => set(p, k, v)) {
   const sat = t.closest('[data-sat]');
   // an answer can be changed, not cleared by tapping it again; the row collapses, so taps pause a moment
-  if (sat) { set(p, sat.dataset.sat, +sat.dataset.v); satEdit = null; draw(); lockTaps(); return true; }
+  if (sat) { put(sat.dataset.sat, +sat.dataset.v); satEdit = null; draw(); lockTaps(); return true; }
   const sc = t.closest('[data-satclear]');
-  if (sc) { if (confirm('Clear this comfort answer?')) { set(p, sc.dataset.satclear, null); satEdit = null; draw(); } return true; }
+  if (sc) { if (confirm('Clear this comfort answer?')) { put(sc.dataset.satclear, null); satEdit = null; draw(); } return true; }
   const se = t.closest('[data-satedit]');
   if (se) { satEdit = se.dataset.satedit; draw(); return true; }
   return false;
@@ -1747,6 +1747,7 @@ route(/^\/nurse\/(\w{20,64})$/, token => {
     paint(`<p class="note">You can fill in only this participant’s PACU details here. Changes reach the study team as you go.</p>
       <div class="fld"><label class="lab" for="ninit">Your initials</label><input id="ninit" value="${esc(settings.me)}" maxlength="6" autocomplete="off" autocapitalize="characters"></div>
       <div class="${locked() ? 'sealed' : ''}"><div class="times pacutimes">${tchip('pacu_in', 'PACU in')}${tchip('pacu_out', 'To ward')}</div>
+      ${comfortHtml(rec, 'sat_post', 'Comfortable after surgery?')}
       <div class="stack">${FORM.pacu.map(group => group[0] === 'h' ? `<h2>${group[1]}</h2>` : group.map(k => fieldHtml(field(k), get)).join('')).join('')}</div></div>
       ${locked() ? sealNote({ f: rec.f }, 'pacu') : ''}${tickHtml(locked(), 'PACU', get('sign_pacu') || '', 'data-unsign', 'data-sign')}
       <p class="muted small" id="nstat" role="status">${esc(status)}</p>`);
@@ -1781,6 +1782,7 @@ route(/^\/nurse\/(\w{20,64})$/, token => {
   view.onclick = e => {
     const t = e.target;
     if (t.closest('.sealed') && t.closest('button')) return toast('PACU is marked complete. Undo its tick to change this.');
+    if (comfortTap(rec, t, draw, nset)) return;
     const chip = t.closest('.chip[data-f]');
     if (chip) {
       const f = field(chip.dataset.f), v = f.type === 'code' ? +chip.dataset.v : chip.dataset.v;

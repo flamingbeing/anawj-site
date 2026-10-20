@@ -341,4 +341,4 @@ export function shownValue(id, get) {
 // What the PACU nurse's link may write (owner, 13 Oct 2026): the PACU page's fields and its complete tick. The same list
 // is the allow-list in firestore.rules (pacu/{token}); the unit test keeps the two in step.
 export const PACU_KEYS = ['pacu_in', 'pacu_out', 'pacu_temp', 'pacu_shiver', 'pacu_ponv', 'pacu_hypot', 'pacu_tx', 'pacu_pain',
-  'nd_dis', 'nd_beh', 'nd_com', 'nd_ill', 'nd_psy', 'pacu_nudesc', 'pacu_delay', 'pacu_delay1h', 'pacu_delay_why', 'sign_pacu'];
+  'nd_dis', 'nd_beh', 'nd_com', 'nd_ill', 'nd_psy', 'pacu_nudesc', 'pacu_delay', 'pacu_delay1h', 'pacu_delay_why', 'sat_post', 'sign_pacu'];
