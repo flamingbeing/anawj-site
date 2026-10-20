@@ -54,8 +54,7 @@ export const JUNIOR_RULES = [
   R('r-jp-hc-ph', 'cover', 'One half call on public holidays', { codes: ['HC'], min: 1, max: 1 }, { who: { tags: POOL_TAGS }, when: { holidays: 'only' } }),
   // people who never call
   R('r-jp-nocall', 'limit', 'No calls for people marked No calls', lim(['C'], 0), { who: { tags: ['nocall'] } }),
-  R('r-jp-nocall-hc', 'limit', 'No calls people: at most one half call a month', lim(['HC'], 1), { who: { tags: ['nocall'] } }),
-  R('r-jp-nocall-hc0', 'limit', 'No calls people: a half call only if the day cannot be filled any other way', lim(['HC'], 0), soft(90, { who: { tags: ['nocall'] } })),
+  R('r-jp-nocall-hc', 'limit', 'No calls people: avoid half calls (only if the day cannot be filled any other way)', lim(['HC'], 0), soft(90, { who: { tags: ['nocall'] } })),
   // rest and spacing
   R('r-jp-pm-call', 'sequence', 'No call or half call the day after a PM shift (it ends at 9pm)', { ifCodes: ['P'], thenCodes: ['C', 'HC'], mode: 'forbid', from: 1, to: 1 }, { who: { tags: POOL_TAGS } }),
   R('r-jp-call-pm', 'sequence', 'No PM shift the day after a call', { ifCodes: ['C'], thenCodes: ['P'], mode: 'forbid', from: 1, to: 1 }, { who: { tags: POOL_TAGS } }),
@@ -104,6 +103,7 @@ export function installJuniorPool(draft) {
     for (const id of SWITCHED) set(id, r => { r.enabled = false; });
     draft.settings.jpRules = 1;
   }
+  draft.settings.jpNch = 1;   // (model.js migrate fixes older saves once)
   return n;
 }
 

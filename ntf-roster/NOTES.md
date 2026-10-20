@@ -146,11 +146,26 @@ new rule of an existing type, made in the app). The comment block at the top of 
 
 Nothing else changes: the checker, the builder, Check and the solver all read `RULE_TYPES`.
 
+## Sharing rules as text (`js/rules-share.js`)
+
+Rules > Copy puts the rules (JSON, same shape as the Export file) on the clipboard; Paste / import takes pasted text or a
+file, accepts the export shape, a bare list, one rule, or a Claude reply with the JSON in a code block, and opens the
+review: plain-English problems per rule (unknown type or code; those are not importable), a dry run (how many problems
+the rule would flag this month as the roster is now), New / Changed / same. A rule without `pool` goes to the roster in
+view. "Guide for Claude" copies a Markdown guide built from `RULE_TYPES` (every type, field and option) plus this
+roster's codes, groups and tags (no staff names), so a new rule type appears in it by itself. Priorities: select by type,
+clear selection, saved selections (per device, `ntf-roster-rq-sets`).
+
 ## Auto-fill (`js/solver.js`, `js/solver-worker.js`)
 
 A pure function run in a Web Worker (the page stays responsive; it falls back to the page if the worker fails). It
 places only duties marked `auto` (default C, P, SMO, OTC, PHD), never touches locked cells, manual codes, leave or
 requests, and clears only its own earlier codes in the month. Demand comes from `cover` rules on auto codes.
+`opts.codes` fills only some codes (the result's `codes` says which; `applyAssignments` then leaves other auto codes
+alone). The dialog remembers (per device, `ntf-roster-af-pref`) which codes, whether to assign the free APS weeks first
+(written in the same undo step as the fill), and "Apply when done" (on by default: it applies itself only when no rule
+is unmet and nothing is short; otherwise it shows the result). The month last seen on a device is reopened
+(`ntf-roster-ui-month`); the Junior/Senior choice already lives in the device's own state.
 Greedy construction (hardest slots first), then simulated annealing with incremental scoring (moves, swaps, add and
 drop), then it drops any duty no rule needs. Hard problems always come first: a move's hard change is scaled far
 above any soft change, and the best roster is the one with the fewest hard points, then the fewest soft, so no

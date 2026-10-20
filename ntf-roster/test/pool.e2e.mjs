@@ -200,6 +200,54 @@ for (const [hash, label] of [['#people?s=pool', 'pool setup'], ['#check?v=aps', 
   ok(w[0] <= w[1] + 1, `${label}: no sideways scroll on a phone (${w[0]} > ${w[1]})`);
   await shot(phone, `phone-${label.replace(/ /g, '-')}`);
 }
+// Auto-fill: choose the codes, free APS weeks offered, applies itself; the last month seen comes back
+{
+  const pg = await open({ width: 1300, height: 900 });
+  await pg.goto(`${BASE}?demo#roster`);
+  await pg.waitForSelector('#nextm', { timeout: 15000 });
+  await pg.click('#nextm'); await pg.waitForTimeout(400);
+  const month = await pg.evaluate(() => window.ntfApp.month);
+  await pg.goto(`${BASE}?demo#roster`); await pg.waitForSelector('#nextm', { timeout: 15000 });
+  ok(await pg.evaluate(() => window.ntfApp.month) === month, 'the roster opens on the last month seen on this device');
+  await pg.click('#autofill'); await pg.waitForSelector('.af');
+  ok((await pg.locator('.af input[type=checkbox][id^="af-c-"]').count()) >= 2, 'Auto-fill lists the codes to fill');
+  ok((await pg.locator('#af-auto').isChecked()), 'Apply when done is on by default');
+  await pg.click('label[for="af-c-P"]');   // leave the PM shifts out
+  await pg.click('.af-actions .btn-primary:has-text("Start")');
+  await pg.waitForFunction(() => !document.querySelector('.af'), null, { timeout: 30000 }).catch(() => {});
+  const cells = await pg.evaluate((m) => { const st = window.ntfApp.store.get(); const k = {}; for (const [d, day] of Object.entries(st.cells)) if (d.startsWith(m)) for (const c of Object.values(day)) for (const x of (c.auto || [])) k[x] = (k[x] || 0) + 1; return k; }, month);
+  ok(!cells.P, `PM shifts were left out (${JSON.stringify(cells)})`);
+  await pg.context().close();
+}
+// Rules: paste a rule (as Claude might send it), review it, add it; priorities: select by type, save, clear
+{
+  const pg = await open({ width: 1300, height: 900 });
+  await pg.goto(`${BASE}?demo#rules`);
+  await pg.waitForSelector('.rv-tools [data-k="paste"]', { timeout: 15000 });
+  const before = await pg.evaluate(() => window.ntfApp.store.get().rules.length);
+  await pg.click('.rv-tools [data-k="paste"]');
+  await pg.fill('.ri-text', 'Sure!\n```json\n{"rules":[{"id":"r-e2e-paste","type":"limit","name":"Max 2 calls","hard":false,"weight":40,"params":{"codes":["C"],"period":"month","max":2}},{"id":"r-e2e-bad","type":"limit","params":{"codes":["ZZZ"],"period":"month","max":2}}]}\n```');
+  await pg.click('.sheet-foot .btn-primary:has-text("Review")');
+  await pg.waitForSelector('.ri-list');
+  ok((await pg.locator('.ri-list li').count()) === 2, 'the review lists both pasted rules: ' + (await pg.textContent('.ri')));
+  ok(/Needs fixing/.test(await pg.textContent('.ri-list')) && /ZZZ/.test(await pg.textContent('.ri-list')), 'the bad code is named in words');
+  ok(/flag/.test(await pg.textContent('.ri-list')), 'a dry run says what the rule would flag');
+  await pg.click('.sheet-foot .btn-primary:has-text("Import")');
+  await pg.waitForTimeout(300);
+  const ids = await pg.evaluate(() => window.ntfApp.store.get().rules.map(r => r.id));
+  ok(ids.includes('r-e2e-paste') && !ids.includes('r-e2e-bad') && ids.length === before + 1, 'only the good rule was added');
+  await pg.click('.rv-tools [data-k="priorities"]');
+  await pg.waitForSelector('.rq-sets');
+  await pg.selectOption('[data-k="bytype"]', 'limit');
+  ok((await pg.locator('.rq-row.sel').count()) >= 2, 'select by type picks every rule of that type');
+  await pg.fill('.rq-name-in', 'limits');
+  await pg.click('[data-k="saveset"]');
+  await pg.click('[data-k="clear"]');
+  ok((await pg.locator('.rq-row.sel').count()) === 0, 'clear selection empties it');
+  await pg.selectOption('[data-k="sets"]', 'limits');
+  ok((await pg.locator('.rq-row.sel').count()) >= 2, 'a saved selection comes back');
+  await pg.context().close();
+}
 await b.close();
 ok(!errors.length, 'no page errors: ' + errors.join(' | '));
 console.log(`ntf-roster pool e2e: ${checks} checks passed`);

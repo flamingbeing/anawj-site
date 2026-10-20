@@ -45,7 +45,9 @@ export function solve(state, opts = {}) {
   const ctx = buildContext(state, { from, to, rules });
   const { n, P, lo, hi, act } = ctx;
   const dm = ctx.dm;
-  const autoCodes = (state.duties || []).filter(d => d.auto && d.kind === 'shift').map(d => d.code);
+  const allAuto = new Set((state.duties || []).filter(d => d.auto && d.kind === 'shift').map(d => d.code));
+  // opts.codes: fill only these codes this run; earlier auto-filled shifts of the other codes stay as they are
+  const autoCodes = (state.duties || []).filter(d => allAuto.has(d.code) && (!Array.isArray(opts.codes) || opts.codes.includes(d.code))).map(d => d.code);
   const autoSet = new Set(autoCodes);
   const K = autoCodes.length;
   const fixed = ctx.codes.slice();
@@ -59,10 +61,10 @@ export function solve(state, opts = {}) {
       const locked = !!(cell && cell.lock);
       if (cell && !locked) {
         const au = cell.auto || [], a = Array.isArray(cell.a) ? cell.a : [];
-        fixed[i] = au.length ? a.filter(c => !au.includes(c)) : a;
+        fixed[i] = au.length ? a.filter(c => !(au.includes(c) && autoSet.has(c))) : a;
         ctx.codes[i] = fixed[i];
       }
-      free[i] = !locked && act[i] && !fixed[i].some(c => autoSet.has(c)) ? 1 : 0;
+      free[i] = !locked && act[i] && !fixed[i].some(c => allAuto.has(c)) ? 1 : 0;
     }
     for (let d = lo; d <= Math.min(hi + 1, n - 1); d++) refresh(ctx, p * n + d);
   }
@@ -365,42 +367,45 @@ export function solve(state, opts = {}) {
     const cnt = coverCount(cr, d);
     if (cnt < cr.info.min) unfilled.push({ date: ctx.days[d], code: autoCodes[k - 1], need: cr.info.min - cnt, ruleId: cr.rule.id });
   }
-  const afterEv = evaluate(withAssignments(state, assignments), { from, to, rules });
+  const afterEv = evaluate(withAssignments(state, assignments, autoCodes), { from, to, rules });
   if (onProgress) onProgress({ best: { hard: afterEv.hard, soft: afterEv.soft }, pct: 100 });
   return {
     assignments,
     before: { hard: beforeEv.hard, soft: beforeEv.soft, score: beforeEv.score },
     after: { hard: afterEv.hard, soft: afterEv.soft, score: afterEv.score },
-    unfilled, iterations: it, ms: Math.round(now() - t0),
+    unfilled, iterations: it, ms: Math.round(now() - t0), codes: autoCodes.slice(),
   };
 }
 
 // Write a solve() result into a draft state (inside store.commit): replaces each unlocked cell's old auto codes
 // with the new ones and keeps manual codes. Returns the number of cells changed.
-export function applyAssignments(draft, assignments) {
+export function applyAssignments(draft, assignments, codes = null) {
+  const sel = Array.isArray(codes) ? new Set(codes) : null;
   let changed = 0;
   for (const date of Object.keys(assignments || {})) {
     const row = assignments[date];
     for (const id of Object.keys(row)) {
       const cell = getCell(draft, date, id);
       if (cell && cell.lock) continue;
-      const oldAuto = (cell && cell.auto) || [];
+      const oldAll = (cell && cell.auto) || [];
+      const oldAuto = sel ? oldAll.filter(c => sel.has(c)) : oldAll;   // only the codes this run filled
+      const other = oldAll.filter(c => !oldAuto.includes(c));
       const keep = cell ? (cell.a || []).filter(c => !oldAuto.includes(c)) : [];
       const add = row[id].filter(c => !keep.includes(c));
       if (oldAuto.length === add.length && add.every(c => oldAuto.includes(c))) continue;
       changed++;
-      setCell(draft, date, id, { a: [...keep, ...add], auto: add });
+      setCell(draft, date, id, { a: [...keep, ...add], auto: [...other, ...add] });
     }
   }
   return changed;
 }
 
 // The state with a result applied, without touching the original (for previews and the after-check).
-export function withAssignments(state, assignments) {
+export function withAssignments(state, assignments, codes = null) {
   const cells = { ...(state.cells || {}) };
   for (const date of Object.keys(assignments || {})) cells[date] = { ...(cells[date] || {}) };
   const copy = { ...state, cells };
-  applyAssignments(copy, assignments);
+  applyAssignments(copy, assignments, codes);
   return copy;
 }
 

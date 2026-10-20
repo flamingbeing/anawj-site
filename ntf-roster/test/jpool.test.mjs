@@ -462,4 +462,16 @@ function pool() {
   eq(placeRule(s, 'c', { hard: false, aboveId: null, belowId: 'd' }), false, 'dropped where it was: nothing changes');
 }
 
+// ---------- a half call for the No calls people is a preference (owner, 20 Oct 2026) ----------
+{
+  const r = J.JUNIOR_RULES.find(x => x.id === 'r-jp-nocall-hc');
+  eq([r.hard, r.params.max, J.JUNIOR_RULES.some(x => x.id === 'r-jp-nocall-hc0')], [false, 0, false], 'new installs: soft, max 0, one rule');
+  const old = M.defaultState();
+  old.rules.push(structuredClone(J.JUNIOR_RULES.find(x => x.id === "r-jp-nocall")), { ...structuredClone(r), hard: true, weight: 10, params: { ...r.params, max: 1 } }, { ...structuredClone(r), id: 'r-jp-nocall-hc0' });
+  delete old.settings.jpNch;
+  const m = M.migrate(old);
+  const hc = m.rules.find(x => x.id === 'r-jp-nocall-hc');
+  eq([hc.hard, hc.params.max, m.rules.some(x => x.id === 'r-jp-nocall-hc0')], [false, 0, false], 'older saves: the one-a-month limit becomes a preference');
+}
+
 console.log(`junior pool tests: ${n} checks passed`);

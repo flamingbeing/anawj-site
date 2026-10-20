@@ -207,6 +207,7 @@ ok(callsIn(await stored(page), M1) === 0, 'next month has no calls before auto-f
 ok(await hard(page) > 0, 'next month has must-fix problems before auto-fill');
 await page.click('#autofill');
 await page.waitForSelector('.af');
+await page.click('label[for="af-auto"]');   // untick Apply when done, to see the preview first
 await page.click('label[for="af-t-15000"]');   // ends early once its search is done (under a second here); the slack is for slow CI machines
 await page.click('.af .btn-primary');
 await page.waitForSelector('.af-headline', { timeout: 30000 });

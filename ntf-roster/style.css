@@ -1112,3 +1112,9 @@ body.month-locked #autofill { display: none; }   /* Fill can't change a locked m
 .rq-w { width: 28px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
 .rq-bar select { min-height: 32px; }
 @media (max-width: 520px) { .rq-row { grid-template-columns: 28px 28px minmax(0, 1fr); } .rq-track { grid-column: 3; } }
+
+.rq-sets { flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.rq-sets select, .rq-name-in { min-height: 32px; max-width: 100%; }
+.rq-name-in { flex: 1 1 140px; padding: 4px 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); font: inherit; background: var(--surface, #fff); color: inherit; }
+.ri-text { width: 100%; box-sizing: border-box; font: 13px/1.4 ui-monospace, monospace; padding: 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface, #fff); color: inherit; }
+.ri-bad { color: var(--bad, #b3261e); }
