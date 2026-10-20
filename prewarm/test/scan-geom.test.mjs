@@ -1,6 +1,6 @@
 // Scan pages: corners, perspective flattening and shadow removal (fake pixels only). node prewarm/test/scan-geom.test.mjs
 import assert from 'node:assert/strict';
-import { orderCorners, rotateCorners, isConvex, quadArea, guessCorners, solveHomography, applyH, warpPage, removeShadow, autoMode, setContrast, flattenPage } from '../js/scan-geom.js';
+import { orderCorners, rotateCorners, isConvex, quadArea, guessCorners, solveHomography, applyH, warpPage, removeShadow, autoMode, setContrast, flattenPage, coachFor, quadMove, photoCheck } from '../js/scan-geom.js';
 
 const near = (a, b, tol, m) => assert.ok(Math.abs(a - b) <= tol, `${m}: ${a} vs ${b}`);
 const img = (w, h, f) => { const d = new Uint8ClampedArray(w * h * 4); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) d.set(f(x, y), (y * w + x) * 4); return d; };
@@ -83,4 +83,18 @@ setContrast(full, 'bw');
 const row = y => { const a = []; for (let x = 10; x < 110; x += 10) a.push(full[(y * 120 + x) * 4]); return a; };
 const spread = Math.max(...row(100)) - Math.min(...row(100));
 assert.ok(spread < 12 && Math.min(...row(100)) > 240, 'even paper across the shadow, spread ' + spread);
+// live camera coach line, steadiness, and the blur / dark check after a shot
+assert.equal(coachFor({ found: false }, 100, 100).ok, false, 'no page: keep looking');
+assert.match(coachFor({ found: true, corners: [{ x: 0, y: 10 }, { x: 90, y: 10 }, { x: 90, y: 90 }, { x: 10, y: 90 }] }, 100, 100).say, /cut off/, 'corner on the edge');
+assert.match(coachFor({ found: true, corners: [{ x: 40, y: 40 }, { x: 60, y: 40 }, { x: 60, y: 60 }, { x: 40, y: 60 }] }, 100, 100).say, /closer/, 'page too small');
+assert.equal(coachFor({ found: true, corners: [{ x: 10, y: 8 }, { x: 88, y: 10 }, { x: 90, y: 92 }, { x: 12, y: 90 }] }, 100, 100).ok, true, 'page found and big');
+near(quadMove(sq, sq.map(p => ({ x: p.x + 3, y: p.y + 4 })), 60, 80), 0.05, 1e-9, 'move is a share of the diagonal');
+const lined = (x, y) => (y % 6 < 2 ? [30, 30, 30, 255] : [235, 235, 230, 255]); // ruled lines: sharp
+const sharpCheck = photoCheck(img(200, 200, lined), 200, 200, [{ x: 0, y: 0 }, { x: 199, y: 0 }, { x: 199, y: 199 }, { x: 0, y: 199 }]);
+assert.ok(!sharpCheck.blurry && !sharpCheck.dark, 'sharp lines pass: ' + JSON.stringify(sharpCheck));
+const soft = img(200, 200, (x, y) => { const v = 130 + 100 * Math.sin(y / 12); return [v, v, v, 255]; }); // smooth shading only: blurry
+assert.ok(photoCheck(soft, 200, 200, [{ x: 0, y: 0 }, { x: 199, y: 0 }, { x: 199, y: 199 }, { x: 0, y: 199 }]).blurry, 'smooth image is blurry');
+const dim = img(200, 200, (x, y) => (y % 6 < 2 ? [5, 5, 5, 255] : [50, 50, 50, 255]));
+assert.ok(photoCheck(dim, 200, 200, [{ x: 0, y: 0 }, { x: 199, y: 0 }, { x: 199, y: 199 }, { x: 0, y: 199 }]).dark, 'dim page is dark');
+
 console.log('scan geometry tests passed');

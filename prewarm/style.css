@@ -523,3 +523,12 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 .scmodes > *, .scbar > * { flex: 1; min-height: var(--tap); }
 .scmodes [aria-pressed="true"] { outline: 3px solid #ffd400; }
 .scbar .primary { flex: 2; }
+/* live camera (scan.js): video with the page outline drawn over it */
+.sclivebox { position: relative; }
+.sclivebox video { display: block; width: 100%; height: 100%; background: #000; }
+.sclivebox canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.sccoach { margin: 0; min-height: 1.5em; font-size: 1.1rem; font-weight: 600; text-align: center; }
+.sclivefail { background: #222; border-radius: var(--r); padding: 12px; display: grid; gap: 8px; }
+.sclivefail p { margin: 0; }
+.sclive .scbig { width: 100%; }
+.sclive [aria-pressed="true"] { outline: 3px solid #2f80ff; }
