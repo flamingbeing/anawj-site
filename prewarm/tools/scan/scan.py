@@ -51,6 +51,34 @@ def arrow_shaft(ink):
     return False
 
 
+def through_arrow(ink):
+    """An arrow drawn down through a cell that also holds its head or a ditto mark: one stroke spanning nearly the whole
+    cell height near the middle. Written digits never run from top to bottom of the cell, so this is not a number."""
+    n, _, st, _ = cv2.connectedComponentsWithStats(ink.astype(np.uint8), connectivity=8)
+    H, W = ink.shape
+    # measured on real pages: arrow shafts are 0.03-0.05 of the cell wide and 0.95-0.97 tall; written letters and digits
+    # that come close are 0.10-0.16 wide
+    return any(st[i][3] >= 0.90 * H and st[i][2] <= 0.08 * W + 2 and 0.3 * W <= st[i][0] + st[i][2] / 2 <= 0.7 * W
+               for i in range(1, n))
+
+
+def mark_groups(ink, gap=6, least=40):
+    """Separate pieces of writing side by side (gaps of `gap` empty columns), each with at least `least` ink pixels:
+    one letter is one group, a crossed-out answer next to a new one is two. The outer tenth on each side is left out: a
+    printed line leaking in along the cell's edge is not a mark."""
+    m = ink.shape[1] // 10
+    cols = ink[:, m:ink.shape[1] - m].sum(axis=0)
+    groups, run, empty = [], 0, gap
+    for c in cols:
+        if c:
+            if empty >= gap and run: groups.append(run); run = 0
+            run += int(c); empty = 0
+        else:
+            empty += 1
+    if run: groups.append(run)
+    return sum(1 for g in groups if g >= least)
+
+
 def crop_rect(rect, cells, shape):
     """(outer, inner): inner is where handwriting is looked for; outer is a little bigger, so digits that overrun the
     cell are not cut off in the crop."""
@@ -113,7 +141,7 @@ def process_page(page_no, flat, tpl, fmap, fields, cells, reader, header_bottom=
         e = dict(kind='text', value=None, flags=[], crop=png(crop), reads=[])
         if filled and f['type'] in NEVER_SEND:
             e['flags'].append('type this in (not sent anywhere)')
-        elif not filled and f['type'] != 'text' and arrow_shaft(cink):   # a long vertical stroke and nothing else: an arrow
+        elif f['type'] != 'text' and (arrow_shaft(cink) if not filled else through_arrow(cink)):   # an arrow: not a number
             e['flags'].append('arrow or ditto: same as the reading above?')
         elif filled and getattr(reader, 'reads_nothing', False):
             read_cell(reader, f, crop)       # the exporter keeps the crop; a no-read run keeps nothing
@@ -126,6 +154,10 @@ def process_page(page_no, flat, tpl, fmap, fields, cells, reader, header_bottom=
             if str(vals[0][0]) != str(vals[1][0]): e['flags'].append('two reads disagree')
             e['value'] = vals[0][0]
             e['flags'] += sorted({p for _, ps in vals for p in ps})
+            if e['value'] is None and not any(r['text'].strip() for r in reads):
+                e['flags'].append('ink in the cell but read as empty')
+            if f.get('opts') and len(f['opts']) <= 3 and mark_groups(cink) > 1:
+                e['flags'].append('two marks in the cell (one crossed out?)')
         out[fid] = e
     return out
 
@@ -178,7 +210,7 @@ def fill_arrows(fields_out, fields):
             cols.setdefault((f['series'], f['col']), []).append((fid, f['point']))
     for pts in cols.values():
         pts.sort(key=point_order)
-        last = None
+        last, doubtful = None, False
         for fid, _ in pts:
             e = fields_out[fid]
             marks = [t for t in e['flags'] if 'same as the reading above' in t]
@@ -186,8 +218,10 @@ def fill_arrows(fields_out, fields):
                 e['value'] = last
                 e['flags'] = [t for t in e['flags'] if t not in marks]
                 e.setdefault('notes', []).append('arrow: copied from the reading above')
-            if e.get('value') not in (None, ''):
-                last = e['value']
+                if doubtful:      # never pass a reading that needs checking down the column silently
+                    e['flags'].append('arrow: copied from a reading that needs checking')
+            elif e.get('value') not in (None, ''):
+                last, doubtful = e['value'], bool(e['flags'])
 
 
 def series_checks(fields_out, fields):
