@@ -98,3 +98,10 @@ for now; every reading so far was a stand-in, and both reads in a stand-in run a
 so there is no second opinion. Check a sample of temperatures against the paper.
 
 Still to prove: a "No pre-warming" patient's page 4 (the option whose tick also ticks "Not applicable"), other handwriting and other patients (a bigger batch), and the live reader.
+
+## Receiving phone uploads (study computer)
+
+`python inbox.py` (bound to 127.0.0.1; `SCAN_INBOX` folder, `SCAN_PORT` default 8788) receives the photos the app's **Send to the
+study computer** button uploads through the Worker (`worker/scan.js`) and Cloudflare's tunnel: `SCAN_INBOX/<scan>/page-<n>.jpg|png`
+plus `meta.json` (who, when). It reads nothing and sends nothing on; run `scan.py` on a received folder yourself for now.
+`python3 inbox_test.py` checks its rules on fake photos. The inbox folder stays out of git.

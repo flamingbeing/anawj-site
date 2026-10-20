@@ -5,6 +5,7 @@
 import { resolve, feedback, FEEDBACK_COOKIE } from './routes.js';
 import { handleAsk, ASK_HOST } from './ask.js';
 import { handleGuest, GUEST_HOST, GUEST_PATH } from './guest.js';
+import { handleScan, SCAN_HOST, SCAN_PREFIX } from './scan.js';
 
 const NOINDEX = 'noindex, nofollow';
 
@@ -13,6 +14,7 @@ export default {
     const u0 = new URL(request.url);
     if (u0.hostname === ASK_HOST && u0.pathname === '/api/ask') return handleAsk(request, env);
     if (u0.hostname === GUEST_HOST && u0.pathname === GUEST_PATH) return handleGuest(request, env);
+    if (u0.hostname === SCAN_HOST && u0.pathname.startsWith(SCAN_PREFIX)) return handleScan(request, env);
     if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
     const url = new URL(request.url);
     const r = resolve(url.hostname, url.pathname);
