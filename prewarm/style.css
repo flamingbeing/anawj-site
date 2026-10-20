@@ -489,16 +489,25 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 }
 
 /* Scan pages */
-.scstrip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
-.scstrip figure { position: relative; flex: 0 0 76px; margin: 0; }
-.scstrip img { width: 76px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); cursor: pointer; display: block; }
-.scstrip .scnum { position: absolute; top: 3px; left: 3px; background: rgba(0,0,0,.65); color: #fff; font-size: .75rem; min-width: 1.4em; text-align: center; border-radius: 10px; padding: 1px 4px; }
-.scstrip .scretry { position: absolute; left: 3px; right: 3px; bottom: 3px; background: #b3261e; color: #fff; border: 0; border-radius: 6px; font-size: .8rem; min-height: 32px; }
-.scstrip figure { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
-.scstrip .sccheck { display: none; position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 2px solid var(--navy); color: #fff; font-size: .8rem; line-height: 18px; text-align: center; }
-.scstrip.selecting .sccheck { display: block; }
-.scstrip figure.picked .sccheck { background: var(--navy); }
-.scstrip figure.picked img { outline: 3px solid var(--navy); outline-offset: -3px; opacity: .75; }
+.scgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; }
+.scgrid figure { position: relative; margin: 0; min-width: 0; }
+.scgrid img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); cursor: pointer; display: block; }
+.scgrid .scnum { position: absolute; top: 3px; left: 3px; background: rgba(0,0,0,.65); color: #fff; font-size: .75rem; min-width: 1.4em; text-align: center; border-radius: 10px; padding: 1px 4px; }
+.scgrid .scretry { position: absolute; left: 3px; right: 3px; bottom: 3px; background: #b3261e; color: #fff; border: 0; border-radius: 6px; font-size: .8rem; min-height: 32px; }
+.scgrid figure { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+.scgrid .sccheck { display: none; position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 2px solid var(--navy); color: #fff; font-size: .8rem; line-height: 18px; text-align: center; }
+.scgrid.selecting .sccheck { display: block; }
+.scgrid figure.picked .sccheck { background: var(--navy); }
+.scgrid figure.picked img { outline: 3px solid var(--navy); outline-offset: -3px; opacity: .75; }
+.scgrid figure.scneeds img { outline: 3px solid var(--warn); outline-offset: -3px; }
+.scgrid .scflag { position: absolute; left: 3px; bottom: 3px; background: var(--warn-soft); color: var(--warn); font-size: .75rem; font-weight: 700; padding: 1px 6px; border-radius: 10px; pointer-events: none; }
+.scslot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; aspect-ratio: 3 / 4; min-height: var(--tap); border: 2px dashed var(--line); border-radius: 4px; background: var(--card); color: var(--muted); font: inherit; font-size: .8rem; cursor: pointer; padding: 0; }
+.scslot b { font-size: 1.1rem; color: var(--ink); }
+.scslot.sctidy { border-style: solid; cursor: default; }
+.scrange { display: flex; align-items: center; gap: 8px; }
+.scrange select { flex: 1; min-height: var(--tap); }
+.scburstmsg { background: var(--warn-soft); color: var(--warn); border-radius: var(--r); padding: 8px 12px; margin: 0; }
+.scdlgwhy { margin: 6px 0 0; color: var(--warn); font-weight: 600; }
 .scselbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .scselbar strong { flex: 1 1 100%; }
 .scselbar button { flex: 1; min-height: var(--tap); }

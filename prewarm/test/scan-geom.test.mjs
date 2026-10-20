@@ -1,6 +1,6 @@
 // Scan pages: corners, perspective flattening and shadow removal (fake pixels only). node prewarm/test/scan-geom.test.mjs
 import assert from 'node:assert/strict';
-import { orderCorners, rotateCorners, isConvex, quadArea, guessCorners, solveHomography, applyH, warpPage, removeShadow, autoMode, setContrast, flattenPage, coachFor, quadMove, photoCheck } from '../js/scan-geom.js';
+import { orderCorners, rotateCorners, isConvex, quadArea, guessCorners, solveHomography, applyH, warpPage, removeShadow, autoMode, setContrast, flattenPage, coachFor, quadMove, photoCheck, edgeInfo, snapCorner, snapSide, uprightScore, rotate180, UPRIGHT_LINES } from '../js/scan-geom.js';
 
 const near = (a, b, tol, m) => assert.ok(Math.abs(a - b) <= tol, `${m}: ${a} vs ${b}`);
 const img = (w, h, f) => { const d = new Uint8ClampedArray(w * h * 4); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) d.set(f(x, y), (y * w + x) * 4); return d; };
@@ -96,5 +96,43 @@ const soft = img(200, 200, (x, y) => { const v = 130 + 100 * Math.sin(y / 12); r
 assert.ok(photoCheck(soft, 200, 200, [{ x: 0, y: 0 }, { x: 199, y: 0 }, { x: 199, y: 199 }, { x: 0, y: 199 }]).blurry, 'smooth image is blurry');
 const dim = img(200, 200, (x, y) => (y % 6 < 2 ? [5, 5, 5, 255] : [50, 50, 50, 255]));
 assert.ok(photoCheck(dim, 200, 200, [{ x: 0, y: 0 }, { x: 199, y: 0 }, { x: 199, y: 199 }, { x: 0, y: 199 }]).dark, 'dim page is dark');
+
+{
+// snapping: a white sheet (60,40)-(240,200) on a dark table; a dragged corner snaps back onto the sheet's corner, a side onto its edge
+const sheet = img(300, 240, (x, y) => (x >= 60 && x < 240 && y >= 40 && y < 200 ? [230, 230, 225, 255] : [50, 45, 40, 255]));
+const ei = edgeInfo(sheet, 300, 240);
+const c0 = snapCorner(ei, { x: 68, y: 33 }, 14);
+assert.ok(c0 && Math.hypot(c0.x - 60, c0.y - 40) <= 2.5, 'corner snaps onto the sheet corner: ' + JSON.stringify(c0));
+assert.equal(snapCorner(ei, { x: 150, y: 120 }, 14), null, 'no corner in the middle of the sheet: stays put');
+const sd = snapSide(ei, { x: 60, y: 52 }, { x: 240, y: 52 }, 20); // the top side dragged 12 px down
+assert.ok(sd && Math.abs(sd.dx) < 0.5 && Math.abs(52 + sd.dy - 40) <= 1.5, 'side snaps onto the top edge: ' + JSON.stringify(sd));
+assert.equal(snapSide(ei, { x: 100, y: 120 }, { x: 200, y: 120 }, 10), null, 'no edge near the middle: stays put');
+
+// upright: fake lines of "letters" (a middle band with strokes above for capitals and b d f h k l t, a few below for g j p q y)
+const textPage = (w, h, lines) => {
+  const d = img(w, h, () => [255, 255, 255, 255]), ink = (x0, y0, x1, y1) => { for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) d.set([20, 20, 20, 255], (y * w + x) * 4); };
+  for (let l = 0; l < lines; l++) {
+    const base = 80 + l * 90;
+    for (let x = 30, i = 0; x < w - 40; x += 14, i++) {
+      if (i % 7 === 6) continue; // a space between words
+      ink(x, base - 12, x + 9, base); // the middle band
+      if (i % 3 === 0) ink(x, base - 22, x + 3, base - 12); // an ascender
+      if (i % 9 === 4) ink(x + 6, base, x + 9, base + 9); // a descender
+    }
+    if (l % 4 === 1) ink(20, base + 18, w - 20, base + 21); // a table rule (left out)
+  }
+  return d;
+};
+const TW = 1200, TH = 1600, up = textPage(TW, TH, 14), u0 = uprightScore(up, TW, TH);
+assert.ok(u0.score > 0.3 && !u0.flip && u0.lines >= UPRIGHT_LINES, 'upright page reads upright: ' + JSON.stringify(u0));
+const u1 = uprightScore(rotate180(up.slice()), TW, TH);
+assert.ok(u1.score < -0.3 && u1.flip, 'upside-down page is turned: ' + JSON.stringify(u1));
+const few = uprightScore(rotate180(textPage(TW, TH, 1)), TW, TH);
+assert.ok(!few.flip, 'one line of text is too little to go on: left as it is: ' + JSON.stringify(few));
+const empty = uprightScore(img(TW, TH, () => [255, 255, 255, 255]), TW, TH);
+assert.ok(!empty.flip && empty.lines === 0, 'blank page: left as it is');
+const r2 = img(2, 1, x => [x, 0, 0, 255]); rotate180(r2); assert.deepEqual([...r2], [1, 0, 0, 255, 0, 0, 0, 255], 'half turn swaps pixels');
+
+}
 
 console.log('scan geometry tests passed');

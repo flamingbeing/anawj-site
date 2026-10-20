@@ -1,6 +1,6 @@
 // Scan pages: the contrast stretch and sizing (fake pixels only). node prewarm/test/scan.test.mjs
 import assert from 'node:assert/strict';
-import { autoLevels, fitSize } from '../js/scan.js';
+import { autoLevels, fitSize, burstLabels } from '../js/scan.js';
 
 // a dull grey "paper" (150) with a few dark "ink" pixels (60): paper goes to white, ink stays dark
 const n = 1000, d = new Uint8ClampedArray(n * 4);
@@ -24,4 +24,9 @@ assert.ok(c[999 * 4] > c[999 * 4 + 1] && c[999 * 4 + 1] > c[999 * 4 + 2], 'warm 
 
 assert.deepEqual(fitSize(4000, 3000), [2400, 1800]);
 assert.deepEqual(fitSize(1000, 800), [1000, 800], 'never scaled up');
+// a burst covers a range of page numbers in order, kept within 1-14
+assert.deepEqual(burstLabels('3', '7'), ['3', '4', '5', '6', '7']);
+assert.deepEqual(burstLabels(1, 14).length, 14);
+assert.deepEqual(burstLabels(9, 2), ['9'], 'an end before the start: just the first page');
+assert.deepEqual(burstLabels(0, 99), burstLabels(1, 14), 'kept within 1-14');
 console.log('scan unit tests passed');

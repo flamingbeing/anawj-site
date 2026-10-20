@@ -3,7 +3,7 @@
 // code (js/scan-geom.js). Pages are kept on this phone (IndexedDB), the original photo beside the tidied copy. "Send" uploads
 // the tidied copies through the Worker's /scan-api/ (behind Cloudflare Access; worker/scan.js) to the study computer, only on
 // prewarmstudy.anawj.com. Nothing here touches patient records or sync. Alignment and reading stay on the study computer.
-import { MAX_EDGE, PAGE_W, PAGE_H, fitSize, autoLevels, guessCorners, isConvex, rotateCorners, flattenPage, setContrast, coachFor, quadMove, photoCheck } from './scan-geom.js';
+import { MAX_EDGE, PAGE_W, PAGE_H, fitSize, autoLevels, guessCorners, isConvex, rotateCorners, flattenPage, setContrast, coachFor, quadMove, photoCheck, edgeInfo, snapCorner, snapSide, uprightScore, rotate180 } from './scan-geom.js';
 export { MAX_EDGE, fitSize, autoLevels };
 export const PAGE_LABELS = Array.from({ length: 14 }, (_, i) => String(i + 1));
 const SRC_EDGE = 3200; // the photo is kept at up to this long edge for the flattening (a page fills most of it)
@@ -12,12 +12,22 @@ const STEADY = 7, GIVE_UP = 20000; // live camera: frames (about 120 ms apart) h
 // per-phone choices (this phone only, not synced): the phone's own camera app instead of the live camera, auto photo on or off
 const pref = (k, d) => { try { const v = localStorage.getItem('prewarm-scan-' + k); return v === null ? d : v === '1'; } catch { return d; } };
 const setPref = (k, v) => { try { localStorage.setItem('prewarm-scan-' + k, v ? '1' : '0'); } catch { /* private window: this visit only */ } };
+const prefStr = (k, d) => { try { return localStorage.getItem('prewarm-scan-' + k) || d; } catch { return d; } };
+const setPrefStr = (k, v) => { try { localStorage.setItem('prewarm-scan-' + k, v); } catch { /* this visit only */ } };
 
 // the page number to offer next: the first free number after the one just saved, else the first free one; none free: the last
 export function nextLabel(taken, after = '') {
   const free = PAGE_LABELS.filter(l => !taken.includes(l)), a = Number(after) || 0;
   return free.find(l => Number(l) > a) || free[0] || PAGE_LABELS[PAGE_LABELS.length - 1];
 }
+
+// several pages in a row (owner, 20 Oct 2026): the page numbers a burst covers, in order ("3 to 7"); each shot takes the next
+export function burstLabels(from, to) {
+  const a = Math.max(1, Math.min(14, Number(from) || 1)), b = Math.max(a, Math.min(14, Number(to) || 14));
+  return PAGE_LABELS.slice(a - 1, b);
+}
+// why a page in the grid wants a look (kept on the page as `needs` until it is checked, adjusted or retaken)
+export const NEEDS = { blurry: 'Looks blurry: retake it, or keep it if the writing reads.', dark: 'Looks dark: retake it with more light.', corners: 'The page edges were a guess: check the corners.' };
 
 // ---------- pages kept on this phone
 const DB = 'prewarm-scan';
@@ -49,27 +59,37 @@ const tick = () => new Promise(r => setTimeout(r, 30)); // let the screen repain
 // deps: { view, esc, toast, subjects: () => [Subject IDs on this phone] }
 export function mount({ view, esc, toast, subjects }) {
   let subject = '', sel = null, urls = [], num = '1', ed = null, queue = [], saving = Promise.resolve(), scanId = '';
+  let run = null, one = null; // run: a burst under way { labels, i }; one: the next shot is just this page { label } (a slot, Retake)
   const failed = new Map(); // page id -> why it was not sent (until the next try)
+  const tidying = new Set(); // page numbers being tidied beside the camera (a burst)
   const url = b => { const u = URL.createObjectURL(b); urls.push(u); return u; };
   const free = () => { urls.forEach(URL.revokeObjectURL); urls = []; };
+  const opts = PAGE_LABELS.map(l => `<option>${l}</option>`).join('');
   view.innerHTML = `<div class="stack scan">
-    <p class="muted small">Lay the sheet on a darker surface and hold the phone over it, whole page in view: the camera takes the photo by itself once the page is found and still. Then nudge the four corners onto the page if needed; it is flattened and the shadows taken out. Pages stay on this phone; the original photo is kept beside the tidied copy.</p>
+    <p class="muted small">Lay the sheet on a darker surface and hold the phone over it, whole page in view: the camera takes the photo by itself once the page is found and still. The page is flattened, turned upright and the shadows taken out; a page that needs a look is marked Check in the grid. Pages stay on this phone; the original photo is kept beside the tidied copy.</p>
     <label class="lab" for="scsub">Subject ID</label>
     <input id="scsub" list="scsubs" autocomplete="off" autocapitalize="characters" placeholder="e.g. DEMO-01"><datalist id="scsubs">${subjects().map(s => `<option value="${esc(s)}">`).join('')}</datalist>
     <div id="scact" hidden>
-      <label class="lab" for="scnum">Page number <small class="muted">(moves on by itself; change it to skip a page)</small></label>
-      <select id="scnum" aria-label="Page number"></select>
+      <label class="tog"><input type="checkbox" id="scburst"><span>Several pages in a row<small>Shoot the pages back to back with no check in between; each is tidied by itself. Look at the ones marked Check after.</small></span></label>
+      <div id="scrange" class="scrange"><label for="scfrom">Pages</label><select id="scfrom" aria-label="First page">${opts}</select><span>to</span><select id="scto" aria-label="Last page">${opts}</select></div>
+      <div id="scone"><label class="lab" for="scnum">Page number <small class="muted">(moves on by itself; change it to skip a page)</small></label>
+      <select id="scnum" aria-label="Page number"></select></div>
+      <p id="scrangenote" class="muted small" hidden></p>
       <label class="primary filebtn scbig" id="scshotlbl"><span id="scshottxt">📷 Take page 1</span><input id="scshot" type="file" accept="image/*" capture="environment" hidden></label>
+      <button class="secondary" id="scstop" hidden>Stop the burst here</button>
       <label class="secondary filebtn">Choose from photos<input id="scpick" type="file" accept="image/*" multiple hidden></label>
       <label class="tog"><input type="checkbox" id="sccamapp"><span>Use phone camera app<small>Instead of the live camera here, on this phone only. For a phone where the live camera is poor.</small></span></label>
     </div>
+    <p id="scburstmsg" class="small scburstmsg" role="status" hidden></p>
     <div id="scselbar" class="scselbar" hidden><strong id="scselcount" role="status"></strong><button class="secondary" id="scselall">All</button><button class="secondary" id="scselnone">None</button><button class="secondary scseldel" id="scseldel">Delete</button><button class="secondary" id="scselcancel">Cancel</button></div>
-    <div id="sclist" class="scstrip"></div>
+    <p id="scprog" class="small" hidden></p>
+    <div id="sclist" class="scgrid"></div>
     <div id="scsend" hidden><button class="primary" id="scup">Send to the study computer</button><p id="scmsg" class="muted small" role="status"></p></div>
     <div id="scsave" hidden><button class="secondary" id="scdl">Save tidied pages to this phone</button></div>
-    <dialog id="scdlg" class="scdlg"><img alt="Scanned page" id="scimg">
-      <div class="row"><button class="secondary" id="scorig">Show original</button><button class="primary" id="scclose">Close</button></div>
-      <div class="row"><select id="scdlgnum" aria-label="Page number for this photo"></select><button class="secondary" id="scretake">Retake</button><button class="secondary" id="scdel">Delete</button></div>
+    <dialog id="scdlg" class="scdlg"><img alt="Scanned page" id="scimg"><p id="scdlgwhy" class="scdlgwhy" hidden></p>
+      <div class="row"><button class="secondary" id="scorig">Show original</button><button class="secondary" id="scadjust">Adjust corners</button><button class="primary" id="scdlgok" hidden>Looks right</button></div>
+      <div class="row"><button class="secondary" id="scretake">Retake</button><label class="secondary filebtn">Choose from gallery<input id="scgallery" type="file" accept="image/*" hidden></label><button class="secondary scseldel" id="scdel">Delete</button></div>
+      <div class="row"><select id="scdlgnum" aria-label="Page number for this photo"></select><button class="primary" id="scclose">Close</button></div>
     </dialog>
     <div id="sclive" class="scedit sclive" hidden role="dialog" aria-label="Live camera">
       <div class="schead"><strong id="sclivetitle">Page</strong><span id="sclivesize" class="small"></span></div>
@@ -81,23 +101,41 @@ export function mount({ view, esc, toast, subjects }) {
     </div>
     <div id="scedit" class="scedit" hidden role="dialog" aria-label="Scan a page">
       <div class="schead"><strong id="sctitle">Page</strong><span id="scstep" class="small"></span></div>
-      <div id="scstage" class="scstage"><canvas id="sccrop" aria-label="Page photo with four corner handles"></canvas><canvas id="screv" aria-label="Flattened page" hidden></canvas><canvas id="scloupe" class="scloupe" width="120" height="120" hidden></canvas><div id="scwork" class="scwork" hidden>Flattening…</div></div>
+      <div id="scstage" class="scstage"><canvas id="sccrop" aria-label="Page photo with corner and side handles"></canvas><canvas id="screv" aria-label="Flattened page" hidden></canvas><canvas id="scloupe" class="scloupe" width="120" height="120" hidden></canvas><div id="scwork" class="scwork" hidden>Flattening…</div></div>
       <p id="schint" class="small scedithint"></p>
       <div id="scmodes" class="scmodes" hidden>${MODES.map(([k, t]) => `<button class="secondary" data-mode="${k}" aria-pressed="false">${t}</button>`).join('')}</div>
       <div class="scbar" id="scbar0" hidden><button class="primary" id="scretake0">Retake</button><button class="secondary" id="scanyway">Use it anyway</button></div>
       <div class="scbar" id="scbar1"><button class="secondary" id="scretake1">Retake</button><button class="secondary" id="scrot">Rotate</button><button class="primary" id="scflat">Flatten</button></div>
-      <div class="scbar" id="scbar2" hidden><button class="secondary" id="scback">Adjust corners</button><button class="secondary" id="scretake2">Retake</button><button class="primary" id="scok">Accept and next</button></div>
+      <div class="scbar" id="scbar2" hidden><button class="secondary" id="scback">Adjust corners</button><button class="secondary" id="scretake2">Retake</button><button class="primary" id="scok">Looks right</button></div>
     </div>
   </div>`;
   const $$ = s => view.querySelector(s);
   const taken = () => (view._pages || []).map(p => p.label).filter(Boolean);
+  const burstOn = () => $$('#scburst').checked;
+  const range = () => burstLabels($$('#scfrom').value, $$('#scto').value);
 
   function setNum(l) {
     num = l;
     $$('#scnum').innerHTML = PAGE_LABELS.map(x => `<option value="${x}" ${x === l ? 'selected' : ''}>${x}${taken().includes(x) ? ' (has a photo: will replace)' : ''}</option>`).join('');
-    $$('#scshottxt').textContent = `📷 Take page ${l}`;
+    paintShot();
   }
+  // the camera button and the burst controls say what the next tap does
+  function paintShot() {
+    const b = burstOn(), r = range();
+    $$('#scrange').hidden = !b; $$('#scone').hidden = b; $$('#scstop').hidden = !run;
+    $$('#scshottxt').textContent = run ? `📷 Take page ${run.labels[run.i]} (${run.i + 1} of ${run.labels.length})`
+      : b ? `📷 Shoot pages ${r[0]} to ${r[r.length - 1]}` : `📷 Take page ${num}`;
+    const over = b && !run ? r.filter(l => taken().includes(l)) : [];
+    $$('#scrangenote').hidden = !over.length;
+    $$('#scrangenote').textContent = over.length ? `Page${over.length > 1 ? 's' : ''} ${over.join(', ')} already ${over.length > 1 ? 'have photos' : 'has a photo'}: a new shot replaces it.` : '';
+  }
+  const burstMsg = t => { $$('#scburstmsg').hidden = !t; $$('#scburstmsg').textContent = t || ''; };
 
+  // the 14 slots: empty (tap to take that page), tidying, taken (tap for the page's own screen), sent, needs a look
+  const slot = p => `<figure data-id="${p.id}" class="${p.needs ? 'scneeds' : ''}">
+      <img src="${url(p.clean)}" alt="Page ${esc(p.label || 'not labelled')}${p.needs ? ', needs a look' : ''}" data-open="${p.id}" draggable="false"><b class="scnum">${esc(p.label || '?')}</b><span class="sccheck" aria-hidden="true">✓</span>
+      ${p.needs ? '<span class="scflag">Check</span>' : ''}
+      ${p.sentAt ? '<span class="scsent">✓</span>' : failed.has(p.id) ? `<button class="scretry" data-retry="${p.id}" title="${esc(failed.get(p.id))}">Retry</button>` : ''}</figure>`;
   async function draw() {
     free();
     const ok = !!subject;
@@ -107,51 +145,107 @@ export function mount({ view, esc, toast, subjects }) {
     if (!scanId) scanId = pages.find(p => p.scan)?.scan || '';
     $$('#scsave').hidden = !pages.length;
     $$('#scsend').hidden = !pages.length || !CAN_SEND;
-    $$('#sclist').innerHTML = pages.map(p => `<figure data-id="${p.id}">
-      <img src="${url(p.clean)}" alt="Page ${esc(p.label || 'not labelled')}" data-open="${p.id}" draggable="false"><b class="scnum">${esc(p.label || '?')}</b><span class="sccheck" aria-hidden="true">✓</span>
-      ${p.sentAt ? '<span class="scsent">✓</span>' : failed.has(p.id) ? `<button class="scretry" data-retry="${p.id}" title="${esc(failed.get(p.id))}">Retry</button>` : ''}</figure>`).join('') || (ok ? '<p class="muted small">No pages yet for this Subject ID.</p>' : '');
+    const by = new Map(), extra = [];
+    for (const p of pages) PAGE_LABELS.includes(p.label) && !by.has(p.label) ? by.set(p.label, p) : extra.push(p);
+    $$('#sclist').innerHTML = !ok ? '' : PAGE_LABELS.map(l => tidying.has(l) ? `<div class="scslot sctidy" data-tidy="${l}"><b>${l}</b><span>Tidying…</span></div>`
+      : by.has(l) ? slot(by.get(l)) : `<button class="scslot" data-shoot="${l}" aria-label="Take page ${l}"><b>${l}</b><span>Take</span></button>`).join('') + extra.map(slot).join('');
+    const check = pages.filter(p => p.needs).length;
+    $$('#scprog').hidden = !ok;
+    $$('#scprog').textContent = `${by.size} of 14 pages` + (check ? ` · ${check} to check` : '') + (tidying.size ? ` · tidying ${tidying.size}` : '');
     setNum(num);
     paintSel();
   }
 
-  // ---------- the capture editor: crop, then flatten and light
+  // ---------- from a photo to a page: guess the corners, check the light, flatten, turn upright
   const dpr = () => Math.min(2, window.devicePixelRatio || 1);
-  async function startFile(file, camera, replace, how = '') {
+  async function prepare(file) {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }), bw = bmp.width, bh = bmp.height;
+    const [sw, sh] = fitSize(bmp.width, bmp.height, SRC_EDGE);
+    const work = document.createElement('canvas'); work.width = sw; work.height = sh;
+    work.getContext('2d', { willReadFrequently: true }).drawImage(bmp, 0, 0, sw, sh); bmp.close?.();
+    const [gw, gh] = fitSize(sw, sh, 300), sm = document.createElement('canvas'); sm.width = gw; sm.height = gh;
+    const sx = sm.getContext('2d', { willReadFrequently: true }); sx.drawImage(work, 0, 0, gw, gh);
+    const g = guessCorners(sx.getImageData(0, 0, gw, gh).data, gw, gh);
+    let quad = g.corners.map(p => ({ x: p.x * sw / gw, y: p.y * sh / gh }));
+    const wide = Math.hypot(quad[1].x - quad[0].x, quad[1].y - quad[0].y) > Math.hypot(quad[3].x - quad[0].x, quad[3].y - quad[0].y);
+    if (wide) quad = rotateCorners(quad); // a sheet photographed sideways: always a portrait page
+    // sure: the whole sheet was found clear of the photo's edges, so the corners step can be skipped (one tap "Looks right")
+    return { work, sw, sh, quad, found: g.found, sure: g.found && coachFor(g, gw, gh).ok && isConvex(g.corners), still: { w: bw, h: bh } };
+  }
+  function lightCheck(pr) { // blur and darkness cannot be fixed later
+    const [cw, ch] = fitSize(pr.sw, pr.sh, 1000), cc = document.createElement('canvas'); cc.width = cw; cc.height = ch;
+    const cx = cc.getContext('2d', { willReadFrequently: true }); cx.drawImage(pr.work, 0, 0, cw, ch);
+    return photoCheck(cx.getImageData(0, 0, cw, ch).data, cw, ch, pr.quad.map(p => ({ x: p.x * cw / pr.sw, y: p.y * ch / pr.sh })));
+  }
+  // the flat page; turned half round when the print reads upside down (unless the person turned it themselves)
+  function flatPage(pr, quad, turned) {
+    const lit = flattenPage(pr.work.getContext('2d').getImageData(0, 0, pr.sw, pr.sh).data, pr.sw, pr.sh, quad);
+    if (!lit) return null;
+    const flip = !turned && uprightScore(lit, PAGE_W, PAGE_H).flip;
+    if (flip) rotate180(lit);
+    return { lit, quad: flip ? rotateCorners(rotateCorners(quad)) : quad, flipped: flip };
+  }
+  const toJpeg = cv => new Promise((ok, no) => cv.toBlob(b => b ? ok(b) : no(new Error('Could not make the tidied copy.')), 'image/jpeg', 0.9));
+  const norm = (q, sw, sh) => q.map(p => ({ x: +(p.x / sw).toFixed(4), y: +(p.y / sh).toFixed(4) }));
+  async function store(label, replace, rec) { // a new photo for a page replaces the one before it
+    const old = replace ? (view._pages || []).find(p => p.id === replace) : (await listPages(subject)).find(p => p.label === label);
+    if (old) await delPage(old.id);
+    await putPage({ id: crypto.randomUUID(), subject, label, at: Date.now(), scan: old?.scan, ...rec });
+  }
+
+  // a burst page, tidied beside the camera with the remembered lighting style; anything doubtful is marked to check
+  function tidyLater(file, label, how, camera) {
+    const sub = subject; tidying.add(label); draw();
+    const job = async () => {
+      await tick();
+      const pr = await prepare(file), check = camera ? lightCheck(pr) : undefined, f = flatPage(pr, pr.quad, false);
+      if (!f) throw new Error('the page could not be found');
+      const cv = document.createElement('canvas'); cv.width = PAGE_W; cv.height = PAGE_H;
+      const img = new ImageData(f.lit, PAGE_W, PAGE_H), mode = prefStr('mode', 'auto'), used = setContrast(img.data, mode);
+      cv.getContext('2d').putImageData(img, 0, 0);
+      const needs = check?.blurry ? 'blurry' : check?.dark ? 'dark' : !pr.sure ? 'corners' : '';
+      if (subject !== sub) return;
+      await store(label, null, { original: file, clean: await toJpeg(cv), corners: norm(f.quad, pr.sw, pr.sh), mode, used, still: { ...pr.still, how }, check, needs, flipped: f.flipped || undefined });
+    };
+    saving = saving.then(job).catch(err => burstMsg(`Page ${label} could not be tidied (${err.message}): tap its slot to take it again.`))
+      .then(() => { tidying.delete(label); return draw(); });
+  }
+
+  // ---------- the capture editor: one look at the flat page when the outline is sure, else the corners first
+  async function startFile(file, camera, replace, how = '', o = {}) {
     $$('#scedit').hidden = false; setStep('load');
     try {
-      const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }), bw = bmp.width, bh = bmp.height;
-      const [sw, sh] = fitSize(bmp.width, bmp.height, SRC_EDGE);
-      const work = document.createElement('canvas'); work.width = sw; work.height = sh;
-      work.getContext('2d', { willReadFrequently: true }).drawImage(bmp, 0, 0, sw, sh); bmp.close?.();
-      const [gw, gh] = fitSize(sw, sh, 300), sm = document.createElement('canvas'); sm.width = gw; sm.height = gh;
-      const sx = sm.getContext('2d', { willReadFrequently: true }); sx.drawImage(work, 0, 0, gw, gh);
-      const g = guessCorners(sx.getImageData(0, 0, gw, gh).data, gw, gh);
-      let quad = g.corners.map(p => ({ x: p.x * sw / gw, y: p.y * sh / gh }));
-      const wide = Math.hypot(quad[1].x - quad[0].x, quad[1].y - quad[0].y) > Math.hypot(quad[3].x - quad[0].x, quad[3].y - quad[0].y);
-      if (wide) quad = rotateCorners(quad); // a sheet photographed sideways: turn it upright
-      ed = { file, camera, replace, work, sw, sh, quad, found: g.found, label: num, mode: 'auto', lit: null, used: 'bw', still: { w: bw, h: bh, how: how || (camera ? 'app' : 'file') } };
-      if (camera) { // blur and darkness cannot be fixed later: offer a retake now (only after a camera shot)
-        const [cw, ch] = fitSize(sw, sh, 1000), cc = document.createElement('canvas'); cc.width = cw; cc.height = ch;
-        const cx = cc.getContext('2d', { willReadFrequently: true }); cx.drawImage(work, 0, 0, cw, ch);
-        const q = photoCheck(cx.getImageData(0, 0, cw, ch).data, cw, ch, quad.map(p => ({ x: p.x * cw / sw, y: p.y * ch / sh })));
-        ed.check = q;
+      const pr = await prepare(file);
+      if (o.corners?.length === 4) { pr.quad = o.corners.map(p => ({ x: p.x * pr.sw, y: p.y * pr.sh })); pr.sure = false; }
+      ed = { ...pr, file, camera, replace, label: o.label || num, one: !!o.one, mode: o.mode || prefStr('mode', 'auto'), lit: null, used: 'bw', turned: !!o.corners,
+        still: o.still || { ...pr.still, how: how || (camera ? 'app' : 'file') } };
+      if (camera) {
+        const q = ed.check = lightCheck(pr);
         ed.warn = q.blurry && q.dark ? 'Looks blurry and dark' : q.blurry ? 'Looks blurry: the writing may not read' : q.dark ? 'Looks dark: turn on the torch or more light' : '';
       }
-      setStep(ed.warn ? 'check' : 'crop');
+      if (ed.warn) setStep('check'); else go();
     } catch (e) { toast('Could not use that photo: ' + e.message); closeEditor(); nextInQueue(); }
   }
+  const go = () => ed.sure ? flatten() : setStep('crop');
   const closeEditor = () => { $$('#scedit').hidden = true; ed = null; };
 
   function setStep(step) {
     const chk = step === 'check', crop = step === 'crop' || chk, rev = step === 'review';
     if (ed) ed.step = step;
     $$('#sctitle').textContent = `Page ${ed?.label || num}`;
-    $$('#scstep').textContent = chk ? 'Check the photo' : crop ? 'Step 1 of 2: corners' : rev ? 'Step 2 of 2: check the page' : '';
+    $$('#scstep').textContent = chk ? 'Check the photo' : crop ? 'Step 1 of 2: corners' : rev ? (ed.cropped ? 'Step 2 of 2: check the page' : 'Check the page') : '';
     $$('#sccrop').hidden = !crop; $$('#screv').hidden = !rev; $$('#scbar0').hidden = !chk; $$('#scbar1').hidden = !crop || chk; $$('#scbar2').hidden = !rev; $$('#scmodes').hidden = !rev;
     $$('#scwork').hidden = step !== 'load' && step !== 'work';
     $$('#scwork').textContent = step === 'load' ? 'Opening photo…' : 'Flattening…';
-    $$('#schint').textContent = chk ? ed.warn + '. Retake?' : crop ? (ed.found ? 'Drag each corner onto the corner of the paper.' : 'Could not spot the page: drag each corner onto the paper’s corner.') : rev ? 'Shadows taken out. Pick a lighting style if the page looks off.' : '';
-    if (crop) { layoutCrop(); if (!chk) checkQuad(); }
+    $$('#schint').textContent = chk ? ed.warn + '. Retake?' : crop ? (ed.found ? 'Drag a corner or the middle of a side onto the paper’s edge; it snaps on.' : 'Could not spot the page: drag each corner onto the paper’s corner.')
+      : rev ? (ed.cropped ? 'Shadows taken out.' : 'Page found and flattened.') + (ed.flipped ? ' Turned the right way up.' : '') + ' Pick a lighting style if it looks off.' : '';
+    if (crop) { ed.cropped = true; edges(); layoutCrop(); if (!chk) checkQuad(); }
+  }
+  function edges() { // the edge map for snapping, from a copy about 800 px long (made once per photo)
+    if (ed.edges) return;
+    const [ew, eh] = fitSize(ed.sw, ed.sh, 800), c = document.createElement('canvas'); c.width = ew; c.height = eh;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(ed.work, 0, 0, ew, eh);
+    ed.edges = edgeInfo(x.getImageData(0, 0, ew, eh).data, ew, eh); ed.ek = ew / ed.sw;
   }
 
   let k = 1; // screen px per photo px in the crop view
@@ -162,13 +256,19 @@ export function mount({ view, esc, toast, subjects }) {
     c.style.width = w + 'px'; c.style.height = h + 'px'; c.width = Math.round(w * d); c.height = Math.round(h * d);
     drawCrop();
   }
+  const mid = i => { const a = ed.quad[i], b = ed.quad[(i + 1) % 4]; return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, a, b }; };
   function drawCrop() {
     const c = $$('#sccrop'), x = c.getContext('2d'), d = dpr();
     x.setTransform(d, 0, 0, d, 0, 0); x.drawImage(ed.work, 0, 0, ed.sw * k, ed.sh * k);
     x.beginPath(); ed.quad.forEach((p, i) => x[i ? 'lineTo' : 'moveTo'](p.x * k, p.y * k)); x.closePath();
     x.fillStyle = 'rgba(255,212,0,.12)'; x.fill(); x.lineWidth = 2; x.strokeStyle = isConvex(ed.quad) ? '#ffd400' : '#ff4040'; x.stroke();
-    ed.quad.forEach((p, i) => {
-      x.beginPath(); x.arc(p.x * k, p.y * k, i === ed.drag ? 16 : 13, 0, 7); x.fillStyle = 'rgba(255,212,0,.3)'; x.fill(); x.lineWidth = 2; x.strokeStyle = '#fff'; x.stroke();
+    for (let i = 0; i < 4; i++) { // side handles: a bar along the middle of each side (moves the whole side)
+      const m = mid(i), ang = Math.atan2(m.b.y - m.a.y, m.b.x - m.a.x);
+      x.save(); x.translate(m.x * k, m.y * k); x.rotate(ang); x.beginPath(); x.roundRect(-20, -7, 40, 14, 7);
+      x.fillStyle = ed.drag === 4 + i ? '#ffd400' : 'rgba(255,212,0,.55)'; x.fill(); x.lineWidth = 2; x.strokeStyle = '#fff'; x.stroke(); x.restore();
+    }
+    ed.quad.forEach((p, i) => { // corner handles, 44 px across
+      x.beginPath(); x.arc(p.x * k, p.y * k, i === ed.drag ? 25 : 22, 0, 7); x.fillStyle = 'rgba(255,212,0,.3)'; x.fill(); x.lineWidth = 2; x.strokeStyle = '#fff'; x.stroke();
     });
   }
   const checkQuad = () => { const ok = isConvex(ed.quad); $$('#scflat').disabled = !ok; if (!ok) $$('#schint').textContent = 'The corners cross over: drag them back round the paper.'; };
@@ -184,31 +284,52 @@ export function mount({ view, esc, toast, subjects }) {
     l.style.top = (top < 170 ? top + 50 : top - 170) + 'px';
   }
 
+  // Drag a corner (0-3) or a side's middle (4-7, both its corners move); on letting go it snaps onto the paper's corner or edge
+  // when one is near (within 3 % of the photo), else it stays where it was put.
+  function snap(i) {
+    const e = ed.edges, kk = ed.ek, r = Math.max(e.w, e.h) * 0.03, cl = p => { p.x = Math.max(0, Math.min(ed.sw, p.x)); p.y = Math.max(0, Math.min(ed.sh, p.y)); };
+    if (i < 4) {
+      const p = ed.quad[i], s = snapCorner(e, { x: p.x * kk, y: p.y * kk }, r);
+      if (s) { p.x = s.x / kk; p.y = s.y / kk; return true; }
+    } else {
+      const a = ed.quad[i - 4], b = ed.quad[(i - 3) % 4], s = snapSide(e, { x: a.x * kk, y: a.y * kk }, { x: b.x * kk, y: b.y * kk }, r);
+      if (s) { for (const p of [a, b]) { p.x += s.dx / kk; p.y += s.dy / kk; cl(p); } return true; }
+    }
+    return false;
+  }
   function dragSetup() {
     const c = $$('#sccrop'); let at = null;
     const pt = e => { const r = c.getBoundingClientRect(); return { x: (e.clientX - r.left) / k, y: (e.clientY - r.top) / k }; };
     c.onpointerdown = e => {
       const q = pt(e); let best = -1, bd = 48 / k;
       ed.quad.forEach((p, i) => { const dd = Math.hypot(p.x - q.x, p.y - q.y); if (dd < bd) { bd = dd; best = i; } });
+      if (best < 0) { bd = 36 / k; for (let i = 0; i < 4; i++) { const m = mid(i), dd = Math.hypot(m.x - q.x, m.y - q.y); if (dd < bd) { bd = dd; best = 4 + i; } } }
       if (best < 0) return;
-      at = { i: best, dx: ed.quad[best].x - q.x, dy: ed.quad[best].y - q.y }; ed.drag = best; c.setPointerCapture(e.pointerId); e.preventDefault(); drawCrop(); loupe(best, true);
+      at = { i: best, last: q, dx: best < 4 ? ed.quad[best].x - q.x : 0, dy: best < 4 ? ed.quad[best].y - q.y : 0 };
+      ed.drag = best; c.setPointerCapture(e.pointerId); e.preventDefault(); drawCrop(); if (best < 4) loupe(best, true);
     };
     c.onpointermove = e => {
-      if (!at) return; const q = pt(e), p = ed.quad[at.i];
-      p.x = Math.max(0, Math.min(ed.sw, q.x + at.dx)); p.y = Math.max(0, Math.min(ed.sh, q.y + at.dy));
-      drawCrop(); loupe(at.i, true); e.preventDefault();
+      if (!at) return; const q = pt(e);
+      if (at.i < 4) { const p = ed.quad[at.i]; p.x = Math.max(0, Math.min(ed.sw, q.x + at.dx)); p.y = Math.max(0, Math.min(ed.sh, q.y + at.dy)); loupe(at.i, true); }
+      else {
+        const a = ed.quad[at.i - 4], b = ed.quad[(at.i - 3) % 4];
+        let dx = q.x - at.last.x, dy = q.y - at.last.y; // keep both corners inside the photo
+        for (const p of [a, b]) { dx = Math.max(-p.x, Math.min(ed.sw - p.x, dx)); dy = Math.max(-p.y, Math.min(ed.sh - p.y, dy)); }
+        for (const p of [a, b]) { p.x += dx; p.y += dy; }
+        at.last = q;
+      }
+      drawCrop(); e.preventDefault();
     };
-    const up = () => { if (!at) return; at = null; ed.drag = -1; loupe(0, false); drawCrop(); checkQuad(); };
+    const up = () => { if (!at) return; const i = at.i; at = null; ed.drag = -1; loupe(0, false); if (snap(i)) navigator.vibrate?.(15); drawCrop(); checkQuad(); };
     c.onpointerup = up; c.onpointercancel = up;
   }
 
   async function flatten() {
     setStep('work'); await tick();
     try {
-      const { sw, sh } = ed, src = ed.work.getContext('2d').getImageData(0, 0, sw, sh).data;
-      const lit = flattenPage(src, sw, sh, ed.quad);
-      if (!lit) throw new Error('the corners do not make a page');
-      ed.lit = lit; setStep('review'); renderMode();
+      const f = flatPage(ed, ed.quad, ed.turned);
+      if (!f) throw new Error('the corners do not make a page');
+      ed.lit = f.lit; ed.quad = f.quad; ed.flipped = f.flipped; setStep('review'); renderMode();
     } catch (e) { toast('Could not flatten: ' + e.message); setStep('crop'); }
   }
   function renderMode() {
@@ -222,42 +343,63 @@ export function mount({ view, esc, toast, subjects }) {
 
   // the camera opens again from a button tap (a phone only opens it from a tap), and the save carries on beside it
   function accept() {
-    const e = ed, label = e.label, cv = $$('#screv');
-    const done = new Promise((ok, no) => cv.toBlob(b => b ? ok(b) : no(new Error('Could not make the tidied copy.')), 'image/jpeg', 0.9)).then(async clean => {
-      const old = e.replace ? (view._pages || []).find(p => p.id === e.replace) : (view._pages || []).find(p => p.label === label);
-      if (old) await delPage(old.id);
-      const nx = (e.sw && e.quad.map(p => ({ x: +(p.x / e.sw).toFixed(4), y: +(p.y / e.sh).toFixed(4) })));
-      await putPage({ id: crypto.randomUUID(), subject, label, at: Date.now(), original: e.file, clean, corners: nx, mode: e.mode, still: e.still, check: e.check, scan: old?.scan });
-    });
+    const e = ed, label = e.label;
+    const done = toJpeg($$('#screv')).then(clean => store(label, e.replace, { original: e.file, clean, corners: norm(e.quad, e.sw, e.sh), mode: e.mode, used: e.used, still: e.still, check: e.check, needs: '', flipped: e.flipped || undefined }));
     saving = saving.then(() => done).catch(err => toast('Could not save the page: ' + err.message)).then(draw);
     const after = nextLabel(taken().concat(label), label);
     closeEditor(); setNum(after);
-    if (queue.length) nextInQueue(); else if (e.camera) shoot();
+    if (queue.length) nextInQueue(); else if (e.camera && !e.one) shoot();
   }
   function nextInQueue() { const f = queue.shift(); if (f) startFile(f.file, f.camera, null); }
-  function retake() { const e = ed; closeEditor(); $$('#scshot').dataset.replace = e.replace || ''; num = e.label; queue = []; shoot(); }
+  function retake() { const e = ed; closeEditor(); $$('#scshot').dataset.replace = e.replace || ''; num = e.label; one = e.one ? { label: e.label } : null; queue = []; shoot(); }
 
   const startNext = async () => { await saving; await draw(); };
+  // a finished photo: just this page (a slot or Retake), the next page of a burst, or the editor for the page number shown
+  async function took(file, camera, replace, how) {
+    if (one) { const o = one; one = null; await startNext(); queue = []; return startFile(file, camera, replace, how, { label: o.label, one: true }); }
+    if (run) {
+      const label = run.labels[run.i++];
+      tidyLater(file, label, how, camera);
+      if (run.i >= run.labels.length) endRun(`Burst done: pages ${run.labels[0]} to ${label}.`);
+      paintShot(); return label;
+    }
+    await startNext(); queue = []; startFile(file, camera, replace, how);
+  }
+  function endRun(t) {
+    const r = run; run = null; if (!r) return; closeLive(); paintShot();
+    const n = r.i; burstMsg(n ? `${t || `Burst stopped after ${n} page${n > 1 ? 's' : ''}.`} Pages marked Check need a look; tap any page to retake it.` : '');
+  }
 
-  $$('#scsub').oninput = e => { subject = e.target.value.trim().toUpperCase(); scanId = ''; num = '1'; draw().then(() => setNum(nextLabel(taken()))); };
+  $$('#scsub').oninput = e => { subject = e.target.value.trim().toUpperCase(); scanId = ''; num = '1'; run = null; one = null; burstMsg(''); draw().then(() => { setNum(nextLabel(taken())); $$('#scfrom').value = nextLabel(taken()); $$('#scto').value = '14'; paintShot(); }); };
   $$('#scnum').onchange = e => setNum(e.target.value);
+  $$('#scburst').checked = pref('burst', true);
+  $$('#scburst').onchange = e => { setPref('burst', e.target.checked); run = null; paintShot(); };
+  $$('#scfrom').onchange = () => { if (Number($$('#scto').value) < Number($$('#scfrom').value)) $$('#scto').value = $$('#scfrom').value; paintShot(); };
+  $$('#scto').onchange = () => { if (Number($$('#scto').value) < Number($$('#scfrom').value)) $$('#scfrom').value = $$('#scto').value; paintShot(); };
+  $$('#scto').value = '14';
+  $$('#scstop').onclick = () => endRun();
   $$('#scshot').onchange = async e => {
     const f = [...e.target.files], r = e.target.dataset.replace || null; e.target.dataset.replace = ''; e.target.value = '';
     if (!subject || !f.length) return;
-    await startNext(); queue = []; startFile(f[0], true, r);
+    took(f[0], true, r, 'app');
   };
   $$('#scpick').onchange = async e => {
     const f = [...e.target.files]; e.target.value = '';
     if (!subject || !f.length) return;
+    if (burstOn()) { // several pages in a row from the gallery: the range's numbers in the order picked
+      const r = range(), use = f.slice(0, r.length);
+      use.forEach((file, i) => tidyLater(file, r[i], 'file', false));
+      return burstMsg(`Tidying pages ${r[0]} to ${r[use.length - 1]}.` + (f.length > r.length ? ` ${f.length - r.length} more photo${f.length - r.length > 1 ? 's were' : ' was'} left out: the range is ${r.length} page${r.length > 1 ? 's' : ''}.` : '') + ' Pages marked Check need a look.');
+    }
     await startNext(); queue = f.slice(1).map(file => ({ file, camera: false })); startFile(f[0], false, null);
   };
   $$('#scflat').onclick = flatten;
-  $$('#scrot').onclick = () => { ed.quad = rotateCorners(ed.quad); drawCrop(); checkQuad(); };
+  $$('#scrot').onclick = () => { ed.quad = rotateCorners(ed.quad); ed.turned = true; drawCrop(); checkQuad(); };
   $$('#scback').onclick = () => setStep('crop');
   $$('#scok').onclick = accept;
   $$('#scretake0').onclick = retake; $$('#scretake1').onclick = retake; $$('#scretake2').onclick = retake;
-  $$('#scanyway').onclick = () => setStep('crop');
-  $$('#scmodes').onclick = e => { const b = e.target.closest('[data-mode]'); if (b) { ed.mode = b.dataset.mode; renderMode(); } };
+  $$('#scanyway').onclick = go;
+  $$('#scmodes').onclick = e => { const b = e.target.closest('[data-mode]'); if (b) { ed.mode = b.dataset.mode; setPrefStr('mode', ed.mode); renderMode(); } };
   addEventListener('resize', () => { if (ed?.step === 'crop' || ed?.step === 'check') layoutCrop(); if (live) layoutLive(); });
   dragSetup();
 
@@ -269,14 +411,17 @@ export function mount({ view, esc, toast, subjects }) {
   let live = null;
   const canLive = () => !pref('camapp', false) && !!navigator.mediaDevices?.getUserMedia;
   function shoot() { if (canLive()) openLive(); else $$('#scshot').click(); }
+  // the camera button: with "Several pages in a row" on, a tap starts a burst over the chosen range
+  function startShot() { if (!run && !one && burstOn()) { run = { labels: range(), i: 0 }; burstMsg(''); paintShot(); } }
+  const liveTitle = () => run && !one ? `Page ${run.labels[run.i]} · ${run.i + 1} of ${run.labels.length}` : `Page ${one?.label || num}`;
   const say = t => { const c = $$('#sccoach'); if (c.textContent !== t) c.textContent = t; };
   const paintAuto = () => { const on = live?.auto; $$('#scauto').setAttribute('aria-pressed', String(!!on)); $$('#scauto').textContent = on ? 'Auto photo on' : 'Auto photo off'; };
 
   async function openLive() {
     closeLive();
-    const L = live = { auto: pref('auto', true), steady: 0, since: Date.now(), busy: false, torch: false, sm: document.createElement('canvas') };
+    const L = live = { auto: pref('auto', true), steady: 0, since: Date.now(), busy: false, torch: false, armed: true, sm: document.createElement('canvas') };
     $$('#sclive').hidden = false; $$('#sclivefail').hidden = true; $$('#sctorch').hidden = true; $$('#scsnap').disabled = true;
-    $$('#sclivetitle').textContent = `Page ${num}`; $$('#sclivesize').textContent = ''; say('Opening the camera…'); paintAuto();
+    $$('#sclivetitle').textContent = liveTitle(); $$('#sclivedone').textContent = run && !one ? 'Done' : 'Close'; $$('#sclivesize').textContent = ''; say('Opening the camera…'); paintAuto();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 } } });
       if (live !== L) { stream.getTracks().forEach(t => t.stop()); return; }
@@ -325,12 +470,14 @@ export function mount({ view, esc, toast, subjects }) {
       const [gw, gh] = fitSize(vw, vh, 240), sm = L.sm; if (sm.width !== gw) { sm.width = gw; sm.height = gh; }
       const sx = sm.getContext('2d', { willReadFrequently: true }); sx.drawImage(v, 0, 0, gw, gh);
       const g = guessCorners(sx.getImageData(0, 0, gw, gh).data, gw, gh), c = coachFor(g, gw, gh);
-      L.steady = c.ok && L.prev && quadMove(L.prev, g.corners, gw, gh) < 0.012 ? L.steady + 1 : 0;
+      // in a burst the next photo waits for the sheet to change: the page gone or cut off, or moved well away from the last shot
+      if (!L.armed && (!c.ok || quadMove(L.shot, g.corners, gw, gh) > 0.04)) { L.armed = true; L.since = Date.now(); }
+      L.steady = L.armed && c.ok && L.prev && quadMove(L.prev, g.corners, gw, gh) < 0.012 ? L.steady + 1 : 0;
       L.prev = c.ok ? g.corners : null;
       drawLive(g.found ? g.corners.map(p => ({ x: p.x * vw / gw, y: p.y * vh / gh })) : null, c.ok);
       if (L.auto && Date.now() - L.since > GIVE_UP) { L.auto = false; L.gaveUp = true; paintAuto(); }
       if (L.auto && L.steady >= STEADY) return capture();
-      say(c.ok ? (L.auto ? 'Hold steady…' : 'Page found: tap Take photo') : c.say + (L.gaveUp ? '. Or tap Take photo' : ''));
+      say(!L.armed ? `Page ${L.took} taken. Now page ${run?.labels[run.i]}: swap the sheet` : c.ok ? (L.auto ? 'Hold steady…' : 'Page found: tap Take photo') : c.say + (L.gaveUp ? '. Or tap Take photo' : ''));
     }
     L.timer = setTimeout(look, 120);
   }
@@ -351,13 +498,20 @@ export function mount({ view, esc, toast, subjects }) {
     }
     if (live !== L) return;
     navigator.vibrate?.(40);
+    if (!blob) { L.busy = false; $$('#scsnap').disabled = false; say('Could not take the photo: try again.'); L.timer = setTimeout(look, 120); return; }
+    if (run && !one) { // a burst: the page is tidied beside the camera, which stays open for the next one
+      const label = await took(blob, true, null, how);
+      if (live !== L) return;
+      Object.assign(L, { busy: false, armed: false, shot: L.prev || [], took: label, steady: 0 });
+      $$('#sclivetitle').textContent = liveTitle(); $$('#scsnap').disabled = false;
+      return look();
+    }
     const r = $$('#scshot').dataset.replace || null; $$('#scshot').dataset.replace = '';
     closeLive();
-    if (!blob) return toast('Could not take the photo: try again.');
-    await startNext(); queue = []; startFile(blob, true, r, how);
+    took(blob, true, r, how);
   }
-  $$('#scsnap').onclick = capture;
-  $$('#sclivedone').onclick = () => { $$('#scshot').dataset.replace = ''; closeLive(); };
+  $$('#scsnap').onclick = () => { if (live) { live.armed = true; capture(); } };
+  $$('#sclivedone').onclick = () => { $$('#scshot').dataset.replace = ''; one = null; if (run) endRun(); else closeLive(); };
   $$('#scauto').onclick = () => { if (!live) return; live.auto = !live.auto; live.since = Date.now(); live.gaveUp = false; live.steady = 0; setPref('auto', live.auto); paintAuto(); };
   $$('#sctorch').onclick = async () => {
     const L = live; if (!L?.track) return;
@@ -366,6 +520,7 @@ export function mount({ view, esc, toast, subjects }) {
     $$('#sctorch').setAttribute('aria-pressed', String(L.torch)); $$('#sctorch').textContent = L.torch ? 'Torch on' : 'Torch off';
   };
   $$('#scfallback').onclick = () => { closeLive(); $$('#scshot').click(); };
+  $$('#scshotlbl').addEventListener('click', startShot, true);
   // the camera button opens the live camera; with the camera app switch on (or no live camera) the label opens the file picker
   $$('#scshotlbl').addEventListener('click', e => { if (e.target !== $$('#scshot') && canLive()) { e.preventDefault(); openLive(); } });
   $$('#sccamapp').checked = pref('camapp', false);
@@ -415,13 +570,27 @@ export function mount({ view, esc, toast, subjects }) {
     }
     const r = e.target.closest('[data-retry]');
     if (r) return send([show(r.dataset.retry)]);
+    const t = e.target.closest('[data-shoot]');
+    if (t) { one = { label: t.dataset.shoot }; setNum(t.dataset.shoot); return shoot(); } // an empty slot: take just that page
     const o = e.target.closest('[data-open]');
     if (o) {
       const p = show(o.dataset.open); let orig = false; view._open = p;
       const sh = () => { $$('#scimg').src = url(orig ? p.original : p.clean); $$('#scorig').textContent = orig ? 'Show tidied' : 'Show original'; };
       $$('#scdlgnum').innerHTML = `<option value="">Which page?</option>` + PAGE_LABELS.map(l => `<option ${p.label === l ? 'selected' : ''}>${l}</option>`).join('');
+      $$('#scdlgwhy').hidden = $$('#scdlgok').hidden = !p.needs; $$('#scdlgwhy').textContent = NEEDS[p.needs] || '';
       $$('#scorig').onclick = () => { orig = !orig; sh(); }; sh(); $$('#scdlg').showModal();
     }
+  };
+  // a taken page: it looks fine after all, adjust its corners, or a new photo from the gallery (one screen at a time: the dialog
+  // closes before the editor opens)
+  $$('#scdlgok').onclick = async () => { const p = view._open; $$('#scdlg').close(); if (!p) return; p.needs = ''; await putPage(p); await draw(); };
+  $$('#scadjust').onclick = () => {
+    const p = view._open; $$('#scdlg').close(); if (!p) return;
+    startFile(p.original, false, p.id, '', { label: p.label || num, one: true, corners: p.corners, mode: p.mode, still: p.still });
+  };
+  $$('#scgallery').onchange = e => {
+    const f = e.target.files[0], p = view._open; e.target.value = ''; $$('#scdlg').close(); if (!f || !p) return;
+    startFile(f, false, p.id, 'file', { label: p.label || num, one: true });
   };
   $$('#scdlgnum').onchange = async e => {
     const p = view._open; if (!p) return; p.label = e.target.value; await putPage(p); toast(p.label ? `Page ${p.label}` : 'Label cleared'); await draw();
@@ -430,7 +599,7 @@ export function mount({ view, esc, toast, subjects }) {
     const p = view._open; if (!p || !confirm('Delete this photo (original and tidied copy)?')) return;
     await delPage(p.id); $$('#scdlg').close(); await draw();
   };
-  $$('#scretake').onclick = () => { const p = view._open; $$('#scdlg').close(); if (!p) return; $$('#scshot').dataset.replace = p.id; num = p.label || num; setNum(num); shoot(); };
+  $$('#scretake').onclick = () => { const p = view._open; $$('#scdlg').close(); if (!p) return; $$('#scshot').dataset.replace = p.id; num = p.label || num; setNum(num); one = { label: num }; shoot(); };
   $$('#scclose').onclick = () => $$('#scdlg').close();
 
   // ---------- sending: all pages not yet sent at once; a page that fails shows Retry on its own
