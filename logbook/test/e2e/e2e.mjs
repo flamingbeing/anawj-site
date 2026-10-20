@@ -1940,7 +1940,7 @@ async function run(label, ctxOpts) {
     await p.locator('.theme-card', { hasText: 'WhatsApp-style' }).click(); await nap(300);
     eq(await s1(), '#008069', 'the theme did not bring its own top band');
     eq(await p.locator('.theme-now b').textContent(), 'WhatsApp-style', 'theme name');
-    assert(await p.evaluate(() => (localStorage.getItem('apmes-logbook-look-css') || '').includes('#008069')), 'look not cached for the first paint');
+    assert(await p.evaluate(() => (localStorage.getItem('apmes-logbook-look-css-v2') || '').includes('#008069')), 'look not cached for the first paint');
     await p.reload({ waitUntil: 'networkidle' }); await nap(300);
     eq(await s1(), '#008069', 'band lost after reload');
     await tab('themes');

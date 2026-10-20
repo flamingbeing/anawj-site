@@ -51,6 +51,23 @@ A theme **never** sets light or dark (no `mode`): give it both palettes and it m
 | `switchStyle` | ios, material | on / off switches |
 | `pressStyle` | highlight, none | what a press looks like |
 
+## Cascade layers (owner, 20 Oct 2026)
+
+`index.html` sets the order `@layer base, facets, theme, custom` and imports `style.css` into `base`. A later layer
+wins whatever the selectors, so **never repeat `:root`** to win; plain selectors are enough.
+
+| Layer | What | Written by |
+|---|---|---|
+| `base` | `style.css` (today's look) | index.html |
+| `base` (again) | most facets and band "none", after style.css: they compete with it by specificity as before, so the app's own special cases (the bold reflection tick, the Display preview) stay | `facetCss`, `lookCss` |
+| `facets` | facets with `wins: true` (header style, see-through bars, tab tone, heading tone, pop-ups, text boxes), each in its own sub-layer in `FACETS` order (a later one wins) | `facetCss` |
+| `theme` | colour tokens: the accent's palettes, then tints, band colours, heading font, `colours` | `schemeCss`, `lookCss`, tab colours |
+| `custom` | the resident's custom CSS | display.js `applyCustomCss` |
+
+High contrast (`html.hc`) uses `!important` in `base` so it still wins over a theme's colours. Browsers without layers
+(before Safari 15.4, Chrome 99, Firefox 97) get `style.css` as a plain sheet and ignore the layered sheets: the
+default look, still usable. The first-paint caches are `apmes-logbook-accent-css-v2` and `-look-css-v2`.
+
 ## Icon sets
 
 `ICON_SETS[set].css` restyles every icon; `paths` can redraw single icons by name, in the 24 × 24 stroked style
@@ -72,7 +89,7 @@ paths in the app's style; never copy an icon font's or a company's artwork.
 Add it to `FACETS` (key, group, label, choices with the default first, CSS per choice, or `js: true` and the code
 that reads it), add its key to `DISPLAY_KEYS` in display.js (a literal list: the settings-file test reads it), and
 to this table. The Themes page, Your themes, the settings file and the first-paint cache pick it up from the list.
-Defaults must stay pixel-identical: `test/e2e/app-style.mjs` checks that all off draws the page as before.
+Its CSS competes with style.css by specificity; give it `wins: true` (facets layer) only if it must beat all of style.css. Never repeat `:root`. Defaults must stay pixel-identical: `test/e2e/app-style.mjs` checks that all off draws the page as before.
 
 ## Inspired catalogue
 

@@ -59,10 +59,15 @@ export function stepZoom(dir) {
 }
 // Colour (this device's display settings): one accent colour; colors.js works out the
 // light, dark and OLED palettes. The CSS is cached on the device so the first paint has it (index.html).
-const ACCENT_CSS_KEY = 'apmes-logbook-accent-css';
+// The look's style sheets go in the cascade layers that index.html sets up (theme, facets, custom), so they win over
+// style.css without :root stacking; the -v2 cache keys keep the old stacked, unlayered CSS from a first paint.
+export const layered = (name, css) => (css ? `@layer ${name} {\n${css}\n}` : '');
+const ACCENT_CSS_KEY = 'apmes-logbook-accent-css-v2';
+const OLD_CSS_KEYS = ['apmes-logbook-accent-css', 'apmes-logbook-look-css'];
+try { for (const k of OLD_CSS_KEYS) localStorage.removeItem(k); } catch { /* storage blocked */ }
 export function applyAccent(c) {
   const accent = cleanAccent(c) || DEFAULT_ACCENT;
-  const css = schemeCss(accent);
+  const css = layered('theme', schemeCss(accent));
   let el = document.getElementById('accent-css');
   if (!el) { el = document.createElement('style'); el.id = 'accent-css'; document.head.append(el); }
   el.textContent = css;
@@ -118,7 +123,7 @@ export function resetDisplay() { adoptedNow = false; try { localStorage.removeIt
 export function applyDisplay(d = display()) { applyCompact(!!d.compact); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); applyLook(d); applyThemeLook(d); }
 // Themes (themes.js): the background tint, the top band, the heading font, spacing and tab style as one style sheet
 // after the colour's (so it wins), cached on the device for the first paint (index.html) like the colour's
-const LOOK_CSS_KEY = 'apmes-logbook-look-css';
+const LOOK_CSS_KEY = 'apmes-logbook-look-css-v2';
 export function applyThemeLook(d = display()) {
   const p = lightPalette(cleanAccent(d.accent) || DEFAULT_ACCENT);
   const css = lookCss(d, [p.s1, p.s2, p.s3, p.s4]);
@@ -168,7 +173,7 @@ export function applyLook(d = {}) {
   if (col === 'tabs' || col === 'all') {
     // with the default colour the tabs follow the NUH stripe at the top; with another colour, the brighter set
     const set = (cleanAccent(d.accent) || DEFAULT_ACCENT) === DEFAULT_ACCENT ? NUH_TAB_COLOURS : TAB_COLOURS;
-    const css = tabVarsCss(set) + '\n' + (col === 'all' ? Object.entries(set).map(([t, hex]) => tabSchemeCss(hex, `body[data-bar="${t}"]`)).join('\n') : '');
+    const css = layered('theme', tabVarsCss(set) + '\n' + (col === 'all' ? Object.entries(set).map(([t, hex]) => tabSchemeCss(hex, `body[data-bar="${t}"]`)).join('\n') : ''));
     let el = document.getElementById('tab-colours');
     if (!el) { el = document.createElement('style'); el.id = 'tab-colours'; document.head.append(el); }
     if (el.textContent !== css) el.textContent = css;
@@ -303,7 +308,8 @@ export function applyCustomCss(d = display()) {
   const on = !!d.customCssOn && res.ok && !!res.css && !/[?&]nocss\b/.test(location.search) && S.tab !== 'display' && S.tab !== 'displayadv';
   if (!on) { if (el) el.textContent = ''; return; }
   if (!el) { el = document.createElement('style'); el.id = 'user-css'; document.head.append(el); }
-  if (el.textContent !== res.css) el.textContent = res.css;
+  const css = layered('custom', res.css);   // the last layer: wins over every look
+  if (el.textContent !== css) el.textContent = css;
 }
 // Settings → Accessibility (#access; owner, 13 Oct 2026): size, contrast, motion and the gestures, gathered from
 // Display and Advanced display. All this device's.

@@ -23,7 +23,7 @@ for (const c of [...PRESETS.map(p => p[0]), '#fff176', '#ffffff', '#000000', '#8
 }
 // navy stays navy in light mode
 assert.equal(lightPalette(DEFAULT_ACCENT).accent, DEFAULT_ACCENT);
-assert.match(schemeCss('#2563eb'), /:root:root\[data-theme="dark"\]\[data-oled\]/);
+assert.match(schemeCss('#2563eb'), /:root\[data-theme="dark"\]\[data-oled\]/);
 assert.doesNotMatch(schemeCss(DEFAULT_ACCENT).split('\n')[0], /--s1/);   // the NUHS stripe stays for Default
 
 console.log('colour tests passed');

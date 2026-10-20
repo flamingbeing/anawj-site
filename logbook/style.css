@@ -1113,16 +1113,17 @@ html.lw-wide main:not(:has(.log-card.panes)) { max-width: 1400px; }
 html.lw-full main:not(:has(.log-card.panes)) { max-width: none; }
 /* while a swipe pushes the page sideways (app.js), it never makes the window scroll sideways */
 .swipe-peek { position: fixed; z-index: 5; margin: 0; pointer-events: none; will-change: transform; }
-/* higher contrast: darker text and stronger lines; "auto" follows the device's Increase contrast */
-html.hc:root:root:root { --ink: #000; --muted: #2e3338; --line: #737a82; --row-alt: #eef0f2; }
-html.hc:root:root:root[data-theme="dark"] { --ink: #fff; --muted: #e8e8e8; --line: #a0a6ad; }
+/* higher contrast: darker text and stronger lines; "auto" follows the device's Increase contrast; !important
+   so it wins over a theme's colours, which sit in a later cascade layer (index.html) */
+html.hc { --ink: #000 !important; --muted: #2e3338 !important; --line: #737a82 !important; --row-alt: #eef0f2 !important; }
+html.hc[data-theme="dark"] { --ink: #fff !important; --muted: #e8e8e8 !important; --line: #a0a6ad !important; }
 html.hc :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 @media (prefers-contrast: more) {
-  html.hc-auto:root:root:root { --ink: #000; --muted: #2e3338; --line: #737a82; --row-alt: #eef0f2; }
-  html.hc-auto:root:root:root[data-theme="dark"] { --ink: #fff; --muted: #e8e8e8; --line: #a0a6ad; }
+  html.hc-auto { --ink: #000 !important; --muted: #2e3338 !important; --line: #737a82 !important; --row-alt: #eef0f2 !important; }
+  html.hc-auto[data-theme="dark"] { --ink: #fff !important; --muted: #e8e8e8 !important; --line: #a0a6ad !important; }
 }
-@media (prefers-contrast: more) and (prefers-color-scheme: dark) { html.hc-auto:root:root:root[data-theme="auto"] { --ink: #fff; --muted: #e8e8e8; --line: #a0a6ad; } }
-@media (prefers-color-scheme: dark) { html.hc:root:root:root[data-theme="auto"] { --ink: #fff; --muted: #e8e8e8; --line: #a0a6ad; } }
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) { html.hc-auto[data-theme="auto"] { --ink: #fff !important; --muted: #e8e8e8 !important; --line: #a0a6ad !important; } }
+@media (prefers-color-scheme: dark) { html.hc[data-theme="auto"] { --ink: #fff !important; --muted: #e8e8e8 !important; --line: #a0a6ad !important; } }
 /* reduce motion: no animations or slides; "auto" follows the device's Reduce motion */
 html.rm *, html.rm *::before, html.rm *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 @media (prefers-reduced-motion: reduce) { html.rm-auto *, html.rm-auto *::before, html.rm-auto *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
