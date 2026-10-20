@@ -20,7 +20,9 @@ those in the review screen.
    - handwriting: crop the cell, ask Claude twice (different framing, 2× scale), accept only if both reads agree;
    - checks (`plausible.py`, `scan.py`): ranges (skin temperatures down to 20 °C), 24-hour times, whole numbers,
      option letters, core temperature jumping >1 °C (skin >6 °C) between neighbours, systolic above diastolic, two ticks
-     in one question, an arrow or ditto ("same as above"). Anything off is flagged; values with no known range are not.
+     in one question. Anything off is flagged; values with no known range are not. An arrow or ditto ("same as above"),
+     and an empty cell an arrow runs through, takes the reading above it in the same column (noted in the review screen);
+     an arrow with nothing above it stays flagged.
 4. **You confirm** (`review.html`): flagged fields first, the photo crop beside each reading. Only values you confirm
    are saved to `patient.reviewed.json`.
 5. **Export** (`export-scan.mjs`): reviewed files → the workbook through the app's own `workbook()`, same 572 columns.
@@ -45,7 +47,9 @@ own) and the page scores 0.70 or better; it is marked `check_alignment`. `--min-
 
 **Local model, no Claude** (`--reader ollama`): the crops go to a vision model in [Ollama](https://ollama.com) on the
 same computer, so nothing leaves it. Same two reads and agreement rule; `--model` (or `SCAN_MODEL`) picks the model, which
-must accept images (`ollama show <model>` lists "vision"; default `gemma4:12b`). Measure it before trusting it:
+must accept images (`ollama show <model>` lists "vision"; default `gemma4:12b`, about 1.5 s per cell on a 16 GB Radeon
+with thinking switched off, as the reader does; a model that ignores `think: false`, such as the thinking build of
+`qwen3-vl:8b`, is slow). Measure it before trusting it:
 `python3 bench.py --form-dir form-data --crops crops/ --truth pt01.reviewed.json --model <model>` reads crops exported with
 `--export-crops` whose values a person has confirmed, and prints how many were right, flagged (sent to the person) and
 WRONG (unflagged and wrong: the number that matters). It prints counts and field ids only.

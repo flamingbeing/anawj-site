@@ -60,7 +60,10 @@ class OllamaReader:
         import urllib.request
         unit = f' ({f["unit"]})' if f.get('unit') else ''
         prompt = (PROMPT_A if variant == 0 else PROMPT_B).format(label=f['label'], unit=unit, expect=_expect(f))
-        body = json.dumps({'model': self.model, 'stream': False, 'format': 'json', 'options': {'temperature': 0},
+        # think off: gemma4 otherwise writes ~270 tokens of reasoning per crop (11 s instead of 1.4 s, same reads);
+        # keep_alive saves a 7-10 s reload between pages; num_predict stops a runaway (answers are ~15 tokens)
+        body = json.dumps({'model': self.model, 'stream': False, 'format': 'json', 'think': False, 'keep_alive': '30m',
+                           'options': {'temperature': 0, 'num_predict': 64},
                            'messages': [{'role': 'user', 'content': prompt, 'images': [base64.b64encode(png).decode()]}]})
         req = urllib.request.Request(self.url + '/api/chat', body.encode(), {'Content-Type': 'application/json'})
         try:

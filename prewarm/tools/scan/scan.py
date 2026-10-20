@@ -168,6 +168,28 @@ def arrow_gaps(fields_out, fields):
                 fields_out[fid]['flags'].append('empty between arrows: same as the reading above?')
 
 
+def fill_arrows(fields_out, fields):
+    """A 'same as above' arrow (or an empty cell the arrow runs through) repeats the reading above it in the same column:
+    copy that value in and note it, so the person sees where it came from. An arrow with nothing above it stays flagged."""
+    cols = {}
+    for fid in fields_out:
+        f = fields[fid]
+        if f.get('series') and f.get('col'):
+            cols.setdefault((f['series'], f['col']), []).append((fid, f['point']))
+    for pts in cols.values():
+        pts.sort(key=point_order)
+        last = None
+        for fid, _ in pts:
+            e = fields_out[fid]
+            marks = [t for t in e['flags'] if 'same as the reading above' in t]
+            if marks and e.get('value') in (None, '') and last is not None:
+                e['value'] = last
+                e['flags'] = [t for t in e['flags'] if t not in marks]
+                e.setdefault('notes', []).append('arrow: copied from the reading above')
+            if e.get('value') not in (None, ''):
+                last = e['value']
+
+
 def series_checks(fields_out, fields):
     """Things a nurse's pen can get wrong that a rule can spot: a temperature jumping, BP upside down, time going back."""
     by = {}
@@ -262,8 +284,9 @@ def main(argv=None, reader=None):
             pages[-1]['template_mismatch'] = True
             print(f'{ph}: page {pg + 1}: printed text is leaking into the ink layer ({leak:.0f}); the template does not match the paper layout (fonts / row heights): ticks on this page are less reliable', file=sys.stderr)
         result.update(process_page(pg, flat, tpls[pg], fmap, fields, boxes.cells(f'{a.form_dir}/blank.pdf', pg), reader, boxes.header_bottom(f'{a.form_dir}/blank.pdf', pg)))
-    series_checks(result, fields)
     arrow_gaps(result, fields)
+    fill_arrows(result, fields)
+    series_checks(result, fields)
     if hasattr(reader, 'finish'):
         reader.finish()
         print(f'{len(reader.items)} handwritten crops, contact sheets a-NN.png and b-NN.png and manifest.json in {a.export_crops}')
