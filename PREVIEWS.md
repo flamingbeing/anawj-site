@@ -67,8 +67,9 @@ the logbook or evals can be tried for real before it reaches `apmes.anawj.com` (
   free plan: no backups, test data only.
 - **Trying a PR:** point `beta` at the PR's branch (`git push --force origin <branch>:beta`); `beta` is disposable,
   nothing ever merges from it. Wait for the anawj-beta build, then send the owner the beta link.
-- **Merging:** PRs that change the logbook or evals wait for the owner's "ship it" after he has tried them on beta
-  (AGENTS.md, "Before merging"), once beta is set up.
+- **Opt-in** (owner, 20 Oct 2026): beta is used only when the owner asks, or for sign-in or rules changes; then the PR
+  waits for his "ship it" (AGENTS.md, "Before merging"). The `anawj-beta` Worker builds only `beta`, not every branch
+  (Settings → Builds: non-production branch builds off), so PRs get one preview, from `anawj-preview`.
 - **Firestore rules:** test the rules with the emulator as before; deploy them to the test project before live.
 
 Still to set up (once): Google sign-in on the test project, with `beta-apmes.anawj.com` in its authorised domains and
@@ -88,7 +89,8 @@ Paid raises the limit. To save minutes:
 
 ## Before-and-after screenshots on PRs
 
-`.github/workflows/pr-screenshots.yml` (`tools/shots.mjs`): on every PR from this repo, the first screen (390 px, demo
+`.github/workflows/pr-screenshots.yml` (`tools/shots.mjs`): on every PR from this repo that changes a page (not only
+notes, tests, `tools/` or `status/`), the first screen (390 px, demo
 mode) of each app the PR changes, on `main` and on the PR, side by side in one PR comment that each push updates. More
 screens: a line `Screens: /logbook/?demo#notes, /evals/?demo` in the PR description (up to 6 pages). The pictures are
 kept on the branch `pr-screenshots`, rewritten on every run as one commit holding only open PRs' latest pictures (no
