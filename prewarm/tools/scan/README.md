@@ -108,7 +108,7 @@ route answers the phone from `status.json` (below): per page received / reading 
 the page the study computer found it to be, its score and value and flag counts; numbers and states only, never values.
 
 `python watch.py` (also on the study computer; needs Ollama, `gcloud` signed in as the owner, and `SCAN_FORM_DIR` from `setup-form.sh`) waits until a received
-folder has been quiet for `SCAN_QUIET` seconds (90), runs `scan.py --reader ollama` on it, and files the values and flags (no photos, crops or labels)
+folder has been quiet for `SCAN_QUIET` seconds (90), runs `scan.py --reader ollama` on it, and files the values and flags with the Subject ID from the phone and each value's form page and place on it (`box`, fractions of the page; no photos, crops or labels)
 as `scanImports/<scan>` in `prewarm-study` with status `pending`, using gcloud's token (so no app user can create one). The phone's page
 numbers go in as `--hint-pages`: kept unless another page lines up clearly better, so a page shot out of order is put right (and the
 phone moves it to its slot). Photos that arrive after a read (a retake, a late page) are read on their own and filed as `<scan>-2`, `-3`...;

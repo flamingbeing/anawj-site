@@ -107,6 +107,15 @@ def read_cell(reader, f, crop_gray):
     return [a, b]
 
 
+def field_box(loc, w, h):
+    """a field's place on its page as fractions of the page {x, y, w, h}: its cell and option boxes together. The phone's tidied
+    page is the whole sheet too, so the same fractions find the field on it (coordinates only, never a picture)."""
+    rs = ([loc['rect']] if loc.get('rect') else []) + list(loc.get('options', {}).values())
+    if not rs: return None
+    x0, y0, x1, y1 = min(r[0] for r in rs), min(r[1] for r in rs), max(r[2] for r in rs), max(r[3] for r in rs)
+    return {'x': round(x0 / w, 4), 'y': round(y0 / h, 4), 'w': round((x1 - x0) / w, 4), 'h': round((y1 - y0) / h, 4)}
+
+
 def process_page(page_no, flat, tpl, fmap, fields, cells, reader, header_bottom=0):
     ink = align.ink_layer(flat, tpl)
     out = {}
@@ -326,7 +335,10 @@ def main(argv=None, reader=None):
             pages[-1]['template_mismatch'] = True
             print(f'{ph}: page {pg + 1}: printed text is leaking into the ink layer ({leak:.0f}); the template does not match the paper layout (fonts / row heights): ticks on this page are less reliable', file=sys.stderr)
         got = process_page(pg, flat, tpls[pg], fmap, fields, boxes.cells(f'{a.form_dir}/blank.pdf', pg), reader, boxes.header_bottom(f'{a.form_dir}/blank.pdf', pg))
-        for e in got.values(): e['page'] = pg + 1          # which page each value came from (the phone's per-page counts)
+        th, tw = tpls[pg].shape[:2]
+        for fid, e in got.items():
+            e['page'] = pg + 1          # which page each value came from (the phone's per-page counts)
+            e['box'] = field_box(fmap['fields'][fid], tw, th)   # where on the page, for the crop the admin sees from the phone's copy
         result.update(got)
     arrow_gaps(result, fields)
     fill_arrows(result, fields)

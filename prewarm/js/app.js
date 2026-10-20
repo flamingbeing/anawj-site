@@ -2019,7 +2019,7 @@ route(/^\/scanimports$/, () => {
   header('Scan imports', '#/settings');
   if (!shared.admin) return paint('<p class="note">Sign in as a study admin from Settings.</p>');
   paint('');
-  scanImports.mount({ view, esc, toast, cloud, patients: () => patients, sid, val, setField: set });
+  scanImports.mount({ view, esc, toast, cloud, patients: () => patients, sid, val, setField: set, photo: scan.pagePhoto });
 });
 route(/^\/settings$/, () => {
   header('Settings', '#/');

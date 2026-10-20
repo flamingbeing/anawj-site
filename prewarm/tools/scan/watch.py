@@ -2,8 +2,10 @@
 
 Every received scan folder (SCAN_INBOX/<scan>/page-<n>.jpg|png, from inbox.py) with photos not read yet that has stopped
 changing is read with scan.py --reader ollama (a local vision model: nothing leaves this computer), and the values and flags
-it found go to Firestore as scanImports/<scan> in prewarm-study (status "pending"). An admin approves them in the app before
-anything reaches a patient (firestore.rules). Photos, crops and the scan.json stay in the folder: only values and flags are sent.
+it found go to Firestore as scanImports/<scan> in prewarm-study (status "pending"), with the Subject ID typed on the phone
+and each value's form page and place on it (coordinates: the app cuts the crop from the phone's own copy). An admin
+approves them in the app before anything reaches a patient (firestore.rules). Photos, crops and the scan.json stay in the
+folder: only values, flags and coordinates are sent.
 
 Rounds: photos that arrive after a folder was read (a retake, a late page) are read on their own and filed as
 scanImports/<scan>-2, -3 ... (an import an admin may be reviewing is never overwritten).
@@ -69,16 +71,38 @@ def ready(folder, now, quiet):
     return now - newest >= quiet
 
 
-def build_doc(scan, scan_json, now_ms):
-    """scan.json -> the import document. Values and flags only: no crops, no photos, no labels."""
+SUBJECT = re.compile(r'^[A-Za-z0-9][A-Za-z0-9 _./-]{0,39}$')   # the Subject IDs inbox.py takes
+
+
+def box_of(b):
+    """a field's place on its page {x, y, w, h} (fractions), or None if it is not one"""
+    if not isinstance(b, dict): return None
+    try: out = {k: round(float(b[k]), 4) for k in ('x', 'y', 'w', 'h')}
+    except (KeyError, TypeError, ValueError): return None
+    return out if all(0 <= v <= 1 for v in out.values()) and out['w'] > 0 and out['h'] > 0 else None
+
+
+def build_doc(scan, scan_json, now_ms, subject=''):
+    """scan.json -> the import document. Values, flags, the form page and the field's place on it (coordinates) only:
+    no crops, no photos, no labels. `subject` is the Subject ID typed on the phone (meta.json), so the app can pick the patient."""
     fields = {}
     for fid, e in scan_json.get('fields', {}).items():
         v = e.get('value')
         flags = [str(x)[:200] for x in e.get('flags', [])][:10]
         if (v is None or str(v) == '') and not flags: continue
         fields[fid] = {'v': '' if v is None else str(v)[:200], 'flags': flags}
+        if isinstance(e.get('page'), int) and 1 <= e['page'] <= 14: fields[fid]['page'] = e['page']
+        if (b := box_of(e.get('box'))): fields[fid]['box'] = b
     pages = [{'page': p.get('page'), 'accepted': bool(p.get('accepted')), 'score': p.get('score')} for p in scan_json.get('pages', [])]
-    return {'scan': scan, 'createdAt': now_ms, 'status': 'pending', 'pages': pages, 'fields': fields}
+    doc = {'scan': scan, 'createdAt': now_ms, 'status': 'pending', 'pages': pages, 'fields': fields}
+    if isinstance(subject, str) and SUBJECT.match(subject.strip()): doc['subject'] = subject.strip()
+    return doc
+
+
+def subject_of(folder):
+    """the Subject ID sent with the photos (inbox.py keeps it in meta.json), or ''"""
+    try: return str(json.load(open(os.path.join(folder, 'meta.json'))).get('subject') or '')
+    except (OSError, ValueError, AttributeError): return ''
 
 
 def fs_value(x):
@@ -151,7 +175,7 @@ def process(folder, scan, form_dir, project, read=run_scan, send=post, get_token
     st['state'] = 'reading'; st['reading'] = [l for l, _ in todo]; save_status(folder, st)
     try:
         sj = read(folder, form_dir, model, todo)
-        doc = build_doc(scan, sj, int(time.time() * 1000))
+        doc = build_doc(scan, sj, int(time.time() * 1000), subject_of(folder))
         if not doc['fields'] and not any(p['accepted'] for p in doc['pages']):
             doc['note'] = 'No photo lined up: retake and send again.'
         out = send(project, import_id, doc, get_token())

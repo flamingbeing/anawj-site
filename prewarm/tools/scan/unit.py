@@ -3,6 +3,10 @@ import cv2, numpy as np
 import plausible as p, scan, ticks
 
 F = lambda id, type, **k: dict(id=id, type=type, **k)
+# a field's place on its page, as fractions (cell and option boxes together; the crop on the admin's phone)
+assert scan.field_box({'rect': [100, 200, 300, 260], 'options': {}}, 1000, 2000) == {'x': 0.1, 'y': 0.1, 'w': 0.2, 'h': 0.03}
+assert scan.field_box({'options': {'0': [100, 50, 120, 70], '1': [400, 50, 420, 80]}}, 1000, 1000) == {'x': 0.1, 'y': 0.05, 'w': 0.32, 'h': 0.03}
+assert scan.field_box({'options': {}}, 1000, 1000) is None
 YN = [[0, 'No'], [1, 'Yes']]; TH = [[-3, '−3 Cold'], [0, '0 Neutral'], [3, '+3 Hot']]
 # numbers: whole, decimal, 3-digit temperature, wide skin range, minus signs
 assert p.clean(F('age', 'int'), '68') == (68, [])

@@ -56,7 +56,14 @@ are in the owner's private notes.
   of order is corrected. `watch.py` writes `status.json` per folder (per photo: page found, score, accepted or why not,
   value and flag counts, import id; review state of each import looked up every 5 min) and `inbox.py` serves it as the
   status route: numbers and states only, never values. Admin screen `js/scan-imports.js`, route
-  `#/scanimports` (Settings › Scan imports, admins, with Scan pages on): pick the patient, tick values, Approve; nothing reaches a patient before that.
+  `#/scanimports` (Settings › Scan imports, admins, with Scan pages on), phone-first (owner, 20 Oct 2026): imports grouped by
+  Subject ID (rounds `-2`, `-3` with their first read); the patient picked from the Subject ID sent with the scan (`subject`,
+  from meta.json via watch.py), else found by typing (no dropdown); values grouped by form page in form order, only those to
+  check shown (flagged, or replacing a saved value: Now saved beside Scanned), the rest folded under "n look fine"; Next to
+  check (and Enter) walks them; a value is edited in place (that ticks it) with "Scanner read: …" kept beside it, and the edit
+  changes only what is copied into the patient, never the import; the photo of each value is cut from this phone's own tidied
+  page (`box`, the field's place as fractions of the page, from scan.py's field map), else "Photo only on the phone that
+  scanned it". Approve; nothing reaches a patient before that.
   Next (owner's call): in-app email allowlist (PB2).
 - **Blinding:** the randomisation group shows only on the pre-warming screen (and when the patient is created).
 - **Columns:** `schema.js` lists fields in template column order; field n is column n. `test/prewarm.test.mjs` pins

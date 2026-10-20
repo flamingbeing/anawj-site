@@ -22,8 +22,9 @@ rules_version = '2';
 //   forms/blank     the blank paper data collection form (.docx, base64), uploaded by an admin:
 //                   { b64, name, size, setAt, setBy }; members and admins read it (the Form view fills it in).
 //   scanImports/{id}  Firetop's reading of one received scan, waiting for an admin:
-//                   { scan, createdAt, status: 'pending'|'approved'|'rejected', pages, fields: { fieldId: { v, flags } },
-//                   reviewedBy?, reviewedAt? }. Values only, no photos or crops.
+//                   { scan, subject?, createdAt, status: 'pending'|'approved'|'rejected', pages,
+//                   fields: { fieldId: { v, flags, page?, box?: { x, y, w, h } } }, reviewedBy?, reviewedAt? }. Values only, no
+//                   photos or crops: subject is the Subject ID typed on the phone, box the field's place on its page (fractions).
 //                   No app user can create one: Firetop writes them with its own Google sign-in. Admins read them and can only
 //                   mark a pending one approved or rejected (nothing else in it changes). Approving copies values into a
 //                   patient through the patients rules below.
