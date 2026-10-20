@@ -25,11 +25,15 @@ A theme **never** sets light or dark (no `mode`): give it both palettes and it m
   `lineHeight`, `band` ('none', 'shades', 'nuh'; or give the theme its own four `band` colours).
 - **Layout:** `navStyle` (tabs / rail), `rowLayout` (card / compact / chat / timeline), `formLayout` (page / sections),
   `tabIcons` (icons only), `pageTitles`, `calPlain`, `iconBtns`.
+- **Fine-tune** (theme-engine.js `FINE_TUNE`; numbers, unset by default, in range and on the step or the theme is refused):
+  `ftBtn` button height 32-56 px, `ftGap` gaps 2-16 px, `ftLine` line weight 0-3 px, `ftShadow` card shadow 0-4,
+  `ftCases` space between cases 0-20 px, `ftDays` space between days 0-32 px, `ftLetter` letter spacing -0.03 to 0.08 em,
+  `ftWeight` text weight 300-600. Their CSS sits in the `tune` layer, after the theme and before custom CSS.
 - **Facets** (theme-engine.js `FACETS`; each off by default; the value must be one of its choices):
 
 | Key | Choices | What it changes |
 |---|---|---|
-| `spacing` | tight, roomy | card padding, row height |
+| `spacing` | tight (Snug), compact (Tight: the old Compact mode), roomy | card padding, row height; the old `compact: true` is folded to `spacing: 'compact'` |
 | `tabStyle` | pill, plain, indicator | how the current tab is marked |
 | `statusBar` | header, page | the phone's status bar colour (Android, browsers) |
 | `headerStyle` | filled, large | a header filled with the accent (Android apps) or an iOS large title |

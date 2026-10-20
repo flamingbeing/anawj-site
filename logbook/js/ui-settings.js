@@ -11,7 +11,7 @@ import { recentCount as snapRecent } from './logging.js';
 import { OPERATOR_HELP } from './search-ops.js';
 import { DEFAULT_ACCENT, cleanAccent, SWATCHES, COLOUR_TOKENS, cleanColours, colourPalette, colourChecks, checkColours } from './colors.js';
 import { THEMES, FEATURED, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, BANDS, HEAD_FONTS } from './themes.js';
-import { FACETS, FACET_GROUPS, facetDefault } from './theme-engine.js';
+import { FACETS, FACET_GROUPS, facetDefault, FINE_TUNE, TUNE_KEYS, cleanTune } from './theme-engine.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS, HEAD_STYLES, mdDate, fileDate } from './markdown.js';
 import { checkCss } from './custom-css.js';
 import { cleanMine, saveMine, minePatch, matchMine, exportText, importText, lookOf } from './my-themes.js';
@@ -21,7 +21,7 @@ import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.
 import { partsSettings } from './ui-parts.js';
 import { labelsOn } from './parts.js';
 import { NAV_STYLES, ROW_LAYOUTS, FORM_LAYOUTS, rowLayoutOf, deviceOn, deviceChanges, deviceReset, DEVICE_SWITCHES } from './device-presets.js';
-import { applyCompact, applyTheme, cachedTheme, TEXT_SIZES, ZOOMS, applyTextSize, applyZoom, applyAccent, display, setDisplay, applyDisplay, LINE_WIDTHS, LINE_HEIGHTS, CONTRASTS, MOTIONS, BUTTON_STYLES, defaultTitle, BORDERS, ROUNDS, roundLevel, BAR_TABS, barTabs, MAX_BAR, arrangeTabs, setTabOnBar, borderLevel, cleanTitle, IPHONE_APP, START_TABS, CARD_STYLES, cardStyle, cardPatch } from './display.js';
+import { applyThemeLook, applyTheme, cachedTheme, TEXT_SIZES, ZOOMS, applyTextSize, applyZoom, applyAccent, display, setDisplay, applyDisplay, LINE_WIDTHS, LINE_HEIGHTS, CONTRASTS, MOTIONS, BUTTON_STYLES, defaultTitle, BORDERS, ROUNDS, roundLevel, BAR_TABS, barTabs, MAX_BAR, arrangeTabs, setTabOnBar, borderLevel, cleanTitle, IPHONE_APP, START_TABS, CARD_STYLES, cardStyle, cardPatch } from './display.js';
 import { resetLink, help, toggle } from './settings-rows.js';
 // (the display helpers are still exported from here: the e2e tests import them from this file)
 export * from './display.js';
@@ -91,11 +91,12 @@ export function renderDisplay() {
     h('section', { class: 'card' },
       h('h2', {}, 'Display'),
       h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Colours, light or dark, corners, fonts and ready-made looks are in ', h('a', { href: '#themes' }, 'Themes'), '.'),
-      toggle('Compact mode', st.compact, v => { applyCompact(v); setDisplay({ compact: v }); }, 'Smaller chips, rows and spacing, so more tags fit.'),
+      // the old Compact mode is Spacing: Tight (Themes → Shape and type)
+      toggle('Compact mode (Tight spacing)', st.spacing === 'compact', v => { applyDisplay(setDisplay({ spacing: v ? 'compact' : null })); }, 'Smaller chips, rows and spacing, so more tags fit. The same as Spacing: Tight in Themes.'),
       // the tab the app opens on (a link or shortcut to a tab still opens that tab)
       pick('Open the app on', START_TABS, st.startTab || 'log', v => { setDisplay({ startTab: v }); toast('Saved'); }),
       DEVICE_NOTE()),
-    resetLink('compact mode and the start tab on this device', () => { applyDisplay(setDisplay({ compact: null, startTab: null })); }),
+    resetLink('compact mode and the start tab on this device', () => { applyDisplay(setDisplay({ ...(display().spacing === 'compact' ? { spacing: null } : {}), startTab: null })); }),
     advancedLink('displayadv', 'Advanced display settings', 'The header and tab bar, Logbook rows, page width, the Case tab layout, custom CSS'));
 }
 
@@ -198,6 +199,7 @@ export function renderThemes() {
       fontPicker('log'),
       lookPick('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
       DEVICE_NOTE()),
+    fineTuneCard(st),
     h('section', { class: 'card' },
       h('h2', {}, 'Layout'),
       lookPick('navStyle', 'Navigation layout', NAV_STYLES, 'tabs', 'The rail appears above 900 px; smaller windows keep tabs.'),
@@ -213,6 +215,24 @@ export function renderThemes() {
     resetLink('the theme and every look setting on this page (light, the NUHS colours, lines, corners, fonts and spacing) on this device', () => {
       applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'fontUiName', 'fontLogName'].map(k => [k, null])) }));
     }));
+}
+// Fine-tune (theme-revamp S2): a slider for each single size (theme-engine.js FINE_TUNE), unset until moved; the
+// page changes as it moves (the tune layer of the look's style sheet). Reset puts them all back to unset.
+function fineTuneCard(st) {
+  const row = t => {
+    const v0 = cleanTune(t.key, st[t.key]);
+    const say = v => (v == null ? 'Not set' : `${v}${t.unit}`);
+    const note = h('span', { class: 'hint', style: 'margin:0' }, say(v0));
+    const input = h('input', { type: 'range', min: String(t.min), max: String(t.max), step: String(t.step), value: String(v0 ?? t.from), 'aria-label': t.label, 'aria-valuetext': say(v0),
+      oninput: e => { const v = cleanTune(t.key, Number(e.target.value)); note.textContent = say(v); e.target.setAttribute('aria-valuetext', say(v)); applyThemeLook(setDisplay({ [t.key]: v })); } });
+    return h('div', { class: 'field tune-row', style: 'margin-top:10px', 'data-tune': t.key }, h('label', { class: 'field', style: 'margin:0' }, t.label, input), note, t.line ? help(t.line) : null);
+  };
+  return h('section', { class: 'card fine-tune' },
+    h('h2', {}, 'Fine-tune'),
+    help('Single sizes over the spacing above. Each is off until you move its slider; a theme can set them too. Bigger tap targets (Accessibility) keep Case tab buttons at 44 px or more.'),
+    FINE_TUNE.map(row),
+    h('div', { class: 'bar', style: 'margin:10px 0 0' }, h('button', { type: 'button', class: 'small', onclick: () => { applyThemeLook(setDisplay(Object.fromEntries(TUNE_KEYS.map(k => [k, null])))); hooks.render(); } }, 'Reset Fine-tune')),
+    DEVICE_NOTE());
 }
 // Settings → Display → Advanced display settings (#displayadv), under headings (owner, 13 Oct 2026): the header and
 // tab bar, Logbook rows, text, the Case tab layout, then custom CSS

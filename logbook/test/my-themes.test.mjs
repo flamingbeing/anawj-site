@@ -12,7 +12,7 @@ assert.deepEqual(lookOf({ accent: '#ABCDEF', shadows: false, flat: true }), { ac
 
 // save, replace by name, newest first, the limit
 let mine = saveMine([], '  Fake   night ', { accent: '#112233', round: 0, compact: true }, 'dark', 'a1');
-assert.deepEqual(mine, [{ id: 'a1', name: 'Fake night', look: { accent: '#112233', round: 0, compact: true }, mode: 'dark' }]);
+assert.deepEqual(mine, [{ id: 'a1', name: 'Fake night', look: { accent: '#112233', round: 0, spacing: 'compact' }, mode: 'dark' }]);   // the old Compact mode is Spacing: Tight
 mine = saveMine(mine, 'Fake day', { spacing: 'roomy' }, null, 'b2');
 mine = saveMine(mine, 'fake NIGHT', { round: 3 }, null, 'c3');
 assert.deepEqual(mine.map(t => t.name), ['fake NIGHT', 'Fake day'], 'same name (any capitals) replaced');

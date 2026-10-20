@@ -73,7 +73,9 @@ export const FACET_GROUPS = [['shape', null], ['header', 'Header and status bar'
 const opts = o => Object.entries(o).map(([k, v]) => [k, v.label]);
 export const FACETS = [
   // Shape and type (drawn on that card, not under App-style details)
-  { key: 'spacing', group: 'shape', label: 'Spacing', choices: [['normal', 'Normal (default)'], ['tight', 'Tight'], ['roomy', 'Roomy']], css: {
+  // Spacing (theme-revamp S2; owner, 21 Oct 2026): 'compact' is the old Compact mode (style.css body.compact, set by
+  // display.js applyCompact), shown as Tight; 'tight' is the milder spacing it always was, shown as Snug
+  { key: 'spacing', group: 'shape', label: 'Spacing', line: 'Tight is the old Compact mode.', choices: [['normal', 'Normal (default)'], ['tight', 'Snug'], ['compact', 'Tight'], ['roomy', 'Roomy']], css: {
     roomy: 'section.card { padding: 20px; margin-bottom: 16px; } ul.cases li { padding-top: 12px; padding-bottom: 12px; } .chips { gap: 8px; }',
     tight: 'section.card { padding: 11px; margin-bottom: 8px; } ul.cases li { padding-top: 6px; padding-bottom: 6px; } .chips { gap: 4px; }' } },
   { key: 'tabStyle', group: 'shape', label: 'Tab bar style', line: 'How the tab you’re on is marked.', choices: [['underline', 'Underline (default)'], ['pill', 'Pill'], ['plain', 'Plain (colour only)'], ['indicator', 'Icon pill (Material)']], css: {
@@ -168,4 +170,49 @@ export function facetCss(d = {}) {
     if (css) out.push(f.wins ? `@layer facets { @layer ${f.key} { ${css} } }` : `@layer base { ${css} }`);
   }
   return out.filter(Boolean);
+}
+
+// The old Compact mode switch (compact: true) is Spacing: Tight now ('compact'; it looked the same with any spacing,
+// its rules being the more specific). The key stays readable: a device, a settings file or a saved theme that still
+// has it is folded on reading. -> the same object if there is nothing to fold
+export function foldCompact(o) {
+  if (!o || typeof o !== 'object' || !('compact' in o)) return o;
+  const { compact, ...rest } = o;
+  return compact === true ? { ...rest, spacing: 'compact' } : rest;
+}
+
+// Fine-tune (Themes → Fine-tune; theme-revamp S2): single size values over the spacing preset, unset (null) by
+// default, per device; a theme may set them too (checkTheme: in range only). Their CSS goes in the tune layer
+// (index.html), after the theme's and before the resident's custom CSS. from: where the slider starts while unset.
+const NOT_BTN = ':not(.link, .linkish, .small, .big, .chip, .note-flag, .demo-flag, .tabs *)';
+export const FINE_TUNE = [
+  { key: 'ftBtn', label: 'Button height', unit: 'px', min: 32, max: 56, step: 2, from: 40,
+    css: v => `:is(button, .btn)${NOT_BTN} { min-height: ${v}px; } html.big-taps .log-card :is(button, .btn)${NOT_BTN} { min-height: max(${v}px, 44px); }` },
+  { key: 'ftGap', label: 'Gaps', line: 'Between buttons and tags.', unit: 'px', min: 2, max: 16, step: 1, from: 8,
+    css: v => `.bar, .chips, .actions, .datebar { gap: ${v}px; }` },
+  { key: 'ftLine', label: 'Line weight', line: 'Card, row and box lines.', unit: 'px', min: 0, max: 3, step: 0.5, from: 1,
+    css: v => `section.card, .log-card, :is(input:not([type=checkbox], [type=radio], [type=range], [type=color]), select, textarea) { border-width: ${v}px; } ul.cases li { border-bottom-width: ${v}px; }` },
+  { key: 'ftShadow', label: 'Shadow', line: 'Under the cards.', unit: '', min: 0, max: 4, step: 1, from: 0,
+    css: v => `section.card { box-shadow: ${v ? `0 ${v}px ${v * 4}px rgba(0, 0, 0, ${(0.04 + 0.03 * v).toFixed(2)})` : 'none'}; }` },
+  { key: 'ftCases', label: 'Space between cases', unit: 'px', min: 0, max: 20, step: 1, from: 10,
+    css: v => `ul.cases > li:not(.monthhead) { padding-top: ${v}px; padding-bottom: ${v}px; }` },
+  { key: 'ftDays', label: 'Space between days', line: 'Above each day or month heading in the Logbook.', unit: 'px', min: 0, max: 32, step: 2, from: 0,
+    css: v => `ul.cases > li.monthhead:not(:first-child) { margin-top: ${v}px; }` },
+  { key: 'ftLetter', label: 'Letter spacing', unit: 'em', min: -0.03, max: 0.08, step: 0.01, from: 0,
+    css: v => `body { letter-spacing: ${v}em; }` },
+  { key: 'ftWeight', label: 'Text weight', unit: '', min: 300, max: 600, step: 100, from: 400,
+    css: v => `body { font-weight: ${v}; }` },
+];
+export const TUNE_KEYS = FINE_TUNE.map(t => t.key);
+// a Fine-tune value if it is a number in range on its step, else null (unset)
+export function cleanTune(k, v) {
+  const t = FINE_TUNE.find(x => x.key === k);
+  if (!t || typeof v !== 'number' || !Number.isFinite(v) || v < t.min - 1e-9 || v > t.max + 1e-9) return null;
+  const n = (v - t.min) / t.step;
+  return Math.abs(n - Math.round(n)) < 1e-6 ? Math.round(v * 1000) / 1000 : null;
+}
+// the CSS of the set Fine-tune values (nothing when none is set)
+export function tuneCss(d = {}) {
+  const css = FINE_TUNE.map(t => { const v = cleanTune(t.key, d[t.key]); return v == null ? '' : t.css(v); }).filter(Boolean);
+  return css.length ? `@layer tune {\n${css.join('\n')}\n}` : '';
 }

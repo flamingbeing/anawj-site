@@ -12,7 +12,7 @@ import { SWITCH_KEYS } from './profiles.js';
 import { cleanSync } from './sync-md.js';
 import { cleanColours } from './colors.js';
 import { cleanMine } from './my-themes.js';
-import { FACET_KEYS, cleanFacet } from './theme-engine.js';
+import { FACET_KEYS, cleanFacet, TUNE_KEYS, cleanTune } from './theme-engine.js';
 import { cleanLayout } from './analytics.js';
 import { cleanLabels, cleanCaseTemplate } from './parts.js';
 import { cleanListFormat } from './list-format.js';
@@ -31,6 +31,7 @@ const OBJECTS = {
   colours: v => { const c = cleanColours(v); return Object.keys(c).length ? c : null; },
   // the theme engine's facets: only their listed choices (theme-engine.js)
   ...Object.fromEntries(FACET_KEYS.map(k => [k, v => cleanFacet(k, v)])),
+  ...Object.fromEntries(TUNE_KEYS.map(k => [k, v => cleanTune(k, v)])),   // Fine-tune: numbers in range
   tagSet: v => (v == null ? null : cleanTagSet(v)),
   shareFormat: v => cleanFormat(v),
   markdown: v => { try { return storedMarkdown(v); } catch { return null; } },

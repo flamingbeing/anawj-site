@@ -5,15 +5,16 @@
 import { S, h, toast, modal, hooks, profile, facultyRole, shows } from './ui-core.js';
 import { DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
 import { lookCss } from './themes.js';
-import { cleanFacet } from './theme-engine.js';
+import { cleanFacet, foldCompact } from './theme-engine.js';
 import { checkCss } from './custom-css.js';
 import { applyFonts } from './fonts.js';
 import { rowLayoutOf } from './device-presets.js';
 import { offBar } from './profiles.js';
 
 
-// Compact mode (this device's display settings, below): body.compact (style.css, "compact mode" block). Cached in
-// localStorage so the first paint after a reload is already compact, before the logbook loads.
+// Spacing: Tight (spacing 'compact', the old Compact mode; this device's display settings, below): body.compact
+// (style.css, "compact mode" block). Cached in localStorage so the first paint after a reload is already tight, before
+// the logbook loads.
 const COMPACT_KEY = 'apmes-logbook-compact';
 export function applyCompact(on) {
   document.body.classList.toggle('compact', !!on);
@@ -91,17 +92,23 @@ export function cachedCompact() {
 const DISPLAY_KEY = 'apmes-logbook-display';
 export const DISPLAY_KEYS = ['colours', 'listHeight', 'myThemes', 'pageSize', 'lbGroup', 'lbSort', 'gridLines', 'gridCols', 'calRefl', 'totalsCompact', 'totalsTargets', 'boxHeight', 'boxGrow', 'moreOrder', 'noteToolbar', 'compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'navStyle', 'rowLayout', 'formLayout', 'rowHold', 'dayCopy', 'hideTabsTyping',
   'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band', 'barBlur', 'tabActiveLabel', 'listStyle', 'titleAlign', 'switchStyle', 'pressStyle', 'iconWeight', 'typeStyle',
-  'statusBar', 'headerStyle', 'tabIconFill', 'iconSet', 'pageMotion', 'sheetStyle', 'toastStyle', 'fieldStyle', 'checkStyle', 'headingTone', 'tabTone'];
+  'statusBar', 'headerStyle', 'tabIconFill', 'iconSet', 'pageMotion', 'sheetStyle', 'toastStyle', 'fieldStyle', 'checkStyle', 'headingTone', 'tabTone',
+  'ftBtn', 'ftGap', 'ftLine', 'ftShadow', 'ftCases', 'ftDays', 'ftLetter', 'ftWeight'];   // Fine-tune (theme-engine.js TUNE_KEYS)
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
 export const display = () => migrateDisplay(deviceDisplay()) || {};
 // before Interface zoom, "Text size" zoomed the page content: carry it over as the zoom (closest step) once
 const OLD_SIZES = { '0.8': '0.8', '0.9': '0.9', '1.12': '1.1', '1.25': '1.25' };
-function migrateDisplay(d) {
-  if (!d || d.v === 2) return d;
-  const out = { ...d, v: 2 };
-  if (OLD_SIZES[String(d.textSize)] && !d.zoom) { out.zoom = OLD_SIZES[String(d.textSize)]; out.textSize = '1'; }
+// Compact mode became Spacing: Tight (theme-revamp S2): folded whenever the old key turns up (a settings file or the
+// account's settings can still bring it), here and in the device's saved themes
+export function migrateDisplay(d) {
+  if (!d) return d;
+  const mine = Array.isArray(d.myThemes) && d.myThemes.some(t => t && t.look && 'compact' in t.look);
+  if (d.v === 2 && !('compact' in d) && !mine) return d;
+  const out = { ...foldCompact(d), v: 2 };
+  if (mine) out.myThemes = d.myThemes.map(t => (t && t.look ? { ...t, look: foldCompact(t.look) } : t));
+  if (d.v !== 2 && OLD_SIZES[String(d.textSize)] && !d.zoom) { out.zoom = OLD_SIZES[String(d.textSize)]; out.textSize = '1'; }
   try { localStorage.setItem(DISPLAY_KEY, JSON.stringify(out)); } catch { /* storage blocked */ }
   return out;
 }
@@ -120,7 +127,7 @@ export function adoptDisplay(accountSettings, { fresh = false } = {}) {
   return display();   // (an old account text size becomes the zoom here too)
 }
 export function resetDisplay() { adoptedNow = false; try { localStorage.removeItem(DISPLAY_KEY); } catch { /* storage blocked */ } }
-export function applyDisplay(d = display()) { applyCompact(!!d.compact); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); applyLook(d); applyThemeLook(d); }
+export function applyDisplay(d = display()) { applyCompact(d.spacing === 'compact'); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); applyLook(d); applyThemeLook(d); }
 // Themes (themes.js): the background tint, the top band, the heading font, spacing and tab style as one style sheet
 // after the colour's (so it wins), cached on the device for the first paint (index.html) like the colour's
 const LOOK_CSS_KEY = 'apmes-logbook-look-css-v2';
