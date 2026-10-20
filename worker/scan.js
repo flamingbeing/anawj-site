@@ -3,7 +3,7 @@
 // is checked again here (the Access token's signature and audience), then passed on to the study computer's own address, which
 // Access guards with a service token only this Worker holds. The Worker stores nothing.
 //   GET  /scan-api/whoami                       -> {email}              (is this browser signed in?)
-//   POST /scan-api/upload/<scan>/<page>         one JPEG or PNG, page 1-9 or x   -> {ok, pages}
+//   POST /scan-api/upload/<scan>/<page>         one JPEG or PNG, page 1-14 or x   -> {ok, pages}
 //   GET  /scan-api/status/<scan>                -> {scan, pages, state}
 // Set in Cloudflare (never in this repo): ACCESS_TEAM (already there), SCAN_ACCESS_AUD (the AUD tag of the Access app for this
 // path), SCAN_ORIGIN (the study computer's address, https), SCAN_CLIENT_ID and SCAN_CLIENT_SECRET (a service token for it).
@@ -13,7 +13,7 @@ import { verifyAccess } from './ask.js';
 export const SCAN_HOST = 'prewarmstudy.anawj.com';
 export const SCAN_PREFIX = '/scan-api/';
 export const MAX_PHOTO = 12 * 1024 * 1024;
-const SCAN_ID = /^[A-Za-z0-9-]{8,64}$/, PAGE = /^[1-9x]$/;
+const SCAN_ID = /^[A-Za-z0-9-]{8,64}$/, PAGE = /^(?:[1-9]|1[0-4]|x)$/;
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' } });
 
