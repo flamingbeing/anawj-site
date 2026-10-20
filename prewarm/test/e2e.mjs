@@ -62,8 +62,8 @@ try {
   assert.match(await page.textContent('#due'), /due \d\d:\d\d/);
   // the 0-min reading is due right now: the due time shows its 'now' state
   await page.waitForFunction(() => document.querySelector('#due')?.dataset.state === 'now', null, { timeout: 5000 });
-  // the top bar: the time now, and to its left what to log next and when (the 0-min temperature, due now)
-  assert.match(await page.textContent('#clock .now'), /Time now\s*\d\d:\d\d/);
+  // the top bar: what to log next and when (the 0-min temperature, due now); no "Time now" clock
+  assert.equal(await page.locator('#clock .now').count(), 0);
   assert.match(await page.textContent('#clock .next'), /Temp 0 min\s*now/);
   assert.equal(await page.getAttribute('#clock .next', 'data-state'), 'now');
   // the 0-min reading is due now: the banner floats over the top of the page (nothing moves) and hides on a tap

@@ -711,8 +711,8 @@ const ESSENTIAL = ['pw_gown', 'pw_start', 'ev_wstop', 'ev_ot', 'io_knife', 'io_d
 const PACU_TIMES = ['pacu_in', 'pacu_out'];
 const mmss = m => { const sec = Math.max(0, Math.floor(m * 60)), h = Math.floor(sec / 3600), mm = Math.floor(sec / 60) % 60, ss = String(sec % 60).padStart(2, '0');
   return h ? `${h}:${String(mm).padStart(2, '0')}:${ss}` : `${mm}:${ss}`; };
-// top bar (owner, 12 Oct 2026): on the right the time now (it sits above the time boxes); to its left a countdown to the
-// next thing to log: the next reading due on this screen, or warming off, whichever comes first
+// top bar: a countdown to the next thing to log: the next reading due on this screen, or warming off, whichever comes first
+// (the "Time now" clock was removed 20 Oct 2026 at the owner's request)
 function clockHtml(p, s) {
   const n = nextDue(p, s);
   let next = '';
@@ -720,7 +720,7 @@ function clockHtml(p, s) {
     const left = n.left, st = left > 2 ? 'later' : left > 0 ? 'soon' : left > -5 ? 'now' : 'late';
     next = `<div class="next" role="button" tabindex="0" aria-label="${esc(n.label)}: open it" data-state="${st}"><small>${esc(n.label)}</small><b>${left > 0 ? 'in ' + mmss(left) : left > -5 ? 'now' : 'late ' + mmss(-left)}</b></div>`;
   }
-  return `${next}<div class="now"><small>Time now</small><b>${fromMin(Math.floor(nowMin()))}</b></div>`;
+  return next;
 }
 function nextDue(p, s) {
   const all = [], mine = duePick(p, s);

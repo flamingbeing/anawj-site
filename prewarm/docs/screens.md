@@ -63,11 +63,10 @@ How the patient screen, key times, sign-offs, forms and look work. Part of the n
   Swipe left / right on either tab to switch. Pull-to-refresh is off (`overscroll-behavior-y: none`). Intra-op
   details, PACU and Perioperative data go back to the Others tab. Sign-offs name their section ("Mark BP, HR, BIS complete", "Mark PACU
   complete"…) and show a ticked green box with who and when once marked (`tickHtml`).
-- **Top bar**: on the right the time now ("Time now 16:08", above the time boxes); to its left the next
-  thing to log and a countdown: the reading due most recently on this screen (Temp or BP, until the next is due) or the
-  next one, or warming off, whichever is first ("Temp 20 min · in 1:42" / "now" / "late 5:29"), coloured and pulsing
-  like the due time, centred between the title and the time; before anything is due (no Prewarm on / Induction yet)
-  there is no countdown and the time stays on the right. Then the Log button for the next event. The old "Prewarm + 12:34" elapsed timer is gone.
+- **Top bar**: the next thing to log and a countdown, centred between the title and the sync chip: the reading due most recently
+  on this screen (Temp or BP, until the next is due) or the next one, or warming off, whichever is first ("Temp 20 min · in 1:42" /
+  "now" / "late 5:29"), coloured and pulsing like the due time; before anything is due (no Prewarm on / Induction yet) there is
+  no countdown. The "Time now" clock was removed on 20 Oct 2026 (owner). Then the sync chip. The old "Prewarm + 12:34" elapsed timer is gone.
 - **Other data**: a small box beside Form view / Sheet view opens the remaining template pages
   (pre-op, pre-op medication, pre-op investigations, day 1 and 2 chart review and analgesia, discharge) on one page
   (`#/p/<id>/data`), each a collapsible header (open by default) over every field in template order (`OTHER_PAGES`; no
