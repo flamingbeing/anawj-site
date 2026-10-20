@@ -72,17 +72,17 @@ export function darkPalette(accent, oled = false) {
 
 const decl = p => Object.entries(p).map(([k, v]) => `--${k}: ${v};`).join(' ');
 // The CSS for an accent: light, dark (data-theme dark, or auto with a dark phone) and OLED (data-oled).
-// :root:root wins over the base palettes in style.css even when this sheet comes first (first paint).
+// display.js puts it in the theme layer (index.html: cascade layers), which wins over the base palettes in style.css.
 // The default accent keeps the NUHS stripe and light palette from style.css.
 export function schemeCss(accent) {
   const c = cleanAccent(accent) || DEFAULT_ACCENT;
   const L = lightPalette(c), D = darkPalette(c), O = darkPalette(c, true);
   if (c === DEFAULT_ACCENT) { for (const k of ['bg', 'line', 'row-alt', 's1', 's2', 's3', 's4']) delete L[k]; delete D.s1; delete D.s2; delete D.s3; delete D.s4; delete O.s1; delete O.s2; delete O.s3; delete O.s4; }
   return [
-    `:root:root { ${decl(L)} }`,
-    `:root:root[data-theme="dark"] { ${decl(D)} }`,
-    `:root:root[data-theme="dark"][data-oled] { ${decl(O)} }`,
-    `@media (prefers-color-scheme: dark) { :root:root[data-theme="auto"] { ${decl(D)} } }`,
+    `:root { ${decl(L)} }`,
+    `:root[data-theme="dark"] { ${decl(D)} }`,
+    `:root[data-theme="dark"][data-oled] { ${decl(O)} }`,
+    `@media (prefers-color-scheme: dark) { :root[data-theme="auto"] { ${decl(D)} } }`,
   ].join('\n');
 }
 
@@ -126,13 +126,13 @@ export function coloursCss(value) {
   const c = cleanColours(value), out = [];
   if (c.light) {
     const vars = decl(colourVars(c.light));
-    out.push(`:root:root:root[data-theme="light"], :root:root:root:not([data-theme]) { ${vars} }`);
-    out.push(`@media (prefers-color-scheme: light) { :root:root:root[data-theme="auto"] { ${vars} } }`);
+    out.push(`:root[data-theme="light"], :root:not([data-theme]) { ${vars} }`);
+    out.push(`@media (prefers-color-scheme: light) { :root[data-theme="auto"] { ${vars} } }`);
   }
   if (c.dark) {
     const vars = decl(colourVars(c.dark));
-    out.push(`:root:root:root[data-theme="dark"], :root:root:root[data-theme="dark"][data-oled] { ${vars} }`);
-    out.push(`@media (prefers-color-scheme: dark) { :root:root:root[data-theme="auto"] { ${vars} } }`);
+    out.push(`:root[data-theme="dark"], :root[data-theme="dark"][data-oled] { ${vars} }`);
+    out.push(`@media (prefers-color-scheme: dark) { :root[data-theme="auto"] { ${vars} } }`);
   }
   return out.join('\n');
 }

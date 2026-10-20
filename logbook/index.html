@@ -28,6 +28,12 @@
     if (saved && !/[?&]demo\b/.test(location.search)) window.LOGBOOK_MOVED_TO = to; else location.replace(to);
   })();
 </script>
+<!-- Cascade layers (docs/theme-engine.md): style.css is the base layer, then the look's facets and theme colours, then
+     the resident's custom CSS, so a later layer wins without :root stacking. This comes before the first-paint sheets
+     below so it sets the order. A browser without layers (before Safari 15.4, Chrome 99, Firefox 97) skips the @import
+     and the layered sheets, and gets style.css on its own: the default look. -->
+<style>@layer base, facets, theme, custom; @import url("style.css") layer(base);</style>
+<script>if (!window.CSSLayerBlockRule) document.write('<link rel="stylesheet" href="style.css">');</script>
 <script>
   // back from Google or Dropbox after a Save to Drive / Dropbox or Sync sign-in (cloud-save.js): keep the answer for
   // the app (it finishes the save after sign-in) and tidy the address back to the Backup page (or the page Sync left)
@@ -39,10 +45,9 @@
   // this device's theme before the first paint (Settings → Display → Theme; light unless chosen)
   try { var t = localStorage.getItem('apmes-logbook-theme'); document.documentElement.dataset.theme = t === 'dark' || t === 'oled' ? 'dark' : t === 'auto' ? 'auto' : 'light'; if (t === 'oled') document.documentElement.dataset.oled = ''; } catch (e) {}
   // and its colour (Settings → Display → Colour; navy unless chosen): the palettes colors.js worked out last time
-  try { var css = localStorage.getItem('apmes-logbook-accent-css'); if (css && css.length < 8000) { var st = document.createElement('style'); st.id = 'accent-css'; st.textContent = css; document.head.appendChild(st); } } catch (e) {}
-  try { var lc = localStorage.getItem('apmes-logbook-look-css'); if (lc && lc.length < 60000) { var ls = document.createElement('style'); ls.id = 'look-css'; ls.textContent = lc; document.head.appendChild(ls); } } catch (e) {}
+  try { var css = localStorage.getItem('apmes-logbook-accent-css-v2'); if (css && css.length < 8000) { var st = document.createElement('style'); st.id = 'accent-css'; st.textContent = css; document.head.appendChild(st); } } catch (e) {}
+  try { var lc = localStorage.getItem('apmes-logbook-look-css-v2'); if (lc && lc.length < 60000) { var ls = document.createElement('style'); ls.id = 'look-css'; ls.textContent = lc; document.head.appendChild(ls); } } catch (e) {}
 </script>
-<link rel="stylesheet" href="style.css">
 <!-- fetch the Case tab's modules at once instead of one import at a time (the other pages load on first use, app.js);
      then the Firebase SDK, or in the demo its stand-in instead -->
 <link rel="modulepreload" href="js/app.js">

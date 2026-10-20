@@ -71,6 +71,34 @@ try {
   await p.locator('.theme-row', { hasText: 'Spotify-style' }).click();
   assert.match(await p.evaluate(() => document.getElementById('look-css').textContent), /#121212/);
   assert.equal(await p.evaluate(() => document.documentElement.dataset.theme), 'light', 'a theme leaves Light or dark alone');
+  // cascade layers (index.html): the order first, style.css as the base layer, every look sheet in a layer, no :root
+  // stacking anywhere; the look survives a reload (first paint from the cache)
+  await apply({ accent: '#7c3aed', colourful: 'all', customCssOn: true, customCss: '.top h1 { letter-spacing: 1px; }' });
+  await p.evaluate(async () => (await import('./js/display.js')).applyCustomCss());
+  const sheets = await p.evaluate(() => {
+    const first = document.styleSheets[0], kinds = s => [...s.cssRules].map(r => r.constructor.name);
+    const own = id => kinds(document.getElementById(id).sheet);
+    return { order: first.cssRules[0].nameList, base: first.cssRules[1].layerName, baseRules: first.cssRules[1].styleSheet.cssRules.length,
+      look: own('look-css'), accent: own('accent-css'), tabs: own('tab-colours'), user: own('user-css'),
+      stacked: [...document.querySelectorAll('style')].some(s => /(:root){2}/.test(s.textContent)) };
+  });
+  assert.deepEqual(sheets.order, ['base', 'facets', 'theme', 'custom']);
+  assert.equal(sheets.base, 'base'); assert.ok(sheets.baseRules > 500, 'style.css loaded into the base layer');
+  for (const k of ['look', 'accent', 'tabs', 'user']) assert.ok(sheets[k].length && sheets[k].every(n => n === 'CSSLayerBlockRule'), k + ' sheet is layered');
+  assert.equal(sheets.stacked, false, 'no :root stacking');
+  const bg = () => p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bg').trim());
+  const themed = await bg();
+  await p.reload(); await p.locator('.theme-row').first().waitFor();
+  assert.equal(await bg(), themed, 'same look after a reload');
+  await p.evaluate(async () => { const m = await import('./js/display.js'); m.resetDisplay(); m.applyDisplay(); });
+  // a browser without cascade layers gets style.css as a plain sheet (and skips the layered look sheets)
+  const old = await b.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+  await old.addInitScript(() => { delete window.CSSLayerBlockRule; });
+  const op = await old.newPage();
+  op.on('pageerror', e => errors.push(e.message));
+  await op.goto(base + '?demo#log'); await op.waitForSelector('textarea.details');
+  assert.equal(await op.locator('link[rel="stylesheet"][href="style.css"]').count(), 1, 'old browsers: plain style.css');
+  await old.close();
   assert.deepEqual(errors, []);
   console.log('PASS app-style details');
 } finally { await b.close(); }

@@ -8,7 +8,7 @@
 
 // the fields every rule below restyles (the app's text boxes, dropdowns and case box)
 const FIELDS = ['input[type="text"]', 'input[type="password"]', 'input[type="search"]', 'input[type="email"]', 'input:not([type])', 'input[type="date"]', 'input[type="number"]', 'select', 'textarea'];
-const fields = (suffix = '') => FIELDS.map(f => `:root:root ${f}${suffix}`).join(', ');   // (over Line strength's fills, html.edges-fill)
+const fields = (suffix = '') => FIELDS.map(f => `:root ${f}${suffix}`).join(', ');
 // tick boxes, but not the on / off switches on the settings pages (style.css draws those)
 const TICK = ':root input[type="checkbox"]:not(.set-page label.check > *)';
 const TABS_SEL = '.tabs button[aria-selected="true"], html.tabs-top .tabs button[aria-selected="true"], html.tabs-bottom .tabs button[aria-selected="true"]';
@@ -79,16 +79,16 @@ export const FACETS = [
   { key: 'tabStyle', group: 'shape', label: 'Tab bar style', line: 'How the tab you’re on is marked.', choices: [['underline', 'Underline (default)'], ['pill', 'Pill'], ['plain', 'Plain (colour only)'], ['indicator', 'Icon pill (Material)']], css: {
     pill: `${TABS_SEL} { border-color: transparent; background: var(--accent-soft); color: var(--accent); border-radius: 999px; }`,
     plain: `${TABS_SEL} { border-color: transparent; color: var(--accent); }`,
-    indicator: `${TABS_SEL} { border-color: transparent; background: var(--accent-soft); color: var(--accent); border-radius: 999px; } @media (max-width: 600px) { :root:root:not(.tabs-top) .tabs button[aria-selected="true"] { background: none; border-radius: 0; } :root:root:not(.tabs-top) .tabs button[aria-selected="true"] .ico { box-sizing: content-box; padding: 4px 18px; margin: -4px 0 0; border-radius: 999px; background: var(--accent-soft); } }` } },
+    indicator: `${TABS_SEL} { border-color: transparent; background: var(--accent-soft); color: var(--accent); border-radius: 999px; } @media (max-width: 600px) { :root:not(.tabs-top) .tabs button[aria-selected="true"] { background: none; border-radius: 0; } :root:not(.tabs-top) .tabs button[aria-selected="true"] .ico { box-sizing: content-box; padding: 4px 18px; margin: -4px 0 0; border-radius: 999px; background: var(--accent-soft); } }` } },
 
   // Header and status bar
   { key: 'statusBar', group: 'header', label: 'Phone status bar', js: true, line: 'The strip above the app on Android and in browsers (display.js paintStatusBar).', choices: [['accent', 'My colour (default)'], ['header', 'Match the header'], ['page', 'Match the page']] },
-  { key: 'headerStyle', group: 'header', label: 'Header', choices: [['plain', 'Plain (default)'], ['filled', 'Filled with my colour (Android apps)'], ['large', 'Large title (iOS)']], css: {
-    filled: ':root:root .top { --header-ink: var(--accent-ink); background: var(--accent); color: var(--accent-ink); border-bottom-color: transparent; } :root:root .top :is(h1, .sub, a, .who, .email) { color: var(--accent-ink); } :root:root:root:root .top .who :is(button, .btn) { background: transparent; color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }',
+  { key: 'headerStyle', wins: true, group: 'header', label: 'Header', choices: [['plain', 'Plain (default)'], ['filled', 'Filled with my colour (Android apps)'], ['large', 'Large title (iOS)']], css: {
+    filled: ':root .top { --header-ink: var(--accent-ink); background: var(--accent); color: var(--accent-ink); border-bottom-color: transparent; } :root .top :is(h1, .sub, a, .who, .email) { color: var(--accent-ink); } :root .top .who :is(button, .btn) { background: transparent; color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent); }',
     // the large title gets its own row under the header's buttons, as on iOS
-    large: ':root:root .top { flex-wrap: wrap; row-gap: 2px; } :root:root .top .who { order: 1; margin-left: auto; } :root:root .top .brand { order: 2; flex: 1 0 100%; display: flex; flex-direction: column; align-items: flex-start; } :root:root .top h1 { flex: none; text-align: start; font-size: calc(32px * var(--fs, 1)); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }' } },
-  { key: 'barBlur', group: 'header', label: 'See-through header and tab bar', bool: true, line: 'Content shows blurred behind them as you scroll (iOS, Instagram).',
-    css: `:root:root .top { background-color: color-mix(in srgb, var(--panel) 72%, transparent); ${blur} } @media (max-width: 600px) { :root:root .tabs { background: color-mix(in srgb, var(--bg) 70%, transparent); ${blur} } }` },
+    large: ':root .top { flex-wrap: wrap; row-gap: 2px; } :root .top .who { order: 1; margin-left: auto; } :root .top .brand { order: 2; flex: 1 0 100%; display: flex; flex-direction: column; align-items: flex-start; } :root .top h1 { flex: none; text-align: start; font-size: calc(32px * var(--fs, 1)); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }' } },
+  { key: 'barBlur', wins: true, group: 'header', label: 'See-through header and tab bar', bool: true, line: 'Content shows blurred behind them as you scroll (iOS, Instagram).',
+    css: `:root .top { background-color: color-mix(in srgb, var(--panel) 72%, transparent); ${blur} } @media (max-width: 600px) { :root .tabs { background: color-mix(in srgb, var(--bg) 70%, transparent); ${blur} } }` },
   { key: 'titleAlign', group: 'header', label: 'Header title', choices: [['default', 'As now (default)'], ['centre', 'Centred (iOS)']], css: { centre: '.top h1 { flex: 1; text-align: center; }' } },
 
   // Tab bar
@@ -96,8 +96,8 @@ export const FACETS = [
     css: '@media (max-width: 600px) { .tabs button:not([aria-selected="true"]) .lbl { display: none; } }' },
   { key: 'tabIconFill', group: 'tabs', label: 'Fill the current tab’s icon', bool: true, line: 'As iPhone and Android tab bars do.',
     css: ':root .tabs button[aria-selected="true"] .ico { fill: color-mix(in srgb, currentColor 28%, transparent); }' },
-  { key: 'tabTone', group: 'tabs', label: 'Active tab colour', choices: [['accent', 'My colour (default)'], ['ink', 'Text colour']],
-    css: { ink: ':root:root:root .tabs button[aria-selected="true"] { color: var(--ink); }' } },
+  { key: 'tabTone', wins: true, group: 'tabs', label: 'Active tab colour', choices: [['accent', 'My colour (default)'], ['ink', 'Text colour']],
+    css: { ink: ':root .tabs button[aria-selected="true"] { color: var(--ink); }' } },
 
   // Lists and type
   { key: 'listStyle', group: 'lists', label: 'List style', line: 'How Logbook rows sit on the page.', choices: [['default', 'Cards (default)'], ['inset', 'Inset grouped (iOS)'], ['edge', 'Edge to edge (Material, chat apps)']], css: {
@@ -109,8 +109,8 @@ export const FACETS = [
 
   // Plain app headers usually use neutral titles even when their actions have a bright accent.
   // Filled headers keep their contrasting title through --header-ink (set only by headerStyle).
-  { key: 'headingTone', group: 'lists', label: 'Heading colour', choices: [['accent', 'My colour (default)'], ['ink', 'Text colour']],
-    css: { ink: ':root:root :is(h1, h2, h3), :root:root section.card h2 { color: var(--ink); } :root:root .top h1 { color: var(--header-ink, var(--ink)); }' } },
+  { key: 'headingTone', wins: true, group: 'lists', label: 'Heading colour', choices: [['accent', 'My colour (default)'], ['ink', 'Text colour']],
+    css: { ink: ':root :is(h1, h2, h3), :root section.card h2 { color: var(--ink); } :root .top h1 { color: var(--header-ink, var(--ink)); }' } },
 
   // Icons (the set first, then the weight, so a chosen weight wins over the set's)
   { key: 'iconSet', group: 'icons', label: 'Icon style', choices: opts(ICON_SETS), css: Object.fromEntries(Object.entries(ICON_SETS).filter(([, s]) => s.css).map(([k, s]) => [k, s.css])) },
@@ -122,15 +122,15 @@ export const FACETS = [
     css: Object.fromEntries(Object.entries(PAGE_MOTIONS).filter(([, m]) => m.vars).map(([k, m]) => [k, `:root { ${m.vars} }`])) },
 
   // Pop-ups and messages
-  { key: 'sheetStyle', group: 'popups', label: 'Pop-up boxes', choices: [['default', 'As now (default)'], ['ios', 'iOS sheets (from the bottom, stacked buttons)'], ['material', 'Material dialogs (very round, text buttons)']], css: {
-    ios: '@media (max-width: 600px) { :root dialog:not(.full) { margin: auto 0 0; width: 100%; max-width: 100%; border: 0; border-radius: calc(13px * var(--round, 1)) calc(13px * var(--round, 1)) 0 0; padding: 24px 16px calc(16px + env(safe-area-inset-bottom, 0px)); } :root dialog:not(.full)::before { content: ""; position: absolute; top: 7px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: color-mix(in srgb, var(--muted) 45%, transparent); } :root dialog:not(.full)[open] { animation: sheet-up var(--dur) var(--ease); } :root dialog:not(.full) > .bar:last-child { flex-direction: column; align-items: stretch; gap: 0; margin: 8px -16px 0; } :root dialog:not(.full) > .bar:last-child > .grow { display: none; } :root:root:root dialog:not(.full) > .bar:last-child > button { width: 100%; min-height: 54px; margin: 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); border-radius: 0; background: none; box-shadow: none; color: var(--accent); font-size: calc(17px * var(--fs, 1)); font-weight: 400; } :root:root:root dialog:not(.full) > .bar:last-child > .primary { order: -1; font-weight: 600; } :root:root:root dialog:not(.full) > .bar:last-child > .danger { color: var(--err); } } @keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }',
-    material: ':root dialog:not(.full) { border: 0; border-radius: calc(28px * var(--round, 1)); padding: 24px; box-shadow: 0 8px 28px rgba(0, 0, 0, .22); } :root dialog:not(.full)[open] { animation: dlg-in var(--dur) var(--ease); } :root dialog:not(.full) h2 { font-size: calc(22px * var(--fs, 1)); font-weight: 400; margin-bottom: 14px; } :root dialog:not(.full) > .bar:last-child { justify-content: flex-end; } :root:root:root dialog:not(.full) > .bar:last-child > button { border-color: transparent; background: none; color: var(--accent); font-weight: 600; box-shadow: none; } :root:root:root dialog:not(.full) > .bar:last-child > button.danger { color: var(--err); } @keyframes dlg-in { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }' } },
+  { key: 'sheetStyle', wins: true, group: 'popups', label: 'Pop-up boxes', choices: [['default', 'As now (default)'], ['ios', 'iOS sheets (from the bottom, stacked buttons)'], ['material', 'Material dialogs (very round, text buttons)']], css: {
+    ios: '@media (max-width: 600px) { :root dialog:not(.full) { margin: auto 0 0; width: 100%; max-width: 100%; border: 0; border-radius: calc(13px * var(--round, 1)) calc(13px * var(--round, 1)) 0 0; padding: 24px 16px calc(16px + env(safe-area-inset-bottom, 0px)); } :root dialog:not(.full)::before { content: ""; position: absolute; top: 7px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 3px; background: color-mix(in srgb, var(--muted) 45%, transparent); } :root dialog:not(.full)[open] { animation: sheet-up var(--dur) var(--ease); } :root dialog:not(.full) > .bar:last-child { flex-direction: column; align-items: stretch; gap: 0; margin: 8px -16px 0; } :root dialog:not(.full) > .bar:last-child > .grow { display: none; } :root dialog:not(.full) > .bar:last-child > button { width: 100%; min-height: 54px; margin: 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); border-radius: 0; background: none; box-shadow: none; color: var(--accent); font-size: calc(17px * var(--fs, 1)); font-weight: 400; } :root dialog:not(.full) > .bar:last-child > .primary { order: -1; font-weight: 600; } :root dialog:not(.full) > .bar:last-child > .danger { color: var(--err); } } @keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }',
+    material: ':root dialog:not(.full) { border: 0; border-radius: calc(28px * var(--round, 1)); padding: 24px; box-shadow: 0 8px 28px rgba(0, 0, 0, .22); } :root dialog:not(.full)[open] { animation: dlg-in var(--dur) var(--ease); } :root dialog:not(.full) h2 { font-size: calc(22px * var(--fs, 1)); font-weight: 400; margin-bottom: 14px; } :root dialog:not(.full) > .bar:last-child { justify-content: flex-end; } :root dialog:not(.full) > .bar:last-child > button { border-color: transparent; background: none; color: var(--accent); font-weight: 600; box-shadow: none; } :root dialog:not(.full) > .bar:last-child > button.danger { color: var(--err); } @keyframes dlg-in { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }' } },
   { key: 'toastStyle', group: 'popups', label: 'Messages (Saved, Undo)', choices: [['default', 'Dark pill at the top (default)'], ['ios', 'iOS banner (frosted, at the top)'], ['material', 'Material snackbar (at the bottom)']], css: {
     ios: `:root #toast { background: color-mix(in srgb, var(--panel) 82%, transparent); color: var(--ink); ${blur} border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); border-radius: calc(18px * var(--round, 1)); padding: 12px 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, .18); transform: translate(-50%, calc(-100% - 16px)); transition: opacity .25s, transform .45s cubic-bezier(.32, .72, 0, 1); } :root #toast.show { transform: translate(-50%, 0); } :root #toast button { color: var(--accent); }`,
     material: ':root #toast { top: auto; bottom: calc(12px + (var(--tabbar-h) + var(--safe-b, 0px)) / var(--ui-zoom, 1)); left: 12px; right: 12px; transform: translateY(16px); max-width: none; justify-content: space-between; min-height: 48px; padding: 6px 8px 6px 16px; border-radius: calc(4px * var(--round, 1)); background: #313033; color: #f4eff4; box-shadow: 0 3px 10px rgba(0, 0, 0, .3); } :root #toast.show { transform: none; } :root #toast button { color: color-mix(in srgb, var(--accent) 40%, #ffffff); } @media (min-width: 601px) { :root #toast { left: 24px; right: auto; bottom: 24px; min-width: 344px; max-width: 560px; } }' } },
 
   // Controls
-  { key: 'fieldStyle', group: 'controls', label: 'Text boxes', choices: [['default', 'Rounded box (default)'], ['ios', 'iOS (grey fill, no line)'], ['filled', 'Material filled (line underneath)'], ['outlined', 'Material outline (thin, square-ish)']], css: {
+  { key: 'fieldStyle', wins: true, group: 'controls', label: 'Text boxes', choices: [['default', 'Rounded box (default)'], ['ios', 'iOS (grey fill, no line)'], ['filled', 'Material filled (line underneath)'], ['outlined', 'Material outline (thin, square-ish)']], css: {
     ios: `${fields()} { border-color: transparent; background-color: color-mix(in srgb, var(--muted) 14%, var(--panel)); border-radius: calc(10px * var(--round, 1)); } ${fields(':focus')} { outline: 0; border-color: transparent; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }`,
     filled: `${fields()} { border-color: transparent; border-bottom-color: var(--muted); border-radius: calc(4px * var(--round, 1)) calc(4px * var(--round, 1)) 0 0; background-color: color-mix(in srgb, var(--ink) 6%, var(--panel)); } ${fields(':focus')} { outline: 0; border-color: transparent; border-bottom-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }`,
     outlined: `${fields()} { border-color: var(--muted); border-radius: calc(4px * var(--round, 1)); background-color: transparent; } ${fields(':focus')} { outline: 0; border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }` } },
@@ -155,13 +155,17 @@ export function cleanFacet(k, v) {
   return f.choices.some(([c]) => c === v) && v !== facetDefault(f) ? v : null;
 }
 export const facetValid = (k, v) => v == null || cleanFacet(k, v) !== null || (!facet(k)?.bool && v === facetDefault(facet(k)));
-// the CSS of the chosen facets, in FACETS order (later ones win)
+// the CSS of the chosen facets, in FACETS order, in cascade layers (index.html): most compete with style.css as they
+// always have (the base layer, after it: the more specific rule wins), so the app's own special cases stay; a facet
+// with wins: true goes in the facets layer, over all of style.css (no :root stacking), each in its own sub-layer so
+// a later facet wins (tabTone over tabStyle)
 export function facetCss(d = {}) {
   const out = [];
   for (const f of FACETS) {
     const v = cleanFacet(f.key, d[f.key]);
     if (v == null || !f.css) continue;
-    out.push(f.bool ? f.css : f.css[v]);
+    const css = f.bool ? f.css : f.css[v];
+    if (css) out.push(f.wins ? `@layer facets { @layer ${f.key} { ${css} } }` : `@layer base { ${css} }`);
   }
   return out.filter(Boolean);
 }
