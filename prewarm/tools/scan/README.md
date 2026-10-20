@@ -20,7 +20,9 @@ those in the review screen.
    - handwriting: crop the cell, ask Claude twice (different framing, 2× scale), accept only if both reads agree;
    - checks (`plausible.py`, `scan.py`): ranges (skin temperatures down to 20 °C), 24-hour times, whole numbers,
      option letters, core temperature jumping >1 °C (skin >6 °C) between neighbours, systolic above diastolic, two ticks
-     in one question, an arrow or ditto ("same as above"). Anything off is flagged; values with no known range are not.
+     in one question. Anything off is flagged; values with no known range are not. An arrow or ditto ("same as above"),
+     and an empty cell an arrow runs through, takes the reading above it in the same column (noted in the review screen);
+     an arrow with nothing above it stays flagged.
 4. **You confirm** (`review.html`): flagged fields first, the photo crop beside each reading. Only values you confirm
    are saved to `patient.reviewed.json`.
 5. **Export** (`export-scan.mjs`): reviewed files → the workbook through the app's own `workbook()`, same 572 columns.

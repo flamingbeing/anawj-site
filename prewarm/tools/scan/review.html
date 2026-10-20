@@ -94,6 +94,7 @@ function row(id) {
   r.append(el('div', { className: 'label' }, e.label, e.unit ? el('span', { className: 'unit', textContent: ' (' + e.unit + ')' }) : ''));
   if (e.crop) r.append(el('p', {}, el('img', { src: 'data:image/png;base64,' + e.crop, alt: 'Photo of the ' + e.label + ' entry' })));
   if (e.flags.length) r.append(el('ul', { className: 'flags' }, ...e.flags.map(t => el('li', { textContent: t }))));
+  if (e.notes && e.notes.length) r.append(el('div', { className: 'reads', textContent: e.notes.join('; ') }));
   if (e.reads && e.reads.length) r.append(el('div', { className: 'reads', textContent: 'Read as: ' + e.reads.map(x => '“' + x + '”').join(' and ') }));
   const ctl = el('div', { className: 'ctl' });
   if (e.kind === 'tick') {

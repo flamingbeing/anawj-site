@@ -55,6 +55,17 @@ out = {'iotemp_0_room': E(), 'iotemp_5_room': E(flags=['arrow or ditto: same as 
        'iotemp_15_room': E(flags=['arrow or ditto: same as the reading above?']), 'iotemp_20_room': E(), 'iotemp_25_room': dict(value=18, flags=[])}
 scan.arrow_gaps(out, F)
 assert out['iotemp_10_room']['flags'] and out['iotemp_20_room']['flags'] and not out['iotemp_0_room']['flags']
+# arrows repeat the reading above (an empty cell the arrow runs through too); an arrow with nothing above stays flagged
+AR = 'arrow or ditto: same as the reading above?'
+out = {'iotemp_0_room': dict(value=18, flags=[]), 'iotemp_5_room': E(flags=[AR]), 'iotemp_10_room': E(),
+       'iotemp_15_room': E(flags=[AR]), 'iotemp_20_room': dict(value=19, flags=[]), 'iotemp_25_room': E()}
+scan.arrow_gaps(out, F); scan.fill_arrows(out, F)
+assert [out[f'iotemp_{p}_room']['value'] for p in ('0', '5', '10', '15', '20', '25')] == [18, 18, 18, 18, 19, None], out
+assert not out['iotemp_5_room']['flags'] and out['iotemp_5_room']['notes'] == ['arrow: copied from the reading above']
+assert not out['iotemp_25_room']['flags']                       # a genuinely empty cell after a reading stays empty
+top = {'iotemp_0_room': E(flags=[AR]), 'iotemp_5_room': dict(value=18, flags=[])}
+scan.fill_arrows(top, F)
+assert top['iotemp_0_room']['value'] is None and top['iotemp_0_room']['flags'] == [AR]
 # series order: baseline first, minutes in order, end of surgery last (a baseline next to the end of surgery is not a "jump")
 arm = {'base': 35.0, '0': 35.2, '5': 34.9, '10': 34.2, '300': 29.8, 'end': 23.6}
 fo = {f'iotemp_{k}_arm': {'value': v, 'flags': []} for k, v in arm.items()}
