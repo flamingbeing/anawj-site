@@ -7,6 +7,7 @@
 import * as M from './model.js';
 import { openRequest } from './ui-requests.js';
 import { RULE_TYPES, describeRule, validateRule, evaluateRule, newRule } from './rules.js';
+import { rulesToText, parseRulesText, rulesGuide } from './rules-share.js';
 
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_TINY = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -122,8 +123,10 @@ export function mount(el, app) {
     h('button', { type: 'button', class: 'btn btn-sm', 'data-k': 'priorities', onclick: openPrio, html: `${app.icon('list')}<span>Priorities</span>` }),
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => openRequest(app), html: `${app.icon('plus')}<span>Add a request</span>` }),
     h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => openLog(), html: `${app.icon('list')}<span>Rules log</span>` }),
-    h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => exportRules(), html: `${dlIcon()}<span>Export</span>` }),
-    h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => importRules(), html: `${app.icon('upload')}<span>Import</span>` }));
+    h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': 'copy', onclick: () => copyRules(), html: `${app.icon('list')}<span>Copy</span>` }),
+    h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': 'paste', onclick: () => importRules(), html: `${app.icon('upload')}<span>Paste / import</span>` }),
+    h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': 'guide', onclick: () => copyGuide(), html: `${app.icon('spark')}<span>Guide for Claude</span>` }),
+    h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => exportRules(), html: `${dlIcon()}<span>Export file</span>` }));
   const bar = h('div', { class: 'rv-bar' }, h('div', { class: 'rv-search' }, h('span', { class: 'bx-search-ic', html: app.icon('search') }), search), filters, tools);
   const list = h('div', { class: 'rv-list' });
   const poolNote = h('p', { class: 'bx-help rv-pool' });
@@ -471,43 +474,83 @@ export function mount(el, app) {
     app.toast(`Exported ${(state.rules || []).length} rules`);
   }
 
-  async function importRules() {
-    const file = await pickFile('.json,application/json');
-    if (!file) return;
-    let data;
-    try { data = JSON.parse(await file.text()); } catch (e) { app.toast('That file is not a rules file (not JSON).', { kind: 'error' }); return; }
-    let rules = null, duties = [];
-    if (data && data.kind === 'ntf-roster-rules' && Array.isArray(data.rules)) { rules = data.rules; duties = Array.isArray(data.duties) ? data.duties : []; }
-    else if (data && data.kind === 'ntf-roster-backup' && data.state && Array.isArray(data.state.rules)) { rules = data.state.rules; duties = data.state.duties || []; }
-    if (!rules) { app.toast('That file has no NTF Roster rules in it.', { kind: 'error' }); return; }
+  async function copyText(text, what) {
+    try { await navigator.clipboard.writeText(text); app.toast(`${what} copied`); return true; } catch (e) { /* no clipboard access */ }
+    const ta = h('textarea', { class: 'ri-text', readonly: true, rows: '10', 'aria-label': what }, text);
+    app.sheet({ title: `Copy ${what}`, body: h('div', null, h('p', { class: 'bx-help' }, 'Select all and copy.'), ta), actions: [{ label: 'Close', primary: true }] });
+    setTimeout(() => { ta.focus(); ta.select(); }, 50);
+    return false;
+  }
+  const copyRules = () => copyText(rulesToText(app.store.get()), `${(app.store.get().rules || []).length} rules`);
+  const copyGuide = () => copyText(rulesGuide(app.store.get()), 'The rules guide for Claude');
+
+  // Paste or file -> review. The review is the same either way.
+  function importRules() {
+    const ta = h('textarea', { class: 'ri-text', rows: '9', placeholder: 'Paste rules here: copied from another roster, or a reply from Claude', 'aria-label': 'Rules to paste' });
+    const msg = h('p', { class: 'warn-box', hidden: true });
+    const go = (text, label) => {
+      const r = parseRulesText(text);
+      if (!r.rules) { msg.hidden = false; msg.textContent = r.problems[0]; return false; }
+      reviewImport(r, label);
+      return true;
+    };
+    const body = h('div', { class: 'ri' },
+      h('p', { class: 'bx-help' }, 'Tip: Guide for Claude copies a description of every rule type and this roster\'s codes. Paste it into a Claude chat, say what you want, then paste the rules it gives you here.'),
+      ta, msg,
+      h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: async () => {
+        const file = await pickFile('.json,application/json,.txt');
+        if (!file) return;
+        const text = await file.text();
+        if (go(text, file.name)) close();
+      } }, 'Or choose a file…'));
+    const close = app.sheet({
+      title: 'Add rules from text', body,
+      actions: [{ label: 'Cancel' }, { label: 'Review', primary: true, fn: () => { if (!ta.value.trim()) { msg.hidden = false; msg.textContent = 'Paste the rules first.'; return false; } return go(ta.value, 'Pasted rules') ? undefined : false; } }],
+    });
+    setTimeout(() => ta.focus(), 50);
+  }
+
+  function reviewImport(parsed, label) {
+    let rules = parsed.rules, duties = parsed.duties;
     // cleaned like a backup (lists that are really lists, duty kinds and colours from the fixed set), so one odd rule
     // or code in a file can't break every check or the grid
     const state = app.store.get();
-    rules = M.splitRules(state, rules.filter(r => r && typeof r === 'object' && !Array.isArray(r) && typeof r.type === 'string').map(M.cleanRule));
+    const view = viewPool(state) === 'senior' ? 'senior' : 'junior';   // a rule that names no roster goes to the one in view
+    rules = M.splitRules(state, rules.filter(r => r && typeof r === 'object' && !Array.isArray(r) && typeof r.type === 'string').map(r => M.cleanRule(r.pool ? r : { ...r, pool: view })));
     duties = (Array.isArray(duties) ? duties : []).filter(d => d && typeof d === 'object' && typeof d.code === 'string' && d.code).map(M.cleanDuty);
     const cur = new Map((state.rules || []).map(r => [r.id, r]));
-    const unknown = rules.filter(r => !r || !RULE_TYPES[r.type]).length;
+    const unknown = parsed.problems.length;
+    const dmNow = M.dutyMap(state);
+    const newCodes = new Set(duties.map(d => d.code));
+    // a trial copy of the roster with the new codes, so a rule using a code that comes with the paste is not called broken
+    const trial = { ...state, duties: [...(state.duties || []), ...duties.filter(d => !dmNow.has(d.code))] };
+    const days = M.monthDays(app.month);
     const items = rules.filter(r => r && RULE_TYPES[r.type]).map(r => {
       const rule = { ...r, id: r.id || M.uid('r') };
       const old = cur.get(rule.id);
-      return { rule, status: !old ? 'new' : stable(old) === stable(rule) ? 'same' : 'changed', on: true };
+      let bad = [], flags = null;
+      try { bad = validateRule(rule, trial); } catch (e) { bad = ['This rule could not be read.']; }
+      if (!bad.length) { try { flags = evaluateRule(trial, rule, { from: days[0], to: days[days.length - 1] }).length; } catch (e) { flags = null; } }
+      return { rule, status: !old ? 'new' : stable(old) === stable(rule) ? 'same' : 'changed', on: !bad.length, bad, flags };
     });
     const dm = M.dutyMap(state);
     const missing = duties.filter(d => d && d.code && !dm.has(d.code));
     let addCodes = true;
     const row = it => {
-      const cb = h('input', { type: 'checkbox', checked: it.on, onchange: () => { it.on = cb.checked; } });
+      const cb = h('input', { type: 'checkbox', checked: it.on, disabled: !!it.bad.length, onchange: () => { it.on = cb.checked; } });
+      const dry = it.flags == null ? '' : it.flags ? ` · would flag ${it.flags} in ${M.fmtMonth(app.month)} as the roster is now` : ` · flags nothing in ${M.fmtMonth(app.month)}`;
       return h('li', null, h('label', { class: 'ri-row' }, cb,
-        h('span', { class: `bx-tag ${it.status === 'new' ? 'ok' : 'warn'}` }, it.status === 'new' ? 'New' : 'Changed'),
-        h('span', null, it.rule.name || describeRule(it.rule, state))));
+        h('span', { class: `bx-tag ${it.bad.length ? 'bad' : it.status === 'new' ? 'ok' : 'warn'}` }, it.bad.length ? 'Needs fixing' : it.status === 'new' ? 'New' : 'Changed'),
+        h('span', null, it.rule.name || describeRule(it.rule, trial), h('span', { class: 'muted' }, ` (${it.rule.hard === false ? `preference ${it.rule.weight ?? 10}` : 'must hold'}${dry})`),
+          it.bad.length ? h('span', { class: 'ri-bad' }, ' ' + it.bad.join('; ')) : null)));
     };
     const fresh = items.filter(i => i.status === 'new'), changedItems = items.filter(i => i.status === 'changed'), same = items.filter(i => i.status === 'same');
     const body = h('div', { class: 'ri' },
-      h('p', null, `${file.name}: ${items.length} rules. ${fresh.length} new, ${changedItems.length} changed, ${same.length} the same as here.`),
+      h('p', null, `${label}: ${items.length} rule${items.length === 1 ? '' : 's'}. ${fresh.length} new, ${changedItems.length} changed, ${same.length} the same as here.`),
       fresh.length || changedItems.length ? h('ul', { class: 'ri-list' }, [...fresh, ...changedItems].map(row)) : h('p', { class: 'ok-box' }, 'Nothing new: every rule in the file is already here.'),
       missing.length ? h('label', { class: 'ri-row ri-codes' }, h('input', { type: 'checkbox', checked: true, onchange: e => { addCodes = e.target.checked; } }),
         h('span', null, `Also add ${missing.length} duty ${missing.length === 1 ? 'code' : 'codes'} these rules use: ${missing.map(d => d.code).join(', ')}`)) : null,
-      unknown ? h('p', { class: 'warn-box' }, `${unknown} ${unknown === 1 ? 'rule has a type' : 'rules have types'} this version doesn't know; skipped.`) : null,
+      unknown ? h('div', { class: 'warn-box' }, parsed.problems.map(t => h('div', null, t))) : null,
       h('p', { class: 'bx-help' }, 'Rules you have here and the file doesn\'t are kept. Import is one step you can undo.'));
     app.sheet({
       title: 'Import rules', body,

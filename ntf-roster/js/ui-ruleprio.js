@@ -52,6 +52,11 @@ function scroller(el) {
   return document.scrollingElement;
 }
 
+// Saved selections (a named set of rule ids), kept on this device.
+const SETS_KEY = 'ntf-roster-rq-sets';
+export function loadSets() { try { const o = JSON.parse(localStorage.getItem(SETS_KEY) || '{}'); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; } }
+export function saveSets(o) { try { localStorage.setItem(SETS_KEY, JSON.stringify(o)); return true; } catch (e) { return false; } }
+
 export function openRulePriorities(app) {
   const { h } = app;
   const body = h('div', { class: 'rq' });
@@ -160,7 +165,38 @@ export function openRulePriorities(app) {
         h('span', { class: 'sw-track', 'aria-hidden': 'true' }), h('span', null, 'Show rules that are off')),
       h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { const all = rules.every(r => selected.has(r.id)); for (const r of rules) all ? selected.delete(r.id) : selected.add(r.id); draw(); } },
         rules.length && rules.every(r => selected.has(r.id)) ? 'Unselect all' : 'Select all'),
-      h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { for (const r of soft) selected.add(r.id); draw(); } }, 'Select preferences')));
+      h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { for (const r of soft) selected.add(r.id); draw(); } }, 'Select preferences'),
+      h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': 'clear', disabled: !selected.size, onclick: () => { selected.clear(); draw(); } }, 'Clear selection')));
+    // select by type (adds every rule of that kind in view) and saved selections
+    const counts = new Map();
+    for (const r of rules) counts.set(r.type, (counts.get(r.type) || 0) + 1);
+    const typeSel = h('select', { 'aria-label': 'Select by type', 'data-k': 'bytype' },
+      h('option', { value: '' }, 'Select by type…'),
+      [...counts].map(([k, n]) => h('option', { value: k }, `${(RULE_TYPES[k] && RULE_TYPES[k].label) || k} (${n})`)));
+    typeSel.onchange = () => { if (!typeSel.value) return; for (const r of rules) if (r.type === typeSel.value) selected.add(r.id); draw(); };
+    const sets = loadSets();
+    const setSel = h('select', { 'aria-label': 'Saved selections', 'data-k': 'sets' },
+      h('option', { value: '' }, Object.keys(sets).length ? 'Saved selections…' : 'No saved selections yet'),
+      Object.keys(sets).map(k => h('option', { value: k }, `${k} (${sets[k].length})`)));
+    setSel.onchange = () => {
+      const ids = sets[setSel.value]; if (!ids) return;
+      const have = new Set((state.rules || []).map(r => r.id));
+      selected.clear(); for (const id of ids) if (have.has(id)) selected.add(id);
+      draw();
+    };
+    const nameIn = h('input', { type: 'text', class: 'rq-name-in', placeholder: 'Name this selection', 'aria-label': 'Name for the saved selection', maxlength: '40' });
+    const saveB = h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': 'saveset', disabled: !selected.size, onclick: () => {
+      const name = nameIn.value.trim() || `Selection ${Object.keys(sets).length + 1}`;
+      const all = loadSets(); all[name] = [...selected];
+      const saved = saveSets(all);
+      app.toast(saved ? `Saved "${name}" (${selected.size})` : 'Could not save on this device', saved ? undefined : { kind: 'error' });
+      draw();
+    } }, 'Save selection');
+    const delB = h('button', { type: 'button', class: 'btn btn-ghost btn-sm', 'data-k': 'delset', disabled: !Object.keys(sets).length, onclick: () => {
+      const k = setSel.value; if (!k) { app.toast('Pick a saved selection above first'); return; }
+      const all = loadSets(); delete all[k]; saveSets(all); app.toast(`Deleted "${k}"`); draw();
+    } }, 'Delete saved');
+    body.append(h('div', { class: 'team-row rq-sets' }, typeSel, setSel, nameIn, saveB, delB));
     const sec = (label, list, isH) => [h('h3', { class: 'rq-h' }, label, h('span', { class: 'bx-count' }, String(list.length))),
       h('ul', { class: 'rq-list', 'aria-label': label, 'data-hard': isH ? '1' : '0' },
         list.length ? list.map(r => row(r, state)) : h('li', { class: 'rq-empty' }, rules.length ? 'None. Drag a rule here.' : 'No rules to show.'))];

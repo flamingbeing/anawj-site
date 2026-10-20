@@ -146,6 +146,16 @@ new rule of an existing type, made in the app). The comment block at the top of 
 
 Nothing else changes: the checker, the builder, Check and the solver all read `RULE_TYPES`.
 
+## Sharing rules as text (`js/rules-share.js`)
+
+Rules > Copy puts the rules (JSON, same shape as the Export file) on the clipboard; Paste / import takes pasted text or a
+file, accepts the export shape, a bare list, one rule, or a Claude reply with the JSON in a code block, and opens the
+review: plain-English problems per rule (unknown type or code; those are not importable), a dry run (how many problems
+the rule would flag this month as the roster is now), New / Changed / same. A rule without `pool` goes to the roster in
+view. "Guide for Claude" copies a Markdown guide built from `RULE_TYPES` (every type, field and option) plus this
+roster's codes, groups and tags (no staff names), so a new rule type appears in it by itself. Priorities: select by type,
+clear selection, saved selections (per device, `ntf-roster-rq-sets`).
+
 ## Auto-fill (`js/solver.js`, `js/solver-worker.js`)
 
 A pure function run in a Web Worker (the page stays responsive; it falls back to the page if the worker fails). It
