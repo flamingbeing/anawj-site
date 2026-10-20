@@ -45,6 +45,13 @@ const getPage = id => tx('readonly', s => s.get(id));
 export const putPage = p => tx('readwrite', s => s.put(p));
 export const delPage = id => tx('readwrite', s => s.delete(id));
 
+// the tidied copy of one form page on this phone, for Scan imports' crops (scan id first; a subject's page as a fallback)
+export async function pagePhoto(scan, subject, page) {
+  const all = await allPages().catch(() => []), want = String(page);
+  const p = all.find(q => q.scan && q.scan === scan && q.label === want) || (subject ? all.find(q => q.subject === subject && q.label === want) : null);
+  return p?.clean || null;
+}
+
 // uploading works only on the real address (Access and the Worker's /scan-api/ are there), not in demo mode or on previews
 // (the browser tests try it on localhost with ?scantest)
 export const CAN_SEND = typeof location !== 'undefined' && (location.hostname === 'prewarmstudy.anawj.com' && !/[?&]demo\b/.test(location.search)

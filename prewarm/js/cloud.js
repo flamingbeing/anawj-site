@@ -4,7 +4,7 @@
 //   members/{uid}  { site, initials, code, joinedAt }       codes/{site}  { code, setAt, setBy }   (admins only)
 //   admins/{email} {}                                       patients/{id} { site, created, deleted?, lock?, f: { id: {v,t,by} } }
 //   pacu/{token}   { site, pid, sid, created, f }      (the PACU nurse's link: the token is the secret; see firestore.rules)
-//   scanImports/{id} { scan, createdAt, status, pages, fields: { id: { v, flags } }, reviewedBy?, reviewedAt? }  (Firetop writes, admins read and approve)
+//   scanImports/{id} { scan, subject?, createdAt, status, pages, fields: { id: { v, flags, page?, box? } }, reviewedBy?, reviewedAt? }  (Firetop writes, admins read and approve)
 //   forms/blank    { b64, name, size, setAt, setBy }        (the blank paper form, .docx; admins upload, members read)
 
 import { FIREBASE_CONFIG } from './firebase-config.js';

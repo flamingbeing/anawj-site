@@ -552,3 +552,32 @@ button.scst-retake { width: 100%; min-height: var(--tap); margin-top: 4px; backg
 .sclivefail p { margin: 0; }
 .sclive .scbig { width: 100%; }
 .sclive [aria-pressed="true"] { outline: 3px solid #2f80ff; }
+/* Scan imports, phone-first (scan-ux S4): by Subject ID, by form page, values to check shown, the rest folded */
+.sigrp { display: grid; gap: 6px; }
+.sigrp h3, .sipage h3 { margin: 6px 0 0; }
+.siimp { width: 100%; display: grid; justify-items: start; gap: 2px; text-align: left; min-height: var(--tap); }
+.siimp small { color: var(--muted); }
+.sidone summary, .sifine summary { min-height: var(--tap); display: flex; align-items: center; cursor: pointer; font-weight: 600; }
+.sipt { display: grid; gap: 6px; padding: 8px 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); }
+.sipt p { margin: 0; }
+.sisum { margin: 0; }
+.sipage { display: grid; gap: 6px; }
+.sirow { display: grid; gap: 4px; padding: 8px 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); scroll-margin: 80px; }
+.sirow.flag { border-color: var(--warn); }
+.sirow.on { box-shadow: 0 0 0 3px var(--navy); }
+.sirow:focus { outline: none; }
+.sihead { display: flex; align-items: center; gap: 8px; min-height: var(--tap); }
+.sihead input { width: 24px; height: 24px; flex: none; }
+.sival { font-size: 18px; min-height: var(--tap); }
+.sicrop { min-height: 32px; display: flex; align-items: center; }
+.sicrop canvas { display: block; width: 100%; height: auto; max-height: 160px; object-fit: contain; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
+.sicmp { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.sicmp span { display: grid; padding: 4px 8px; border-radius: var(--r); background: var(--bg); }
+.sicmp span:last-child { background: var(--warn-soft); }
+.sibar { position: sticky; bottom: 0; z-index: 4; display: flex; gap: 8px; padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px)); background: var(--bg); }
+.sibar button { flex: 1; min-height: var(--tap); }
+@media (min-width: 640px) {
+  .sirow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 12px; }
+  .sirow > * { grid-column: 2; }
+  .sirow > .sicrop { grid-column: 1; grid-row: 1 / span 6; align-items: start; }
+}
