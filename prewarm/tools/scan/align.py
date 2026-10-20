@@ -99,9 +99,54 @@ def _align_from(gray, quad, template_gray):
     return (fine, s1) if s1 >= s0 else (flat, s0)
 
 
+def _best_scale_shift(pa, pt, scales, max_shift):
+    """1-D: stretch the photo's ink profile `pa` by each scale about its centre and slide it over the template's `pt`; return
+    the [(correlation, scale, shift)] list, best first (shift in profile samples, to move the photo onto the template)."""
+    n = len(pt); x = np.arange(n, dtype=np.float32); tn = pt - pt.mean(); out = []
+    for sc in scales:
+        # photo sample at template position u is pa[(u - n/2 - shift)/sc + n/2]
+        for sh in range(-max_shift, max_shift + 1):
+            src = (x - n / 2 - sh) / sc + n / 2
+            ok = (src >= 0) & (src <= n - 1)
+            if ok.sum() < 0.6 * n: continue
+            v = np.interp(src[ok], x, pa) - 0; t = tn[ok]
+            den = np.sqrt(((v - v.mean()) ** 2).sum() * ((t - t.mean()) ** 2).sum())
+            if den > 0: out.append((float(((v - v.mean()) * (t - t.mean())).sum() / den), float(sc), float(sh)))
+    out.sort(reverse=True)
+    return out
+
+
+def coarse_quads(gray, template_gray, top=4):
+    """The photo is framed a little off the template (the page fills 85-130% of the frame, shifted a few percent): ECC cannot
+    recover from that. Match the photo's row and column ink profiles to the template's over a range of scales and shifts, and
+    return the best placements as quads for _align_from to refine."""
+    h, w = template_gray.shape
+    H, W = gray.shape
+    ink = lambda im: (flatten_illumination(im) < 170).astype(np.float32)
+    flat = cv2.resize(gray, (w, h), interpolation=cv2.INTER_AREA)
+    a, t = ink(flat), ink(template_gray)
+    f = 4  # profiles at quarter resolution
+    prof = lambda m, ax: cv2.GaussianBlur(cv2.resize(m, None, fx=1 / f, fy=1 / f, interpolation=cv2.INTER_AREA).mean(ax).reshape(-1, 1), (1, 5), 0).ravel()
+    scales = np.arange(0.85, 1.31, 0.025)
+    ys = _best_scale_shift(prof(a, 1), prof(t, 1), scales, int(240 / f))[:top]
+    xs = _best_scale_shift(prof(a, 0), prof(t, 0), scales, int(180 / f))[:top]
+    quads = []
+    for _, sy, dy in ys[:2]:
+        for _, sx, dx in xs[:2]:
+            dxp, dyp = dx * f, dy * f
+            # template corners seen in the (template-sized) photo, then in the real photo's pixels
+            q = np.array([[(0 - w / 2 - dxp) / sx + w / 2, (0 - h / 2 - dyp) / sy + h / 2],
+                          [(w - w / 2 - dxp) / sx + w / 2, (0 - h / 2 - dyp) / sy + h / 2],
+                          [(w - w / 2 - dxp) / sx + w / 2, (h - h / 2 - dyp) / sy + h / 2],
+                          [(0 - w / 2 - dxp) / sx + w / 2, (h - h / 2 - dyp) / sy + h / 2]], np.float32)
+            quads.append((q * np.array([W / w, H / h])).astype(np.float32))
+    return quads
+
+
 def align_page(photo_bgr, template_gray):
     """Try each guess at the sheet (brightness corners, colour corners, the whole photo as already cropped) and keep the
-    best-aligned. A shadow or a hand can fool one guess (a shaded edge cuts a corner off); rarely all of them."""
+    best-aligned. A shadow or a hand can fool one guess (a shaded edge cuts a corner off); rarely all of them. If none lines
+    up, slide and scale the photo over the template to find where the page sits and refine from there."""
     gray = cv2.cvtColor(photo_bgr, cv2.COLOR_BGR2GRAY)
     best = None
     for quad in (find_sheet(gray), find_sheet_colour(photo_bgr), None):
@@ -109,7 +154,14 @@ def align_page(photo_bgr, template_gray):
         if best is None or score > best[1]:
             best = (out, score)
         if score >= 0.9:
-            break
+            return best
+    if best[1] < 0.85:
+        for quad in coarse_quads(gray, template_gray):
+            out, score = _align_from(gray, quad, template_gray)
+            if score > best[1]:
+                best = (out, score)
+            if best[1] >= 0.9:
+                break
     return best
 
 
