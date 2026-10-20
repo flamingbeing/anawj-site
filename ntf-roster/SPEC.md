@@ -32,6 +32,7 @@ Public repo: never commit real names, rosters or leave. Demo and tests use made-
 | `js/ui-roster.js` | month grid, cell editor, paint mode, phone views, auto-fill dialog | C |
 | `js/ui-day.js` | one day: who is on what, away, problems (phone default) | C |
 | `js/ui-rules.js`, `css/rules.css` | rule list, schema-driven rule builder, templates, rule log, rules import/export | B |
+| `js/rules-text.js`, `test/rules-text.test.mjs` | rules as plain sentences: Edit as text lines, the readable rules file, `TEXT_FORMS` | integration |
 | `js/ui-people.js` | staff list, groups, tags, duty codes editor | B |
 | `js/ui-check.js` | problems list by rule, fairness table, coverage table | B |
 | `js/io.js`, `vendor/exceljs.min.js` | Excel import/export (department sheet layout), JSON backup, ICS, CSV | D |

@@ -186,6 +186,54 @@ s = await stored(page);
 ok(s.rules.find(r => r.id === newRule.id).enabled === false, 'the rule switch turns it off');
 ok(await hard(page) === 0, 'no must-fix problems once it is off');
 
+// Rules › Edit as text: change a number, add a line, remove a line; an unreadable line is named and nothing is saved
+{
+  const before = await stored(page);
+  await page.click('.rv-tools [data-k="text"]');
+  await page.waitForSelector('.rt-text');
+  await axe(page, 'edit rules as text');
+  const text = await page.inputValue('.rt-text');
+  ok(/^MUST\s+.*at most 7 C a month, scaled by FTE\s+\[r-maxcall\]$/m.test(text), 'each rule is a plain line');
+  const edited = text.replace('at most 7 C a month', 'at most 6 C a month').split('\n').filter(l => !/\[r-req-pr\]$/.test(l)).join('\n');
+  await page.fill('.rt-text', edited + '\nMUST  Juniors: at most lots of C\n');
+  await page.click('.sheet-foot .btn-primary');
+  await page.waitForSelector('.rt .warn-box:not([hidden])');
+  ok(/Line \d+/.test(await page.textContent('.rt .warn-box')), 'an unreadable line is named');
+  await page.fill('.rt-text', edited + '\nPREF 30  No clinic after call = If C, then no Clinic on the next day\n');
+  await page.click('.sheet-foot .btn-primary');
+  await page.waitForSelector('.ri-list');
+  await page.waitForSelector('.rt-text', { state: 'detached' });   // the editor closes for the review
+  const review = await page.textContent('.ri:has(.ri-list)');
+  ok(/1 new, 1 changed/.test(review) && /1 to delete/.test(review), `the review lists the changes (${review.slice(0, 120)})`);
+  await axe(page, 'review of the text edit');
+  await page.click('.sheet-foot .btn-primary');
+  await page.waitForTimeout(250);
+  s = await stored(page);
+  ok(s.rules.find(r => r.id === 'r-maxcall').params.max === 6, 'the edited number is saved');
+  ok(!s.rules.some(r => r.id === 'r-req-pr'), 'the removed line deleted its rule');
+  const added = s.rules.find(r => r.name === 'No clinic after call');
+  ok(added && added.type === 'sequence' && added.hard === false && added.weight === 30 && added.pool === 'junior', 'the new line is a new rule');
+  ok(s.rules.length === before.rules.length, 'one added, one deleted');
+  await page.evaluate(() => window.ntfApp.store.undo());
+  await page.waitForTimeout(150);
+  s = await stored(page);
+  ok(s.rules.find(r => r.id === 'r-maxcall').params.max === 7 && s.rules.some(r => r.id === 'r-req-pr'), 'one undo brings it all back');
+  // Paste / import reads the readable file (Export as text) and rule lines too
+  const file = await page.evaluate(async () => (await import('./js/rules-text.js')).rulesToFile(window.ntfApp.store.get()));
+  await page.click('.rv-tools [data-k="paste"]');
+  await page.waitForSelector('.ri-text');
+  await page.fill('.ri-text', file.replace(/at most 7 C a month/i, 'At most 5 C a month') + '\n- name: Clinic days\n  strength: preference 15\n  who: Juniors\n  rule: At most 2 Clinic a week\n');
+  await page.click('.sheet-foot .btn-primary');
+  await page.waitForSelector('.ri-list');
+  const rv = await page.textContent('.ri:has(.ri-list)');
+  ok(/1 new, 1 changed/.test(rv), `the text file imports with a review (${rv.slice(0, 300)})`);
+  await page.click('.sheet-back:last-child .sheet-foot .btn-primary');
+  await page.waitForTimeout(250);
+  s = await stored(page);
+  ok(s.rules.find(r => r.id === 'r-maxcall').params.max === 5 && s.rules.some(r => r.name === 'Clinic days' && r.weight === 15), 'imported from text');
+  await page.evaluate(() => window.ntfApp.store.undo());
+}
+
 // people and more tabs
 await go(page, '#people');
 await page.waitForSelector('.pv-row');

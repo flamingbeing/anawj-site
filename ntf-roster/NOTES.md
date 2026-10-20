@@ -142,7 +142,9 @@ new rule of an existing type, made in the app). The comment block at the top of 
 4. **Check it in the browser**: Rules › Add rule shows the new card; build one in `?demo` and see its problems in the
    grid and in Check. If Auto-fill should be able to satisfy it (not just score it), check `js/solver.js` step 2: only
    `cover`, `standing` and minimum `limit` rules create demand; everything else is scored.
-5. **Document it**: one line in the rule-type list above and in the table in `SPEC.md`.
+5. **Give it a sentence**: one entry in `TEXT_FORMS` in `js/rules-text.js` (the words for Edit as text and the
+   readable file; `test/rules-text.test.mjs` fails until there is one), and a case in that test's list.
+6. **Document it**: one line in the rule-type list above and in the table in `SPEC.md`.
 
 Nothing else changes: the checker, the builder, Check and the solver all read `RULE_TYPES`.
 
@@ -355,6 +357,29 @@ restriction" (same day, following days, between two people, and ready-made ones)
 - The old address `anawj.com/ntf-roster/` (GitHub Pages; not an authorised sign-in domain) forwards to
   ntfroster.anawj.com. A browser with a roster saved there stays and shows a "Moved" bar: Download backup, then Go
   (Restore from a backup at the new address).
+
+## Rules as plain sentences (20 Oct 2026, `js/rules-text.js`)
+
+The owner: rules must be easy for a person to read and change. Every rule can be written as one exact sentence and
+read back as the very same rule (`test/rules-text.test.mjs` checks every default rule and every option of every type).
+
+- **Line format** (Rules › Edit as text, for the roster in view):
+  `MUST  Name = Juniors: at most 7 C a month, scaled by FTE (weekends)  // note  [r-maxcall]`. Status first: `MUST`,
+  `PREF 20` (a preference with priority 20), `OFF` in front for a rule turned off. `Name =` and `// note` are optional;
+  who goes before the colon (left out for everyone; names of groups, tags, people, or `juniors`/`seniors`; `except`
+  names people left out; a name that is two things is written `group …`/`tag …`/`person …`); when goes in brackets at
+  the end (`weekends`, `Mon, Wed`, `weekdays, except public holidays`, `public holidays only`, `from 2026-11-01`,
+  `until …`). Codes are the roster's own codes or the words for tokens (`any shift`, `leave`, `away`, `at work`,
+  `post call`, `other duty`, `a request`, `anything`). Each type's sentence is a pattern in `TEXT_FORMS`.
+- **Editing**: the `[id]` ties a line to its rule; a line without one (or a copy of a line) is a new rule; a removed
+  line deletes its rule. Settings a sentence doesn't show (the run length of a weekly limit, the number on a "never
+  with" rule) stay as they were. Review is the import review plus Delete rows, and saving is one undo step. A line
+  that can't be read is named ("Line 12: …") and stops the review: nothing is guessed, and its rule is never deleted.
+  A rule that can't be written exactly (no codes yet, an unknown person) is a `# Kept as it is … [id]` line.
+- **Readable file** (Rules › Export as text): one block per rule, `- name:` then `strength`, `on`, `roster`, `who`,
+  `rule`, `when`, `note` (more lines indented four spaces), `id`; a rule that can't be written gets a `json:` field.
+  Paste / import reads this file, rule lines, or JSON (`looksLikeRulesFile`, then lines starting with MUST/PREF).
+- JSON copy, export and the Guide for Claude are unchanged.
 
 ## Rules: all confirmed, Priorities sheet (19 Oct 2026)
 

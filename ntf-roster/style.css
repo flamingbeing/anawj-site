@@ -1118,3 +1118,11 @@ body.month-locked #autofill { display: none; }   /* Fill can't change a locked m
 .rq-name-in { flex: 1 1 140px; padding: 4px 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); font: inherit; background: var(--surface, #fff); color: inherit; }
 .ri-text { width: 100%; box-sizing: border-box; font: 13px/1.4 ui-monospace, monospace; padding: 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface, #fff); color: inherit; }
 .ri-bad { color: var(--bad, #b3261e); }
+
+/* Rules › Edit as text (rules-text.js) */
+.rt-text { min-height: 40vh; white-space: pre; overflow-wrap: normal; overflow-x: auto; tab-size: 2; }
+.rt-ex { margin-top: 10px; }
+.rt-ex summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+.rt-ex-list { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 6px; }
+.rt-ex-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.rt-ex-list code { font: 12px/1.4 ui-monospace, monospace; overflow-wrap: anywhere; flex: 1 1 220px; }
