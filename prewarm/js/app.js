@@ -424,8 +424,10 @@ function nowFor(p, s) {
   return r == null ? n : n + 1440 * Math.round((r - n) / 1440);
 }
 // readings due after that stage ended (into OT for pre-warming, surgery end for intra-op) aren't expected
+// the End reading, once saved, is the last temperature: nothing later is due, even if Surgery end wasn't logged (owner, 20 Oct 2026)
 function expected(p, s, due) {
   let end = toMin(val(p, s === 'prewarm' ? 'ev_ot' : 'io_done'));
+  if (end == null && s === 'iotemp') end = toMin(savedAt(p, s, 'end'));
   const r = refOf(p, s);
   if (end == null || r == null) return true;
   while (end < r) end += 1440;
@@ -735,7 +737,7 @@ function nextDue(p, s) {
 }
 // the reading due most recently (until the next one is due), else the next one coming up
 function duePick(p, s) {
-  if (sealedBy(p, s)) return null; // marked complete: nothing more is asked for
+  if (sealedBy(p, s) || (s === 'prewarm' && noWarming(p))) return null; // marked complete, or no pre-warming: nothing is asked for
   const now = nowFor(p, s);
   const timed = pointsFor(p, s).map(x => ({ x, due: dueOf(p, s, x) })).filter(t => t.due != null && expected(p, s, t.due)).sort((a, b) => a.due - b.due);
   const cur = timed.filter(t => t.due <= now).pop(), up = timed.find(t => t.due > now && !savedAt(p, s, t.x.key));
@@ -806,10 +808,34 @@ function openTarget(t, pad = true) {
   pendingOpen = { ...t, at: Date.now() };
   if (location.hash === hash) render(); else go(hash);
 }
-const defaultSeries = p => noWarming(p) || val(p, 'ev_ot') || val(p, 'io_knife') ? 'iotemp' : 'prewarm';
+// patient comfort (owner, 20 Oct 2026): the before-surgery question sits on the Pre-warming tab, the after-surgery one
+// on the PACU page; one line once answered
+const COMFORT = BY_ID.sat_pre.opts;
+let satEdit = null;
+function comfortHtml(p, id, label) {
+  const v = val(p, id);
+  if (v != null && satEdit !== id) {
+    return `<div class="comfort done"><span>${label}: <b>${esc(COMFORT.find(o => String(o[0]) === String(v))?.[1] || v)}</b></span><button class="link" data-satedit="${id}">Change</button><button class="link" data-satclear="${id}">Clear</button></div>`;
+  }
+  return `<div class="comfort"><span class="lab">${label}<small>ask the patient</small></span>
+    <div class="seg comfort5">${COMFORT.map(([ov, ol]) => `<button class="chip" data-sat="${id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${ol.replace('omfortable', 'omfort&shy;able')}</button>`).join('')}</div></div>`;
+}
+// true when the tap was a comfort answer, Change or Clear
+function comfortTap(p, t, draw) {
+  const sat = t.closest('[data-sat]');
+  // an answer can be changed, not cleared by tapping it again; the row collapses, so taps pause a moment
+  if (sat) { set(p, sat.dataset.sat, +sat.dataset.v); satEdit = null; draw(); lockTaps(); return true; }
+  const sc = t.closest('[data-satclear]');
+  if (sc) { if (confirm('Clear this comfort answer?')) { set(p, sc.dataset.satclear, null); satEdit = null; draw(); } return true; }
+  const se = t.closest('[data-satedit]');
+  if (se) { satEdit = se.dataset.satedit; draw(); return true; }
+  return false;
+}
+// the no-pre-warming group opens on the Pre-warming tab until the before-surgery comfort answer is in
+const defaultSeries = p => val(p, 'ev_ot') || val(p, 'io_knife') || (noWarming(p) && val(p, 'sat_pre') != null) ? 'iotemp' : 'prewarm';
 route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s, key) => {
   const p = patients[id]; if (!p) return go('#/');
-  // the no-pre-warming group keeps the Pre-warming tab, which just says so (owner, 12 Oct 2026)
+  // the no-pre-warming group keeps the Pre-warming tab, which says so and asks the before-surgery comfort question (owner, 12 and 20 Oct 2026)
   if (!s) s = defaultSeries(p);
   const noPw = s === 'prewarm' && noWarming(p);
   const sealed = () => sealedBy(p, noPw ? null : s);
@@ -1009,17 +1035,6 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       return `<button class="tchip ${v ? 'set' : ''}${WARM_EVENTS.has(f) ? ' warm' : ''}" data-ev="${f}" aria-label="${i + 1}, ${full}: ${v ? v + ', tap to change' : 'tap to set now'}">${n}<span>${l}</span><b>${v ? esc(v) : 'tap'}</b></button>`;
     }).join('')}</div>`;
   }
-  // patient comfort: pre-op question at the top, post-op at the bottom; one line once answered
-  const COMFORT = BY_ID.sat_pre.opts;
-  let satEdit = null;
-  function comfortHtml(id, label) {
-    const v = val(p, id);
-    if (v != null && satEdit !== id) {
-      return `<div class="comfort done"><span>${label}: <b>${esc(COMFORT.find(o => String(o[0]) === String(v))?.[1] || v)}</b></span><button class="link" data-satedit="${id}">Change</button><button class="link" data-satclear="${id}">Clear</button></div>`;
-    }
-    return `<div class="comfort"><span class="lab">${label}<small>ask the patient</small></span>
-      <div class="seg comfort5">${COMFORT.map(([ov, ol]) => `<button class="chip" data-sat="${id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${ol.replace('omfortable', 'omfort&shy;able')}</button>`).join('')}</div></div>`;
-  }
   // the other forms, Still to fill and Mark complete: the same on both tabs (owner, 12 Oct 2026)
   function linksHtml() {
     const done = (pg, name) => val(p, 'sign_' + pg) ? ` class="done" aria-label="${name}, complete"` : '';
@@ -1072,10 +1087,10 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     // three parts (owner, 12 Oct 2026): key times; the tab bar and its readings (swipe changes tab here only);
     // the other forms, Still to fill and Mark complete, the same on both tabs
     paint(`<section class="third top" aria-label="Key times">${val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${timesHtml()}</section>
-      <section class="third mid">${ptabsHtml()}${main ? comfortHtml('sat_pre', 'Comfortable before surgery?') : ''}${reading}
+      <section class="third mid">${ptabsHtml()}${s === 'prewarm' ? comfortHtml(p, 'sat_pre', 'Comfortable before surgery?') : ''}${reading}
       ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
-      ${main ? (noPw ? '' : signoffHtml(p, s)) + comfortHtml('sat_post', 'Comfortable after surgery?') : signoffHtml(p, s)}</section>
+      ${main && noPw ? '' : signoffHtml(p, s)}</section>
       <section class="third bot" aria-label="Other forms and checks">${linksHtml()}${gapsHtml(p)}${doneHtml(p)}
       <p class="resetline"><button class="link" id="resetsub">Reset this subject</button></p></section>`);
     refreshBar();
@@ -1161,13 +1176,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     if (fl && !t.closest('[data-step], .num')) { touched.add(fl.dataset.fill); draft[fl.dataset.fill] = start[fl.dataset.fill].toFixed(1); draw(); return; }
     const m = t.closest('[data-map]');
     if (m) { draft.map = m.dataset.map; draw(); return; }
-    const sat = t.closest('[data-sat]');
-    // an answer can be changed, not cleared by tapping it again; the row collapses, so taps pause a moment
-    if (sat) { set(p, sat.dataset.sat, +sat.dataset.v); satEdit = null; draw(); lockTaps(); return; }
-    const sc = t.closest('[data-satclear]');
-    if (sc) { if (confirm('Clear this comfort answer?')) { set(p, sc.dataset.satclear, null); satEdit = null; draw(); } return; }
-    const se = t.closest('[data-satedit]');
-    if (se) { satEdit = se.dataset.satedit; draw(); return; }
+    if (comfortTap(p, t, draw)) return;
     const ev = t.closest('[data-ev]');
     if (ev) { editTime(ev.dataset.ev); return; }
     const n = t.closest('.num[data-type]');
@@ -1402,8 +1411,8 @@ function gaps(p) {
     const all = pages.flatMap(pg => FORM[pg].map(([k]) => k)), done = all.filter(k => get(k) != null).length;
     add(`POD${n} chart review ${days > n ? 'overdue' : 'due today'}`, [`${done} of ${all.length} answered`], at('data/day' + n));
   }
-  if (get('ev_ot') && get('sat_pre') == null) add('Comfort not asked', ['Before surgery'], '#/p/' + p.id);
-  if (get('pacu_in') && get('sat_post') == null) add('Comfort not asked', ['After surgery'], '#/p/' + p.id);
+  if (get('ev_ot') && get('sat_pre') == null) add('Comfort not asked', ['Before surgery'], `#/p/${p.id}/prewarm`);
+  if (get('pacu_in') && get('sat_post') == null) add('Comfort not asked', ['After surgery'], `#/p/${p.id}/form/pacu`);
   return out;
 }
 function gapsHtml(p) {
@@ -1620,7 +1629,7 @@ function formPage(id, pg, back) {
     const pt = pg === 'pacu' ? `<div class="times pacutimes">${[['pacu_in', 'PACU in'], ['pacu_out', 'To ward']].map(([f, l]) =>
       `<button class="tchip ${get(f) ? 'set' : ''}" data-pev="${f}" aria-label="${EVENT_FULL[f] || l}: ${get(f) ? get(f) + ', tap to change' : 'tap to set now'}"><span>${l}</span><b>${get(f) ? esc(get(f)) : 'tap'}</b></button>`).join('')}</div>` : '';
     const sl = sealedBy(p, pg);
-    paint(`<div class="${sl ? 'sealed' : ''}">${pt}<div class="stack">${FORM[pg].map(group => {
+    paint(`<div class="${sl ? 'sealed' : ''}">${pt}${pg === 'pacu' ? comfortHtml(p, 'sat_post', 'Comfortable after surgery?') : ''}<div class="stack">${FORM[pg].map(group => {
       if (group[0] === 'h') return `<h2>${group[1]}</h2>`;
       if (group[0] === 'tx') return txTable(p);
       if (group[0] === 'ix') return ixTable(p);
@@ -1631,6 +1640,7 @@ function formPage(id, pg, back) {
   };
   draw();
   view.onclick = e => {
+    if (pg === 'pacu' && comfortTap(p, e.target, draw)) return;
     const b = e.target.closest('.chip[data-f]');
     if (b) { const f = field(b.dataset.f); const v = f.type === 'code' ? +b.dataset.v : b.dataset.v; set(p, f.id, String(get(f.id)) === String(v) ? null : v); recalc(p); draw(); return; }
     const u = e.target.closest('[data-use]');

@@ -295,6 +295,7 @@ jobs.push(() => tryit(async () => {
   await pg.click('#seldone');
   await pg.locator('.list a').first().click(); await pg.waitForSelector('#clock');
   await pg.evaluate(() => { Storage.prototype.setItem = () => { throw new Error('QuotaExceededError'); }; });
+  await pg.click('.tabs2 a:first-child'); await pg.waitForSelector('.chip[data-sat="sat_pre"]'); // the before-surgery comfort question is on the Pre-warming tab
   await pg.click('.chip[data-sat="sat_pre"][data-v="1"]'); await pg.waitForTimeout(300);
   log(/couldn’t store the last change/.test(await pg.textContent('#storefull').catch(() => '')), 'storage full stays on screen');
   await ctx.close();
@@ -355,7 +356,7 @@ jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 1);
   const st = await pg.textContent('[data-ev="io_gown_start"] b');
-  if (!/\d\d:\d\d/.test(st)) { await tapNow(pg, 'io_gown_start'); await pg.waitForTimeout(200); }
+  if (!/\d\d:\d\d/.test(st)) { await tapNow(pg, 'io_gown_start'); await pg.waitForTimeout(900); } // past the tap guard
   const t = await pg.textContent('[data-ev="io_gown_start"] b');
   await pg.click('.strip a:has-text("55")'); await pg.waitForSelector('#save');
   const due = (await pg.textContent('#due')).match(/\d\d:\d\d/)?.[0];
@@ -478,9 +479,15 @@ jobs.push(() => tryit(async () => {
   await pg.goto('http://localhost:8080/prewarm/?demo#/new'); await pg.waitForSelector('#sid');
   await pg.fill('#sid', 'NOPW-X'); await pg.click('.seg .chip[data-v="3"]'); await pg.click('button[type=submit]');
   await pg.waitForSelector('.tabs2');
-  log(/Intra-op/.test(await pg.textContent('.tabs2 [aria-selected="true"]')), 'no pre-warming opens on Intra-op');
-  await pg.click('.tabs2 a:first-child'); await pg.waitForSelector('.nopw');
+  // no pre-warming still opens on the Pre-warming tab, which asks the before-surgery comfort question; once answered it opens on Intra-op
+  await pg.waitForSelector('.nopw');
+  const nopwUrl = pg.url();
+  log(/Pre-warming/.test(await pg.textContent('.tabs2 [aria-selected="true"]')), 'no pre-warming opens on Pre-warming until comfort is answered');
   log(/No pre-warming/.test(await pg.textContent('.nopw')) && !await pg.$('#save'), 'Pre-warming tab says no pre-warming, nothing to save');
+  log(!/Prewarm|Temp Prewarm/.test(await pg.textContent('.next').catch(() => '')), 'no pre-warming: no pre-warming countdown in the top bar');
+  await pg.click('.chip[data-sat="sat_pre"][data-v="2"]'); await pg.waitForTimeout(100);
+  await pg.goto(nopwUrl.split('#')[0] + '#/'); await pg.goto(nopwUrl); await pg.waitForSelector('.tabs2');
+  log(/Intra-op/.test(await pg.textContent('.tabs2 [aria-selected="true"]')), 'no pre-warming opens on Intra-op once comfort is answered');
   await ctx.close();
 }));
 // Y. Reset this subject asks twice (Cancel on the second keeps everything); PACU view opens only the PACU page;

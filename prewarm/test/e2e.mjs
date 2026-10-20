@@ -41,7 +41,7 @@ try {
   await page.click('button[type=submit]');
   // the patient opens on the main screen: times, then pre-warming temperatures
   await page.waitForSelector('.times');
-  // pre-op comfort at the top, one line once answered; post-op comfort at the bottom
+  // pre-op comfort on the Pre-warming tab, one line once answered; post-op comfort is on the PACU page
   assert.match(await page.textContent('.comfort'), /before surgery/);
   if (SHOTS) await page.screenshot({ path: SHOTS + '/fit.png' });
   // one timepoint fits a 390 x 844 phone: Save is on screen without scrolling
@@ -49,7 +49,7 @@ try {
   assert.ok(sv.y + sv.height <= 844, 'Save is below the fold: ' + (sv.y + sv.height));
   await page.click('.chip[data-sat="sat_pre"][data-v="2"]');
   assert.match(await page.textContent('.comfort.done'), /Neutral/);
-  assert.ok(await page.$('.chip[data-sat="sat_post"]'), 'post-op comfort at the bottom');
+  assert.equal(await page.$('.chip[data-sat="sat_post"]'), null, 'post-op comfort is not on the temperatures screen');
   assert.equal(await page.$('.links a[href$="/form/satis"]'), null, 'no separate satisfaction screen');
   assert.match(await page.textContent('.tabs2 [aria-selected="true"]'), /Pre-warming/);
   assert.match(await page.textContent('.badge'), /10 min pre-warming/, 'group shows with the pre-warming temperatures');

@@ -6,8 +6,10 @@ How the patient screen, key times, sign-offs, forms and look work. Part of the n
   compact grid (tap an empty one = now; tap a set one to change or clear it), then all temperatures with a
   Pre-warming / Intra-op switch (opens on Intra-op once the patient is in OT), then links to the other forms in the
   order they're filled in (BP/HR/BIS, intra-op details, PACU, satisfaction, form view).
-- **Patient comfort**: pre-op question at the top of the main screen, post-op at the bottom (no
-  separate screen); one line once answered. "Sheet view" (was Spreadsheet view, earlier Form view) is a text link under the other forms.
+- **Patient comfort** (owner, 20 Oct 2026): the before-surgery question is at the top of the Pre-warming tab, the
+  after-surgery one at the top of the PACU page (no separate screen); one line once answered. The no-pre-warming group
+  still opens on the Pre-warming tab until the before-surgery answer is in (then on Intra-op); Still to fill links to
+  each question's screen. "Sheet view" (was Spreadsheet view, earlier Form view) is a text link under the other forms.
 - **Look:** the NUHS design system's app theme (`nuhsdesign/tokens.css`, Open Sans): white app bar with the four-quarter band (orange / red / stripe
   blue #178fd7 / navy), grey #f3f3f3 ground, white cards with 14px corners and hairlines, 10px controls, navy as the
   only accent (Save, selected chips, active tab), bold navy titles, 44px tap targets, dark toast at the top.
