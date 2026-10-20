@@ -48,6 +48,16 @@ edge2 = np.zeros((42, 106), np.uint8); edge2[:, 1:4] = 1
 assert not scan.arrow_shaft(edge2)
 short = np.zeros((42, 106), np.uint8); short[10:22, 52:55] = 1
 assert not scan.arrow_shaft(short)
+# an arrow through a cell that also holds its head (so it counts as writing) is still an arrow; digits are not
+thru = np.zeros((42, 106), np.uint8); thru[1:41, 52:55] = 1; cv2.line(thru, (44, 30), (53, 40), 1, 2); cv2.line(thru, (62, 30), (53, 40), 1, 2)
+assert scan.through_arrow(thru) and not scan.through_arrow(digits) and not scan.through_arrow(short)
+one = np.zeros((42, 106), np.uint8); cv2.putText(one, '1', (45, 34), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 1, 3)
+assert not scan.through_arrow(one)
+# a crossed-out answer next to a new one is two marks; one letter is one
+yn = np.zeros((42, 106), np.uint8); cv2.putText(yn, 'N', (40, 34), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 1, 3)
+assert scan.mark_groups(yn) == 1
+yx = yn.copy(); cv2.putText(yx, 'Y', (8, 34), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 1, 3); cv2.line(yx, (4, 30), (30, 8), 1, 2)
+assert scan.mark_groups(yx) == 2
 # empty cells between arrows are flagged, a genuinely empty column is not
 F = {f'iotemp_{p}_room': dict(id=f'iotemp_{p}_room', series='iotemp', col='room', point=p) for p in ('0', '5', '10', '15', '20', '25')}
 E = lambda **k: {'value': None, 'flags': [], **k}

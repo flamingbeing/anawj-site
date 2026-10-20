@@ -22,7 +22,9 @@ those in the review screen.
      option letters, core temperature jumping >1 °C (skin >6 °C) between neighbours, systolic above diastolic, two ticks
      in one question. Anything off is flagged; values with no known range are not. An arrow or ditto ("same as above"),
      and an empty cell an arrow runs through, takes the reading above it in the same column (noted in the review screen);
-     an arrow with nothing above it stays flagged.
+     an arrow with nothing above it stays flagged. An arrow is found from the ink before any reader sees the cell (a stroke
+     running nearly the whole cell height), so a model never turns one into a number. A cell with ink read as empty is
+     flagged, and so is a Y / N cell with two marks side by side (a crossed-out answer).
 4. **You confirm** (`review.html`): flagged fields first, the photo crop beside each reading. Only values you confirm
    are saved to `patient.reviewed.json`.
 5. **Export** (`export-scan.mjs`): reviewed files → the workbook through the app's own `workbook()`, same 572 columns.
