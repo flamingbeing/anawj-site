@@ -12,6 +12,7 @@ NEVER_SEND = {'text', 'date', 'word'}      # IDs, dates, names and free text are
 MIN_ALIGN = 0.80                            # below this, the photo is rejected: retake it
 LEAK_WARN = 15.0                            # printed-ink leakage per 1000 px outside the fields: real good pages measured 0.6-3.6, a dense table page 9.6
 TABLE_OK, TABLE_PAGE_MIN = 0.85, 0.70       # a page under MIN_ALIGN is still accepted if every refined table fits this well on its own
+HINT_MARGIN = 0.03                          # another page must line up this much better than the phone's page number to win
 CHECK_ALIGN = 0.90                          # between the two, the page is read but flagged 'check the crops line up'
 JUMP = {'core': 1.0, 'chest': 6.0, 'arm': 6.0, 'thigh': 6.0, 'calf': 6.0}   # °C between neighbouring readings
 
@@ -262,22 +263,27 @@ def aligned(img, tpl, tables):
     return flat, score, []
 
 
-def best_page(img, tpls, tables_of, forced=None):
-    """Align the photo to its most likely pages and keep the best fit: page look-alikes (big tables) fool a quick guess."""
+def best_page(img, tpls, tables_of, forced=None, hint=None):
+    """Align the photo to its most likely pages and keep the best fit: page look-alikes (big tables) fool a quick guess.
+    hint: the page number the phone gave the photo; it is tried too and kept unless another page fits clearly better
+    (by HINT_MARGIN), so a photo taken out of order in a burst is put on its real page."""
     if forced:
         pg = forced - 1; flat, score, ts = aligned(img, tpls[pg], tables_of(pg)); return pg, flat, score, ts
     _, guess = align.guess_page(img, tpls)
-    best = None
-    for pg in sorted(range(len(tpls)), key=lambda i: -guess[i])[:3]:
-        flat, score, ts = aligned(img, tpls[pg], tables_of(pg))
-        if best is None or score > best[2]: best = (pg, flat, score, ts)
-    return best
+    tries = sorted(range(len(tpls)), key=lambda i: -guess[i])[:3]
+    h = hint - 1 if hint and 0 < hint <= len(tpls) else None
+    if h is not None and h not in tries: tries.append(h)
+    fits = {pg: aligned(img, tpls[pg], tables_of(pg)) for pg in tries}
+    pg = max(fits, key=lambda i: fits[i][1])
+    if h is not None and fits[pg][1] - fits[h][1] < HINT_MARGIN: pg = h
+    return (pg, *fits[pg])
 
 
 def main(argv=None, reader=None):
     ap = argparse.ArgumentParser()
     ap.add_argument('--form-dir', required=True); ap.add_argument('--out', required=True)
     ap.add_argument('--pages', help='page number of each photo, in order, e.g. 7,9,1 (otherwise worked out from the photo)')
+    ap.add_argument('--hint-pages', help='likely page number of each photo, in order (the phone\'s numbers; x for none): kept unless another page lines up clearly better')
     ap.add_argument('--export-crops', metavar='DIR', help='no reading: write the handwritten crops to DIR for someone to read')
     ap.add_argument('--readings', metavar='FILE', help='use readings made from the exported crops, as {field id: text}, instead of the API')
     ap.add_argument('--readings2', metavar='FILE', help='a second, independent reading of the same crops: the two are compared and any disagreement is flagged')
@@ -293,6 +299,8 @@ def main(argv=None, reader=None):
     tpls = templates(a.form_dir)
     forced = [int(x) for x in a.pages.split(',')] if a.pages else [None] * len(a.photos)
     if len(forced) != len(a.photos): ap.error('--pages needs one page number per photo')
+    hints = [int(x) if x.isdigit() else None for x in a.hint_pages.split(',')] if a.hint_pages else [None] * len(a.photos)
+    if len(hints) != len(a.photos): ap.error('--hint-pages needs one page number (or x) per photo')
     if a.readings2 and not a.readings: ap.error('--readings2 needs --readings')
     reader = reader or (readers.CropExporter(a.export_crops) if a.export_crops else readers.NoReader() if a.no_read
                         else readers.FileReader(a.readings, a.readings2) if a.readings else readers.OllamaReader(a.model) if a.reader == 'ollama'
@@ -300,9 +308,9 @@ def main(argv=None, reader=None):
     _tables = {}
     tables_of = lambda pg: _tables.setdefault(pg, boxes.tables(f'{a.form_dir}/blank.pdf', pg))
     result, pages = {}, []
-    for ph, fp in zip(a.photos, forced):
+    for ph, fp, hp in zip(a.photos, forced, hints):
         img = cv2.imread(ph)
-        pg, flat, score, tscores = best_page(img, tpls, tables_of, fp)
+        pg, flat, score, tscores = best_page(img, tpls, tables_of, fp, hp)
         # a page can fall just short overall while its refined tables sit right on the printed lines: accept that, but say so
         by_tables = bool(tscores) and min(tscores) >= TABLE_OK and score >= TABLE_PAGE_MIN
         ok = score >= a.min_align or by_tables
@@ -317,7 +325,9 @@ def main(argv=None, reader=None):
         if leak > LEAK_WARN:
             pages[-1]['template_mismatch'] = True
             print(f'{ph}: page {pg + 1}: printed text is leaking into the ink layer ({leak:.0f}); the template does not match the paper layout (fonts / row heights): ticks on this page are less reliable', file=sys.stderr)
-        result.update(process_page(pg, flat, tpls[pg], fmap, fields, boxes.cells(f'{a.form_dir}/blank.pdf', pg), reader, boxes.header_bottom(f'{a.form_dir}/blank.pdf', pg)))
+        got = process_page(pg, flat, tpls[pg], fmap, fields, boxes.cells(f'{a.form_dir}/blank.pdf', pg), reader, boxes.header_bottom(f'{a.form_dir}/blank.pdf', pg))
+        for e in got.values(): e['page'] = pg + 1          # which page each value came from (the phone's per-page counts)
+        result.update(got)
     arrow_gaps(result, fields)
     fill_arrows(result, fields)
     series_checks(result, fields)

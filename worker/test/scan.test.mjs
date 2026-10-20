@@ -24,8 +24,8 @@ const fake = reply => async (url, init = {}) => {
   return reply(url, init);
 };
 const ok = () => Response.json({ ok: true, pages: ['1'] });
-const req = (path, { method = 'GET', jwt, body, type = 'image/jpeg', origin } = {}) => new Request('https://prewarmstudy.anawj.com' + path, {
-  method, body, headers: { ...(jwt ? { 'Cf-Access-Jwt-Assertion': jwt } : {}), ...(body ? { 'Content-Type': type } : {}), ...(origin ? { Origin: origin } : {}) },
+const req = (path, { method = 'GET', jwt, body, type = 'image/jpeg', origin, subject } = {}) => new Request('https://prewarmstudy.anawj.com' + path, {
+  method, body, headers: { ...(jwt ? { 'Cf-Access-Jwt-Assertion': jwt } : {}), ...(body ? { 'Content-Type': type } : {}), ...(origin ? { Origin: origin } : {}), ...(subject ? { 'X-Scan-Subject': subject } : {}) },
 });
 const photo = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
 const ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
@@ -53,7 +53,15 @@ assert.equal(calls.length, 1);
 assert.equal(calls[0].url, `https://scan.example.test/scan-api/upload/${ID}/4`);
 const h = calls[0].init.headers;
 assert.equal(h['CF-Access-Client-Id'], 'cid'); assert.equal(h['CF-Access-Client-Secret'], 'csecret'); assert.equal(h['X-Scan-User'], 'member@example.com');
-assert.equal(h['Cf-Access-Jwt-Assertion'], undefined);
+assert.equal(h['Cf-Access-Jwt-Assertion'], undefined); assert.equal(h['X-Scan-Subject'], undefined, 'no subject: none passed on');
+
+// the Subject ID typed on the phone goes on with the photo; one with odd characters is refused before anything is sent
+calls = [];
+r = await handleScan(req(`/scan-api/upload/${ID}/5`, { method: 'POST', jwt: good, body: photo, subject: 'DEMO-01' }), env, fake(ok));
+assert.equal(r.status, 200); assert.equal(calls[0].init.headers['X-Scan-Subject'], 'DEMO-01');
+calls = [];
+r = await handleScan(req(`/scan-api/upload/${ID}/5`, { method: 'POST', jwt: good, body: photo, subject: '<script>' }), env, fake(ok));
+assert.equal(r.status, 400); assert.equal(calls.length, 0);
 
 // status
 calls = [];

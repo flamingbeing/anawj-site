@@ -133,4 +133,20 @@ json.dump({'fields': {'a_core': '36.5', 'b_core': '36.6', 'c_core': '36.7'}}, op
 stub = readers.StubReader({'a_core': '36.5', 'b_core': '36.6', 'c_core': '36.1'}, wrong={('b_core', 1): '36.8'})
 res = bench.main(['--form-dir', d, '--crops', d, '--truth', f'{d}/truth.json'], reader=stub)
 assert res == {'right': ['a_core'], 'flagged': ['b_core'], 'WRONG': ['c_core']}, res
+# page pick: the phone's page number is kept unless another page lines up clearly better (a burst shot out of order)
+_al, _gp = scan.aligned, scan.align.guess_page
+fit = {0: 0.70, 1: 0.86, 2: 0.88, 3: 0.95}
+scan.aligned = lambda img, tpl, tables: ('flat', fit[tpl], [])
+scan.align.guess_page = lambda img, tpls: (None, [0.1, 0.5, 0.4, 0.3])        # quick guess ranks 1, 2, 3 first
+tp = [0, 1, 2, 3]
+assert scan.best_page(None, tp, lambda pg: [], hint=3)[:2] == (3, 'flat'), 'page 4 (0.95) beats the phone page 3 (0.88)'
+assert scan.best_page(None, tp, lambda pg: [])[0] == 3, 'no hint: the best fit'
+assert scan.best_page(None, tp, lambda pg: [], hint=4)[0] == 3
+fit[3] = 0.90
+assert scan.best_page(None, tp, lambda pg: [], hint=3)[0] == 2, 'within the margin the phone wins'
+assert scan.best_page(None, tp, lambda pg: [], hint=1)[0] == 3, 'hint outside the quick guess is tried, then beaten'
+fit[0] = 0.91
+assert scan.best_page(None, tp, lambda pg: [], hint=1)[0] == 0, 'hint outside the quick guess is tried and kept'
+assert scan.best_page(None, tp, lambda pg: [], forced=2)[0] == 1
+scan.aligned, scan.align.guess_page = _al, _gp
 print('unit: ok')
