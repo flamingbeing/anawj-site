@@ -31,19 +31,19 @@ r = await get('https://apmes.anawj.com/evals/nothing'); assert.equal(r.status, 4
 r = await get('https://apmes.anawj.com/logbook'); assert.equal(r.status, 301); assert.equal(r.headers.get('Location'), 'https://apmes.anawj.com/logbook/');
 // a subdomain never serves another app's files, the repo's notes or the root
 for (const [h, p] of [['nuhjuniormonthly.anawj.com', '/logbook/index.html'], ['nuhjuniormonthly.anawj.com', '/AGENTS.md'], ['nuhjuniormonthly.anawj.com', '/hand-babies/'],
-  ['apmes.anawj.com', '/prewarm/index.html'], ['apmes.anawj.com', '/nuh-roster/'], ['prewarmstudy.anawj.com', '/logbook/index.html'], ['prewarmstudy.anawj.com', '/AGENTS.md'],
+  ['apmes.anawj.com', '/nuh-roster/index.html'], ['apmes.anawj.com', '/nuh-roster/'], ['nuhroster.anawj.com', '/logbook/index.html'], ['nuhroster.anawj.com', '/AGENTS.md'],
   ['nuhroster.anawj.com', '/prewarm/'], ['nuhroster.anawj.com', '/logbook/js/app.js'], ['apmes.anawj.com', '/evals/..%2flogbook/index.html'], ['apmes.anawj.com', '/evals/%2e%2e/prewarm/index.html']]) {
   r = await get(`https://${h}${p}`);
   assert.equal(r.status, 404, `${h}${p} -> ${r.status}`);
 }
 // one-app hosts: the app at the root, its own folder name too
-r = await get('https://prewarmstudy.anawj.com/'); assert.equal(r.status, 200);
-r = await get('https://prewarmstudy.anawj.com/sw.js'); assert.equal(r.status, 200);
-r = await get('https://prewarmstudy.anawj.com/prewarm/sw.js'); assert.equal(r.status, 200);
-r = await get('https://prewarmstudy.anawj.com/prewarm'); assert.equal(r.status, 301);
+r = await get('https://nuhroster.anawj.com/'); assert.equal(r.status, 200);
+r = await get('https://nuhroster.anawj.com/sw.js'); assert.equal(r.status, 200);
+r = await get('https://nuhroster.anawj.com/nuh-roster/sw.js'); assert.equal(r.status, 200);
+r = await get('https://nuhroster.anawj.com/nuh-roster'); assert.equal(r.status, 301);
 r = await get('https://nuhroster.anawj.com/'); assert.equal(r.status, 200);
 // the shared design folder is served on every subdomain (apps link ../nuhsdesign/tokens.css); the old /design/ is gone
-for (const h of ['nuhjuniormonthly.anawj.com', 'apmes.anawj.com', 'prewarmstudy.anawj.com', 'nuhroster.anawj.com']) {
+for (const h of ['nuhjuniormonthly.anawj.com', 'apmes.anawj.com', 'nuhroster.anawj.com', 'nuhroster.anawj.com']) {
   r = await get(`https://${h}/nuhsdesign/tokens.css`); assert.equal(r.status, 200, h);
   r = await get(`https://${h}/nuhsdesign`); assert.equal(r.status, 301, h);
   assert.equal(r.headers.get('Location'), `https://${h}/nuhsdesign/`);
@@ -66,11 +66,11 @@ r = await get('https://apmes.anawj.com/__/firebase/init.json'); assert.equal(r.s
 assert.equal(JSON.parse(await r.text()).authDomain, 'apmes.anawj.com');
 assert.equal((await get('https://apmes.anawj.com/__/auth/handler.html')).status, 200);
 r = await get('https://apmes.anawj.com/apmes/guidebook/dops-expectations.md'); assert.equal(r.status, 200);
-for (const u of ['https://apmes.anawj.com/apmes/', 'https://apmes.anawj.com/apmes/originals/x', 'https://apmes.anawj.com/apmes/README.md', 'https://nuhroster.anawj.com/apmes/guidebook/dops-expectations.md', 'https://prewarmstudy.anawj.com/apmes/guidebook/dops-expectations.md']) {
+for (const u of ['https://apmes.anawj.com/apmes/', 'https://apmes.anawj.com/apmes/originals/x', 'https://apmes.anawj.com/apmes/README.md', 'https://nuhroster.anawj.com/apmes/guidebook/dops-expectations.md', 'https://nuhroster.anawj.com/apmes/guidebook/dops-expectations.md']) {
   assert.equal((await get(u)).status, 404, u);
 }
 // ... and only there, only those two folders
-for (const u of ['https://nuhroster.anawj.com/__/auth/handler', 'https://prewarmstudy.anawj.com/__/firebase/init.json', 'https://nuhroster.anawj.com/__/auth/handler', 'https://apmes.anawj.com/__/', 'https://apmes.anawj.com/apmes-auth/firebase/init.json']) {
+for (const u of ['https://nuhroster.anawj.com/__/auth/handler', 'https://nuhroster.anawj.com/__/firebase/init.json', 'https://nuhroster.anawj.com/__/auth/handler', 'https://apmes.anawj.com/__/', 'https://apmes.anawj.com/apmes-auth/firebase/init.json']) {
   assert.equal((await get(u)).status, 404, u);
 }
 // only GET and HEAD
@@ -89,7 +89,7 @@ r = await get('https://anawj-preview.example.workers.dev/_sites/apmes.anawj.com/
 r = await get('https://anawj-preview.example.workers.dev/_sites/apmes.anawj.com/evals'); assert.equal(r.status, 301);
 assert.equal(r.headers.get('Location'), 'https://anawj-preview.example.workers.dev/_sites/apmes.anawj.com/evals/');
 r = await get('https://anawj-preview.example.workers.dev/_sites/apmes.anawj.com/prewarm/'); assert.equal(r.status, 404);
-r = await get('https://anawj-preview.example.workers.dev/_sites/prewarmstudy.anawj.com/'); assert.equal(r.status, 200);
+r = await get('https://anawj-preview.example.workers.dev/_sites/nuhroster.anawj.com/'); assert.equal(r.status, 200);
 console.log('worker tests passed');
 
 // the feedback button (edit/NOTES.md): every page of a PR preview gets the script; the real addresses only when
@@ -106,12 +106,12 @@ console.log('worker tests passed');
   assert.match(r.headers.get('Set-Cookie'), /^anawj-feedback=1; Max-Age=2592000; Path=\/; Secure; SameSite=Lax$/);
   assert.equal(r.headers.get('X-Robots-Tag'), 'noindex, nofollow');
   const withCookie = (url, cookie) => worker.fetch(new Request(url, { headers: { Cookie: cookie } }), { ASSETS });
-  r = await withCookie('https://prewarmstudy.anawj.com/', 'a=b; anawj-feedback=1'); assert.ok((await text(r)).includes(TAG), 'on with the cookie');
-  r = await withCookie('https://prewarmstudy.anawj.com/?feedback=0', 'anawj-feedback=1'); assert.ok(!(await text(r)).includes(TAG), 'off with ?feedback=0');
+  r = await withCookie('https://nuhroster.anawj.com/', 'a=b; anawj-feedback=1'); assert.ok((await text(r)).includes(TAG), 'on with the cookie');
+  r = await withCookie('https://nuhroster.anawj.com/?feedback=0', 'anawj-feedback=1'); assert.ok(!(await text(r)).includes(TAG), 'off with ?feedback=0');
   assert.match(r.headers.get('Set-Cookie'), /^anawj-feedback=; Max-Age=0;/);
-  r = await withCookie('https://prewarmstudy.anawj.com/', 'anawj-feedback=0'); assert.ok(!(await text(r)).includes(TAG));
+  r = await withCookie('https://nuhroster.anawj.com/', 'anawj-feedback=0'); assert.ok(!(await text(r)).includes(TAG));
   // the script itself is served on every subdomain (a shared folder, like the design files)
-  for (const h of ['nuhjuniormonthly.anawj.com', 'apmes.anawj.com', 'prewarmstudy.anawj.com', 'nuhroster.anawj.com']) {
+  for (const h of ['nuhjuniormonthly.anawj.com', 'apmes.anawj.com', 'nuhroster.anawj.com', 'nuhroster.anawj.com']) {
     r = await get(`https://${h}/feedback/overlay.js`); assert.equal(r.status, 200, h);
   }
 }

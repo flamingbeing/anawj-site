@@ -22,21 +22,21 @@ for (const [h, p] of [['apmes.anawj.com', '/hand-babies/'], ['apmes.anawj.com', 
 }
 // dot segments are resolved by URL parsing before we see them; check the worker's view of them anyway
 for (const raw of ['/%2e%2e/logbook/', '/../logbook/', '/..%2flogbook/']) {
-  const u = new URL(raw, 'https://prewarmstudy.anawj.com');
-  const r = resolve('prewarmstudy.anawj.com', u.pathname);
-  assert.ok(r.notFound || (r.file && r.file.startsWith('prewarm/') && !r.file.includes('..')), raw + ' -> ' + JSON.stringify(r));
+  const u = new URL(raw, 'https://nuhroster.anawj.com');
+  const r = resolve('nuhroster.anawj.com', u.pathname);
+  assert.ok(r.notFound || (r.file && r.file.startsWith('nuh-roster/') && !r.file.includes('..')), raw + ' -> ' + JSON.stringify(r));
 }
 for (const p of ['/..%2flogbook/', '/%2e%2e%2flogbook/', '/a%5c..%5clogbook/', '/a\\b']) {
-  assert.deepEqual(resolve('prewarmstudy.anawj.com', p), { notFound: true }, p);
+  assert.deepEqual(resolve('nuhroster.anawj.com', p), { notFound: true }, p);
   assert.deepEqual(resolve('anawj-preview.x.workers.dev', p), { notFound: true }, p);
 }
 
 // one-app hosts: the app at the root; its own folder name works too (until its links are updated)
-assert.deepEqual(resolve('prewarmstudy.anawj.com', '/'), { file: 'prewarm/' });
-assert.deepEqual(resolve('prewarmstudy.anawj.com', '/js/app.js'), { file: 'prewarm/js/app.js' });
-assert.deepEqual(resolve('prewarmstudy.anawj.com', '/prewarm/'), { file: 'prewarm/' });
-assert.deepEqual(resolve('prewarmstudy.anawj.com', '/prewarm/sw.js'), { file: 'prewarm/sw.js' });
-assert.deepEqual(resolve('prewarmstudy.anawj.com', '/prewarm'), { redirect: '/prewarm/' });
+assert.deepEqual(resolve('nuhroster.anawj.com', '/'), { file: 'nuh-roster/' });
+assert.deepEqual(resolve('nuhroster.anawj.com', '/js/app.js'), { file: 'nuh-roster/js/app.js' });
+assert.deepEqual(resolve('nuhroster.anawj.com', '/nuh-roster/'), { file: 'nuh-roster/' });
+assert.deepEqual(resolve('nuhroster.anawj.com', '/nuh-roster/sw.js'), { file: 'nuh-roster/sw.js' });
+assert.deepEqual(resolve('nuhroster.anawj.com', '/nuh-roster'), { redirect: '/nuh-roster/' });
 assert.deepEqual(resolve('nuhroster.anawj.com', '/'), { file: 'nuh-roster/' });
 assert.deepEqual(resolve('NUHROSTER.anawj.com:443', '/x.js'), { file: 'nuh-roster/x.js' });
 assert.deepEqual(resolve('ntfroster.anawj.com', '/'), { file: 'ntf-roster/' });
@@ -48,7 +48,7 @@ assert.deepEqual(resolve('ntfroster.anawj.com', '/__/auth/handler'), { file: '__
 assert.deepEqual(resolve('ntfroster.anawj.com', '/__/firebase/init.json'), { file: 'ntf-auth/firebase/init.json' });
 assert.deepEqual(resolve('ntfroster.anawj.com', '/ntf-auth/firebase/init.json'), { file: 'ntf-roster/ntf-auth/firebase/init.json' });   // only through /__/firebase/
 // ... and never another app's files (only folders under the app's own folder are reachable)
-assert.deepEqual(resolve('prewarmstudy.anawj.com', '/logbook/js/app.js'), { file: 'prewarm/logbook/js/app.js' });   // that file doesn't exist there: 404
+assert.deepEqual(resolve('nuhroster.anawj.com', '/logbook/js/app.js'), { file: 'nuh-roster/logbook/js/app.js' });   // that file doesn't exist there: 404
 
 // every other host (previews, the copy of main) serves the repo as it is
 assert.deepEqual(resolve('anawj-preview.example.workers.dev', '/logbook/'), { file: 'logbook/' });
@@ -56,7 +56,7 @@ assert.deepEqual(resolve('anawj-preview.example.workers.dev', '/'), { file: '' }
 
 // trying an address on a preview: /_sites/<host>/…
 assert.deepEqual(resolve('x.workers.dev', '/_sites/apmes.anawj.com/evals/'), { file: 'evals/' });
-assert.deepEqual(resolve('x.workers.dev', '/_sites/prewarmstudy.anawj.com/'), { file: 'prewarm/' });
+assert.deepEqual(resolve('x.workers.dev', '/_sites/nuhroster.anawj.com/'), { file: 'nuh-roster/' });
 assert.deepEqual(resolve('x.workers.dev', '/_sites/apmes.anawj.com/evals'), { redirect: '/_sites/apmes.anawj.com/evals/' });
 assert.deepEqual(resolve('x.workers.dev', '/_sites/apmes.anawj.com/prewarm/'), { notFound: true });
 assert.deepEqual(resolve('x.workers.dev', '/_sites/nuhroster.anawj.com'), { redirect: '/_sites/nuhroster.anawj.com/' });
@@ -72,7 +72,7 @@ for (const h of Object.keys(SITES)) {
   // /design/ is not shared any more: a shared host 404s, a one-app host looks inside its own folder (also a 404)
   assert.deepEqual(resolve(h, '/design/tokens.css'), SITES[h].root ? { file: SITES[h].root + 'design/tokens.css' } : { notFound: true }, h);
 }
-assert.deepEqual(resolve('x.workers.dev', '/_sites/prewarmstudy.anawj.com/nuhsdesign/tokens.css'), { file: 'nuhsdesign/tokens.css' });
+assert.deepEqual(resolve('x.workers.dev', '/_sites/nuhroster.anawj.com/nuhsdesign/tokens.css'), { file: 'nuhsdesign/tokens.css' });
 assert.deepEqual(resolve('x.workers.dev', '/nuhsdesign/tokens.css'), { file: 'nuhsdesign/tokens.css' });
 
 // design.anawj.com/v1/: the kit for every repo (nuhsdesign/ at /v1/, the feedback script at /v1/feedback/), nothing else

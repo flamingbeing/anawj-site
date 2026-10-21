@@ -12,7 +12,7 @@ notes; every step is done.
 |---|---|---|
 | `anawj.com/` | `index.html` | Status page only. Stays on GitHub Pages. |
 | `anaes.anawj.com/bis/`, `/ot/` | (none) | Forwards to `anantf.com/bis/` and `anantf.com/ot/`: the BIS to DSA and OT simulators moved to the anantf site on 16 Oct 2026. `anawj.com/bis-dsa/` and `/ot-sim/` are stub pages forwarding there too. |
-| `prewarmstudy.anawj.com/` | `prewarm/` | **Real study data.** The name is a reminder that it holds sensitive data and stays isolated. `/scan-api/` is the scan upload (`worker/scan.js`), behind Cloudflare Access. |
+| `prewarmstudy.anawj.com/` | (repo `prewarm`) | **Real study data.** Served by the `prewarm` repo's own Worker since 21 Oct 2026 (repo split), with the scan upload. This repo's `prewarm/` is the old copy until anawj-site becomes a landing site; change the app there. |
 | `hand.anawj.com` | (own repo `hand`) | Moved to its own repo and Worker on 21 Oct 2026; the old folders here stay until the landing step. |
 | `nuhroster.anawj.com/` | `nuh-roster/` | Own Firebase project `nuh-roster`. |
 | `nuhjuniormonthly.anawj.com/` | `nuh-junior-monthly/` | NUH junior monthly roster helper (15 Oct 2026). Data in the browser. |
