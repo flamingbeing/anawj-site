@@ -8,6 +8,7 @@ import { lookCss } from './themes.js';
 import { cleanFacet, foldCompact } from './theme-engine.js';
 import { checkCss } from './custom-css.js';
 import { applyFonts } from './fonts.js';
+import { cleanWall, dimOf, minDim, patternSamples, cssHex, getPhoto } from './wallpaper.js';
 import { rowLayoutOf } from './device-presets.js';
 import { offBar } from './profiles.js';
 
@@ -30,7 +31,7 @@ export function applyTheme(t) {
   document.documentElement.dataset.theme = theme === 'oled' ? 'dark' : theme;
   if (theme === 'oled') document.documentElement.dataset.oled = ''; else delete document.documentElement.dataset.oled;
   try { theme === 'light' ? localStorage.removeItem(THEME_KEY) : localStorage.setItem(THEME_KEY, theme); } catch { /* storage blocked */ }
-  paintStatusBar();
+  paintStatusBar(); paintDim();
 }
 export function cachedTheme() {
   try { return localStorage.getItem(THEME_KEY) || 'light'; } catch { return 'light'; }
@@ -93,7 +94,8 @@ const DISPLAY_KEY = 'apmes-logbook-display';
 export const DISPLAY_KEYS = ['colours', 'listHeight', 'myThemes', 'pageSize', 'lbGroup', 'lbSort', 'gridLines', 'gridCols', 'calRefl', 'totalsCompact', 'totalsTargets', 'boxHeight', 'boxGrow', 'moreOrder', 'noteToolbar', 'compact', 'textSize', 'zoom', 'accent', 'startTab', 'fontUi', 'fontUiName', 'fontLog', 'fontLogName', 'lineWidth', 'lineHeight', 'contrast', 'motion', 'tabIcons', 'tabBar', 'hideHeader', 'caseInverted', 'colourful', 'customCss', 'customCssOn', 'autoFocus', 'appTitle', 'boxCaps', 'boxCorrect', 'boxSpell', 'reflSpell', 'pinBox', 'pinSearch', 'firstField', 'compactTags', 'borders', 'round', 'shadows', 'bigTaps', 'tabOrder', 'tabHidden', 'swipeTabs', 'rowMenu', 'rowCopy', 'reflToolbar', 'edgeBack', 'hideWords', 'flat', 'btnStyle', 'iconBtns', 'calPlain', 'pageTitles', 'rowShort', 'navStyle', 'rowLayout', 'formLayout', 'rowHold', 'dayCopy', 'hideTabsTyping',
   'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band', 'barBlur', 'tabActiveLabel', 'listStyle', 'titleAlign', 'switchStyle', 'pressStyle', 'iconWeight', 'typeStyle',
   'statusBar', 'headerStyle', 'tabIconFill', 'iconSet', 'pageMotion', 'sheetStyle', 'toastStyle', 'fieldStyle', 'checkStyle', 'headingTone', 'tabTone',
-  'ftBtn', 'ftGap', 'ftLine', 'ftShadow', 'ftCases', 'ftDays', 'ftLetter', 'ftWeight'];   // Fine-tune (theme-engine.js TUNE_KEYS)
+  'ftBtn', 'ftGap', 'ftLine', 'ftShadow', 'ftCases', 'ftDays', 'ftLetter', 'ftWeight',
+  'wallpaper', 'wallDim', 'iconTint', 'iconTintStrength', 'tabIcon'];   // Fine-tune (theme-engine.js TUNE_KEYS), then wallpaper.js and the icon tint (theme-revamp S4)
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -127,7 +129,59 @@ export function adoptDisplay(accountSettings, { fresh = false } = {}) {
   return display();   // (an old account text size becomes the zoom here too)
 }
 export function resetDisplay() { adoptedNow = false; try { localStorage.removeItem(DISPLAY_KEY); } catch { /* storage blocked */ } }
-export function applyDisplay(d = display()) { applyCompact(d.spacing === 'compact'); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); applyLook(d); applyThemeLook(d); }
+export function applyDisplay(d = display()) { applyCompact(d.spacing === 'compact'); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); applyLook(d); applyThemeLook(d); applyWallpaper(d); }
+
+// Wallpaper (Themes → Wallpaper; wallpaper.js): <html class="wall"> turns on style.css's two layers behind the page,
+// the picture (a pattern's from the look's style sheet, the photo's from IndexedDB as --wall here) and the dim
+// (--wall-dim: the page colour over it). The dim never goes under the floor that keeps text on the page at 4.5:1 with
+// the colours in use now, so it is worked out again when light, dark, the colour or the photo changes.
+let photo = { rec: null, url: '' }, photoWanted = false;
+export function applyWallpaper(d = display()) {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement, w = cleanWall(d.wallpaper);
+  root.classList.toggle('wall', !!w);
+  photoWanted = w === 'photo';
+  if (!photoWanted) { root.style.removeProperty('--wall'); root.style.removeProperty('--wall-size'); root.style.removeProperty('--wall-repeat'); }
+  paintDim(d);
+  if (photoWanted && !photo.rec) loadPhoto();
+  else if (photoWanted) showPhoto();
+}
+// a new photo (or none) kept: shown from the next paint
+export function photoChanged(rec = null) {
+  if (photo.url) URL.revokeObjectURL(photo.url);
+  photo = { rec, url: '' };
+  applyWallpaper();
+}
+async function loadPhoto() {
+  const rec = await getPhoto();
+  if (!photoWanted || photo.rec || !rec?.blob) return;
+  photo = { rec, url: '' }; showPhoto(); paintDim();
+}
+function showPhoto() {
+  if (!photo.url) photo.url = URL.createObjectURL(photo.rec.blob);
+  const s = document.documentElement.style;
+  s.setProperty('--wall', `url("${photo.url}")`); s.setProperty('--wall-size', 'cover'); s.setProperty('--wall-repeat', 'no-repeat');
+}
+// the colours text on the page uses now, as #rrggbb (null if one can't be read)
+export function pagePalette() {
+  const cs = getComputedStyle(document.documentElement);
+  const pal = Object.fromEntries(['bg', 'ink', 'muted', 'accent'].map(k => [k, cssHex(cs.getPropertyValue('--' + k))]));
+  return Object.values(pal).every(Boolean) ? pal : null;
+}
+// the dim to use (0 to 1): the chosen one, or the floor if that is higher -> { dim, floor }
+export function wallDim(d = display()) {
+  const w = cleanWall(d.wallpaper), pal = w && pagePalette();
+  const samples = w === 'photo' ? photo.rec?.samples || [] : w ? patternSamples(w, pal || {}) : [];
+  const floor = pal && samples.length ? minDim(samples, pal) : 0;
+  return { dim: Math.max(dimOf(d) / 100, floor), floor };
+}
+function paintDim(d = display()) {
+  if (typeof document === 'undefined' || !document.documentElement.classList.contains('wall')) return;
+  const v = String(wallDim(d).dim);
+  if (document.documentElement.style.getPropertyValue('--wall-dim') !== v) document.documentElement.style.setProperty('--wall-dim', v);
+  try { localStorage.setItem(DIM_KEY, v); } catch { /* storage blocked */ }
+}
+const DIM_KEY = 'apmes-logbook-wall-dim';   // for the first paint (index.html), so a photo never shows undimmed
 // Themes (themes.js): the background tint, the top band, the heading font, spacing and tab style as one style sheet
 // after the colour's (so it wins), cached on the device for the first paint (index.html) like the colour's
 const LOOK_CSS_KEY = 'apmes-logbook-look-css-v2';
@@ -155,7 +209,7 @@ export function paintStatusBar(d = display()) {
   try { mode ? localStorage.setItem(STATUS_KEY, colour) : localStorage.removeItem(STATUS_KEY); } catch { /* storage blocked */ }
 }
 // Auto light or dark: the phone switching changes the colours under the status bar too
-if (typeof window !== 'undefined' && window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => paintStatusBar());
+if (typeof window !== 'undefined' && window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { paintStatusBar(); paintDim(); });
 // page width (lineWidth), line spacing, contrast, motion, icons-only tabs: classes on <html> and --lh (style.css, end); also set at
 // first paint from the same localStorage entry (index.html)
 export const LINE_WIDTHS = [['narrow', 'Narrow (easier to read on a big screen)'], ['normal', 'Normal (default)'], ['wide', 'Wide'], ['full', 'Full (no limit)']];

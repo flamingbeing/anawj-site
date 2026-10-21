@@ -6,6 +6,8 @@
 // A new facet: add it to FACETS (and its CSS, or the code that reads it), and a choice to a theme in themes.js.
 // How to write themes with it: docs/theme-engine.md. Pure, unit-tested (test/theme-engine.test.mjs).
 
+import { cleanAccent, lightPalette, darkPalette } from './colors.js';
+
 // the fields every rule below restyles (the app's text boxes, dropdowns and case box)
 const FIELDS = ['input[type="text"]', 'input[type="password"]', 'input[type="search"]', 'input[type="email"]', 'input:not([type])', 'input[type="date"]', 'input[type="number"]', 'select', 'textarea'];
 const fields = (suffix = '') => FIELDS.map(f => `:root ${f}${suffix}`).join(', ');
@@ -50,6 +52,50 @@ export const ICON_SETS = {
 // the path to draw for an icon: the set's own, else the default; set: <html data-icons> (display.js applyLook)
 export function iconPath(name, fallback, set = typeof document !== 'undefined' ? document.documentElement.dataset.icons : '') {
   return (set && ICON_SETS[set]?.paths?.[name]) || fallback;
+}
+
+// An icon per tab (Themes → App-style details → Icons; theme-revamp S4): any tab may take one of these instead of
+// its own (tabIcon: { log: 'pen', … }, this device's; a theme may set it). Same grid and stroke as the tab bar's.
+export const TAB_ICONS = {
+  plus: ['Plus in a circle', 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8v8M8 12h8'],
+  pen: ['Pen', 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4'],
+  book: ['Book', 'M4 5.5C6.5 4 9.5 4 12 5.5 14.5 4 17.5 4 20 5.5V20c-2.5-1.5-5.5-1.5-8 0-2.5-1.5-5.5-1.5-8 0zM12 5.5V20'],
+  bookmark: ['Bookmark', 'M6 3h12v18l-6-4-6 4z'],
+  list: ['List', 'M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01'],
+  clipboard: ['Clipboard', 'M9 3h6v4H9zM9 5H5v16h14V5h-4M9 12h6M9 16h4'],
+  calendar: ['Calendar', 'M4 6h16v15H4zM4 10h16M8 3v5M16 3v5'],
+  chart: ['Line chart', 'M4 4v16h16M7 15l4-5 3 3 5-7'],
+  pulse: ['Heartbeat', 'M3 12h4l2-5 4 10 2-5h6'],
+  heart: ['Heart', 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z'],
+  star: ['Star', 'M12 3.5l2.6 5.3 5.9.9-4.25 4.1 1 5.8L12 16.9l-5.25 2.7 1-5.8L3.5 9.7l5.9-.9z'],
+  bulb: ['Light bulb', 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z'],
+  home: ['House', 'M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-6h4v6'],
+  grid: ['Squares', 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'],
+  syringe: ['Syringe', 'M14 4l6 6M17 7l-9 9-3 1 1-3 9-9M11 7l6 6M4 20l2-2'],
+  person: ['Person', 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0'],
+};
+// a saved tab-icon choice: tab ids (letters) to names in TAB_ICONS only, at most 13; {} when none
+export function cleanTabIcons(v) {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+  return Object.fromEntries(Object.entries(v).filter(([k, x]) => /^[a-z]{1,12}$/.test(k) && typeof x === 'string' && Object.hasOwn(TAB_ICONS, x)).sort(([a], [b]) => (a < b ? -1 : 1)).slice(0, 13));
+}
+// the path for a tab's icon: its chosen one, else the icon set's, else the default
+export const tabIconPath = (id, fallback, chosen = {}) => (Object.hasOwn(TAB_ICONS, chosen[id]) ? TAB_ICONS[chosen[id]][1] : iconPath(id, fallback));
+
+// Icon tint (theme-revamp S4, as iOS 18 tinted icons): one colour mixed into every line icon at a strength (10 to 100%,
+// unset = 100), apart from the current tab and icons on filled buttons. The colour is first made readable as text
+// is (colors.js: 4.5:1 on light pages, 7:1 on dark ones), so a pale or dark pick still shows in both.
+export const cleanTintStrength = v => (Number.isInteger(v) && v >= 10 && v <= 100 && v % 10 === 0 ? v : null);
+const TINTED = ':root .ico:not(.tabs [aria-selected="true"] .ico, :is(.primary, .danger, .swatch) .ico, .more-list .ico)';
+export function iconTintCss(d = {}) {
+  const c = cleanAccent(d.iconTint);
+  if (!c) return '';
+  const s = cleanTintStrength(d.iconTintStrength) ?? 100;
+  const v = p => `--icon-tint: ${p.accent};`;
+  return [`:root { ${v(lightPalette(c))} }`, `:root[data-theme="dark"] { ${v(darkPalette(c))} }`, `:root[data-theme="dark"][data-oled] { ${v(darkPalette(c, true))} }`,
+    `@media (prefers-color-scheme: dark) { :root[data-theme="auto"] { ${v(darkPalette(c))} } }`,
+    `${TINTED} { stroke: color-mix(in srgb, var(--icon-tint) ${s}%, currentColor); }`,
+    `:root .more-list .ico { stroke: color-mix(in srgb, var(--icon-tint) ${s}%, var(--accent)); }`].join('\n');
 }
 
 // Page motion (app.js slidePages): keyframes for the new page going deeper (dir 1), back (dir -1) or to another tab

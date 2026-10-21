@@ -2,8 +2,9 @@
 // it under a name of your own (this device, `display().myThemes`), to pick again later like any theme. Export writes
 // them to a file (.json) to keep or pass on; Import reads such a file back (only known look settings, checked).
 // Pure (test/my-themes.test.mjs); the page is ui-settings.js renderThemes.
-import { THEME_KEYS, TINTS } from './themes.js';
-import { FACET_KEYS, cleanFacet, TUNE_KEYS, cleanTune, foldCompact } from './theme-engine.js';
+import { THEME_KEYS, TINTS, keepPhoto } from './themes.js';
+import { FACET_KEYS, cleanFacet, TUNE_KEYS, cleanTune, foldCompact, cleanTintStrength, cleanTabIcons } from './theme-engine.js';
+import { cleanPattern, cleanDim } from './wallpaper.js';
 import { cleanAccent, cleanColours, checkColours } from './colors.js';
 
 export const MAX_MINE = 12;
@@ -21,6 +22,9 @@ const OK = {
   colourful: v => v === true || word(v), lineHeight: v => typeof v === 'string' && /^\d(\.\d{1,2})?$/.test(v),
   ...Object.fromEntries(FACET_KEYS.map(k => [k, v => cleanFacet(k, v) !== null])),   // the theme engine's facets: listed choices only
   ...Object.fromEntries(TUNE_KEYS.map(k => [k, v => cleanTune(k, v) !== null])),   // Fine-tune: numbers in range
+  // wallpaper.js: a pattern (a photo stays on its device, so a saved theme never holds it), icon tint, tab icons
+  wallpaper: v => !!cleanPattern(v), wallDim: v => cleanDim(v) !== null, iconTint: v => !!cleanAccent(v),
+  iconTintStrength: v => cleanTintStrength(v) !== null, tabIcon: v => Object.keys(cleanTabIcons(v)).length > 0,
 };
 const okValue = (k, v) => v != null && (OK[k] ? OK[k](v) : typeof v === 'boolean' || word(v));
 
@@ -28,7 +32,7 @@ const okValue = (k, v) => v != null && (OK[k] ? OK[k](v) : typeof v === 'boolean
 export function lookOf(d = {}) {
   d = foldCompact(d) || {};   // an old saved theme's Compact mode is Spacing: Tight
   const out = {};
-  for (const k of THEME_KEYS) if (k !== 'colours' && okValue(k, d[k])) out[k] = k === 'accent' ? cleanAccent(d[k]) : d[k];
+  for (const k of THEME_KEYS) if (k !== 'colours' && okValue(k, d[k])) out[k] = k === 'accent' || k === 'iconTint' ? cleanAccent(d[k]) : k === 'tabIcon' ? cleanTabIcons(d[k]) : d[k];
   const colours = cleanColours(d.colours);
   if (Object.keys(colours).length) out.colours = colours;
   return out;
@@ -51,7 +55,8 @@ export function saveMine(list, name, d, mode = null, id = Math.random().toString
   return cleanMine([{ id, name: n, look: lookOf(d), ...(MODES.includes(mode) ? { mode } : {}) }, ...rest]);
 }
 // the patch that puts a saved theme on this device: every look setting (unset ones back to the default)
-export const minePatch = t => ({ theme: null, ...Object.fromEntries(THEME_KEYS.map(k => [k, t.look[k] ?? null])) });
+// (a photo wallpaper on this device stays: keepPhoto)
+export const minePatch = (t, current = {}) => keepPhoto({ theme: null, ...Object.fromEntries(THEME_KEYS.map(k => [k, t.look[k] ?? null])) }, current);
 // the saved theme the device's look matches, if any
 export function matchMine(list, d) {
   const now = JSON.stringify(lookOf(d));

@@ -6,13 +6,19 @@
 
 import { coloursCss, checkColours } from './colors.js';
 import { STACKS } from './fonts.js';
-import { FACETS, FACET_KEYS, facetCss, cleanFacet, TUNE_KEYS, cleanTune, tuneCss } from './theme-engine.js';
+import { FACETS, FACET_KEYS, facetCss, cleanFacet, TUNE_KEYS, cleanTune, tuneCss, iconTintCss, cleanTintStrength, cleanTabIcons } from './theme-engine.js';
+import { patternCss, cleanPattern, cleanDim } from './wallpaper.js';
 
 // the display keys a theme sets; anything a theme doesn't list goes back to its default (null), unless it keeps it
 export const THEME_KEYS = ['colours', 'accent', 'colourful', 'borders', 'flat', 'round', 'shadows', 'fontUi', 'fontLog', 'headFont', 'lineHeight',
   'btnStyle', 'iconBtns', 'tabIcons', 'pageTitles', 'calPlain', 'rowShort', 'navStyle', 'rowLayout', 'formLayout', 'contrast', 'bgTint', 'band',
   ...FACET_KEYS,   // the theme engine's facets (theme-engine.js): spacing, tab style, header, icons, motion, pop-ups, controls…
-  ...TUNE_KEYS];   // Fine-tune values (theme-engine.js): numbers, unset by default
+  ...TUNE_KEYS,   // Fine-tune values (theme-engine.js): numbers, unset by default
+  'wallpaper', 'wallDim', 'iconTint', 'iconTintStrength', 'tabIcon'];   // wallpaper.js (a pattern, never a photo), icon tint, a tab's icon
+// A photo wallpaper is this device's own (wallpaper.js): a theme or a saved theme that sets no wallpaper keeps it
+export function keepPhoto(patch, current = {}) {
+  return current.wallpaper === 'photo' && patch.wallpaper == null ? { ...patch, wallpaper: 'photo', wallDim: current.wallDim ?? null } : patch;
+}
 
 // Background tints: the page ground (and for some the cards and text) in light and dark
 export const TINTS = {
@@ -968,7 +974,7 @@ export const themeById = id => THEMES.find(t => t.id === id) || THEMES[0];
 export function themePatch(theme, current = {}) {
   const patch = { theme: theme.id === 'nuhs' ? null : theme.id };
   for (const k of THEME_KEYS) patch[k] = (theme.keep || []).includes(k) ? current[k] ?? null : theme.look[k] ?? null;
-  return patch;
+  return keepPhoto(patch, current);
 }
 // does the device's look still match its theme? -> { theme, custom }
 export function themeState(d = {}) {
@@ -976,8 +982,9 @@ export function themeState(d = {}) {
   // off switches save as false or null alike (Soft shadows aside: false there means off, null on)
   // (colours is an object: compared by its contents)
   const val = (o, k) => (o[k] === false && k !== 'shadows' ? null : o[k] && typeof o[k] === 'object' ? JSON.stringify(o[k]) : o[k] ?? null);
+  const photo = d.wallpaper === 'photo' && !theme.look.wallpaper;   // (kept by keepPhoto: not a change)
   const custom = THEME_KEYS.some(k => !(theme.keep || []).includes(k) && val(d, k) !== val(theme.look, k)
-    && !(k === 'borders' && d.flat && theme.look.flat));
+    && !(k === 'borders' && d.flat && theme.look.flat) && !(photo && (k === 'wallpaper' || k === 'wallDim')));
   return { theme, custom };
 }
 // The problems with a theme (an empty list when it is fine): run over every theme by the tests, so a new one can't
@@ -995,6 +1002,12 @@ export function checkTheme(t) {
     else if (TUNE_KEYS.includes(k) && cleanTune(k, v) === null) bad.push(`look.${k}: ${JSON.stringify(v)} is out of range`);
   }
   if (t.look?.bgTint && !TINTS[t.look.bgTint]) bad.push(`look.bgTint: no tint ${t.look.bgTint}`);
+  const lk = t.look || {};
+  if (lk.wallpaper != null && !cleanPattern(lk.wallpaper)) bad.push('look.wallpaper: a pattern (never a photo)');
+  if (lk.wallDim != null && cleanDim(lk.wallDim) === null) bad.push('look.wallDim: 0 to 90 in steps of 5');
+  if (lk.iconTint != null && !/^#[0-9a-f]{6}$/.test(lk.iconTint)) bad.push('look.iconTint: #rrggbb');
+  if (lk.iconTintStrength != null && cleanTintStrength(lk.iconTintStrength) === null) bad.push('look.iconTintStrength: 10 to 100 in steps of 10');
+  if (lk.tabIcon != null && JSON.stringify(cleanTabIcons(lk.tabIcon)) !== JSON.stringify(lk.tabIcon)) bad.push('look.tabIcon: tab ids to icons in TAB_ICONS, in order');
   if (t.band && !(t.band.length === 4 && t.band.every(c => /^#[0-9a-f]{6}$/.test(c)))) bad.push('band: four #rrggbb colours');
   try { checkColours(t.look || {}, TINTS[t.look?.bgTint] || {}); } catch (err) { bad.push('colours: ' + err.message); }
   return bad;
@@ -1036,6 +1049,8 @@ export function lookCss(d = {}, shades = null) {
   // the theme engine's facets (theme-engine.js): App-style details, spacing, tab style; nothing unless chosen
   rules.push(...facetCss(d));
   colours.push(coloursCss(d.colours));
+  // after the colours, so they follow the palette: a wallpaper pattern (wallpaper.js) and the icon tint (theme-engine.js)
+  colours.push(patternCss(d), iconTintCss(d));
   const layer = (name, css) => (css.filter(Boolean).length ? `@layer ${name} {\n${css.filter(Boolean).join('\n')}\n}` : '');
   return [...rules, layer('theme', colours), tuneCss(d)].filter(Boolean).join('\n');
 }

@@ -6,9 +6,10 @@ import { replaceShow, legacyShow, tabsAfter } from './profiles.js';
 import { appVersion, versionLabel, freshCopy } from './app-version.js';
 import { S, hooks, h, toast, basicHides, basicMode, logbookOnly, facultyMode, facultyRole, clearToast, cloud, writes, transients, setCases, scheduleSummary, fill, resetCaches, patchLogbook, confirmBox, fileButton, modal, download, todayISO, settings, setCategoryNames, categoryNames as categoryNamesNow, watchMyReflections, resetters } from './ui-core.js';
 import { renderLog, focusLog, logCasesChanged, clearDrafts } from './ui-log.js';
-import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, IPHONE_APP, setPageLabel, START_TABS, arrangeTabs, setTabOnBar, barTabs, MAX_BAR } from './display.js';
+import { applyCompact, cachedCompact, applyTheme, cachedTheme, applyTextSize, cachedTextSize, applyZoom, cachedZoom, stepZoom, applyAccent, adoptDisplay, applyDisplay, applyCustomCss, display, setDisplay, resetDisplay, DISPLAY_KEYS, IPHONE_APP, setPageLabel, START_TABS, arrangeTabs, setTabOnBar, barTabs, MAX_BAR, photoChanged } from './display.js';
+import { getPhoto, putPhoto, deletePhoto } from './wallpaper.js';
 import { gripDrag, moveIn } from './drag-list.js';
-import { iconPath, pageMotion } from './theme-engine.js';
+import { tabIconPath, cleanTabIcons, pageMotion } from './theme-engine.js';
 import { createNavigation } from './navigation.js';
 import { renderNotes, leaveNotes, openDayNote, renderNoteSettings } from './ui-notepad.js';
 import { fromQuery, keepShared, readInbox } from './share-in.js';
@@ -112,7 +113,7 @@ const icon = id => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'ico'); svg.setAttribute('aria-hidden', 'true');
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  path.setAttribute('d', iconPath(id, ICONS[id]));   // (an icon set's own drawing, theme-engine.js)
+  path.setAttribute('d', tabIconPath(id, ICONS[id], cleanTabIcons(display().tabIcon)));   // (one picked for the tab, or an icon set's own drawing: theme-engine.js)
   svg.append(path);
   return svg;
 };
@@ -490,13 +491,19 @@ function resetAllCard() {
     if (fileBox.checked) { try { exportSettings(); } catch (err) { return toast('Could not save the settings file: ' + err.message); } }
     const beforeDev = { ...display() }, beforeMode = cachedTheme(), beforeAcct = { ...((S.logbook && S.logbook.settings) || {}) };
     const patch = acct ? mod.settingsFile.resetAccountPatch(beforeAcct, { tags }) : {};
+    // the wallpaper photo goes too (kept in memory for Undo)
+    const photo = await getPhoto();
+    if (photo) await deletePhoto();
     applyTheme('light');
     applyDisplay(setDisplay(Object.fromEntries(DISPLAY_KEYS.map(k => [k, null]))));
+    if (photo) photoChanged(null);
     applyCustomCss();
     if (Object.keys(patch).length) await patchLogbook({ settings: patch });
     hooks.paintTabs?.(); render();
     toast('All settings reset', { action: 'Undo', onaction: async () => {
+      if (photo) await putPhoto(photo).catch(() => {});   // first, so the look comes back in one step
       applyTheme(beforeMode);
+      if (photo) photoChanged(photo);
       applyDisplay(setDisplay(Object.fromEntries(DISPLAY_KEYS.map(k => [k, beforeDev[k] ?? null]))));
       applyCustomCss();
       if (Object.keys(patch).length) await patchLogbook({ settings: Object.fromEntries(Object.keys(patch).map(k => [k, beforeAcct[k] ?? null])) });
@@ -582,7 +589,7 @@ function paintTabs() {
   // for its own pages too, and anything else off the bar under More
   const bar = visibleTabs(), { shown, sel } = barTabOf(S.tab);
   // same tabs as before: only move the selection, so the bar never blinks while changing tab (swipe included)
-  const key = shown.map(id => id + ':' + bar.find(t => t.id === id).label).join('|') + '#' + (document.documentElement.dataset.icons || '');   // (a new icon set redraws the icons)
+  const key = shown.map(id => id + ':' + bar.find(t => t.id === id).label).join('|') + '#' + (document.documentElement.dataset.icons || '') + JSON.stringify(cleanTabIcons(display().tabIcon));   // (a new icon set or tab icon redraws the icons)
   tabsEl.classList.toggle('many', shown.length > 5);
   if (tabsEl.dataset.key === key && tabsEl.children.length) {
     for (const b of tabsEl.children) b.setAttribute('aria-selected', String(b.dataset.tab === sel));

@@ -1820,3 +1820,18 @@ html.form-sections .case-section .lp-left, html.form-sections .case-section .lp-
 
 html:is(.rows-chat, .rows-timeline) ul.cases li[data-date]:hover { background: var(--row-alt); }
 html:is(.rows-chat, .rows-timeline) ul.cases li.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* Wallpaper (Settings → Themes → Wallpaper; theme-revamp S4, wallpaper.js): behind every page, under solid cards.
+   ::before is the picture (--wall: a pattern from the look's style sheet, or the photo set by display.js), ::after the
+   page colour over it at --wall-dim, which display.js keeps high enough for text on the page to stay at 4.5:1. */
+html.wall { background: var(--bg); }
+html.wall body { background: transparent; }
+html.wall::before, html.wall::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+html.wall::before { background-image: var(--wall, none); background-size: var(--wall-size, cover); background-repeat: var(--wall-repeat, no-repeat); background-position: center; }
+html.wall::after { background: var(--bg); opacity: var(--wall-dim, 0); }
+@media print { html.wall::before, html.wall::after { display: none; } }
+/* the photo in Settings: tap it to take a colour */
+.wall-thumb { display: block; max-width: 100%; max-height: 180px; margin-top: 8px; border-radius: calc(8px * var(--round, 1)); border: 1px solid var(--line); cursor: crosshair; touch-action: manipulation; }
+.tab-icon-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.tab-icon-row .ico { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tab-icon-row label { flex: 1; margin: 0; }

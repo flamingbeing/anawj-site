@@ -22,6 +22,15 @@ try { for (const width of [390, 1280]) {
     D.applyTheme('dark'); D.applyDisplay(D.setDisplay({ accent: '#8a7a9e', borders: 1 }));
     await patchLogbook({ settings: { autoTick: true, rYear: 3, tagSet: tagSet() } });
   });
+  // a wallpaper photo (theme-revamp S4): Reset clears it from the device, Undo puts it back
+  const photo = () => p.evaluate(async () => !!(await (await import('./js/wallpaper.js')).getPhoto()));
+  await p.evaluate(async () => {
+    const c = document.createElement('canvas'); c.width = 40; c.height = 30; c.getContext('2d').fillRect(0, 0, 20, 30);
+    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    const W = await import('./js/wallpaper.js'), D = await import('./js/display.js');
+    D.photoChanged(await W.savePhoto(new File([blob], 'w.png', { type: 'image/png' }))); D.applyDisplay(D.setDisplay({ wallpaper: 'photo' }));
+  });
+  assert.equal(await photo(), true);
   const before = await state();
   assert.deepEqual({ ...before, cases: 0 }, { accent: '#8a7a9e', borders: 1, mode: 'dark', autoTick: true, rYear: 3, tags: true, cases: 0 });
   const reset = async ({ account = false, tags = false, file = true } = {}) => {
@@ -39,9 +48,13 @@ try { for (const width of [390, 1280]) {
   // this device only: the look goes, the account's settings stay; Undo brings the look back
   await reset();
   assert.deepEqual(await state(), { ...before, accent: null, borders: null, mode: 'light' });
+  assert.equal(await photo(), false, 'the wallpaper photo is cleared');
+  assert.equal(await p.evaluate(() => document.documentElement.classList.contains('wall')), false);
   await p.locator('#toast button', { hasText: 'Undo' }).click();
   await p.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
   assert.deepEqual(await state(), before);
+  assert.equal(await photo(), true, 'Undo puts the photo back');
+  await p.waitForFunction(() => /blob:/.test(getComputedStyle(document.documentElement, '::before').backgroundImage));
   // the account too, tags kept: logging preferences go, the year and tags stay
   await reset({ account: true, file: false });
   assert.deepEqual(await state(), { ...before, accent: null, borders: null, mode: 'light', autoTick: null });
