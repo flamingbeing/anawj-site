@@ -141,7 +141,7 @@ details.sect > .stack { margin-top: 4px; }
 
 /* Pre-warming / Intra-op switch: navy underline tabs */
 .tabs2 { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); }
-.tabs2 a { display: flex; align-items: center; justify-content: center; min-height: 40px; padding: 4px 8px; text-decoration: none; color: var(--muted); border-bottom: 2px solid transparent; }
+.tabs2 a { white-space: nowrap; display: flex; align-items: center; justify-content: center; min-height: 40px; padding: 4px 8px; text-decoration: none; color: var(--muted); border-bottom: 2px solid transparent; }
 .tabs2 a[aria-selected="true"] { border-bottom-color: var(--navy); color: var(--ink); font-weight: 600; }
 .sect { margin: 0; }
 
@@ -213,6 +213,12 @@ input.num { border: 2px solid var(--navy); border-radius: var(--r); background: 
 .comfort5.roomy { grid-template-columns: 1fr 1fr; }
 .comfort5.roomy .chip { font-size: 14px; line-height: 1.2; padding: 4px 8px; hyphens: none; }
 .comfort5.roomy .chip:nth-child(3) { grid-column: 1 / -1; }
+/* consent: one row, label then Declined (left) and Consented (right) */
+.comfort.consent { grid-template-columns: auto 1fr 1.6fr; align-items: center; }
+.comfort.consent .chip { font-size: 13px; line-height: 1.2; padding: 4px 8px; min-width: 0; }
+.comfort + .comfort { margin-top: 4px; }
+.comfort .consentok { float: right; color: var(--ok); font-size: 12px; }
+.comfort .consentok .link { font-size: 12px; padding: 0 4px; }
 
 /* forms */
 .fld { display: grid; gap: 6px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 10px 12px; }

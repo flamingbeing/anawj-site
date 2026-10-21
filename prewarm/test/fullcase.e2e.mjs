@@ -88,6 +88,7 @@ await Promise.all(['1', '2', '3'].map(async ARM => {
   for (const f of ['nd_dis', 'nd_beh', 'nd_com', 'nd_ill', 'nd_psy']) await pg.click(`.chip[data-f="${f}"][data-v="0"]`);
   await pg.click('.chip[data-sat="sat_post"][data-v="1"]'); await pg.waitForTimeout(100);
   await pg.goto(`${BASE}?demo#/p/${pid}/prewarm`); await pg.waitForSelector('.times');
+  await pg.click('.chip[data-sat="consent_st"][data-v="1"]'); await pg.clock.fastForward(800); // the tap guard ignores taps near the last one for 0.7 s
   await pg.click('.chip[data-sat="sat_pre"][data-v="1"]'); await pg.waitForTimeout(100);
   await adv(60); steps.push(await pacuTime('pacu_out', 'To ward'));
   await pg.goto(`${BASE}?demo#/p/${pid}`); await pg.waitForSelector('.times'); await pg.waitForTimeout(1500);

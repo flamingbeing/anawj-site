@@ -4,18 +4,21 @@ How the patient screen, key times, sign-offs, forms and look work. Part of the n
 
 - **Screens follow the day**: opening a patient lands on one main screen: the event times as a
   compact grid (tap an empty one = now; tap a set one to change or clear it), then all temperatures with a
-  Pre-warming / Intra-op switch (opens on Intra-op once the patient is in OT), then links to the other forms in the
+  Induction room / Intra-op switch (opens on Induction room until the patient is in OT, for every group), then links to the other forms in the
   order they're filled in (BP/HR/BIS, intra-op details, PACU, satisfaction, form view).
-- **Consent** (owner, 21 Oct 2026): first on Pre-op, `consent_st` (Extra sheet): 1 = consented, duplicate form given
-  to the patient; 0 = declined to participate. A declined patient's home-list line is grey, the ID struck through,
+- **Induction room tab** (owner, 21 Oct 2026; was the Pre-warming tab): general induction-room things plus the
+  pre-warming temperatures. Start on a new patient opens it, in every group. The internal route stays `prewarm`.
+- **Consent** (owner, 21 Oct 2026): first on the Induction room tab (moved from Pre-op), `consent_st` (Extra sheet):
+  1 = consented, duplicate form given to the patient; 0 = declined to participate. Shown in place of the comfort
+  question until answered (one card tall, so Save stays on screen); once consented, the comfort question shows with
+  "✓ Consented · Change" on its label line; a declined patient is asked nothing more there. A declined patient's home-list line is grey, the ID struck through,
   "Declined to participate". The Screening ID is no longer asked (`NOT_ASKED`); its column stays.
 - **Home list Form view shortcut** (admins): a 44 px icon button at the top right of each patient card (owner, 21 Oct
   2026), no longer a full-height tile.
 - **Notes** on Intra-op details is a full-width text box (`long: true` fields). On PACU (and the nurse's page) the five
-  comfort answers are two per row with Neutral alone in the middle (`roomy`); the Pre-warming tab keeps them in one row.
-- **Patient comfort** (owner, 20 Oct 2026): the before-surgery question is at the top of the Pre-warming tab, the
-  after-surgery one at the top of the PACU page (no separate screen); one line once answered. The no-pre-warming group
-  still opens on the Pre-warming tab until the before-surgery answer is in (then on Intra-op); Still to fill links to
+  comfort answers are two per row with Neutral alone in the middle (`roomy`); the Induction room tab keeps them in one row.
+- **Patient comfort** (owner, 20 Oct 2026): the before-surgery question is at the top of the Induction room tab
+  (after consent), the after-surgery one at the top of the PACU page (no separate screen); one line once answered; Still to fill links to
   each question's screen. "Sheet view" (was Spreadsheet view, earlier Form view) is a text link under the other forms.
 - **Look:** the NUHS design system's app theme (`nuhsdesign/tokens.css`, Open Sans): white app bar with the four-quarter band (orange / red / stripe
   blue #178fd7 / navy), grey #f3f3f3 ground, white cards with 14px corners and hairlines, 10px controls, navy as the
@@ -39,8 +42,8 @@ How the patient screen, key times, sign-offs, forms and look work. Part of the n
   per-section sign-offs stay on the BP / HR / BIS screen and the other forms.
 - **Patient screen layout**: key times at the top on both tabs, then the Temperatures / Others
   tab bar, then the tab's readings; the bottom part (Intra-op details, PACU, Perioperative data, Form / Sheet view,
-  Still to fill, Mark complete) is the same on both tabs. The no-pre-warming group keeps a Pre-warming tab that says
-  "No pre-warming". Intra-op time 0 is induction (`io_knife`, labelled Induction; the paper form's row reads
+  Still to fill, Mark complete) is the same on both tabs. The no-pre-warming group keeps the Induction room tab
+  (consent, comfort) with a note that there are no pre-warming temperatures. Intra-op time 0 is induction (`io_knife`, labelled Induction; the paper form's row reads
   "Knife-to-skin start time (Induction)").
 - **Three parts, reset, PACU view**: the patient screen has three bordered parts with their
   own backgrounds (key times blue-grey; tab bar and readings; shared bottom part beige). Swipe changes tab only in

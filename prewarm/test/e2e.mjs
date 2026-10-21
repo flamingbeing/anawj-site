@@ -41,17 +41,24 @@ try {
   await page.click('button[type=submit]');
   // the patient opens on the main screen: times, then pre-warming temperatures
   await page.waitForSelector('.times');
-  // pre-op comfort on the Pre-warming tab, one line once answered; post-op comfort is on the PACU page
-  assert.match(await page.textContent('.comfort'), /before surgery/);
+  // consent, then pre-op comfort in its place, on the Induction room tab, one line once answered; post-op comfort is on the PACU page
+  assert.match(await page.textContent('.comfort'), /Consent/);
+  assert.deepEqual(await page.$$eval('.chip[data-sat="consent_st"]', x => x.map(b => b.dataset.v)), ['0', '1'], 'Declined left, Consented right');
+  assert.equal(await page.$('.chip[data-sat="sat_pre"]'), null, 'comfort waits for consent');
   if (SHOTS) await page.screenshot({ path: SHOTS + '/fit.png' });
   // one timepoint fits a 390 x 844 phone: Save is on screen without scrolling
   const sv = await page.locator('#save').boundingBox();
   assert.ok(sv.y + sv.height <= 844, 'Save is below the fold: ' + (sv.y + sv.height));
+  await page.click('.chip[data-sat="consent_st"][data-v="1"]'); await page.waitForTimeout(800); // the tap guard
+  assert.match(await page.textContent('.comfort:has([data-sat="sat_pre"])'), /before surgery.*Consented/s);
+  const sv2 = await page.locator('#save').boundingBox();
+  assert.ok(sv2.y + sv2.height <= 844, 'Save is below the fold once consented: ' + (sv2.y + sv2.height));
   await page.click('.chip[data-sat="sat_pre"][data-v="2"]');
-  assert.match(await page.textContent('.comfort.done'), /Neutral/);
+  assert.match(await page.textContent('.comfort.done:has([data-satedit="sat_pre"])'), /Neutral/);
+  assert.match(await page.textContent('.comfort.done:has([data-satedit="consent_st"])'), /Consented, copy given/);
   assert.equal(await page.$('.chip[data-sat="sat_post"]'), null, 'post-op comfort is not on the temperatures screen');
   assert.equal(await page.$('.links a[href$="/form/satis"]'), null, 'no separate satisfaction screen');
-  assert.match(await page.textContent('.tabs2 [aria-selected="true"]'), /Pre-warming/);
+  assert.match(await page.textContent('.tabs2 [aria-selected="true"]'), /Induction room/);
   assert.match(await page.textContent('.badge'), /10 min pre-warming/, 'group shows with the pre-warming temperatures');
   // Gown on is still empty, so it asks first (a stray tap shouldn't log out of order)
   let asked = ''; page.once('dialog', d => { asked = d.message(); d.accept(); });
