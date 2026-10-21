@@ -218,8 +218,9 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
     or the old v40 worker still in charge while the new one waits for its reload and the phone already has the new manifest), the share reaches
     GitHub Pages, which refuses POSTs (405), so a static fallback page can't help. The worker installs on the first
     visit, so this only bites in that window.
-- **Connect Claude** (`mcp/`, Settings → Connect Claude (advanced) links its README on GitHub): a read-only MCP
-  server residents run locally; Google "Desktop app" OAuth (loopback, PKCE) → Firebase `signInWithIdp` → Firestore
+- **Connect Claude** (`mcp/`, Settings → Connect Claude (advanced) links its README on GitHub): an MCP
+  server residents run locally (reads, plus `add_case`, `update_case`, `save_reflection` for drafts: preview, then
+  `confirm: true`; no deletes; new cases also queue their `sheetOutbox` entry); Google "Desktop app" OAuth (loopback, PKCE) → Firebase `signInWithIdp` → Firestore
   REST as the user, so the rules apply; only `logbooks/{own email}` and the user's own `residents` entry. Owner
   setup (the Desktop client ID and its non-confidential secret in `mcp/config.mjs`) is in `mcp/README.md`; until
   then sign-in can't work. The Desktop client ID is set in `mcp/config.mjs`; the agent's safety check refuses to

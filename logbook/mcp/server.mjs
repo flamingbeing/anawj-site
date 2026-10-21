@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// APMES Logbook MCP server (read-only). See README.md.
+// APMES Logbook MCP server: reads your own logbook, and adds or changes cases and draft reflections. See README.md.
 //   node server.mjs login    sign in with Google in the browser
 //   node server.mjs logout   delete the stored token
 //   node server.mjs          run the MCP server on stdio (Claude Desktop / Claude Code start it)
@@ -14,37 +14,52 @@ const SELF = fileURLToPath(import.meta.url);
 const log = m => process.stderr.write(m + '\n');
 const LOGIN_HINT = `In a terminal, run:\n  node "${SELF}" login\nthen ask again.`;
 
-// All the user's data, fetched together and kept for a minute so a run of tool calls reads Firestore once.
-const CACHE_MS = 60_000;
-let cache = null;
-async function getData() {
-  if (cache && Date.now() - cache.at < CACHE_MS) return cache.data;
+// The signed-in user's own logbook (makeLogbookSource), made when first needed.
+function source() {
   let session;
   try { session = makeSession({ apiKey: API_KEY }); }
   catch (e) { if (e instanceof NotSignedInError) throw new Error(`Not signed in to the APMES Logbook. ${LOGIN_HINT}`); throw e; }
   const firestore = makeFirestore({ projectId: PROJECT_ID, getIdToken: f => session.getIdToken(f) });
-  const src = makeLogbookSource({ firestore, email: session.email });
+  return makeLogbookSource({ firestore, email: session.email });
+}
+const signInProblem = e => (e instanceof NotSignedInError ? new Error(`APMES Logbook sign-in problem: ${e.message}. ${LOGIN_HINT}`) : e);
+
+// All the user's data, fetched together and kept for a minute so a run of tool calls reads Firestore once. fresh (the
+// write tools): read it again, so a change is made to the stored version.
+const CACHE_MS = 60_000;
+let cache = null;
+async function getData(fresh = false) {
+  if (!fresh && cache && Date.now() - cache.at < CACHE_MS) return cache.data;
+  const src = source();
   try {
     const [logbook, cases, reflections, resident] = await Promise.all([src.logbook(), src.cases(), src.reflections(), src.resident()]);
     const data = { email: src.email, logbook, cases, reflections, resident };
     cache = { at: Date.now(), data };
     return data;
-  } catch (e) {
-    if (e instanceof NotSignedInError) throw new Error(`APMES Logbook sign-in problem: ${e.message}. ${LOGIN_HINT}`);
-    throw e;
-  }
+  } catch (e) { throw signInProblem(e); }
 }
+
+const write = name => async x => { try { return await source()[name](x); } catch (e) { throw signInProblem(e); } };
+const writer = {
+  saveCase: write('saveCase'),
+  saveReflection: write('saveReflection'),
+  queueSheetRow: write('queueSheetRow'),
+  invalidate: () => { cache = null; },
+};
 
 async function serve() {
   const [{ McpServer }, { StdioServerTransport }] = await Promise.all([
     import('@modelcontextprotocol/sdk/server/mcp.js'),
     import('@modelcontextprotocol/sdk/server/stdio.js'),
   ]);
-  const server = new McpServer({ name: 'apmes-logbook', version: '0.1.0' }, {
-    instructions: 'Read-only access to the signed-in resident\'s own APMES Logbook: cases, progress against APMES targets, and reflections. Case details are de-identified initials and short descriptions; do not try to identify patients.',
+  const server = new McpServer({ name: 'apmes-logbook', version: '0.2.0' }, {
+    instructions: 'The signed-in resident\'s own APMES Logbook: cases, progress against APMES targets, and reflections. '
+      + 'add_case, update_case and save_reflection write to it: always call them first without confirm, show the user the preview, '
+      + 'and call again with confirm: true only after the user agrees. Reflections are saved as drafts only. '
+      + 'Case details are de-identified initials and short descriptions; never add names, NRIC or record numbers, and do not try to identify patients.',
   });
-  for (const tool of defineTools(getData)) {
-    server.registerTool(tool.name, { title: tool.title, description: tool.description, inputSchema: tool.shape, annotations: READ_ONLY },
+  for (const tool of defineTools(getData, writer)) {
+    server.registerTool(tool.name, { title: tool.title, description: tool.description, inputSchema: tool.shape, annotations: tool.annotations || READ_ONLY },
       args => callTool(tool, args));
   }
   await server.connect(new StdioServerTransport());

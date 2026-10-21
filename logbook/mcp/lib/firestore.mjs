@@ -1,6 +1,8 @@
-// Firestore REST, read-only, as the signed-in user (so firestore.rules apply exactly as in the app).
+// Firestore REST, as the signed-in user (so firestore.rules apply exactly as in the app).
 // Only the user's own logbook (logbooks/{email} and its cases / reflections) and the residents entry
-// with their email are ever read. The HTTP layer (fetch) and the token source are injected for tests.
+// with their email are ever read. Writes go only to the user's own cases and reflections, and to the
+// sheet outbox entry of a new case (as the app does). The HTTP layer (fetch) and the token source are
+// injected for tests.
 
 // ---- typed values -> plain JS ----
 
@@ -29,6 +31,21 @@ export function decodeDoc(doc) {
   const id = String(doc.name || '').split('/').pop();
   return data.id == null && id ? { ...data, id } : data;
 }
+
+// ---- plain JS -> typed values (the shapes cleanCase / cleanReflection make: strings, numbers, booleans, null,
+// lists and maps) ----
+
+export function encodeValue(v) {
+  if (v == null) return { nullValue: null };
+  if (typeof v === 'string') return { stringValue: v };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (Array.isArray(v)) return { arrayValue: v.length ? { values: v.map(encodeValue) } : {} };
+  if (typeof v === 'object') return { mapValue: { fields: encodeFields(v) } };
+  throw new Error(`Cannot store a ${typeof v}`);
+}
+
+export const encodeFields = o => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v !== undefined).map(([k, v]) => [k, encodeValue(v)]));
 
 // ---- client ----
 
@@ -63,6 +80,18 @@ export function makeFirestore({ projectId, getIdToken, fetch = globalThis.fetch,
 
   return {
     async getDoc(segments) { return decodeDoc(await call(docUrl(segments))); },
+
+    // Writes the whole document (replacing one that is there). mustNotExist: refused if it already exists.
+    async setDoc(segments, data, { mustNotExist = false } = {}) {
+      const q = mustNotExist ? '?currentDocument.exists=false' : '';
+      const body = await call(docUrl(segments) + q, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: encodeFields(data) }),
+      });
+      if (!body) throw new FirestoreError('Firestore error 404: not saved', 404);
+      return decodeDoc(body);
+    },
 
     async listCollection(segments) {
       const out = [];
@@ -103,6 +132,11 @@ export function makeLogbookSource({ firestore, email }) {
     logbook: () => firestore.getDoc(own),
     cases: () => firestore.listCollection([...own, 'cases']),
     reflections: () => firestore.listCollection([...own, 'reflections']),
+    saveCase: c => firestore.setDoc([...own, 'cases', String(c.id)], c),
+    saveReflection: r => firestore.setDoc([...own, 'reflections', String(r.id)], r),
+    // a new case's copy for the response sheet (rules: the entry carries this user's email and logbook rid; one
+    // already there is refused, as in the app)
+    queueSheetRow: e => firestore.setDoc(['sheetOutbox', String(e.id)], e, { mustNotExist: true }),
     // the residents rule lets a user read only the entry carrying their own email
     async resident() {
       try { return (await firestore.queryEqual('residents', 'email', me, 1))[0] || null; }
