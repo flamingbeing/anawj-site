@@ -1,4 +1,4 @@
-# Logbook screens: Settings, Markdown, Sync, backup, Notes, Connect Claude
+# Logbook screens: Settings, Markdown, Sync, backup, Notes, Connect an AI assistant
 
 Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where things are (screens), part 4.
 
@@ -218,7 +218,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
     or the old v40 worker still in charge while the new one waits for its reload and the phone already has the new manifest), the share reaches
     GitHub Pages, which refuses POSTs (405), so a static fallback page can't help. The worker installs on the first
     visit, so this only bites in that window.
-- **Connect Claude** (`mcp/`, Settings → Connect Claude (advanced) links its README on GitHub): an MCP
+- **Connect an AI assistant** (`mcp/`, Settings → Connect an AI assistant (advanced) links its README on GitHub): an MCP
   server residents run locally (reads, plus `add_case`, `update_case`, `save_reflection` for drafts: preview, then
   `confirm: true`; no deletes; new cases also queue their `sheetOutbox` entry); Google "Desktop app" OAuth (loopback, PKCE) → Firebase `signInWithIdp` → Firestore
   REST as the user, so the rules apply; only `logbooks/{own email}` and the user's own `residents` entry. Owner

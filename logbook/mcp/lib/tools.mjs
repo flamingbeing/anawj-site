@@ -14,7 +14,7 @@ import {
 } from './write.mjs';
 import {
   MAX_ROWS, MAX_PLAN, parseList, rowsFromCases, checkRows, buildCases, describeRows, suggester, formatSuggestions,
-  untaggedReport, planOf, buildPlanItems, formatPlan,
+  untaggedReport, planOf, buildPlanItems, formatPlan, pickDue, casesFromPlan,
 } from './bulk.mjs';
 
 const limit = z.number().int().min(1).max(MAX_LIMIT).optional().describe(`Most rows to return (default ${DEFAULT_LIMIT}, max ${MAX_LIMIT})`);
@@ -122,7 +122,7 @@ export function defineTools(getData, writer = null) {
     {
       name: 'list_plan',
       title: 'Planned cases',
-      description: 'Your planned cases (a list pasted for a later day, waiting to be confirmed in the app once done): due now and later.',
+      description: 'Your planned cases (a list pasted for a later day, waiting to be logged once done), each with its id: due now and later.',
       shape: {},
       async run() {
         const d = await getData();
@@ -275,6 +275,50 @@ function writeTools(getData, writer) {
         await writer.savePlan([...plan, ...buildPlanItems(rows, day)]);
         writer.invalidate();
         return `Planned ${rows.length} case${rows.length === 1 ? '' : 's'} for ${day}. They wait on the app's Log tab that day: tick each one once done.`;
+      },
+    },
+    {
+      name: 'log_planned',
+      title: 'Log planned cases as done',
+      annotations: ADDS,
+      description: 'Log planned cases that are due (today or earlier) as done, like ✓ Done on the app\'s Log tab → Planned: each becomes a case on its planned date, goes to the Google Form response sheet, and leaves the plan. Give ids (from list_plan) or all_due: true. Preview first; save with confirm: true once the user agrees. To change a case first, log it and then use update_case.',
+      shape: {
+        ids: z.array(z.string().min(1).max(200)).min(1).max(MAX_PLAN).optional().describe('Planned cases to log (ids from list_plan)'),
+        all_due: z.boolean().optional().describe('true: every planned case due today or earlier'),
+        confirm,
+      },
+      async run(args) {
+        if (!!args.ids === !!args.all_due) throw new Error('Give ids (from list_plan) or all_due: true, one of the two.');
+        const d = await fresh();
+        const items = pickDue(planOf(d.logbook), { ids: args.ids || null });
+        const { cases, dups } = casesFromPlan(items, d.cases);
+        if (!args.confirm) {
+          const rows = items.map(p => ({ date: p.date, initials: p.initials, details: String(p.details || ''), cats: p.cats || [] }));
+          const dupNums = items.map((p, i) => (dups.includes(String(p.id)) ? i + 1 : 0)).filter(Boolean);
+          return `${items.length} planned case${items.length === 1 ? '' : 's'} to log as done${dups.length ? ` (${dups.length} already in the logbook: only removed from the plan)` : ''}:\n\n${describeRows(rows, dupNums)}${PREVIEW('log_planned')}`;
+        }
+        const rid = d.logbook && d.logbook.rid;
+        const done = new Set(dups);
+        let queued = 0;
+        const problems = [];
+        for (const { plan: pid, case: c } of cases) {
+          try { await writer.saveCase(c); done.add(pid); }
+          catch (e) { problems.push(`Stopped after ${done.size - dups.length} of ${cases.length}: ${e.message}. The rest stay in the plan: call log_planned again (list_plan shows them).`); break; }
+          const entry = outboxOn() && rid ? outboxEntry(c, { email: d.email, rid }) : null;
+          if (entry) {
+            try { await writer.queueSheetRow(entry); queued++; }
+            catch (e) { problems.push(`Case ${c.id} saved but not queued for the response sheet (${e.message}).`); }
+          }
+        }
+        // the plan as stored now, less what was logged (a change made meanwhile in the app stays)
+        if (done.size) {
+          try { await writer.savePlan(planOf((await fresh()).logbook).filter(p => !done.has(String(p.id)))); }
+          catch (e) { problems.push(`Logged, but not removed from the plan (${e.message}): remove them in the app, Log tab → Planned (×).`); }
+        }
+        writer.invalidate();
+        const saved = done.size - dups.length;
+        return [`Logged ${saved} planned case${saved === 1 ? '' : 's'} as done${dups.length ? ` (${dups.length} already in the logbook, only removed from the plan)` : ''}.`,
+          queued ? `Queued ${queued} for the response sheet.` : '', ...problems].filter(Boolean).join('\n');
       },
     },
   ];

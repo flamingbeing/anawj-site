@@ -144,4 +144,37 @@ data.logbook.plan = Array.from({ length: 100 }, (_, i) => ({ id: 'p' + i, date: 
 r = await call('plan_cases', { cases: [{ details: 'x' }] });
 assert.match(txt(r), /at most 100/);
 
+// log_planned: due ones become cases on their planned date (source paste, sheet queued) and leave the plan
+data.logbook.plan = [
+  { id: 'd1', date: '2026-01-02', initials: 'EF', details: 'knee scope', cats: ['08'], tags: ['08:day'] },
+  { id: 'd2', date: today(), details: 'hernia', cats: [] },
+  { id: 'd3', date: '2026-01-01', initials: 'XY', details: 'LSCS spinal', cats: [] },   // already logged (c2)
+  { id: 'l1', date: '2030-01-01', details: 'later', cats: [] },
+];
+assert.equal((await call('log_planned', {})).isError, true, 'ids or all_due needed');
+assert.equal((await call('log_planned', { ids: ['d1'], all_due: true })).isError, true, 'not both');
+assert.match(txt(await call('log_planned', { ids: ['l1'] })), /not due yet/);
+assert.match(txt(await call('log_planned', { ids: ['nope'] })), /No planned case with id "nope"/);
+log.length = 0;
+r = await call('log_planned', { all_due: true });
+assert.match(txt(r), /^3 planned cases to log as done \(1 already in the logbook/);
+assert.match(txt(r), /1\. 2026-01-02 · EF: knee scope/);
+assert.match(txt(r), /Preview only/);
+assert.equal(log.length, 0);
+r = await call('log_planned', { all_due: true, confirm: true });
+assert.match(txt(r), /^Logged 2 planned cases as done \(1 already in the logbook/);
+const logged = log.filter(([k]) => k === 'case').map(([, c]) => c);
+assert.deepEqual(logged.map(c => [c.date, c.details, c.source]), [['2026-01-02', 'knee scope', 'paste'], [today(), 'hernia', 'paste']]);
+assert.deepEqual(logged[0].tags, ['08:day'], 'personal tags kept');
+assert.deepEqual(log.filter(([k]) => k === 'plan')[0][1].map(p => p.id), ['l1'], 'only the later one stays');
+// by id, and a save that fails keeps the rest in the plan
+log.length = 0;
+writer.saveCase = async () => { throw new Error('offline'); };
+r = await call('log_planned', { ids: ['d1'], confirm: true });
+assert.match(txt(r), /Stopped after 0 of 1: offline/);
+assert.equal(log.filter(([k]) => k === 'plan').length, 0, 'plan untouched when nothing saved');
+writer.saveCase = async c => { log.push(['case', c]); };
+r = await call('list_plan', {});
+assert.match(txt(r), /\(id d1\)/);
+
 console.log('bulk.test.mjs: ok');
