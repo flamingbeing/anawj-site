@@ -1,7 +1,7 @@
 // Cloudflare Workers config: the PR previews (PREVIEWS.md) and the subdomains (SUBDOMAINS.md). anawj.com itself is
 // GitHub Pages and ignores this file. The Worker (worker/sites.js) serves the repo root's files and decides which
-// folder each address may see (worker/routes.js). No data, no secrets in this file (the Worker's settings, such as the scan
-// upload's SCAN_* values, are set in the Cloudflare dashboard).
+// folder each address may see (worker/routes.js). No data, no secrets in this file (the Worker's settings, such as Ask
+// Claude's, are set in the Cloudflare dashboard).
 {
   "name": "anawj-preview",
   "main": "worker/sites.js",

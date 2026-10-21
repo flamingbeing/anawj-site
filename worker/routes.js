@@ -1,7 +1,7 @@
 // Which folder of this repo each public address serves (SUBDOMAINS.md). Pure functions, no Cloudflare APIs, so
 // worker/test/routes.test.mjs can check them in Node. worker/sites.js is the Worker that uses them.
 //
-// A host in SITES is served only from the folders listed for it: prewarmstudy.anawj.com can never reach the logbook's
+// A host in SITES is served only from the folders listed for it: nuhroster.anawj.com can never reach the logbook's
 // files, and so on. Any other host (the PR previews on workers.dev, the copy of main on anawj-preview) serves the
 // whole repo as it is, as before.
 
@@ -12,7 +12,6 @@
 export const SITES = {
   // the anaesthesia teaching pages moved to anantf.com on 16 Oct 2026 (the BIS and OT simulators): old links forward
   'anaes.anawj.com': { moved: { '/bis/': 'https://anantf.com/bis/', '/ot/': 'https://anantf.com/ot/' } },
-  'prewarmstudy.anawj.com': { root: 'prewarm/' },
   'nuhroster.anawj.com': { root: 'nuh-roster/' },
   // NTF anaesthesia monthly duty roster (its own data, so its own host). /__/auth/ and /__/firebase/ are Firebase's
   // sign-in helper pages on this host (authDomain ntfroster.anawj.com, as apmes does): ntf-auth/ holds its init.json.

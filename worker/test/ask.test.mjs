@@ -85,8 +85,8 @@ r = await worker.fetch(new Request('https://ask.anawj.com/api/ask', { method: 'P
 assert.equal(r.status, 503, 'not set up without secrets');
 r = await worker.fetch(new Request('https://hand.anawj.com/api/ask', { method: 'POST', body: '{}' }), { ASSETS });
 assert.equal(r.status, 405, 'no API anywhere else');
-r = await worker.fetch(new Request('https://prewarmstudy.anawj.com/'), { ASSETS });
+r = await worker.fetch(new Request('https://nuhroster.anawj.com/'), { ASSETS });
 assert.equal(r.status, 200, 'a site host still serves its own page');
-r = await worker.fetch(new Request('https://prewarmstudy.anawj.com/logbook/'), { ASSETS });
+r = await worker.fetch(new Request('https://nuhroster.anawj.com/logbook/'), { ASSETS });
 assert.equal(r.status, 404, 'a site host serves only its own folder');
 console.log('ask tests passed');
