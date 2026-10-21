@@ -1,8 +1,8 @@
 {
   "name": "apmes-logbook-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Read-only MCP server for your own APMES Logbook (cases, progress, reflections).",
+  "description": "MCP server for your own APMES Logbook: read cases, progress and reflections; add or change cases and draft reflections.",
   "type": "module",
   "main": "server.mjs",
   "engines": {
@@ -12,7 +12,7 @@
     "login": "node server.mjs login",
     "logout": "node server.mjs logout",
     "start": "node server.mjs",
-    "test": "node test/firestore.test.mjs && node test/logbook.test.mjs && node test/tools.test.mjs && node test/auth.test.mjs"
+    "test": "node test/firestore.test.mjs && node test/logbook.test.mjs && node test/tools.test.mjs && node test/write.test.mjs && node test/auth.test.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.1",

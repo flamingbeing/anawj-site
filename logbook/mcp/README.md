@@ -1,8 +1,8 @@
 # APMES Logbook MCP server
 
-A small local [MCP](https://modelcontextprotocol.io) server that lets Claude (Claude Desktop or Claude Code) read **your own** APMES Logbook: your cases, your progress against the APMES targets, and your reflections. You ask in plain words ("which tags am I behind on?", "find my cases with an adductor canal block last month") and Claude calls these tools.
+A small local [MCP](https://modelcontextprotocol.io) server that lets Claude (Claude Desktop or Claude Code) work with **your own** APMES Logbook: read your cases, your progress against the APMES targets and your reflections, and add or change cases and draft reflections. You ask in plain words ("which tags am I behind on?", "find my cases with an adductor canal block last month", "log today's list: …", "start a draft reflection on that case") and Claude calls these tools.
 
-**It is read-only.** There are no tools that add, change or delete anything. It signs in as you and reads Firestore with your own sign-in, so the same `firestore.rules` as the web app apply: it can only see `logbooks/{your email}` (cases and reflections) and your own entry on the programme list (for your residency year).
+It signs in as you and uses Firestore with your own sign-in, so the same `firestore.rules` as the web app apply: it can only see `logbooks/{your email}` (cases and reflections) and your own entry on the programme list (for your residency year), and it can only write your own cases and reflections.
 
 | Tool | What it returns |
 |---|---|
@@ -13,11 +13,21 @@ A small local [MCP](https://modelcontextprotocol.io) server that lets Claude (Cl
 | `get_reflection({ id })` | the full text of one reflection (figures are not read, only their captions) |
 | `missing_targets({ year? })` | tags behind or due for your year, and reflection headings below their minimum |
 
+Writing (each one is two calls: without `confirm` it only shows what would be saved; Claude shows you that and saves with `confirm: true` once you agree):
+
+| Tool | What it does |
+|---|---|
+| `add_case({ date?, initials?, details, tags?, interesting?, confirm? })` | adds a case as if typed in the app (date defaults to today); like any app case it also goes to the Google Form response sheet (`sheetOutbox`) |
+| `update_case({ id, date?, initials?, details?, tags?, interesting?, confirm? })` | changes only the fields given; `tags` replaces the whole list |
+| `save_reflection({ id?, heading?, subheading?, title?, date?, initials?, diagnosis?, summary?, learning_points?, references?, case_id?, confirm? })` | starts a new draft (no `id`) or changes one of your drafts; always saved as a draft |
+
+Safeguards: nothing is ever deleted (there is no delete tool); complete reflections can't be changed from here (edit them, and mark drafts complete, in the app); text that looks like an identifier (an NRIC/FIN or 7 or more digits) is refused; a case with the same date, initials and details as one already there is refused; tags must each match one current tag (a tag with sub-tags needs the sub-tag). Saves use the app's own `cleanCase` / `cleanReflection` (`../js/clean.js`), so they look exactly like the app's and the app shows them at once. Writes always read your latest data first, so they change what is stored now. Cases are saved with source `app` (the rules allow no other source for a typed case).
+
 `limit` defaults to 50 and is capped at 500. Your residency year comes from the programme list (as in the app), else from Settings in the app, else R1; pass `year` (1–5) to override it. Counts and targets use the app's own code (`../js/engine.js`, `../js/categories.js`, `../js/reflections.js`), so they match the Analytics tab.
 
 ## Privacy: read this first
 
-- **What you read through it is sent to Claude (Anthropic).** Case details and reflections that a tool returns go into your Claude conversation. Check your hospital's policy on using AI tools with clinical logs before you use it, and keep your cases de-identified (initials and a short description, no names or NRIC numbers), as the logbook already asks.
+- **What you read or write through it is sent to Claude (Anthropic).** Case details and reflections that a tool returns or saves go through your Claude conversation. Check your hospital's policy on using AI tools with clinical logs before you use it, and keep your cases de-identified (initials and a short description, no names or NRIC numbers), as the logbook already asks.
 - **Your sign-in stays on your computer.** Only a Firebase refresh token and your email are stored, in `~/.config/apmes-logbook-mcp/token.json` (readable only by you, mode 0600). Nothing goes to any server other than Google's (sign-in and Firestore) and, through Claude, Anthropic.
 - **To revoke access:** run `node server.mjs logout` (deletes the token file), and remove the app in your Google Account → Security → Third-party access ("Your connections to third-party apps & services").
 
@@ -64,10 +74,10 @@ Commands: `node server.mjs login` (sign in), `node server.mjs logout` (delete th
 ## How it works
 
 1. **Sign-in, with no server of ours.** Google OAuth for an installed app: a one-off listener on `http://127.0.0.1:<random port>`, PKCE (S256) and a `state` check, scopes `openid email`. The code is exchanged at `https://oauth2.googleapis.com/token`, and the Google ID token is turned into a Firebase sign-in with `accounts:signInWithIdp` (Identity Toolkit), using the logbook's public Firebase API key from `../js/firebase-config.js`. The Firebase refresh token is stored; a fresh ID token is fetched from `securetoken.googleapis.com` when needed and kept in memory only.
-2. **Data.** Firestore REST (`firestore.googleapis.com/v1/projects/apmes-logbook/databases/(default)/documents/logbooks/{email}/cases`, likewise `reflections` and the logbook doc), as you, with `Authorization: Bearer <ID token>`, 300 per page. Your residents entry is found with the same query the app makes (`residents` where `email == your email`). Data is cached for a minute so a run of questions reads Firestore once.
+2. **Data.** Firestore REST (`firestore.googleapis.com/v1/projects/apmes-logbook/databases/(default)/documents/logbooks/{email}/cases`, likewise `reflections` and the logbook doc), as you, with `Authorization: Bearer <ID token>`, 300 per page. Your residents entry is found with the same query the app makes (`residents` where `email == your email`). Data is cached for a minute so a run of questions reads Firestore once. Writes `PATCH` the whole document (`logbooks/{email}/cases/{id}` or `reflections/{id}`); a new case's sheet copy is written to `sheetOutbox/{id}` only if not there yet (`currentDocument.exists=false`).
 3. **About the client secret in `config.mjs`.** Google's "Desktop app" OAuth clients still ask for the client secret at the token step, even with PKCE. Google documents that, for installed apps, this secret is not treated as confidential (it ships inside every copy of the app); the protection is the loopback redirect, PKCE and your own consent. So `CLIENT_ID` and `CLIENT_SECRET` are kept in `config.mjs` in this public repo on purpose. You can override them with the environment variables `APMES_GOOGLE_CLIENT_ID` and `APMES_GOOGLE_CLIENT_SECRET` (and the API key with `APMES_FIREBASE_API_KEY`).
 
-Files: `server.mjs` (commands and MCP wiring), `config.mjs`, `lib/auth.mjs` (sign-in, token file, refresh), `lib/firestore.mjs` (REST client and typed-value decoder), `lib/logbook.mjs` (filters, search, summaries), `lib/tools.mjs` (tool definitions).
+Files: `server.mjs` (commands and MCP wiring), `config.mjs`, `lib/auth.mjs` (sign-in, token file, refresh), `lib/firestore.mjs` (REST client and typed-value decoder), `lib/logbook.mjs` (filters, search, summaries), `lib/write.mjs` (building and checking what the write tools save), `lib/tools.mjs` (tool definitions).
 
 ## Tests
 
