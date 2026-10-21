@@ -2,27 +2,52 @@
 // APMES Logbook MCP server: reads your own logbook, and adds or changes cases and draft reflections. See README.md.
 //   node server.mjs login    sign in with Google in the browser
 //   node server.mjs logout   delete the stored token
-//   node server.mjs          run the MCP server on stdio (Claude Desktop / Claude Code start it)
+//   node server.mjs          run the MCP server on stdio (Claude Desktop / Claude Code start it); not signed in yet,
+//                            the first tool call opens the browser to sign in (no terminal needed)
 
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { CLIENT_ID, CLIENT_SECRET, API_KEY, PROJECT_ID, isConfigured } from './config.mjs';
-import { login, makeSession, deleteToken, defaultTokenFile, NotSignedInError } from './lib/auth.mjs';
+import { login, makeSession, deleteToken, defaultTokenFile, NotSignedInError, openBrowser } from './lib/auth.mjs';
 import { makeFirestore, makeLogbookSource } from './lib/firestore.mjs';
 import { defineTools, callTool, READ_ONLY } from './lib/tools.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
+const VERSION = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version;
 const log = m => process.stderr.write(m + '\n');
-const LOGIN_HINT = `In a terminal, run:\n  node "${SELF}" login\nthen ask again.`;
+
+// Not signed in (or the sign-in expired): the tool call that finds out starts the browser sign-in itself and answers
+// at once with the address, so it works from Claude Desktop with no terminal. One sign-in at a time.
+let signingIn = null;
+async function startSignIn(why) {
+  if (!isConfigured()) return new Error('The APMES Logbook connector is not set up yet (no Google sign-in client). Ask the app owner.');
+  const started = !signingIn;
+  if (started) {
+    let url = '';
+    signingIn = {
+      done: login({ clientId: CLIENT_ID, clientSecret: CLIENT_SECRET, apiKey: API_KEY, log, open: (u, l) => { url = u; openBrowser(u, l); } })
+        .then(({ email }) => log(`Signed in as ${email}.`), e => log(`Sign-in did not finish: ${e.message}`))
+        .finally(() => { signingIn = null; }),
+      url: () => url,
+    };
+  }
+  // login() opens the listener first; the address is there a moment later
+  for (let i = 0; i < 20 && signingIn && !signingIn.url(); i++) await new Promise(r => setTimeout(r, 50));
+  const url = signingIn ? signingIn.url() : '';
+  return new Error(`${why} ${started ? 'A browser window is opening' : 'A browser window is waiting'} for you to sign in to the APMES Logbook with Google (the account you use for the logbook).`
+    + (url ? ` If it didn't open, go to:\n${url}\n` : ' ')
+    + 'Once the page says you are signed in, ask again. (Or, in a terminal: node "' + SELF + '" login)');
+}
 
 // The signed-in user's own logbook (makeLogbookSource), made when first needed.
-function source() {
+async function source() {
   let session;
   try { session = makeSession({ apiKey: API_KEY }); }
-  catch (e) { if (e instanceof NotSignedInError) throw new Error(`Not signed in to the APMES Logbook. ${LOGIN_HINT}`); throw e; }
+  catch (e) { if (e instanceof NotSignedInError) throw await startSignIn('Not signed in to the APMES Logbook yet.'); throw e; }
   const firestore = makeFirestore({ projectId: PROJECT_ID, getIdToken: f => session.getIdToken(f) });
   return makeLogbookSource({ firestore, email: session.email });
 }
-const signInProblem = e => (e instanceof NotSignedInError ? new Error(`APMES Logbook sign-in problem: ${e.message}. ${LOGIN_HINT}`) : e);
+const signInProblem = async e => (e instanceof NotSignedInError ? startSignIn(`APMES Logbook sign-in problem: ${e.message}.`) : e);
 
 // All the user's data, fetched together and kept for a minute so a run of tool calls reads Firestore once. fresh (the
 // write tools): read it again, so a change is made to the stored version.
@@ -30,19 +55,20 @@ const CACHE_MS = 60_000;
 let cache = null;
 async function getData(fresh = false) {
   if (!fresh && cache && Date.now() - cache.at < CACHE_MS) return cache.data;
-  const src = source();
+  const src = await source();
   try {
     const [logbook, cases, reflections, resident] = await Promise.all([src.logbook(), src.cases(), src.reflections(), src.resident()]);
     const data = { email: src.email, logbook, cases, reflections, resident };
     cache = { at: Date.now(), data };
     return data;
-  } catch (e) { throw signInProblem(e); }
+  } catch (e) { throw await signInProblem(e); }
 }
 
-const write = name => async x => { try { return await source()[name](x); } catch (e) { throw signInProblem(e); } };
+const write = name => async x => { const src = await source(); try { return await src[name](x); } catch (e) { throw await signInProblem(e); } };
 const writer = {
   saveCase: write('saveCase'),
   saveReflection: write('saveReflection'),
+  savePlan: write('savePlan'),
   queueSheetRow: write('queueSheetRow'),
   invalidate: () => { cache = null; },
 };
@@ -52,9 +78,9 @@ async function serve() {
     import('@modelcontextprotocol/sdk/server/mcp.js'),
     import('@modelcontextprotocol/sdk/server/stdio.js'),
   ]);
-  const server = new McpServer({ name: 'apmes-logbook', version: '0.2.0' }, {
+  const server = new McpServer({ name: 'apmes-logbook', version: VERSION }, {
     instructions: 'The signed-in resident\'s own APMES Logbook: cases, progress against APMES targets, and reflections. '
-      + 'add_case, update_case and save_reflection write to it: always call them first without confirm, show the user the preview, '
+      + 'add_case, add_cases, update_case, save_reflection and plan_cases write to it: always call them first without confirm, show the user the preview, '
       + 'and call again with confirm: true only after the user agrees. Reflections are saved as drafts only. '
       + 'Case details are de-identified initials and short descriptions; never add names, NRIC or record numbers, and do not try to identify patients.',
   });
