@@ -5,6 +5,7 @@
 import { S, h, toast, modal, hooks, profile, facultyRole, shows } from './ui-core.js';
 import { DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
 import { lookCss } from './themes.js';
+import { lookNow, nightRef } from './my-themes.js';
 import { cleanFacet, foldCompact } from './theme-engine.js';
 import { checkCss } from './custom-css.js';
 import { applyFonts } from './fonts.js';
@@ -31,7 +32,7 @@ export function applyTheme(t) {
   document.documentElement.dataset.theme = theme === 'oled' ? 'dark' : theme;
   if (theme === 'oled') document.documentElement.dataset.oled = ''; else delete document.documentElement.dataset.oled;
   try { theme === 'light' ? localStorage.removeItem(THEME_KEY) : localStorage.setItem(THEME_KEY, theme); } catch { /* storage blocked */ }
-  paintStatusBar(); paintDim();
+  if (nightRef(display())) applyDisplay(); else { paintStatusBar(); paintDim(); }   // (the night theme comes and goes with Auto)
 }
 export function cachedTheme() {
   try { return localStorage.getItem(THEME_KEY) || 'light'; } catch { return 'light'; }
@@ -76,6 +77,13 @@ export function applyAccent(c) {
   const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute('content', lightPalette(accent).accent);
   try { accent === DEFAULT_ACCENT ? localStorage.removeItem(ACCENT_CSS_KEY) : localStorage.setItem(ACCENT_CSS_KEY, css); } catch { /* storage blocked */ }
 }
+// Case text size (Accessibility; theme-revamp S5): the case box and case text in lists (the logging font's places)
+// bigger or smaller than the rest, as --cs (style.css); set at first paint from the display entry (index.html)
+export const CASE_SIZES = [['0.9', 'Smaller'], ['1', 'Same as the text (default)'], ['1.15', 'Larger'], ['1.3', 'Larger still'], ['1.5', 'Largest']];
+export function applyCaseSize(z) {
+  const v = CASE_SIZES.some(([k]) => k === String(z)) ? String(z) : '1';
+  if (typeof document !== 'undefined') v === '1' ? document.documentElement.style.removeProperty('--cs') : document.documentElement.style.setProperty('--cs', v);
+}
 export function cachedTextSize() {
   try { return localStorage.getItem(SIZE_KEY) || '1'; } catch { return '1'; }
 }
@@ -95,7 +103,9 @@ export const DISPLAY_KEYS = ['colours', 'listHeight', 'myThemes', 'pageSize', 'l
   'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band', 'barBlur', 'tabActiveLabel', 'listStyle', 'titleAlign', 'switchStyle', 'pressStyle', 'iconWeight', 'typeStyle',
   'statusBar', 'headerStyle', 'tabIconFill', 'iconSet', 'pageMotion', 'sheetStyle', 'toastStyle', 'fieldStyle', 'checkStyle', 'headingTone', 'tabTone',
   'ftBtn', 'ftGap', 'ftLine', 'ftShadow', 'ftCases', 'ftDays', 'ftLetter', 'ftWeight',
-  'wallpaper', 'wallDim', 'iconTint', 'iconTintStrength', 'tabIcon'];   // Fine-tune (theme-engine.js TUNE_KEYS), then wallpaper.js and the icon tint (theme-revamp S4)
+  'wallpaper', 'wallDim', 'iconTint', 'iconTintStrength', 'tabIcon', 'nightTheme', 'caseSize'];
+// (the last lines: Fine-tune, theme-engine.js TUNE_KEYS; wallpaper.js and the icon tint, theme-revamp S4; the theme when
+// the phone is dark, my-themes.js lookNow, and case text size, theme-revamp S5)
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -129,7 +139,18 @@ export function adoptDisplay(accountSettings, { fresh = false } = {}) {
   return display();   // (an old account text size becomes the zoom here too)
 }
 export function resetDisplay() { adoptedNow = false; try { localStorage.removeItem(DISPLAY_KEY); } catch { /* storage blocked */ } }
-export function applyDisplay(d = display()) { applyCompact(d.spacing === 'compact'); applyTextSize(d.textSize || '1'); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); applyLook(d); applyThemeLook(d); applyWallpaper(d); }
+// The look shown now (theme-revamp S5): the device's own, its night theme while the phone is dark on Auto
+// (my-themes.js lookNow), or a theme from a link while it is being tried (previewLook). Every look painter goes
+// through it, so a single setting changed on Themes doesn't bring the day look back at night.
+let preview = null;
+const darkNow = () => cachedTheme() === 'auto' && typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
+export const lookToShow = (d = display()) => (d.shown ? d : preview || { ...lookNow(d, darkNow()), shown: true });
+export const nightShowing = () => !preview && !!nightRef(display()) && darkNow();
+export function previewLook(d) { preview = d ? { ...d, shown: true } : null; applyDisplay(); }
+export function applyDisplay(d = display()) {
+  d = lookToShow(d);
+  applyCompact(d.spacing === 'compact'); applyTextSize(d.textSize || '1'); applyCaseSize(d.caseSize); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); applyLook(d); applyThemeLook(d); applyWallpaper(d);
+}
 
 // Wallpaper (Themes → Wallpaper; wallpaper.js): <html class="wall"> turns on style.css's two layers behind the page,
 // the picture (a pattern's from the look's style sheet, the photo's from IndexedDB as --wall here) and the dim
@@ -138,6 +159,7 @@ export function applyDisplay(d = display()) { applyCompact(d.spacing === 'compac
 let photo = { rec: null, url: '' }, photoWanted = false;
 export function applyWallpaper(d = display()) {
   if (typeof document === 'undefined') return;
+  d = lookToShow(d);
   const root = document.documentElement, w = cleanWall(d.wallpaper);
   root.classList.toggle('wall', !!w);
   photoWanted = w === 'photo';
@@ -177,6 +199,7 @@ export function wallDim(d = display()) {
 }
 function paintDim(d = display()) {
   if (typeof document === 'undefined' || !document.documentElement.classList.contains('wall')) return;
+  d = lookToShow(d);
   const v = String(wallDim(d).dim);
   if (document.documentElement.style.getPropertyValue('--wall-dim') !== v) document.documentElement.style.setProperty('--wall-dim', v);
   try { localStorage.setItem(DIM_KEY, v); } catch { /* storage blocked */ }
@@ -186,6 +209,7 @@ const DIM_KEY = 'apmes-logbook-wall-dim';   // for the first paint (index.html),
 // after the colour's (so it wins), cached on the device for the first paint (index.html) like the colour's
 const LOOK_CSS_KEY = 'apmes-logbook-look-css-v2';
 export function applyThemeLook(d = display()) {
+  d = lookToShow(d);
   const p = lightPalette(cleanAccent(d.accent) || DEFAULT_ACCENT);
   const css = lookCss(d, [p.s1, p.s2, p.s3, p.s4]);
   let el = document.getElementById('look-css');
@@ -200,6 +224,7 @@ export function applyThemeLook(d = display()) {
 const STATUS_KEY = 'apmes-logbook-statusbar';
 export function paintStatusBar(d = display()) {
   if (typeof document === 'undefined') return;
+  d = lookToShow(d);
   const meta = document.querySelector('meta[name="theme-color"]'); if (!meta) return;
   const mode = d.statusBar === 'header' || d.statusBar === 'page' ? d.statusBar : null;
   const root = getComputedStyle(document.documentElement);
@@ -209,7 +234,7 @@ export function paintStatusBar(d = display()) {
   try { mode ? localStorage.setItem(STATUS_KEY, colour) : localStorage.removeItem(STATUS_KEY); } catch { /* storage blocked */ }
 }
 // Auto light or dark: the phone switching changes the colours under the status bar too
-if (typeof window !== 'undefined' && window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { paintStatusBar(); paintDim(); });
+if (typeof window !== 'undefined' && window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if (nightRef(display())) applyDisplay(); else { paintStatusBar(); paintDim(); } });
 // page width (lineWidth), line spacing, contrast, motion, icons-only tabs: classes on <html> and --lh (style.css, end); also set at
 // first paint from the same localStorage entry (index.html)
 export const LINE_WIDTHS = [['narrow', 'Narrow (easier to read on a big screen)'], ['normal', 'Normal (default)'], ['wide', 'Wide'], ['full', 'Full (no limit)']];
@@ -217,6 +242,7 @@ export const LINE_HEIGHTS = [['0.9', 'Tight'], ['1', 'Normal (default)'], ['1.15
 export const CONTRASTS = [['auto', 'Follow the device (default)'], ['normal', 'Normal'], ['high', 'Higher contrast']];
 export const MOTIONS = [['auto', 'Follow the device (default)'], ['full', 'Animations on'], ['reduce', 'Reduce motion']];
 export function applyLook(d = {}) {
+  d = lookToShow(d);
   const c = document.documentElement.classList;
   c.toggle('lw-narrow', d.lineWidth === 'narrow'); c.toggle('lw-wide', d.lineWidth === 'wide'); c.toggle('lw-full', d.lineWidth === 'full');
   document.documentElement.style.setProperty('--lh', LINE_HEIGHTS.some(([v]) => v === String(d.lineHeight)) ? String(d.lineHeight) : '1');

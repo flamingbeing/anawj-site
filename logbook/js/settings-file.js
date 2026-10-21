@@ -36,6 +36,9 @@ const OBJECTS = {
   // Wallpaper (wallpaper.js): a pattern only (a photo never leaves its device), the dim; the icon tint and tab icons
   wallpaper: v => cleanPattern(v), wallDim: v => cleanDim(v), iconTint: v => cleanAccent(v), iconTintStrength: v => cleanTintStrength(v),
   tabIcon: v => { const t = cleanTabIcons(v); return Object.keys(t).length ? t : null; },
+  // the theme when the phone is dark (a theme's id or 'mine:<id>'), case text size (theme-revamp S5)
+  nightTheme: v => (typeof v === 'string' && /^(mine:)?[a-z0-9]{1,20}$/.test(v) ? v : null),
+  caseSize: v => (['0.9', '1.15', '1.3', '1.5'].includes(String(v)) ? String(v) : null),
   tagSet: v => (v == null ? null : cleanTagSet(v)),
   shareFormat: v => cleanFormat(v),
   markdown: v => { try { return storedMarkdown(v); } catch { return null; } },

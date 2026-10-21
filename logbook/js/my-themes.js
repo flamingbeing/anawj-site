@@ -2,7 +2,8 @@
 // it under a name of your own (this device, `display().myThemes`), to pick again later like any theme. Export writes
 // them to a file (.json) to keep or pass on; Import reads such a file back (only known look settings, checked).
 // Pure (test/my-themes.test.mjs); the page is ui-settings.js renderThemes.
-import { THEME_KEYS, TINTS, keepPhoto } from './themes.js';
+import { THEME_KEYS, TINTS, keepPhoto, checkTheme, THEMES, themePatch } from './themes.js';
+import { cleanFontFile } from './fonts.js';
 import { FACET_KEYS, cleanFacet, TUNE_KEYS, cleanTune, foldCompact, cleanTintStrength, cleanTabIcons } from './theme-engine.js';
 import { cleanPattern, cleanDim } from './wallpaper.js';
 import { cleanAccent, cleanColours, checkColours } from './colors.js';
@@ -63,9 +64,14 @@ export function matchMine(list, d) {
   return cleanMine(list).find(t => JSON.stringify(lookOf(t.look)) === now) || null;
 }
 
-// the file: { kind, version, themes }
-export const exportText = list => JSON.stringify({ kind: FILE_KIND, version: 1, themes: cleanMine(list).map(({ id, ...t }) => t) }, null, 2);
-// a file's themes, checked; added to yours (a name already there is replaced) -> { list, added }
+// the file: { kind, version, themes }. fonts: a theme id -> { ui, log } uploaded font files ({ name, data: base64 }),
+// carried for a theme whose font is "Your own font file" (theme-revamp S5), so it looks the same on the other phone
+export const exportText = (list, fonts = {}) => JSON.stringify({ kind: FILE_KIND, version: 1, themes: cleanMine(list).map(({ id, ...t }) => {
+  const f = Object.fromEntries(['ui', 'log'].filter(slot => t.look[slot === 'ui' ? 'fontUi' : 'fontLog'] === 'file' && fonts[id]?.[slot]).map(slot => [slot, fonts[id][slot]]));
+  return Object.keys(f).length ? { ...t, fonts: f } : t;
+}) }, null, 2);
+// a file's themes, checked; added to yours (a name already there is replaced) -> { list, added, fonts }
+// fonts: a theme id (in the new list) -> { ui, log } font files ({ name, data: ArrayBuffer }), each checked (fonts.js)
 export function importText(text, list) {
   let data;
   try { data = JSON.parse(String(text || '')); } catch { throw new Error('That isn’t a themes file'); }
@@ -75,5 +81,65 @@ export function importText(text, list) {
   const names = new Set(got.map(t => t.name.toLowerCase()));
   const merged = [...got, ...cleanMine(list).filter(t => !names.has(t.name.toLowerCase()))];
   if (merged.length > MAX_MINE) throw new Error(`Up to ${MAX_MINE} themes of your own: delete some first`);
-  return { list: cleanMine(merged), added: got.length };
+  const out = cleanMine(merged), fonts = {};
+  for (const raw of data.themes) {
+    const t = raw && raw.fonts && typeof raw.fonts === 'object' && got.find(x => x.name === cleanName(raw.name));
+    if (!t) continue;
+    for (const slot of ['ui', 'log']) {
+      const rec = t.look[slot === 'ui' ? 'fontUi' : 'fontLog'] === 'file' ? cleanFontFile(raw.fonts[slot]) : null;
+      if (rec) (fonts[out.find(x => x.name === t.name).id] ||= {})[slot] = rec;
+    }
+  }
+  return { list: out, added: got.length, fonts };
+}
+
+// Theme links (theme-revamp S5): a look as a link to send in WhatsApp (…/logbook/#theme=…); whoever opens it sees it
+// at once, with Use / Cancel. The link is input from anyone, so it goes through the same checks as a themes file and
+// then checkTheme: each setting it rejects is dropped (never trusted), and fonts are the bundled ones only (a typed
+// font name or an uploaded file stays on its phone). Light or dark travels as a label only, as in Your themes.
+export const LINK_KEY = 'theme';
+const MAX_LINK = 6000;
+const toB64u = str => btoa(String.fromCharCode(...new TextEncoder().encode(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const fromB64u = str => new TextDecoder().decode(Uint8Array.from(atob(str.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)));
+// a theme ({ name, look, mode }) as a link from the app's address (origin + path)
+export function themeLink(base, t) {
+  const look = linkLook(lookOf(t.look || {}));
+  return `${base}#${LINK_KEY}=${toB64u(JSON.stringify({ v: 1, n: cleanName(t.name) || 'Shared theme', l: look, ...(MODES.includes(t.mode) ? { m: t.mode } : {}) }))}`;
+}
+// the look, made safe for a link: (after lookOf) whatever checkTheme rejects is dropped, fonts that aren't bundled too
+function linkLook(look) {
+  look = { ...look };
+  const bad = () => checkTheme({ id: 'shared', name: 'Shared', group: 'classic', desc: 'A theme from a link', look });
+  for (const b of bad()) {
+    const k = /^look\.(\w+)/.exec(b)?.[1] || (b.startsWith('colours') ? 'colours' : null);
+    if (k) delete look[k];
+  }
+  if (bad().length) delete look.colours, delete look.bgTint, delete look.accent;   // colours that clash in a way no single key explains
+  return bad().length ? {} : look;
+}
+// the theme in an address's #theme=… (null when there is none); throws a message when it is there but unreadable
+export function themeFromLink(hash) {
+  const m = /^#?theme=([A-Za-z0-9_-]+)$/.exec(String(hash || '').split('?')[0]);
+  if (!m) return /^#?theme=/.test(String(hash || '')) ? broken() : null;
+  if (m[1].length > MAX_LINK) broken();
+  let raw;
+  try { raw = JSON.parse(fromB64u(m[1])); } catch { broken(); }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || raw.v !== 1 || !raw.l || typeof raw.l !== 'object') broken();
+  return { name: cleanName(raw.n) || 'Shared theme', look: linkLook(lookOf(raw.l)), ...(MODES.includes(raw.m) ? { mode: raw.m } : {}) };
+}
+function broken() { throw new Error('That theme link is broken or cut short: ask for it again'); }
+
+// Day and night (theme-revamp S5): with Light or dark on Auto, nightTheme picks the theme for when the phone is dark
+// ('mine:<id>' for one of Your themes, else a theme's id); the day look is the one set on Themes as usual.
+// -> the look to show now (d itself by day, or with no night theme)
+export function nightRef(d = {}) {
+  const ref = typeof d.nightTheme === 'string' ? d.nightTheme : '';
+  if (ref.startsWith('mine:')) { const t = cleanMine(d.myThemes).find(x => x.id === ref.slice(5)); return t ? { mine: t, name: t.name } : null; }
+  const t = THEMES.find(x => x.id === ref);
+  return t ? { theme: t, name: t.name } : null;
+}
+export function lookNow(d = {}, dark = false) {
+  const n = dark ? nightRef(d) : null;
+  if (!n) return d;
+  return { ...d, ...(n.mine ? minePatch(n.mine, d) : themePatch(n.theme, d)) };
 }
