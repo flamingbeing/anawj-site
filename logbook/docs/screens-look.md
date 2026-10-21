@@ -2,6 +2,21 @@
 
 Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where things are (screens), part 3, with Themes.
 
+- **Themes and Advanced theme settings** (TE S2, owner 21 Oct 2026): Themes (`#themes`) keeps the essentials: the
+  themes and Browse all, Keep when changing theme, Your themes, Colour and light (light or dark, the night theme, Colour,
+  Background), Wallpaper, then one row to **Advanced theme settings** (`#themesadv`, `renderThemesAdv`): Shape and type,
+  Fine-tune, Header and tab bar, Rows and forms, App-style details, More colour (Colourful, Top band), Edit colours,
+  Custom CSS. Both pages have the preview and the reset. Which card is on which page is `THEME_CARDS` in look-schema.js,
+  and every look setting names its card (`section`; unit test in `look-schema.test.mjs`), so the pages can't drift. A
+  copied `#themes?find=…` link to an option now on Advanced opens Advanced (`SPILL` in app.js `showFound`); Settings
+  search lists both pages. The paragraph below is from before the split.
+- **The colour sheet** (TE S2; `ui-colour-sheet.js`, grid in `colour-grid.js`; e2e `colour-sheet.mjs`): Colour → More
+  colours, the icon tint and each Edit colours token open it instead of the phone's own picker (which shows only a few
+  colours): 12 hues × 8 shades (OKLCH, as much colour as fits) and a grey row, one radio group with names like "Teal,
+  shade 5" (arrows along a row, up and down a hue), a dot in each cell showing the deeper shade the palette uses for text
+  (Colour and icon tint), a hex box, Recent (this device, 8), and the phone's own picker last. The page changes as you
+  pick; Cancel puts it back. Grid, Recent and phone-picker colours are snapped to 6 bits a channel (`snap`, at most 2/255
+  off, invisible) so a link carries them in 18 bits; a typed hex stays exactly as typed.
 - **Look settings: Themes / Layout / Accessibility** (theme-revamp S3, 21 Oct 2026). Display (`#display`) and Advanced
   display (`#displayadv`) are gone. **Themes** (`#themes`) holds every look: it opens with "Themes are kept on this
   device only" and Export (`exportThemes`: Your themes, or this look, as a file), then the themes, Your themes, Colour

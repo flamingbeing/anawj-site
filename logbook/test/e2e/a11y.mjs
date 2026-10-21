@@ -73,6 +73,8 @@ const SCREENS = [
   ['Account', hash('account'), false],
   ['Settings', hash('settings'), false],
   ['Themes', hash('themes'), true],
+  ['Advanced theme settings', hash('themesadv'), true],
+  ['Colour sheet', async p => { await hash('themes')(p); await p.getByRole('button', { name: 'More colours', exact: true }).click(); await p.waitForSelector('dialog.colour-sheet[open]'); }, true],
   ['Layout', hash('layout'), false],
   ['Accessibility', hash('access'), false],
   ['Logging', hash('logging'), false],

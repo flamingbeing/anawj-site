@@ -384,8 +384,8 @@ export const cardStyle = d => (d.flat ? 'flat' : d.shadows === false ? 'outlined
 export const cardPatch = v => (v === 'flat' ? { flat: true } : v === 'outlined' ? { flat: null, shadows: false } : { flat: null, shadows: null });
 export const borderLevel = d => (Number.isInteger(d.borders) && d.borders >= 0 && d.borders < BORDERS.length - 1 ? d.borders : BORDERS.length - 1);
 export const cleanTitle = s => String(s || '').replace(/[\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
-// Custom CSS (custom-css.js): only CSS that passes checkCss, never on Themes (where it is edited) or Layout, and off with ?nocss
-const CSS_FREE = ['themes', 'themesall', 'layout'];
+// Custom CSS (custom-css.js): only CSS that passes checkCss, never on the Themes pages (where it is edited) or Layout, and off with ?nocss
+const CSS_FREE = ['themes', 'themesadv', 'themesall', 'layout'];
 export function applyCustomCss(d = display()) {
   if (typeof document === 'undefined') return;
   let el = document.getElementById('user-css');

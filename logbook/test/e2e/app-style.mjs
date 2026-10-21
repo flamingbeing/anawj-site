@@ -10,7 +10,7 @@ try {
   const p = await ctx.newPage(), errors = [];
   p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
-  await p.evaluate(() => { location.hash = '#themes'; });
+  await p.evaluate(() => { location.hash = '#themesadv'; });   // (Advanced theme settings, TE S2)
   await p.locator('section.card', { hasText: 'App-style details' }).waitFor();
   const shot = async () => { await p.waitForTimeout(500); return (await p.screenshot({ animations: 'disabled', caret: 'hide' })).toString('base64'); };
   const before = await shot();
@@ -59,6 +59,7 @@ try {
   assert.equal(await p.evaluate(() => document.documentElement.dataset.icons), undefined);
   { const now = await shot(); if (now !== before && process.env.SHOTS) { const fs = await import('node:fs'); fs.writeFileSync(process.env.SHOTS + '/a.png', Buffer.from(before, 'base64')); fs.writeFileSync(process.env.SHOTS + '/b.png', Buffer.from(now, 'base64')); } assert.ok(now === before, 'engine off: the same page as before'); }
   // an inspired theme brings its details along, and Undo takes them away
+  await p.evaluate(() => { location.hash = '#themes'; }); await p.locator('.theme-grid').nth(1).locator('.theme-card').first().waitFor();
   assert.equal(await p.locator('.theme-grid').nth(1).locator('.theme-card').count(), 8, 'eight Inspired themes on the page');
   assert.equal(await p.locator('.theme-list').count(), 0, 'no scrolling list on the Themes page');
   await p.locator('.theme-card', { hasText: 'Apple' }).click();

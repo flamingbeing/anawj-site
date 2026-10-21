@@ -2,7 +2,7 @@
 // Look settings (look-schema.js): one list of what every look setting may hold, used by bundled themes, saved themes,
 // themes files, settings files and theme links; and what stays when changing theme.
 import assert from 'node:assert/strict';
-import { LOOK, LOOK_KEYS, cleanLook, KEEP_GROUPS, keepGroups, keptKeys } from '../js/look-schema.js';
+import { LOOK, LOOK_KEYS, cleanLook, KEEP_GROUPS, keepGroups, keptKeys, THEME_CARDS, cardsOn } from '../js/look-schema.js';
 import { THEMES, THEME_KEYS, themeById, themePatch, themeState, checkTheme } from '../js/themes.js';
 import { lookOf, saveMine, minePatch, matchMine } from '../js/my-themes.js';
 import { readSettingsFile, SETTINGS_KIND } from '../js/settings-file.js';
@@ -58,3 +58,15 @@ assert.deepEqual([p.accent, p.rowLayout, p.wallpaper], ['#654321', 'chat', 'grid
 assert.equal(matchMine(saved, { ...mine, ...p }).name, 'Fake mine');
 assert.equal(matchMine(saved, { ...mine, ...p, themeKeep: [] }), null, 'nothing kept: every setting counts');
 console.log('look-schema keep when changing theme: ok');
+
+// Themes and Advanced theme settings (TE S2): every setting names a card, every card is on one page; the essentials
+// (themes, Keep, Your themes, light or dark, colour, background, wallpaper) on Themes, the rest on the Advanced page
+const cardIds = THEME_CARDS.map(([id]) => id);
+assert.equal(new Set(cardIds).size, cardIds.length, 'a card listed twice');
+for (const f of LOOK) assert.ok(cardIds.includes(f.section), `${f.key}: no card (section) on the Themes pages`);
+assert.deepEqual(cardsOn('themes'), ['themes', 'mine', 'colour', 'wallpaper']);
+const on = page => LOOK.filter(f => cardsOn(page).includes(f.section)).map(f => f.key);
+assert.deepEqual(on('themes'), ['accent', 'bgTint', 'wallpaper', 'wallDim']);
+for (const k of ['round', 'fontUi', 'ftGap', 'colours', 'navStyle', 'tabStyle', 'statusBar', 'iconTint', 'colourful', 'band']) assert.ok(on('themesadv').includes(k), k + ' not on Advanced');
+assert.deepEqual(on('access'), ['contrast']);
+console.log('look-schema theme pages: ok');

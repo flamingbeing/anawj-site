@@ -22,6 +22,12 @@ Read [theme-engine.md](theme-engine.md) and [the catalogue review](theme-catalog
   layout by default, fonts optional). Next, from the owner's feedback the same day: Themes page essentials vs an
   Advanced theme settings page; a full colour picker (the phone's own picker offers only a few colours); wallpaper
   that can actually be seen; then the palette resolver and colour roles below, with NUHS looking exactly as now.
+- 21 Oct 2026, TE S2: Themes keeps the essentials, the rest moved to Advanced theme settings (`#themesadv`), the split
+  driven by `THEME_CARDS` and a `section` per setting in `look-schema.js`; the colour sheet (grid of shades, hex,
+  Recent, the phone's picker last) replaces the phone's own picker; theme link format 3 (settings as steps from the one
+  before, grid colours as their place, snapped colours in 18 bits, white and black pre-sent, tab icons as list places,
+  6-bit names): a fully custom theme went from 178 to about 120 characters with the address. Format 2 links still open.
+  Next: TE S3, wallpaper that can be seen.
 
 ## Observed problems and recommended order
 

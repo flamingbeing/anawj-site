@@ -11,7 +11,7 @@ import { recentCount as snapRecent } from './logging.js';
 import { OPERATOR_HELP } from './search-ops.js';
 import { DEFAULT_ACCENT, cleanAccent, SWATCHES, COLOUR_TOKENS, cleanColours, colourPalette, colourChecks, checkColours } from './colors.js';
 import { THEMES, FEATURED, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, BANDS, HEAD_FONTS } from './themes.js';
-import { COLOURFUL, KEEP_GROUPS, keepGroups } from './look-schema.js';
+import { COLOURFUL, KEEP_GROUPS, keepGroups, cardsOn } from './look-schema.js';
 import { FACETS, FACET_GROUPS, facetDefault, FINE_TUNE, TUNE_KEYS, cleanTune, TAB_ICONS, cleanTabIcons, cleanTintStrength } from './theme-engine.js';
 import { WALLPAPERS, cleanWall, dimOf, DIM_MAX, savePhoto, getPhoto, deletePhoto, mainColour, colourAt } from './wallpaper.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS, HEAD_STYLES, mdDate, fileDate } from './markdown.js';
@@ -141,20 +141,18 @@ export function renderThemesAll() {
       } }, 'Suggest a theme')),
       help('Inspired by apps, brands and visual traditions: colours, surfaces, shapes and type.')));
 }
-export function renderThemes() {
-  const st = display(), { theme, custom } = themeState(st);
+// Themes (#themes) keeps the essentials; Advanced theme settings (#themesadv) the rest (TE S2, owner 21 Oct 2026).
+// Which card is on which page, in what order, is look-schema.js THEME_CARDS (each look setting names its card).
+function themeCards(st) {
+  const { theme, custom } = themeState(st);
   const set = (k, off = null) => v => applyDisplay(setDisplay({ [k]: v || off }));
   const look = (k, label, opts, dflt, line) => pick(label, opts, st[k] ?? dflt, v => applyDisplay(setDisplay({ [k]: v === dflt ? null : v })) || hooks.render(), line);
   // one theme-engine facet (theme-engine.js): a switch or a ✓ list; the default saves as null
   const facetRow = f => (f.bool ? toggle(f.label, st[f.key], v => { applyDisplay(setDisplay({ [f.key]: v || null })); hooks.render(); }, f.line)
     : look(f.key, f.label, f.choices, facetDefault(f), f.line));
   const facetsOf = g => FACETS.filter(f => f.group === g).map(facetRow);
-  return h('div', { class: 'set-page themes-page' },
-    displayPreview(),
-    // themes live in this browser only (owner, 20 Oct 2026): say so first, with Export to move them
-    h('p', { class: 'tip device-only', role: 'note', style: 'display:flex;align-items:center;gap:8px' }, h('span', { class: 'grow' }, 'Themes are kept on this device only.'),
-      h('button', { type: 'button', class: 'small', onclick: () => exportThemes(display()) }, 'Export…')),
-    h('section', { class: 'card' },
+  return {
+    themes: () => h('section', { class: 'card' },
       h('h2', {}, 'Themes'),
       h('p', { class: 'theme-now' }, 'Now: ', h('b', {}, matchMine(st.myThemes, st) && custom ? `${matchMine(st.myThemes, st).name} (yours)` : themeLabel(st))),
       help('A theme sets the colours, light or dark, corners, lines, fonts and spacing in one go. Change anything below afterwards; your changes stay.'),
@@ -165,21 +163,18 @@ export function renderThemes() {
       h('div', { class: 'theme-grid' }, FEATURED.map(id => themeCard(THEMES.find(t => t.id === id), theme, custom))),
       h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('a', { class: 'btn small', href: '#themesall' }, 'Browse all themes')),
       keepCard(st)),
-    myThemesCard(st, custom),
-    h('section', { class: 'card' },
+    mine: () => myThemesCard(st, custom),
+    colour: () => h('section', { class: 'card' },
       h('h2', {}, 'Colour and light'),
       pick('Light or dark', THEME_MODES, cachedTheme(), v => { applyTheme(v); setDisplay({ themeMode: null }); hooks.render(); }),
       nightPick(st),
       h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
       help('Pastels show as a soft tint, with a deeper shade for text and buttons so everything stays easy to read.'),
-      pick('Colourful', COLOURFUL, st.colourful === true ? 'tabs' : st.colourful || 'off', v => { applyDisplay(setDisplay({ colourful: v === 'off' ? null : v })); hooks.render(); },
-        'A colour for each tab.', 'With the default colour, the tabs follow the NUH stripe at the top: Add orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Background',
         h('select', { 'aria-label': 'Background', onchange: e => { applyDisplay(setDisplay({ bgTint: e.target.value === 'auto' ? null : e.target.value })); hooks.render(); } },
-          Object.entries(TINTS).map(([k, t]) => h('option', { value: k, selected: (st.bgTint || 'auto') === k }, t.label)))),
-      look('band', 'Top band', BANDS, 'theme', 'The four-colour strip along the top. NUHS keeps the NUH stripe; other themes bring their own.')),
-    wallpaperCard(st),
-    h('section', { class: 'card' },
+          Object.entries(TINTS).map(([k, t]) => h('option', { value: k, selected: (st.bgTint || 'auto') === k }, t.label))))),
+    wallpaper: () => wallpaperCard(st),
+    shape: () => h('section', { class: 'card' },
       h('h2', {}, 'Shape and type'),
       pick('Card style', CARD_STYLES, cardStyle(st), v => { applyDisplay(setDisplay(cardPatch(v))); hooks.render(); }, 'How cards and lists stand off the page. How strong the lines are: Line strength, just below.'),
       // the strength of the lines around cards, fields, buttons and chips (Flat, in Card style, hides them all)
@@ -197,8 +192,8 @@ export function renderThemes() {
       toggle('Icons instead of words on common buttons', st.iconBtns, set('iconBtns'), 'Share, Copy, Notes and Filter.', 'Each still says its name to screen readers, and on a computer when you point at it.'),
       toggle('Plain calendar', st.calPlain, set('calPlain'), 'Numbers with the count under them, no tiles.', 'Today in a coloured circle, the day you picked in a dark one.'),
       DEVICE_NOTE()),
-    fineTuneCard(st),
-    h('section', { class: 'card' },
+    tune: () => fineTuneCard(st),
+    header: () => h('section', { class: 'card' },
       h('h2', {}, 'Header and tab bar'),
       h('label', { class: 'field' }, 'Name in the header',
         h('input', { type: 'text', value: st.appTitle || '', placeholder: defaultTitle(), maxlength: '40', 'aria-label': 'Name in the header',
@@ -210,23 +205,50 @@ export function renderThemes() {
       toggle('Icons only in the tab bar', st.tabIcons, v => applyDisplay(setDisplay({ tabIcons: v }))),
       help('Where the tab bar sits and which tabs it shows: ', h('a', { href: '#layout' }, 'Layout'), '.'),
       DEVICE_NOTE()),
-    h('section', { class: 'card' },
+    rows: () => h('section', { class: 'card' },
       h('h2', {}, 'Rows and forms'),
       lookPick('navStyle', 'Navigation layout', NAV_STYLES, 'tabs', 'The rail appears above 900 px; smaller windows keep tabs.'),
       lookPick('rowLayout', 'Logbook row layout', ROW_LAYOUTS, 'card'),
       toggle('Shorter Logbook rows', rowLayoutOf(st) === 'compact', v => { applyDisplay(setDisplay({ rowShort: v, rowLayout: null })); hooks.render(); }, 'One line for the case, one grey line of tags, no buttons.', 'The initials and case in bold, the short date at the right. Tap a row to open it; press and hold (Layout) for Copy and Reflect.'),
       lookPick('formLayout', 'Case form layout', FORM_LAYOUTS, 'page'),
       DEVICE_NOTE()),
-    h('section', { class: 'card' },
+    details: () => h('section', { class: 'card' },
       h('h2', {}, 'App-style details'),
       help('Finer touches that make the logbook feel like other phone apps. Each is its own setting and off until you choose it.'),
       FACET_GROUPS.filter(([g, title]) => title).map(([g, title]) => [h('h3', {}, title), facetsOf(g), g === 'icons' ? iconExtras(st) : null]),
       DEVICE_NOTE()),
-    editColours(st),
-    customCssCard(),
-    resetLink('the theme and every look setting on this page (light, the NUHS colours, lines, corners, fonts, spacing, the header and custom CSS: switched off, your CSS is kept) on this device', () => {
-      applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'nightTheme', 'fontUiName', 'fontLogName', 'appTitle', 'hideHeader', 'customCssOn'].map(k => [k, null])) }));
-    }));
+    colours: () => h('section', { class: 'card' },
+      h('h2', {}, 'More colour'),
+      pick('Colourful', COLOURFUL, st.colourful === true ? 'tabs' : st.colourful || 'off', v => { applyDisplay(setDisplay({ colourful: v === 'off' ? null : v })); hooks.render(); },
+        'A colour for each tab.', 'With the default colour, the tabs follow the NUH stripe at the top: Add orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.'),
+      look('band', 'Top band', BANDS, 'theme', 'The four-colour strip along the top. NUHS keeps the NUH stripe; other themes bring their own.')),
+    edit: () => editColours(st),
+    css: () => customCssCard(),
+  };
+}
+const themesReset = () => resetLink('the theme and every look setting on Themes and Advanced theme settings (light, the NUHS colours, lines, corners, fonts, spacing, the header and custom CSS: switched off, your CSS is kept) on this device', () => {
+  applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'nightTheme', 'fontUiName', 'fontLogName', 'appTitle', 'hideHeader', 'customCssOn'].map(k => [k, null])) }));
+});
+export function renderThemes() {
+  const cards = themeCards(display());
+  return h('div', { class: 'set-page themes-page' },
+    displayPreview(),
+    // themes live in this browser only (owner, 20 Oct 2026): say so first, with Export to move them
+    h('p', { class: 'tip device-only', role: 'note', style: 'display:flex;align-items:center;gap:8px' }, h('span', { class: 'grow' }, 'Themes are kept on this device only.'),
+      h('button', { type: 'button', class: 'small', onclick: () => exportThemes(display()) }, 'Export…')),
+    cardsOn('themes').map(id => cards[id]()),
+    advancedLink('themesadv', 'Advanced theme settings', 'Shape and type, fine-tune, the header and tab bar, rows and forms, app-style details, more colour, edit colours, custom CSS'),
+    themesReset());
+}
+// Settings → Themes → Advanced theme settings (#themesadv)
+export function renderThemesAdv() {
+  const cards = themeCards(display());
+  return h('div', { class: 'set-page themes-page' },
+    displayPreview(),
+    h('p', { class: 'theme-now' }, 'Now: ', h('b', {}, themeLabel(display()))),
+    h('p', { class: 'hint', style: 'margin:0 0 10px' }, 'The finer parts of the look. A theme sets these too; a change here makes it Custom, to save under Your themes on ', h('a', { href: '#themes' }, 'Themes'), '.'),
+    cardsOn('themesadv').map(id => cards[id]()),
+    themesReset());
 }
 // Keep when changing theme (owner, 21 Oct 2026; look-schema.js KEEP_GROUPS): the settings that stay yours whichever
 // theme you pick, Your themes and the night theme included
@@ -307,7 +329,8 @@ function iconExtras(st) {
   return [
     h('div', { class: 'field', style: 'margin-top:10px' }, 'Icon tint',
       h('div', { class: 'bar', style: 'margin:4px 0 0' },
-        h('input', { type: 'color', value: tint || '#6d4fc2', 'aria-label': 'Icon tint colour', onchange: e => { applyDisplay(setDisplay({ iconTint: cleanAccent(e.target.value) })); hooks.render(); } }),
+        h('button', { type: 'button', class: 'swatch' + (tint ? ' on' : ''), style: `--sw:${tint || '#6d4fc2'}`, 'aria-label': 'Icon tint colour', title: tint || 'Off',
+          onclick: async () => { const c = await sheet({ title: 'Icon tint', value: tint || '#6d4fc2', shade: true, note: null }); if (c) { applyDisplay(setDisplay({ iconTint: c })); hooks.render(); } } }),
         tint ? h('button', { type: 'button', class: 'small linkish', onclick: () => { applyDisplay(setDisplay({ iconTint: null, iconTintStrength: null })); hooks.render(); } }, 'Off') : h('span', { class: 'hint', style: 'margin:0' }, 'Off')),
       help('One colour mixed into every icon (not the tab you’re on), as iPhone’s tinted icons. It is made deep or light enough to show in light and dark.')),
     tint ? h('div', { class: 'field', style: 'margin-top:6px' }, h('label', { class: 'field', style: 'margin:0' }, 'Tint strength',
@@ -354,14 +377,19 @@ function editColours(st) {
   const paint = () => {
     for (const mode of ['light', 'dark']) buttons[mode].setAttribute('aria-pressed', String(mode === side));
     const palette = colourPalette(state(), side, tint);
+    const sayFor = k => c => colourChecks({ ...st, colours: { ...draft, [side]: { ...draft[side], [k]: c } } }, tint).filter(p => p.side === side && (p.fg === k || p.bg === k))
+      .map(p => `${p.fg} on ${p.bg}: ${p.ratio.toFixed(2)}:1${p.ratio < 4.5 ? ' (needs 4.5:1)' : ''}`).join('; ') || 'Not checked for contrast.';
     fill(body, COLOUR_TOKENS.map(k => {
-      const picker = h('input', { type: 'color', value: palette[k], 'aria-label': `${side === 'light' ? 'Light' : 'Dark'} ${k}`, oninput: e => {
-        draft[side] = { ...draft[side], [k]: e.target.value }; reset.disabled = false; paintReport();
+      const name = `${side === 'light' ? 'Light' : 'Dark'} ${k}`;
+      const picker = h('button', { type: 'button', class: 'swatch token-swatch', style: `--sw:${palette[k]}`, 'aria-label': name, title: palette[k], onclick: async () => {
+        const c = await sheet({ title: name, value: palette[k], note: sayFor(k) });
+        if (!c) return;
+        draft[side] = { ...draft[side], [k]: c }; paint();
       } });
       const reset = h('button', { type: 'button', class: 'small', disabled: !draft[side]?.[k], 'aria-label': `Reset ${k}`, onclick: () => {
         delete draft[side][k]; draft = cleanColours(draft); paint();
       } }, 'Reset');
-      return h('div', { class: 'bar', style: 'margin:8px 0;justify-content:space-between' }, h('label', { class: 'bar' }, k, picker), reset);
+      return h('div', { class: 'bar', style: 'margin:8px 0;justify-content:space-between' }, h('span', { class: 'bar' }, picker, k, h('small', { class: 'hint', style: 'margin:0' }, palette[k])), reset);
     }));
     paintReport();
   };
@@ -587,8 +615,9 @@ function customCssCard() {
       h('p', { class: 'hint help', style: 'margin:6px 0 0' }, 'It never applies on this page, so you can always come back and fix it. If something goes wrong elsewhere, open the app with ?nocss at the end of the address. Saved on this device only; app updates can change the class names it relies on.')));
 }
 
-// any colour, straight from the device's own colour picker (owner, 13 Oct 2026: no preset swatches); Default goes
-// back to the app's navy
+// suggested colours, then More colours… (TE S2: the colour sheet, ui-colour-sheet.js, instead of the phone's own picker,
+// which shows only a few); Default goes back to the app's navy
+const sheet = opts => import('./ui-colour-sheet.js').then(m => m.colourSheet(opts));
 function accentPicker() {
   const cur = cleanAccent(display().accent) || DEFAULT_ACCENT;
   const set = c => { applyDisplay(setDisplay({ accent: c === DEFAULT_ACCENT ? null : c })); hooks.render(); };   // (also redoes the Colourful shades)
@@ -597,9 +626,9 @@ function accentPicker() {
     SWATCHES.map(([group, list]) => h('div', { class: 'swatch-row', role: 'group', 'aria-label': group }, h('span', { class: 'swatch-group' }, group),
       list.map(([c, name]) => h('button', { type: 'button', class: 'swatch', style: `--sw:${c}`, title: name, 'aria-label': name, 'aria-pressed': String(c === cur), onclick: () => set(c) })))),
     h('div', { class: 'swatch-row' }, h('span', { class: 'swatch-group' }, 'Your own'),
-      h('label', { class: 'swatch custom' + (known ? '' : ' on'), style: known ? '' : `--sw:${cur}`, title: 'Any colour' },
-        h('input', { type: 'color', class: 'accent-input', value: cur, 'aria-label': 'Custom colour', oninput: e => applyAccent(e.target.value), onchange: e => set(e.target.value) })),
-      h('span', { class: 'hint', style: 'margin:0' }, 'Custom…')));
+      h('button', { type: 'button', class: 'swatch custom' + (known ? '' : ' on'), style: known ? '' : `--sw:${cur}`, title: 'Any colour', 'aria-label': known ? 'More colours' : `More colours (now ${cur})`,
+        onclick: async () => { const c = await sheet({ title: 'Colour', value: cur, shade: true, onPreview: applyAccent }); if (c) set(c); } }),
+      h('span', { class: 'hint', style: 'margin:0' }, 'More colours…')));
 }
 
 // ---------- Markdown (Logbook: Copy on a case or a day, Share day; the notes export) ----------

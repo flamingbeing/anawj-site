@@ -108,7 +108,7 @@ const ICONS = {
   more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
 };
 // the Advanced pages (Settings menu) use their parent page's icon
-ICONS.layout = 'M3 4h18v16H3zM3 9h18M9 9v11'; ICONS.loggingadv = ICONS.logging;
+ICONS.layout = 'M3 4h18v16H3zM3 9h18M9 9v11'; ICONS.loggingadv = ICONS.logging; ICONS.themesadv = ICONS.themes;
 const icon = id => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'ico'); svg.setAttribute('aria-hidden', 'true');
@@ -144,6 +144,7 @@ const TABS = [
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
   { id: 'themes', label: 'Themes', render: page(['settings'], m => m.settings.renderThemes()), hidden: true, under: 'settings', unlisted: true, desc: 'Ready-made looks, colour, light or dark, fonts, spacing, the header, custom CSS' },
+  { id: 'themesadv', label: 'Advanced theme settings', render: page(['settings'], m => m.settings.renderThemesAdv()), hidden: true, under: 'themes', unlisted: true, desc: 'Shape and type, fine-tune, the header and tab bar, rows and forms, app-style details, more colour, edit colours, custom CSS' },
   { id: 'themesall', label: 'Browse all themes', render: page(['settings'], m => m.settings.renderThemesAll()), hidden: true, under: 'themes', unlisted: true, desc: 'Every theme, search, suggest a theme' },
   { id: 'access', label: 'Accessibility', render: page(['settings'], m => m.settings.renderAccessibility()), hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion' },
   { id: 'layout', label: 'Layout', render: page(['settings'], m => m.settings.renderLayout()), hidden: true, under: 'settings', unlisted: true, desc: 'The start tab, the tab bar, Logbook row buttons, page width, the Add tab, gestures' },
@@ -281,7 +282,7 @@ function installCard() {
 // Search in Settings (owner): the options of every settings page and its Advanced page, read from the pages
 // themselves (each is drawn once, off screen, the first time someone types), so the index never goes stale.
 // A result opens its page and scrolls to the option, which flashes.
-const SEARCH_PAGES = ['showhide', 'themes', 'layout', 'access', 'logging', 'loggingadv', 'tags', 'reflset', 'notesset', 'sharefmt', 'sendto', 'sync', 'account'];
+const SEARCH_PAGES = ['showhide', 'themes', 'themesadv', 'layout', 'access', 'logging', 'loggingadv', 'tags', 'reflset', 'notesset', 'sharefmt', 'sendto', 'sync', 'account'];
 const SEARCH_MODS = ['settings', 'send', 'sync', 'account'];   // the modules those pages are drawn from
 let settingsIndex = null, findAfterRender = '';
 const optionText = n => {
@@ -318,6 +319,7 @@ const searchSettings = (index, q) => {
   if (!words.length) return [];
   return index.filter(x => { const hay = (x.text + ' ' + x.hint + ' ' + x.page).toLowerCase(); return words.every(w => hay.includes(w)); }).slice(0, 12);
 };
+const SPILL = { themes: 'themesadv' };
 function showFound() {
   const want = findAfterRender; findAfterRender = '';
   // two frames on: changeScreen puts the new page at its top in the next frame, which would undo the scroll
@@ -325,6 +327,8 @@ function showFound() {
   requestAnimationFrame(() => requestAnimationFrame(function find() {
     if (sliding) { afterSlide = find; return; }
     const n = [...app.querySelectorAll('h2, h3, label.field, label.check, legend, summary')].find(x => optionText(x).replace(/\s+/g, ' ').startsWith(want.slice(0, 60)));
+    // a link from before an option moved to its page's Advanced page (Themes → Advanced theme settings, TE S2)
+    if (!n && SPILL[S.tab] && want) { findAfterRender = want; return go(SPILL[S.tab]); }
     if (!n) return;
     // a heading inside a card (h3) is found itself, not the whole card from its top
     const target = n.matches('h3') ? n : n.closest('fieldset, label, details, section') || n;
@@ -939,7 +943,7 @@ document.addEventListener('touchend', async e => {
 // its counts in place; other screens re-render when nothing is being edited (pendingRender: declared above render()).
 // Settings pages that show no case data: drawing them again would only throw away what is half filled in there (a
 // sync place being added, a search being typed)
-const CASE_FREE = new Set(['settings', 'showhide', 'themes', 'themesall', 'layout', 'access', 'logging', 'loggingadv', 'reflset', 'sendto', 'sync']);
+const CASE_FREE = new Set(['settings', 'showhide', 'themes', 'themesadv', 'themesall', 'layout', 'access', 'logging', 'loggingadv', 'reflset', 'sendto', 'sync']);
 hooks.casesChanged = () => {
   paintWho();
   if (S.tab === 'log') return logCasesChanged();
@@ -1339,7 +1343,7 @@ addEventListener('keydown', e => {
   e.preventDefault();   // instead of the browser's own zoom, so the setting and the screen agree
   const v = stepZoom(dir);
   toast(`Zoom ${Math.round(v * 100)}%`, { ms: 1200 });
-  if (S.tab === 'access' || S.tab === 'themes' || S.tab === 'themesall') render();
+  if (['access', 'themes', 'themesadv', 'themesall'].includes(S.tab)) render();
 });
 if (cachedCompact()) document.body.classList.add('compact');   // first paint; corrected once the logbook loads
 paintWho();

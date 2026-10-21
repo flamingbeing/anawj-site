@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import { THEMES } from '../js/themes.js';
 import { TAB_ICONS } from '../js/theme-engine.js';
-import { lookOf, cleanMine, saveMine, minePatch, matchMine, exportText, importText, MAX_MINE, FILE_KIND, themeLink, themeFromLink, LINK_KEYS, lookNow, nightRef } from '../js/my-themes.js';
+import { lookOf, cleanMine, saveMine, minePatch, matchMine, exportText, importText, MAX_MINE, FILE_KIND, themeLink, themeFromLink, LINK_KEYS, LINK_TABS, LINK_ICONS, KNOWN3, lookNow, nightRef } from '../js/my-themes.js';
+import { GRID, snap } from '../js/colour-grid.js';
 import { lookField } from '../js/look-schema.js';
 
 // every built-in theme's look survives the checks unchanged
@@ -73,7 +74,14 @@ const custom = { name: 'Fake fully custom', mode: 'auto', look: { ...THEMES[0].l
     dark: { bg: '#0b0e12', panel: '#161b22', ink: '#f0f3f6', muted: '#a8b3bf', line: '#2c333c', accent: '#7fb2ff', accentInk: '#000000' } } } };
 const customLink = themeLink(B, custom);
 assert.deepEqual(themeFromLink(hashOf(customLink)), { name: custom.name, mode: 'auto', look: lookOf(custom.look) });
-assert.ok(hashOf(customLink).length < 160, 'custom: ' + hashOf(customLink).length);
+assert.ok(hashOf(customLink).length < 115, 'custom: ' + hashOf(customLink).length);
+// format 3 (TE S2): colours picked in the app (snapped) make a fully custom theme about 120 characters with the address
+const snapAll = look => ({ ...look, accent: snap(look.accent), colours: Object.fromEntries(Object.entries(look.colours).map(([s, t]) => [s, Object.fromEntries(Object.entries(t).map(([k, c]) => [k, snap(c)]))])) });
+const snappedLink = themeLink('https://apmes.anawj.com/logbook/', { ...custom, name: 'Night shift', look: snapAll(custom.look) });
+assert.ok(snappedLink.length <= 120, 'snapped: ' + snappedLink.length);
+assert.deepEqual(themeFromLink(snappedLink.split('/logbook/')[1]).look, lookOf(snapAll(custom.look)), 'snapped colours arrive exactly');
+const gridLook = { accent: GRID[70].c, colours: { light: { bg: GRID[97].c, ink: GRID[103].c }, dark: { bg: GRID[103].c, accent: GRID[41].c } } };
+assert.deepEqual(themeFromLink(hashOf(themeLink(B, { name: 'Fake', look: gridLook }))).look, lookOf(gridLook));
 assert.deepEqual(themeFromLink(hashOf(link)), { name: 'Fake ishift/i', look: { accent: '#112233', spacing: 'roomy', fontUi: 'nunito' }, mode: 'dark' });
 // a bundled theme changed a little is written out in full, not as the theme plus changes, so editing that theme later
 // never changes what an old link shows
@@ -88,6 +96,12 @@ for (const [k, was] of Object.entries(fx.lists)) {
   if (Array.isArray(was)) assert.deepEqual(f.values.slice(0, was.length), was, `${k}: add new choices at the end only`);
   else assert.deepEqual({ min: f.min, step: f.step }, was, `${k}: keep its lowest value and step`);
 }
+assert.equal(KNOWN3, fx.format3.known);
+assert.deepEqual(LINK_KEYS.slice(0, KNOWN3).map(k => (k.includes('.') ? 'colour' : lookField(k).kind)), fx.format3.kinds, 'format 3: the first settings keep their kind');
+assert.deepEqual(GRID.map(x => x.c).slice(0, fx.format3.grid.length), fx.format3.grid, 'colour grid: add cells at the end only');
+assert.deepEqual(LINK_TABS.slice(0, fx.format3.tabs.length), fx.format3.tabs, 'LINK_TABS: add at the end only');
+assert.deepEqual(LINK_ICONS.slice(0, fx.format3.icons.length), fx.format3.icons, 'tab icons: add at the end only');
+assert.ok(fx.links.some(l => l.format === 3) && fx.links.some(l => !l.format), 'fixtures of both formats');
 for (const l of fx.links) assert.deepEqual(themeFromLink('#t=' + l.link), { name: l.name, look: l.look, ...(l.mode ? { mode: l.mode } : {}) }, l.link);
 // a setting or a value this phone doesn't know (a link from a newer app) is skipped, the rest kept
 const bitsLink = write => {
@@ -103,6 +117,13 @@ assert.deepEqual(themeFromLink(bitsLink((put, num, text) => {
   num(LINK_KEYS.indexOf('spacing')); put(0, 2); num(90);   // an unknown choice
   num(LINK_KEYS.indexOf('round')); put(0, 2); num(1);
 })), { name: 'Fake', look: { round: 1 } });
+// format 3 too: a setting past KNOWN3 says its kind, so one this phone doesn't know is skipped
+assert.deepEqual(themeFromLink(bitsLink((put, num, text) => {
+  put(3, 2); put(0, 1); put(0, 3); put(0, 1); put(1, 1); num(4); for (const c of 'Fake') put(' abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-'.indexOf(c), 6); num(2);
+  num(LINK_KEYS.indexOf('round')); num(1);
+  num(500); put(1, 2); put(0, 1); put(0, 18);   // an unknown colour setting
+})), { name: 'Fake', look: { round: 1 } });
+assert.throws(() => themeFromLink(bitsLink(put => { put(3, 2); put(1, 1); put(0, 8); })), /newer version/);
 // format 1 links (and the JSON #theme= ones before them) ask for a new one; a theme this app doesn't have says so
 const old = Buffer.from(hashOf(link).slice(3), 'base64url'); old[0] = (old[0] & 0x3f) | 0x40;
 assert.throws(() => themeFromLink('#t=' + old.toString('base64url')), /older version/);
