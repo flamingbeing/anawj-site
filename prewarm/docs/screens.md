@@ -10,6 +10,12 @@ How the patient screen, key times, sign-offs, forms and look work. Part of the n
   pre-warming temperatures. Start on a new patient opens it, in every group. The internal route stays `prewarm`.
 - **Email and PayNow** button under the Induction room tab's readings (owner, 21 Oct 2026): its own page; details in
   [sharing-and-sync.md](sharing-and-sync.md).
+- **New patient** (owner, 21 Oct 2026): Start needs the Subject ID and group. **Save draft** and **Patient declined**
+  need only the Subject ID (declined sets `consent_st` 0). **Share subject** / **Share to PACU** save a draft first, so a
+  case can be shared before it starts. A draft (no group, not declined) shows "Draft" with a dashed edge on the list and
+  reopens the form (`#/new/<id>`); it has no POD due lines.
+- **Home list order** (owner, 21 Oct 2026): by Subject ID, largest on top, numbers compared as numbers (S-10 above S-9).
+  "All but X (latest)" still means the latest edited.
 - **Consent** (owner, 21 Oct 2026): first on the Induction room tab (moved from Pre-op), `consent_st` (Extra sheet):
   1 = consented, duplicate form given to the patient; 0 = declined to participate. Shown in place of the comfort
   question until answered (one card tall, so Save stays on screen); once consented, the comfort question shows with

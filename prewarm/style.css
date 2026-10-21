@@ -253,6 +253,7 @@ body.ro main .k, body.ro main .num, body.ro main .chip, body.ro main .tchip, bod
 .list a.locked { background: var(--bg); border-style: dashed; color: var(--muted); }
 .list a.declined { background: var(--bg); color: var(--muted); border-left: 6px solid var(--muted); }
 .list a.declined b { color: var(--muted); text-decoration: line-through; }
+.list a.draft { border-left: 6px dashed var(--line); }
 .list .declline { color: var(--muted); font-style: italic; }
 .fld textarea { width: 100%; box-sizing: border-box; min-height: 84px; font: inherit; padding: 8px; border: 1px solid var(--line-input); border-radius: var(--r); resize: vertical; }
 .listhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }

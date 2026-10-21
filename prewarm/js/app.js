@@ -590,9 +590,11 @@ function setLock(ids, on) {
 let homeStop = null;
 function home() {
   header('Prewarming study' + (DEMO ? ' (demo)' : ''), null, `<a class="iconbtn" href="#/settings" aria-label="Settings">⚙</a>`);
-  const list = Object.values(patients).filter(p => !isGone(p)).sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created));
+  // largest Subject ID on top (owner, 21 Oct 2026), numbers compared as numbers (S-10 above S-9)
+  const all = Object.values(patients).filter(p => !isGone(p));
+  const list = [...all].sort((a, b) => String(val(b, 'enrol_id') ?? '').localeCompare(String(val(a, 'enrol_id') ?? ''), undefined, { numeric: true, sensitivity: 'base' }) || b.created - a.created);
   if (selecting && selMode === 'lock' && !canLock()) selecting = null;
-  const latest = list[0];
+  const latest = [...all].sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created))[0];
   paint(`
     ${settings.me && settings.site ? '' : `<div class="note">Add your ${settings.me ? '' : 'initials and '}hospital in <a href="#/settings">Settings</a>${settings.me ? '' : ' so each reading shows who entered it'}.</div>`}
     <div class="newrow"><button class="primary big" id="new">+ New patient</button><a class="secondary big" id="pacuview" href="#/pacu" title="Hand the phone to the PACU nurse: tapping a participant opens only their PACU page">PACU view</a></div>
@@ -614,7 +616,7 @@ function home() {
       // admins also get a shortcut to the patient's Form view on every line (owner, 13 Oct 2026)
       const formLink = canLock() ? `<a class="formlink" href="#/p/${p.id}/form" aria-label="Form view of ${esc(sidL(p))}" title="Form view">${FORM_ICON}</a>` : '';
       if (locked) return `<li${sa} class="${formLink ? 'rowact' : ''}"><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a>${formLink}</li>`;
-      return `<li${sa} class="${formLink ? 'rowact' : ''}"><a href="#/p/${p.id}"${declined(p) ? ' class="declined"' : ''}${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a>${formLink}</li>`;
+      return `<li${sa} class="${formLink ? 'rowact' : ''}"><a href="${isDraft(p) ? '#/new/' : '#/p/'}${p.id}"${declined(p) ? ' class="declined"' : isDraft(p) ? ' class="draft"' : ''}${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a>${formLink}</li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
     <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`}</p>${refreshHtml()}`);
   $('#psearch')?.addEventListener('input', e => { const q = e.target.value.trim().toLowerCase(); view.querySelectorAll('.list li[data-sid]').forEach(li => { li.hidden = !!q && !li.dataset.sid.includes(q); }); });
@@ -664,7 +666,7 @@ function home() {
 // chart-review days (14 Oct 2026): POD1 / POD2 are due the first and second calendar day after surgery, until their
 // Complete tick. Surgery date = the Surgery date field, else the day the patient was started on this phone.
 function podDays(p) {
-  if (isGone(p) || status(p) === 'Not started') return null;
+  if (isGone(p) || declined(p) || isDraft(p) || status(p) === 'Not started') return null;
   const od = val(p, 'op_date'), start = od && /^\d{4}-\d{2}-\d{2}$/.test(od) ? new Date(od + 'T00:00:00') : new Date(new Date(p.created || Date.now()).toDateString());
   return Math.round((new Date(new Date().toDateString()) - start) / 864e5);
 }
@@ -680,29 +682,58 @@ function status(p) {
   if (val(p, 'pacu_in')) return 'PACU';
   if (val(p, 'io_knife') || val(p, 'ev_ot')) return 'In OT';
   if (val(p, 'pw_start') || val(p, 'pw_gown')) return 'Pre-warming';
+  if (val(p, 'arm') == null) return 'Draft: group not chosen yet';
   return 'Not started';
 }
 
-route(/^\/new$/, () => {
-  header('New patient', '#/');
+// New patient (owner, 21 Oct 2026): Start needs the group; Save draft and Patient declined need only the Subject ID;
+// Share subject / Share to PACU save a draft first, so a case can be shared before it starts. A draft (no group, not
+// declined) opens here again from the list.
+const isDraft = p => val(p, 'arm') == null && !declined(p);
+route(/^\/new(?:\/(\w+))?$/, draftId => {
+  const draft = draftId ? patients[draftId] : null;
+  if (draftId && (!draft || !isDraft(draft))) return go(draft ? '#/p/' + draftId : '#/');
+  header(draft ? 'Draft: ' + sid(draft) : 'New patient', '#/');
   paint(`<form id="f" class="stack">
-    <label class="lab" for="sid">Subject ID</label><input id="sid" required autocomplete="off" autocapitalize="characters">
+    <label class="lab" for="sid">Subject ID</label><input id="sid" required autocomplete="off" autocapitalize="characters" value="${esc(draft ? val(draft, 'enrol_id') || '' : '')}">
     <span class="lab">Randomisation group</span>
     <div class="seg col">${GROUPS.map(([v, l]) => `<button type="button" class="chip" data-v="${v}">${l}</button>`).join('')}</div>
-    <p class="muted small">After this, the group shows only on the pre-warming screen.</p>
-    <button class="primary big" type="submit">Start</button></form>`);
+    <p class="muted small">After this, the group shows only on the Induction room tab.</p>
+    <button class="primary big" type="submit">Start</button>
+    <div class="sharerow"><button type="button" class="secondary" id="draft">Save draft</button><button type="button" class="secondary" id="declined">Patient declined</button></div>
+    <div class="sharerow caseshare"><button type="button" class="secondary" id="nshare">Share subject</button><button type="button" class="secondary" id="npacu">Share to PACU</button></div>
+    <small class="muted">Share before the case starts: the patient is saved as a draft first.</small></form>`);
   let arm = null;
   view.querySelectorAll('.seg .chip').forEach(b => b.onclick = () => { arm = +b.dataset.v; view.querySelectorAll('.seg .chip').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+  // the record for what is on screen (the draft, or a new one); null with a message when the Subject ID won't do
+  const save = () => {
+    const id = $('#sid').value.trim();
+    if (!id) { toast('Enter the Subject ID.'); return null; }
+    if (Object.values(patients).some(p => p !== draft && !isGone(p) && String(val(p, 'enrol_id')).toLowerCase() === id.toLowerCase())) { toast('That Subject ID is already on this phone.'); return null; }
+    const p = draft || newRecord();
+    if (!draft) { patients[p.id] = p; if (settings.site) set(p, 'site', settings.site); }
+    if (val(p, 'enrol_id') !== id) set(p, 'enrol_id', id);
+    if (arm) set(p, 'arm', arm);
+    saveAll();
+    return p;
+  };
   $('#f').onsubmit = e => {
     e.preventDefault();
-    const id = $('#sid').value.trim();
-    if (!id) return toast('Enter the Subject ID.');
+    if (!$('#sid').value.trim()) return toast('Enter the Subject ID.');
     if (!arm) return toast('Choose the randomisation group.');
-    if (Object.values(patients).some(p => !isGone(p) && String(val(p, 'enrol_id')).toLowerCase() === id.toLowerCase())) return toast('That Subject ID is already on this phone.');
-    const p = newRecord(); set(p, 'enrol_id', id); set(p, 'arm', arm); if (settings.site) set(p, 'site', settings.site); patients[p.id] = p; saveAll();
+    const p = save(); if (!p) return;
     // Start opens the Induction room tab for every group, no pre-warming too (owner, 21 Oct 2026)
     go('#/p/' + p.id + '/prewarm');
   };
+  $('#draft').onclick = () => { const p = save(); if (!p) return; toast(val(p, 'arm') == null ? 'Draft saved: tap it on the list to choose the group and start' : 'Saved'); go(val(p, 'arm') == null ? '#/' : '#/p/' + p.id + '/prewarm'); };
+  $('#declined').onclick = () => {
+    if (!$('#sid').value.trim()) return toast('Enter the Subject ID.');
+    if (!confirm(`Record ${$('#sid').value.trim()} as declined to participate?`)) return;
+    const p = save(); if (!p) return;
+    set(p, 'consent_st', 0); toast('Recorded as declined'); go('#/');
+  };
+  $('#nshare').onclick = () => { const p = save(); if (p) go(`#/p/${p.id}/share`); };
+  $('#npacu').onclick = () => { const p = save(); if (p) go(`#/p/${p.id}/pacushare`); };
 });
 
 // ---------- patient main screen: event times, temperatures, then links to the other forms in the order they are
@@ -2327,7 +2358,7 @@ route(/^\/open\/(\w+)$/, id => {
 });
 route(/^\/p\/(\w+)\/share$/, async id => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sidL(p) + ' · Share subject', '#/p/' + id);
+  header(sidL(p) + ' · Share subject', (isDraft(p) ? '#/new/' : '#/p/') + id);
   const box = body => paint(`<div class="paculink"><h2>Share subject</h2>${body}</div>`);
   if (!cloud.enabled) return box('<p class="muted small">Not available in demo mode.</p>');
   if (!sharing()) return box('<p class="muted small">Join your hospital’s team (Settings) to share a subject.</p>');
@@ -2355,7 +2386,7 @@ route(/^\/p\/(\w+)\/share$/, async id => {
 // Share to PACU: the PACU nurse link (it used to sit at the bottom of the PACU page)
 route(/^\/p\/(\w+)\/pacushare$/, id => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sidL(p) + ' · Share to PACU', '#/p/' + id);
+  header(sidL(p) + ' · Share to PACU', (isDraft(p) ? '#/new/' : '#/p/') + id);
   const draw = () => { paint(pacuLinkHtml(p)); };
   draw();
   view.onclick = e => {
