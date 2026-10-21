@@ -1,5 +1,5 @@
-// The privacy check before Send (edit/index.html, feedback/overlay.js and ask/index.html keep the same list, PRIVATE): what it flags
-// as possible patient details, what ordinary clinical wording it leaves alone, and that the two copies match.
+// The feedback button's privacy check before Send (feedback/overlay.js, PRIVATE; Ask Claude in the owner-tools repo keeps the
+// same list): what it flags as possible patient details and what ordinary clinical wording it leaves alone.
 // Run: node feedback/test/privacy.test.mjs
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -10,9 +10,7 @@ const src = f => {
   assert.ok(m, `${f}: PRIVATE list found`);
   return m[1].replace(/\s+/g, ' ');
 };
-const editor = src('edit/index.html'), button = src('feedback/overlay.js'), askPage = src('ask/index.html');
-assert.equal(editor, button, 'the editor and the feedback button check the same things');
-assert.equal(askPage, button, 'Ask Claude checks the same things');
+const button = src('feedback/overlay.js');
 const PRIVATE = eval(button);
 const flags = t => PRIVATE.filter(([re]) => re.test(t)).map(([, w]) => w);
 

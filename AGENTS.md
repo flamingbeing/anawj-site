@@ -2,84 +2,58 @@
 
 Instructions for every AI assistant working here (Claude Code reads this through `CLAUDE.md`).
 
-Static site on GitHub Pages plus one Cloudflare Worker for the subdomains. **Public repo: fake data only; no names,
-patient data, real evaluation data, secrets or tokens.** Anything private goes in the owner's private notes, not here
-(details in the owner's private notes); leave at most that pointer. Start with the app's `STATUS.md`, then `NOTES.md`.
+Static landing site on GitHub Pages (anawj.com) plus one Cloudflare Worker (`anawj-preview`) for design.anawj.com and
+the anaes.anawj.com forwards. **Public repo: fake data only; no names, patient data, secrets or tokens.** Anything
+private goes in the owner's private notes, not here; leave at most that pointer.
 
-| App | Folder | Host | Start with |
-|---|---|---|---|
-| APMES case logbook | `logbook/` (old copy) | `apmes.anawj.com/logbook/` (served from the `apmes` repo since 21 Oct 2026; this folder stays until removed) | the `apmes` repo |
-| APMES assessments (evals) | `evals/` (old copy) | `apmes.anawj.com/evals/` (served from the `apmes` repo since 21 Oct 2026; this folder stays until removed) | the `apmes` repo |
-| APMES People | `people/` (old copy) | `apmes.anawj.com/people/` (served from the `apmes` repo since 21 Oct 2026; this folder stays until removed) | the `apmes` repo |
-| Applicants feedback | `applicants/` (old copy) | `apmes.anawj.com/applicants/` (served from the `apmes` repo since 21 Oct 2026; this folder stays until removed) | the `apmes` repo |
-| CCC 360 | `360/` (old copy) | `apmes.anawj.com/360/` (served from the `apmes` repo since 21 Oct 2026; this folder stays until removed) | the `apmes` repo |
-| NUH daily roster | `nuh-roster/` | `nuhroster.anawj.com` | `NOTES.md` |
-| NTF monthly roster | `ntf-roster/` | `ntfroster.anawj.com` | `NOTES.md`, `SPEC.md` |
-| NUH junior monthly | `nuh-junior-monthly/` | `nuhjuniormonthly.anawj.com` | `NOTES.md` |
-| Prewarming study | `prewarm/` (old copy; the app now lives in repo `prewarm`) | `prewarmstudy.anawj.com` (served by repo `prewarm`) | `NOTES.md`, `PLAN.md` |
-| Hand surgery pages | `hand-babies/`, `hand-log/`, `cmcj/` | `hand.anawj.com` (served from the `hand` repo since 21 Oct 2026; these folders are old copies) | the `hand` repo |
-| Page editor | `edit/` | `anawj.com/edit/` | `edit/NOTES.md` |
-| Ask Claude | `ask/`, `worker/ask.js` | `ask.anawj.com` | `edit/NOTES.md` |
-| Programme documents | `apmes/` (old copy) | not served from here | the `apmes` repo |
-| Design tokens, app kit | `nuhsdesign/` | every host, `/nuhsdesign/` | `README.md` |
+Since the repo split (21 Oct 2026) every app lives in its own group repo with its own Worker; this repo keeps only:
 
-The BIS to DSA and OT simulators live in the anantf site repo (`NTF-Anaesthesia/anantf-site`); work on them there.
-Hosts: [SUBDOMAINS.md](SUBDOMAINS.md). Security: [OPERATIONS.md](OPERATIONS.md). Direction: [ROADMAP.md](ROADMAP.md).
+| What | Folder | Address |
+|---|---|---|
+| Home page (server up or down, no app links) | `index.html` | `anawj.com` |
+| Privacy page | `privacy/` | `anawj.com/privacy/` |
+| Old-address forwards | `<old folder>/index.html`, `404.html`, `moved.json` | `anawj.com/<old folder>/...` |
+| NUHS design kit | `nuhsdesign/` | `design.anawj.com/v1/` |
+| Feedback button | `feedback/` | `design.anawj.com/v1/feedback/` |
+| Site-wide session notes | `status/` | not served |
+
+Where the apps went (`moved.json` is the list the forwards use): `apmes` (logbook, evals, people, applicants, 360,
+programme documents; apmes.anawj.com), `rosters` (nuh-roster, ntf-roster, nuh-junior-monthly), `prewarm`
+(prewarmstudy.anawj.com), `hand` (hand.anawj.com: babies, handlog, cmcj), `owner-tools` (Ask Claude, ask.anawj.com).
+The page editor was retired on 21 Oct 2026 (owner); Ask Claude takes page-edit requests. The BIS to DSA and OT simulators
+live in the anantf site repo (`NTF-Anaesthesia/anantf-site`). Hosts: [SUBDOMAINS.md](SUBDOMAINS.md). Security:
+[OPERATIONS.md](OPERATIONS.md).
 
 ## Rules that bite
 
-- **Apps stay unlisted.** The homepage (`index.html`) only shows whether the server is up. Never link apps from it, and
-  give each app page `<meta name="robots" content="noindex, nofollow">` (GitHub Pages ignores `_headers`).
-- **Subdomains** (owner, 13 Oct 2026): an app that saves data or signs people in gets its own subdomain (apps sharing
-  data or sign-in share one, like `apmes.`, now served by the `apmes` repo); static pages share one by topic (`hand.`). Never put a data app on a
-  subdomain with apps it doesn't need to share with.
-- **Firestore rules deploy live on merge** (`deploy-firestore-rules.yml`; `logbook/firestore.rules` is no longer deployed from here: the `apmes` repo deploys it since 21 Oct 2026). Run `tools/test-rules.sh` (local emulator, never the live projects), merge
-  only when Checks are green, confirm the "Deploy Firestore rules" run, and report what the rules now allow or deny.
-  Never loosen rules on real-data collections to pass a test. A manual run deploys over live rules: ask the owner.
-  The workflow compiles the rules first, so a syntax error leaves the live rules as they were. A new Firestore-backed app
-  needs a matrix entry and paths filter in the workflow.
-- **Generated files:** `evals/js/catalogue.js` and `forms.js`. Edit `apmes/` or `evals/tools/build-data.mjs`, then run
-  `node evals/tools/build-data.mjs`.
-- **Service workers:** don't bump `sw.js` `VERSION` by hand. The deploy stamps it (`tools/stamp-versions.mjs`) as
-  `<app>-<date>-<hash>`; change the base (`logbook-v40`) only when the worker's own logic changes.
-- **App version lines:** every app with a service worker ends its settings screen (or footer) with small muted
-  `App version 2026-10-14 (3f9a2c1d)` (from its `<app>-` cache name) and a `Not updating? Get the latest version`
-  button: fetch `sw.js` with `cache: 'no-store'` first, then unregister only this app's worker, delete only `<app>-`
-  caches, reload. Never touch saved data or sign-in.
-- **PR titles** start with the app ("Logbook: …"); a workflow labels PRs by folder. One PR number sequence for all apps.
-- **Blocked by the cloud environment** (no Google Cloud sign-in, real documents, a secret)? Ask the owner to pass it to
-  the owner's private helper. No secrets or patient data in a request. Firebase and Cloudflare tools only with the
-  owner's approval in that session (`CLAUDE.md`).
-- **Vital apps** (`prewarm/`, live study data; `logbook/`): full tests before merging, and nothing
-  merged into prewarm while the owner says a case is being collected.
+- **The home page stays unlisted:** it only shows whether the server is up. Never link apps from it; every page has
+  `<meta name="robots" content="noindex, nofollow">` (GitHub Pages ignores `_headers`).
+- **The kit is shared:** other repos load `design.anawj.com/v1/`. Never break `/v1/`; a breaking change goes in `/v2/`
+  beside it (`worker/routes.js`).
+- **Forwards:** a moved folder keeps a small `index.html` that forwards (path, query and # kept), and `404.html` forwards
+  deeper old links using the same list. The logbook's forward first offers what a browser saved at the old address as a
+  settings file. Add a line to `moved.json` (and the `404.html` copy) when another address moves.
+- **New apps go in a group repo**, not here (the owner's plan; ask before adding an app folder).
+- **PR titles** start with the area ("Kit: …", "Landing: …").
+- **Previews are off** (`preview_urls: false`); check the Worker locally with `npx wrangler@4 dev --local`.
 
 ## Before merging
 
 GitHub runs these on every PR ("Checks"; red means don't merge). Merge your own PRs once they pass, by the number the
-PR creation returned (never a guess), and report with the link. Handover PRs wait for the owner's approval.
-Beta for the APMES apps now lives in the `apmes` repo (PREVIEWS.md, "Beta"); nothing here needs it. PRs merge once Checks pass.
+PR creation returned (never a guess), and report with the link.
 
 ```
 node tools/check.mjs
-for f in evals/test/*.test.mjs logbook/test/*.test.mjs nuh-roster/test/*.test.mjs ntf-roster/test/*.test.mjs prewarm/test/*.test.mjs people/test/*.test.mjs applicants/test/*.test.mjs 360/test/*.test.mjs worker/test/*.test.mjs feedback/test/*.test.mjs; do node "$f"; done
+for f in worker/test/*.test.mjs feedback/test/*.test.mjs; do node "$f"; done
+node tools/proofread.mjs
+node feedback/test/e2e.mjs   # needs checkouts of hand, rosters and prewarm beside this repo (SIBLINGS=<dir>)
 ```
-
-Per app, as well (only the touched app while iterating):
-
-- Logbook: `tools/test-logbook.sh` (`quick` skips the full e2e), plus `node logbook/test/e2e/a11y.mjs` after UI changes.
-- Rules: `tools/test-rules.sh`. Prewarm: `tools/test-prewarm.sh`. Evals UI: e2e in `evals/README.md`.
-- Each other app: its `test/e2e.mjs` (NTF roster also `tour.e2e.mjs`, `perf.e2e.mjs`; applicants and 360 also `model.test.mjs`).
-  Editor changes also run `node hand-babies/test/e2e.mjs`. New or moved pages: `node tools/proofread.mjs`.
 
 ## Showing and saving work
 
-- **Show it:** every PR that changes a page gets an automatic before-and-after screenshot comment; add
-  `Screens: /logbook/?demo#notes` to the PR body for more. Don't take or send your own screenshots or preview links
-  unless the owner asks ([PREVIEWS.md](PREVIEWS.md)). Previews can't sign in, by design.
-- **Build minutes are limited:** every push to a branch with a PR starts a Cloudflare build. Push once per finished
-  step, not to save work in progress.
-- **Status:** update the app's `STATUS.md` when a task finishes or a decision is made, and before compacting or ending
-  ([save-state skill](.agents/skills/save-state/SKILL.md)); edit only your own `<app>/status/<session>.md`. Lasting
+- **Build minutes are limited:** push once per finished step, not to save work in progress.
+- **Status:** update `STATUS.md` when a task finishes or a decision is made, and before compacting or ending
+  ([save-state skill](.agents/skills/save-state/SKILL.md)); edit only your own `status/<session>.md`. Lasting
   rules go in `NOTES.md`, or here if they apply to the whole repo.
 
 ## Claude Code–Codex handovers

@@ -2,113 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<script>
-// The app lives at hand.anawj.com/handlog/. The same folder is also served at anawj.com/hand-log/; send visitors on
-// from there (saved entries are per address, so everyone should use one). A no-op on hand.anawj.com, previews and
-// localhost.
-if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname))
-  location.replace('https://hand.anawj.com/handlog/' + location.pathname.replace(/^\/hand-log\/?/, '') + location.search + location.hash);
-</script>
-<meta name="theme-color" content="#f9f9fb">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Hand log">
-<title>Hand log</title>
-<meta name="description" content="Log hand surgery DOPS and Mini-CEX workplace-based assessments on your phone.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23002f6c'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EL%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="../nuhsdesign/tokens.css">
-<link rel="stylesheet" href="../nuhsdesign/app.css">
-<link rel="stylesheet" href="style.css">
-<script src="../nuhsdesign/app.js" defer></script>
+<title>This page has moved</title>
+<meta http-equiv="refresh" content="0; url=https://hand.anawj.com/handlog/">
+<script>location.replace("https://hand.anawj.com/handlog/" + location.search + location.hash);</script>
 </head>
-<body class="a-app">
-<header class="a-bar">
-  <div class="a-band" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-  <div class="a-bar-row">
-    <a class="a-bar-btn" id="bar-back" href="#list" aria-label="Back to entries"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Entries</a>
-    <span class="a-bar-title" id="bar-title" aria-hidden="true">Hand log</span>
-    <span></span>
-  </div>
-</header>
-<nav class="a-tabbar" aria-label="Sections">
-  <a href="#list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Entries</span></a>
-  <a href="#new-dops"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></svg><span>New DOPS</span></a>
-  <a href="#new-minicex"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M3 21c1-4 3.8-6 7-6 1.4 0 2.7.4 3.8 1.1M18 14v7M14.5 17.5h7"/></svg><span>New Mini-CEX</span></a>
-  <a href="#summary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Summary</span></a>
-</nav>
-<main id="main" class="a-main" tabindex="-1">
-  <section id="view-list" class="view" hidden>
-    <h1 class="a-title">Entries</h1>
-    <p id="empty" class="empty" hidden>No entries yet. Start a <a href="#new-dops">DOPS</a> or a <a href="#new-minicex">Mini-CEX</a>.</p>
-    <div class="big-add-row a-actions a-actions--row">
-      <a class="big-add a-btn" href="#new-dops"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>DOPS</a>
-      <a class="big-add a-btn a-btn--tinted" href="#new-minicex"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Mini-CEX</a>
-    </div>
-    <label for="list-filter" class="a-sr">Search entries</label>
-    <div class="a-search"><input id="list-filter" class="a-field" type="search" placeholder="Search entries" autocomplete="off"></div>
-    <ul id="entries" class="entries a-list"></ul>
-  </section>
-
-  <section id="view-form" class="view" hidden>
-    <h1 id="form-title" class="a-title">New entry</h1>
-    <p class="a-subtitle">Saved on this phone only. No patient names or identifiers, and no assessor full names.</p>
-    <form id="entry-form" novalidate>
-      <ul class="a-list fields">
-        <li class="field a-row"><label for="f-date">Date</label><input id="f-date" class="a-field" name="date" type="date" required></li>
-        <li class="field a-row stack"><label for="f-item" id="f-item-label">Procedure</label><select id="f-item" class="a-field" name="item" required></select></li>
-        <li class="field a-row stack"><label for="f-assessor">Assessor (role or initials)</label>
-          <input id="f-assessor" class="a-field" name="assessor" type="text" autocomplete="off" placeholder="e.g. Consultant, AB (no full names)"></li>
-        <li class="field a-row"><label for="f-setting">Setting</label>
-          <select id="f-setting" class="a-field" name="setting"><option>Clinic</option><option>OT</option><option>Ward</option><option>ED</option></select></li>
-        <li class="field a-row"><label for="f-complexity">Complexity</label>
-          <select id="f-complexity" class="a-field" name="complexity"><option>Low</option><option selected>Medium</option><option>High</option></select></li>
-      </ul>
-      <div id="domains"></div>
-      <ul class="a-list fields">
-        <li class="field a-row"><label for="f-global">Global rating</label><select id="f-global" class="a-field" name="global" required></select></li>
-      </ul>
-      <div class="field text"><label for="f-good" class="a-section">What went well</label><textarea id="f-good" class="a-field" name="good" rows="3"></textarea></div>
-      <div class="field text"><label for="f-improve" class="a-section">To improve</label><textarea id="f-improve" class="a-field" name="improve" rows="3"></textarea></div>
-      <div class="field text"><label for="f-action" class="a-section">Agreed action</label><textarea id="f-action" class="a-field" name="action" rows="3"></textarea></div>
-      <p id="form-error" class="error" role="alert"></p>
-      <button type="submit" class="btn primary a-btn a-btn--block">Save</button>
-    </form>
-  </section>
-
-  <section id="view-entry" class="view" hidden>
-    <h1 id="entry-title" class="a-title">Entry</h1>
-    <dl id="entry-detail" class="detail"></dl>
-    <div class="actions a-actions">
-      <button type="button" id="export-one" class="btn a-btn a-btn--tinted a-btn--block">Export CSV</button>
-      <button type="button" id="delete" class="btn danger a-btn a-btn--danger a-btn--block">Delete</button>
-    </div>
-  </section>
-
-  <section id="view-summary" class="view" hidden>
-    <h1 class="a-title">Summary</h1>
-    <h2 class="a-section">By type</h2>
-    <ul id="sum-type" class="counts a-list"></ul>
-    <h2 class="a-section">By procedure or case</h2>
-    <ul id="sum-item" class="counts a-list"></ul>
-    <h2 class="a-section">Export and backup</h2>
-    <div class="actions a-actions">
-      <button type="button" id="export-csv" class="btn primary a-btn a-btn--block">Export CSV</button>
-      <button type="button" id="export-json" class="btn a-btn a-btn--tinted a-btn--block">Back up (JSON)</button>
-    </div>
-    <ul class="a-list">
-      <li><label class="a-row restore" for="import-json"><span class="a-row-text">Restore from backup (JSON)</span><span class="a-chev" aria-hidden="true"></span></label>
-        <input id="import-json" class="a-sr" type="file" accept="application/json,.json"></li>
-    </ul>
-    <p id="import-msg" class="a-footnote" role="status"></p>
-    <div class="appinfo">
-      <p class="small" id="appver" hidden></p>
-      <p class="small"><button type="button" id="getlatest" class="linkbtn">Not updating? Get the latest version</button> <span id="getlatest-msg" role="status"></span></p>
-    </div>
-  </section>
-</main>
-<script type="module" src="js/app.js"></script>
+<body>
+<p>This page has moved to <a href="https://hand.anawj.com/handlog/">hand.anawj.com/handlog</a>.</p>
 </body>
 </html>

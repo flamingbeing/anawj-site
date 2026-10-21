@@ -12,13 +12,8 @@
 export const SITES = {
   // the anaesthesia teaching pages moved to anantf.com on 16 Oct 2026 (the BIS and OT simulators): old links forward
   'anaes.anawj.com': { moved: { '/bis/': 'https://anantf.com/bis/', '/ot/': 'https://anantf.com/ot/' } },
-  'nuhroster.anawj.com': { root: 'nuh-roster/' },
-  // NTF anaesthesia monthly duty roster (its own data, so its own host). /__/auth/ and /__/firebase/ are Firebase's
-  // sign-in helper pages on this host (authDomain ntfroster.anawj.com): ntf-auth/ holds its init.json.
-  'ntfroster.anawj.com': { root: 'ntf-roster/', prefixes: { '/__/auth/': '__/auth/', '/__/firebase/': 'ntf-auth/firebase/' } },
-  // NUH junior monthly roster helper (cardiac and ICU calls into the department's Google Sheet; its own data)
-  'nuhjuniormonthly.anawj.com': { root: 'nuh-junior-monthly/' },
-  // apmes.anawj.com and beta-apmes.anawj.com moved to the apmes repo (its own Workers) on 21 Oct 2026: not listed here.
+  // Every app moved to its own repo and Worker (repo split, 21 Oct 2026): apmes., beta-apmes., nuhroster., ntfroster.,
+  // nuhjuniormonthly., prewarmstudy., hand. and ask.anawj.com are not served from here any more.
   // The NUHS design kit for every app, also in other repos (repo split, 21 Oct 2026): /v1/ is nuhsdesign/ and
   // /v1/feedback/ the feedback button's script. Kit files carry a CORS header (kitCors), so pages on other hosts
   // can load them. A new kit version that breaks pages goes in /v2/ beside it; /v1/ stays as it is.

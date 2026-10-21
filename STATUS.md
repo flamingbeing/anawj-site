@@ -4,9 +4,14 @@ Site-wide work that belongs to no single app: the homepage, subdomains and hosti
 `STATUS.md`. Lasting rules go in `AGENTS.md`. "Recently done" is updated at save-state only. What is now, waiting, next
 and decided: details in the owner's private notes.
 
-Last updated: 2026-10-17.
+Last updated: 2026-10-21.
 
 ## Recently done
+
+- 21 Oct: **landing only** (repo split, last step): every app folder removed (they live in their group repos: apmes,
+  rosters, prewarm, hand, owner-tools); old `anawj.com/<folder>/` addresses forward to the new hosts (`moved.json`,
+  `404.html`); the Worker serves only design.anawj.com and the anaes forwards; previews off; the page editor retired;
+  the Firestore rules and PR-screenshot workflows removed (each group repo deploys its own rules).
 
 - 16 Oct: the **BIS to DSA and OT simulators moved to anantf.com** (`/bis/`, `/ot/`; NTF-Anaesthesia/anantf-site #130,
   with their own Checks). `anaes.anawj.com/bis/`, `/ot/` and `anawj.com/bis-dsa/`, `/ot-sim/` forward there.

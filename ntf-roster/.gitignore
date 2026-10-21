@@ -1,6 +1,0 @@
-# Real department sheets and exports must never be committed (real staff names).
-*.xlsx
-*.xls
-*.csv
-*.ics
-private/

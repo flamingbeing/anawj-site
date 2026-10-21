@@ -1,66 +1,14 @@
 <!doctype html>
-<html lang="en-GB">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>APMES Evals</title>
-<meta name="description" content="Request and complete DOPS, Mini-CEX and EBD workplace-based assessments.">
-<meta name="theme-color" content="#f9f9fb">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Evals">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<script>
-  // Firebase starts downloading at once rather than after the app's own files (cloud.js imports these;
-  // keep the version in step). Not in the demo, which never loads Firebase.
-  if (!/[?&]demo\b/.test(location.search)) ['app', 'auth', 'firestore'].forEach(function (n) {
-    var l = document.createElement('link'); l.rel = 'modulepreload'; l.crossOrigin = 'anonymous';
-    l.href = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-' + n + '.js'; document.head.appendChild(l);
-  });
-</script>
-<!-- the web font doesn't hold up the first paint (system font until it arrives) -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap"></noscript>
-<script>
-  // Evals now lives at apmes.anawj.com/evals/ (with the logbook: one sign-in). The same folder is still served at
-  // anawj.com/evals/, so send visitors on from there, path, query and # kept, so assessor links and "Assess me"
-  // QR codes keep working. Only when it is the top page, and a no-op on apmes.anawj.com, previews and localhost.
-  if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname)) location.replace('https://apmes.anawj.com' + location.pathname + location.search + location.hash);
-</script>
-<script>
-  // theme before the first paint (More → Settings → Theme; light unless chosen)
-  try { var t = localStorage.getItem('evals-theme'); if (t === 'auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light'; } catch (e) {}
-</script>
-<link rel="stylesheet" href="../nuhsdesign/tokens.css">
-<link rel="stylesheet" href="../nuhsdesign/app.css">
-<link rel="stylesheet" href="style.css">
-<script src="../nuhsdesign/app.js" defer></script>
+<title>This page has moved</title>
+<meta http-equiv="refresh" content="0; url=https://apmes.anawj.com/evals/">
+<script>location.replace("https://apmes.anawj.com/evals/" + location.search + location.hash);</script>
 </head>
-<body class="a-app">
-<header class="a-bar e-appbar">
-  <div class="a-band"><i></i><i></i><i></i><i></i></div>
-  <div class="a-bar-row">
-    <button type="button" id="back" class="a-bar-btn e-appbar__back" aria-label="Back" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span aria-hidden="true">Back</span></button>
-    <div class="e-appbar__titles">
-      <h1 id="title" class="a-bar-title e-appbar__title">APMES Evals</h1>
-      <p id="sub" class="e-appbar__sub" hidden></p>
-    </div>
-    <div id="me" class="e-appbar__right"></div>
-  </div>
-</header>
-
-<nav id="tabs" class="a-tabbar e-bottomnav" aria-label="Main" hidden></nav>
-<div id="banner" class="e-banners" hidden></div>
-<main id="app" class="a-main"><p class="e-loading">Loading…</p></main>
-<div id="toast" class="a-toast" role="status" aria-live="polite"></div>
-
-<script type="module" src="js/app.js"></script>
+<body>
+<p>This page has moved to <a href="https://apmes.anawj.com/evals/">apmes.anawj.com/evals</a>.</p>
 </body>
 </html>

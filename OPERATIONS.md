@@ -1,5 +1,8 @@
 # Operations
 
+> **Since 21 Oct 2026 (repo split):** the apps moved to their own repos and Workers; this repo is the landing site, the kit
+> at design.anawj.com/v1/ and the old-address forwards (AGENTS.md). Older text below describes the site before that.
+
 The principles behind the site's accounts and data. Account lists, costs, the pre-launch checklist and handover steps
 are in the owner's private notes; ask the owner. Keep this file free of account names, amounts and contact details.
 
