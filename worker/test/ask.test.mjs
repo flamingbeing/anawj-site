@@ -77,7 +77,7 @@ assert.deepEqual(await r.json(), { issue: 501, pr: 502, prUrl: 'https://github.c
   preview: 'https://page-edits-issue-501-anawj-preview.kohwenjun.workers.dev/_sites/hand.anawj.com/babies/' });
 assert.equal(previewOf('page-edits/issue-9', 'https://anawj.com/privacy/'), 'https://page-edits-issue-9-anawj-preview.kohwenjun.workers.dev/privacy/');
 
-// through the Worker: only ask.anawj.com/api/ask takes a POST; the page itself is served there
+// through the Worker: only ask.anawj.com/api/ask takes a POST (the page itself is served by owner-tools now)
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const ASSETS = { async fetch(rq) { const f = path.join(root, decodeURIComponent(new URL(rq.url).pathname));
   return fs.existsSync(f) && fs.statSync(f).isFile() ? new Response(fs.readFileSync(f), { headers: { 'Content-Type': 'text/html' } }) : new Response('nope', { status: 404 }); } };
@@ -85,8 +85,8 @@ r = await worker.fetch(new Request('https://ask.anawj.com/api/ask', { method: 'P
 assert.equal(r.status, 503, 'not set up without secrets');
 r = await worker.fetch(new Request('https://hand.anawj.com/api/ask', { method: 'POST', body: '{}' }), { ASSETS });
 assert.equal(r.status, 405, 'no API anywhere else');
-r = await worker.fetch(new Request('https://ask.anawj.com/'), { ASSETS });
-assert.equal(r.status, 200); assert.match(await r.text(), /<title>Ask Claude<\/title>/);
-r = await worker.fetch(new Request('https://ask.anawj.com/logbook/'), { ASSETS });
-assert.equal(r.status, 404, 'ask.anawj.com serves only its own page');
+r = await worker.fetch(new Request('https://prewarmstudy.anawj.com/'), { ASSETS });
+assert.equal(r.status, 200, 'a site host still serves its own page');
+r = await worker.fetch(new Request('https://prewarmstudy.anawj.com/logbook/'), { ASSETS });
+assert.equal(r.status, 404, 'a site host serves only its own folder');
 console.log('ask tests passed');
