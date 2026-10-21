@@ -8,7 +8,7 @@ How the patient screen, key times, sign-offs, forms and look work. Part of the n
   order they're filled in (BP/HR/BIS, intra-op details, PACU, satisfaction, form view).
 - **Induction room tab** (owner, 21 Oct 2026; was the Pre-warming tab): general induction-room things plus the
   pre-warming temperatures. Start on a new patient opens it, in every group. The internal route stays `prewarm`.
-- **Email and PayNow** button under the Induction room tab's readings (owner, 21 Oct 2026): its own page; details in
+- **Email and PayNow** button under consent on the Induction room tab (owner, 21 Oct 2026): its own page; details in
   [sharing-and-sync.md](sharing-and-sync.md).
 - **New patient** (owner, 21 Oct 2026): Start needs the Subject ID and group. **Save draft** and **Patient declined**
   need only the Subject ID (declined sets `consent_st` 0). **Share subject** / **Share to PACU** save a draft first, so a
@@ -110,12 +110,18 @@ How the patient screen, key times, sign-offs, forms and look work. Part of the n
   - Without an uploaded form (or not sharing), the Form view shows the older simple HTML version. Demo: choose a blank
     .docx on the Form view; it stays in that browser tab.
   - Subject ID: one character per box; longer IDs get the five boxes merged into one.
-- **Perioperative data split in three**: one row of three buttons on the patient screen: Pre-op
-  (`#/p/<id>/data`: Subject ID and group, pre-op, meds, bloods; tick `sign_periop`, label "Pre-op and patient
-  details"), POD1 (`/data/day1`: chart review, analgesia; `sign_pod1`) and POD2 (`/data/day2`: chart review,
-  analgesia, discharge; `sign_pod2`). Questions and order unchanged (`DATA_PARTS` in app.js). Each tick locks only
-  its page; "data collection complete" closes none of them. Progress ticks on the list and the export's "Complete: …"
-  columns (Extra sheet) have the three.
+- **Perioperative data in four parts**: on the patient screen Pre-op sits left of Intra-op details and PACU, and
+  POD1, POD2 and Discharge share the line under them (21 Oct 2026). Pre-op (`#/p/<id>/data`: Subject ID and group,
+  pre-op, meds, bloods; tick `sign_periop`, label "Pre-op and patient details"), POD1 (`/data/day1`: chart review,
+  analgesia; `sign_pod1`), POD2 (`/data/day2`: chart review, analgesia; `sign_pod2`) and Discharge (`/data/dc`;
+  `sign_dc`, split from POD2 on 21 Oct 2026: patients whose POD2 was ticked before then show Discharge unticked).
+  Every section starts open. Questions and order unchanged (`DATA_PARTS` in app.js). Each tick locks only its page;
+  "data collection complete" closes none of them. Progress ticks on the list and the export's "Complete: …" columns
+  (Extra sheet) have all four.
+- **Thermal Sensation Scale**: the study's original table (scale, words, comments) sits under Save on a pre-warming
+  reading, the picked row marked; under Save so Save stays on a phone screen.
+- **Email and PayNow** button: under the consent line on the Induction room tab, once consent and the before-surgery
+  comfort question are answered.
 - **Read only hides empty timepoints**: once a section is marked complete (or data collection is),
   `pointsFor` shows only the timepoints that have a time or a reading (all, if none has), so no time is offered for
   logging and the strip has no empty tabs; opening a hidden one goes to the default point. The bottom of Settings and

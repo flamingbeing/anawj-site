@@ -603,8 +603,16 @@ button.scst-retake { width: 100%; min-height: var(--tap); margin-top: 4px; backg
   .sirow > .sicrop { grid-column: 1; grid-row: 1 / span 6; align-items: start; }
 }
 /* Email and PayNow (js/pay.js) */
-.paybtn { flex-direction: column; gap: 0; margin-top: 8px; }
-.paybtn small { color: var(--muted); font-size: 12px; }
+.paybtn { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; min-height: 40px; padding: 4px 10px;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); color: var(--navy); font-weight: 600; font-size: 14px; text-decoration: none; }
+.paybtn small { color: var(--muted); font-weight: 400; font-size: 12px; }
+/* the original Thermal Sensation Scale under its chips */
+.tsscale { grid-column: 1 / -1; width: 100%; border-collapse: collapse; font-size: 12px; line-height: 1.3; color: var(--ink); }
+.tsscale caption { font-weight: 600; font-size: 12px; text-align: left; padding: 2px 4px; color: var(--navy); }
+.tsscale th { font-weight: 600; text-align: left; border-bottom: 1px solid var(--line); padding: 1px 4px; }
+.tsscale td { border-bottom: 1px solid var(--line); padding: 1px 4px; }
+.tsscale td:first-child { width: 2.2em; text-align: right; font-variant-numeric: tabular-nums; }
+.tsscale tr.on td { background: var(--soft); font-weight: 600; }
 .paylist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .paylist h3 { margin: 0 0 4px; }
 .payids { display: grid; gap: 2px; margin: 0 0 6px; word-break: break-all; }

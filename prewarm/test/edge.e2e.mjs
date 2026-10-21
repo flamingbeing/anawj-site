@@ -209,7 +209,7 @@ jobs.push(() => tryit(async () => {
 jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
-  await pg.click('#haemolink'); await pg.click('.links.three a:has-text("Pre-op")'); await pg.click('details.sect[data-pg="study"] summary'); await pg.waitForSelector('#f-enrol_id');
+  await pg.click('#haemolink'); await pg.click('.links.three a:has-text("Pre-op")'); await pg.waitForSelector('#f-enrol_id');
   await pg.fill('#f-enrol_id', 'DEMO-02'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(200);
   log(/already used/.test(await pg.textContent('#toast')) && await pg.inputValue('#f-enrol_id') === 'DEMO-01', 'duplicate Subject ID refused');
   await pg.fill('#f-enrol_id', 'DEMO-01A'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(200);
@@ -651,7 +651,7 @@ jobs.push(() => tryit(async () => {
   const id = (await pg.evaluate(() => location.hash)).split('/')[2];
   const prog = async () => { await pg.evaluate(() => { location.hash = '#/'; }); await pg.waitForSelector('.list .progress'); return pg.$$eval(`.list a[href$="/${id}"] .progress > span`, as => as.map(a => (a.classList.contains('on') ? '+' : '-') + a.textContent.trim()).join('|')); };
   const back = async (h = '') => { await pg.evaluate(x => { location.hash = x; }, `#/p/${id}${h}`); await pg.waitForTimeout(500); };
-  log((await prog()).split('|').length === 8 && !(await prog()).includes('+'), 'list shows eight sections, none complete yet: ' + await prog());
+  log((await prog()).split('|').length === 9 && !(await prog()).includes('+'), 'list shows nine sections, none complete yet: ' + await prog());
   await back(); log(await pg.$('.progress') === null, 'no extra tick boxes on the patient page');
   await pg.click('[data-sign="iotemp"]'); await pg.waitForTimeout(300);
   log(/\+✓Intra-op temps/.test(await prog()), 'a section marked complete shows its tick on the list');
