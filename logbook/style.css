@@ -1849,15 +1849,35 @@ html.form-sections .case-section .lp-left, html.form-sections .case-section .lp-
 html:is(.rows-chat, .rows-timeline) ul.cases li[data-date]:hover { background: var(--row-alt); }
 html:is(.rows-chat, .rows-timeline) ul.cases li.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
-/* Wallpaper (Settings → Themes → Wallpaper; theme-revamp S4, wallpaper.js): behind every page, under solid cards.
+/* Wallpaper (Settings → Themes → Wallpaper; theme-revamp S4, wallpaper.js): behind every page, under the cards.
    ::before is the picture (--wall: a pattern from the look's style sheet, or the photo set by display.js), ::after the
-   page colour over it at --wall-dim, which display.js keeps high enough for text on the page to stay at 4.5:1. */
+   page colour over it at --wall-dim, as dim as you chose (TE S3). */
 html.wall { background: var(--bg); }
 html.wall body { background: transparent; }
 html.wall::before, html.wall::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; }
 html.wall::before { background-image: var(--wall, none); background-size: var(--wall-size, cover); background-repeat: var(--wall-repeat, no-repeat); background-position: center; }
 html.wall::after { background: var(--bg); opacity: var(--wall-dim, 0); }
 @media print { html.wall::before, html.wall::after { display: none; } }
+/* Text on the bare page (hints and lines between cards, the version line) has its own backing of the page colour at
+   --wall-scrim, which display.js makes just enough for 4.5:1 over the picture, so the picture needn't be dimmed for
+   it. A box-shadow spread widens it without moving the text. */
+html.wall #app > :is(p, label, h2, h3),
+html.wall #app > :not(section, details, dialog, .card) > :is(p, label, h2, h3, h4),
+html.wall #app > :not(section, details, dialog, .card) > details:not(.card) > summary,
+html.wall #app .fine-print p {
+  --scrim: color-mix(in srgb, var(--bg) var(--wall-scrim, 0%), transparent);
+  background-color: var(--scrim); box-shadow: 0 0 0 5px var(--scrim); border-radius: calc(6px * var(--round, 1));
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
+/* See-through cards (TE S3, wallFrost): the card colour at --card-alpha (80% or more, enough for 4.5:1 over the
+   picture) with the picture blurred behind; solid where the browser can't blur. Not with Flat (no cards). */
+html.wall.wall-frost:not(.flat) :is(section.card, details.card):not(.admin-card) {
+  background-color: color-mix(in srgb, var(--panel) var(--card-alpha, 100%), transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html.wall.wall-frost :is(section.card, details.card):not(.admin-card) { background-color: var(--panel); }
+}
 /* the photo in Settings: tap it to take a colour */
 .wall-thumb { display: block; max-width: 100%; max-height: 180px; margin-top: 8px; border-radius: calc(8px * var(--round, 1)); border: 1px solid var(--line); cursor: crosshair; touch-action: manipulation; }
 .tab-icon-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }

@@ -100,7 +100,9 @@ const MAX_LINK = 2000;
 const bytesOf = str => Uint8Array.from(atob(str.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 const b64uOf = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const SIDES = ['light', 'dark'];
-export const LINK_KEYS = [...LOOK.filter(f => f.kind !== 'colours').map(f => f.key), ...SIDES.flatMap(s => COLOUR_TOKENS.map(k => `${s}.${k}`))];
+// (settings added to the look after tabIcon, from TE S3, come after the colour tokens, so older places never move)
+const LATE = LOOK.findIndex(f => f.key === 'tabIcon') + 1;
+export const LINK_KEYS = [...LOOK.slice(0, LATE).filter(f => f.kind !== 'colours').map(f => f.key), ...SIDES.flatMap(s => COLOUR_TOKENS.map(k => `${s}.${k}`)), ...LOOK.slice(LATE).map(f => f.key)];
 class Bits {
   constructor(bytes) { this.b = bytes ? [...bytes].flatMap(x => [7, 6, 5, 4, 3, 2, 1, 0].map(i => (x >> i) & 1)) : []; this.i = 0; }
   put(v, n) { for (let i = n - 1; i >= 0; i--) this.b.push(Math.floor(v / 2 ** i) % 2); }

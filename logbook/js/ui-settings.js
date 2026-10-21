@@ -13,7 +13,7 @@ import { DEFAULT_ACCENT, cleanAccent, SWATCHES, COLOUR_TOKENS, cleanColours, col
 import { THEMES, FEATURED, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, BANDS, HEAD_FONTS } from './themes.js';
 import { COLOURFUL, KEEP_GROUPS, keepGroups, cardsOn } from './look-schema.js';
 import { FACETS, FACET_GROUPS, facetDefault, FINE_TUNE, TUNE_KEYS, cleanTune, TAB_ICONS, cleanTabIcons, cleanTintStrength } from './theme-engine.js';
-import { WALLPAPERS, cleanWall, dimOf, DIM_MAX, savePhoto, getPhoto, deletePhoto, mainColour, colourAt } from './wallpaper.js';
+import { WALLPAPERS, cleanWall, dimOf, DIM_MAX, inkOf, INK_MIN, INK_MAX, INK_STEP, savePhoto, getPhoto, deletePhoto, mainColour, colourAt } from './wallpaper.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS, HEAD_STYLES, mdDate, fileDate } from './markdown.js';
 import { checkCss } from './custom-css.js';
 import { cleanMine, saveMine, minePatch, matchMine, exportText, importText, lookOf, nightRef } from './my-themes.js';
@@ -277,15 +277,20 @@ function nightPick(st) {
       : help('By day, the look set on this page; when the phone turns dark, this theme.'),
   ];
 }
-// Wallpaper (theme-revamp S4; wallpaper.js): a pattern or your own photo behind every page, and how much the page
-// colour dims it. The photo stays on this device; tap it to take a colour from it (or its main colour) for the accent.
+// Wallpaper (theme-revamp S4; wallpaper.js): a pattern or your own photo behind every page, how much the page colour
+// dims it, how strong a pattern is and see-through cards (TE S3). The photo stays on this device; tap it to take a
+// colour from it (or its main colour) for the accent.
 function wallpaperCard(st) {
   const w = cleanWall(st.wallpaper) || 'none';
-  const say = () => { const { dim, floor } = wallDim(); const n = Math.round(dim * 100);
-    return Math.round(floor * 100) > dimOf(display()) ? `${n}% (raised so text stays easy to read${floor >= 0.9 ? '; this picture is too busy to show much' : ''})` : `${n}%`; };
+  const say = () => { const { dim, scrim } = wallDim(); const n = Math.round(dim * 100), raised = n > dimOf(display());
+    return raised ? `${n}% (raised so text stays easy to read: Flat cards put text on the picture)` : `${n}%${scrim > 0 ? '. Text between cards gets a soft backing.' : ''}`; };
   const note = h('span', { class: 'hint', style: 'margin:0', 'aria-live': 'polite' }, say());
   const dim = h('input', { type: 'range', min: '0', max: String(DIM_MAX), step: '5', value: String(dimOf(st)), 'aria-label': 'Dim the wallpaper', 'aria-valuetext': `${dimOf(st)}%`,
     oninput: e => { const v = Number(e.target.value); e.target.setAttribute('aria-valuetext', `${v}%`); applyWallpaper(setDisplay({ wallDim: v })); note.textContent = say(); } });
+  const inkSay = v => `${Math.round((v - INK_MIN) / INK_STEP) + 1} of ${(INK_MAX - INK_MIN) / INK_STEP + 1}`;
+  const inkNote = h('span', { class: 'hint', style: 'margin:0', 'aria-live': 'polite' }, inkSay(inkOf(st)));
+  const ink = h('input', { type: 'range', min: String(INK_MIN), max: String(INK_MAX), step: String(INK_STEP), value: String(inkOf(st)), 'aria-label': 'Pattern strength', 'aria-valuetext': inkSay(inkOf(st)),
+    oninput: e => { const v = Number(e.target.value); e.target.setAttribute('aria-valuetext', inkSay(v)); inkNote.textContent = inkSay(v); applyThemeLook(setDisplay({ wallInk: v === INK_MIN ? null : v })); applyWallpaper(); note.textContent = say(); } });
   const thumb = h('img', { class: 'wall-thumb', alt: 'Your wallpaper photo. Tap it to use a colour from it.', hidden: true });
   const fileNote = h('span', { class: 'hint' });
   const useColour = (c, how) => { if (!c) return toast('No clear colour there'); applyDisplay(setDisplay({ accent: c === DEFAULT_ACCENT ? null : c })); toast(`Colour ${how}: ${c}`); hooks.render(); };
@@ -309,10 +314,13 @@ function wallpaperCard(st) {
   return h('section', { class: 'card wallpaper' },
     h('h2', {}, 'Wallpaper'),
     pick('Wallpaper', WALLPAPERS, w, v => { applyDisplay(setDisplay({ wallpaper: v === 'none' ? null : v })); hooks.render(); },
-      'Behind every page. Cards stay solid, so what’s in them reads as before.'),
+      'Behind every page. Cards stay solid unless you make them see-through below.'),
     photoRow,
     h('div', { class: 'field', style: 'margin-top:10px', hidden: w === 'none' }, h('label', { class: 'field', style: 'margin:0' }, 'Dim', dim), note,
-      help('The page colour laid over the wallpaper. It goes up by itself when the picture would make text on the page hard to read.')),
+      help('The page colour laid over the wallpaper. Text between cards gets its own soft backing when the picture would make it hard to read.')),
+    h('div', { class: 'field', style: 'margin-top:10px', hidden: w === 'none' || w === 'photo' }, h('label', { class: 'field', style: 'margin:0' }, 'Pattern strength', ink), inkNote),
+    h('div', { hidden: w === 'none' }, toggle('See-through cards', st.wallFrost, on => { applyWallpaper(setDisplay({ wallFrost: on || null })); note.textContent = say(); },
+      'Cards let the wallpaper show through, softly blurred. They stay solid enough to read, and solid on phones that can’t blur.')),
     DEVICE_NOTE());
 }
 // Icons (App-style details; theme-revamp S4): a tint for every icon and an icon of your choice for each tab

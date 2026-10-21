@@ -27,7 +27,7 @@ const strs = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string').map(x
 const OBJECTS = {
   // look settings a theme may hold: only the values the Themes page can show (look-schema.js; a wallpaper photo never
   // leaves its device), and which of them stay when changing theme
-  ...Object.fromEntries(['navStyle', 'rowLayout', 'formLayout', 'colours', ...FACET_KEYS, ...TUNE_KEYS, 'wallpaper', 'wallDim', 'iconTint', 'iconTintStrength', 'tabIcon'].map(k => [k, v => cleanLook(k, v)])),
+  ...Object.fromEntries(['navStyle', 'rowLayout', 'formLayout', 'colours', ...FACET_KEYS, ...TUNE_KEYS, 'wallpaper', 'wallDim', 'wallInk', 'wallFrost', 'iconTint', 'iconTintStrength', 'tabIcon'].map(k => [k, v => cleanLook(k, v)])),
   themeKeep: v => (Array.isArray(v) ? KEEP_GROUPS.map(([g]) => g).filter(g => v.includes(g)) : null),
   // the theme when the phone is dark (a theme's id or 'mine:<id>'), case text size (theme-revamp S5)
   nightTheme: v => (typeof v === 'string' && /^(mine:)?[a-z0-9]{1,20}$/.test(v) ? v : null),

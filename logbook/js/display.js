@@ -9,7 +9,7 @@ import { lookNow, nightRef } from './my-themes.js';
 import { cleanFacet, foldCompact } from './theme-engine.js';
 import { checkCss } from './custom-css.js';
 import { applyFonts } from './fonts.js';
-import { cleanWall, dimOf, minDim, patternSamples, cssHex, getPhoto } from './wallpaper.js';
+import { cleanWall, dimOf, minDim, patternSamples, inkOf, scrimFor, frostAlpha, cssHex, getPhoto } from './wallpaper.js';
 import { rowLayoutOf } from './device-presets.js';
 import { LINE_HEIGHTS, CONTRASTS, BUTTON_STYLES, BORDERS, ROUNDS } from './look-schema.js';
 export { LINE_HEIGHTS, CONTRASTS, BUTTON_STYLES, BORDERS, ROUNDS };   // (look-schema.js: with the values a theme may hold)
@@ -105,7 +105,7 @@ export const DISPLAY_KEYS = ['colours', 'listHeight', 'myThemes', 'pageSize', 'l
   'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band', 'barBlur', 'tabActiveLabel', 'listStyle', 'titleAlign', 'switchStyle', 'pressStyle', 'iconWeight', 'typeStyle',
   'statusBar', 'headerStyle', 'tabIconFill', 'iconSet', 'pageMotion', 'sheetStyle', 'toastStyle', 'fieldStyle', 'checkStyle', 'headingTone', 'tabTone',
   'ftBtn', 'ftGap', 'ftLine', 'ftShadow', 'ftCases', 'ftDays', 'ftLetter', 'ftWeight',
-  'wallpaper', 'wallDim', 'iconTint', 'iconTintStrength', 'tabIcon', 'nightTheme', 'caseSize', 'themeKeep'];
+  'wallpaper', 'wallDim', 'iconTint', 'iconTintStrength', 'tabIcon', 'nightTheme', 'caseSize', 'themeKeep', 'wallInk', 'wallFrost'];
 // (the last lines: Fine-tune, theme-engine.js TUNE_KEYS; wallpaper.js and the icon tint, theme-revamp S4; the theme when
 // the phone is dark, my-themes.js lookNow, and case text size, theme-revamp S5; what stays when changing theme, look-schema.js)
 export function deviceDisplay() {
@@ -156,8 +156,10 @@ export function applyDisplay(d = display()) {
 
 // Wallpaper (Themes → Wallpaper; wallpaper.js): <html class="wall"> turns on style.css's two layers behind the page,
 // the picture (a pattern's from the look's style sheet, the photo's from IndexedDB as --wall here) and the dim
-// (--wall-dim: the page colour over it). The dim never goes under the floor that keeps text on the page at 4.5:1 with
-// the colours in use now, so it is worked out again when light, dark, the colour or the photo changes.
+// (--wall-dim: the page colour over it). Text on the bare page gets its own backing (--wall-scrim) that reaches the
+// floor keeping it at 4.5:1 with the colours in use now; see-through cards (wall-frost) cover the picture with the
+// card colour at --card-alpha. Both are worked out again when light, dark, the colour or the photo changes. Flat
+// cards have no card behind their text, so there the whole dim still goes up to the floor.
 let photo = { rec: null, url: '' }, photoWanted = false;
 export function applyWallpaper(d = display()) {
   if (typeof document === 'undefined') return;
@@ -186,26 +188,33 @@ function showPhoto() {
   const s = document.documentElement.style;
   s.setProperty('--wall', `url("${photo.url}")`); s.setProperty('--wall-size', 'cover'); s.setProperty('--wall-repeat', 'no-repeat');
 }
-// the colours text on the page uses now, as #rrggbb (null if one can't be read)
+// the colours text on the page uses now, and the card colour, as #rrggbb (null if one can't be read)
 export function pagePalette() {
   const cs = getComputedStyle(document.documentElement);
-  const pal = Object.fromEntries(['bg', 'ink', 'muted', 'accent'].map(k => [k, cssHex(cs.getPropertyValue('--' + k))]));
+  const pal = Object.fromEntries(['bg', 'panel', 'ink', 'muted', 'accent'].map(k => [k, cssHex(cs.getPropertyValue('--' + k))]));
   return Object.values(pal).every(Boolean) ? pal : null;
 }
-// the dim to use (0 to 1): the chosen one, or the floor if that is higher -> { dim, floor }
+// what to paint (0 to 1) -> { dim: the page colour over the picture, floor: what text on the bare page needs, scrim:
+// the backing that text gets, frost: the card colour over the picture (see-through cards; 1 when off) }
 export function wallDim(d = display()) {
   const w = cleanWall(d.wallpaper), pal = w && pagePalette();
-  const samples = w === 'photo' ? photo.rec?.samples || [] : w ? patternSamples(w, pal || {}) : [];
+  const samples = w === 'photo' ? photo.rec?.samples || [] : w ? patternSamples(w, pal || {}, inkOf(d)) : [];
   const floor = pal && samples.length ? minDim(samples, pal) : 0;
-  return { dim: Math.max(dimOf(d) / 100, floor), floor };
+  const dim = d.flat ? Math.max(dimOf(d) / 100, floor) : dimOf(d) / 100;
+  const frost = d.wallFrost && !d.flat ? (pal ? frostAlpha(samples, dim, pal) : 1) : 1;
+  return { dim, floor, scrim: scrimFor(floor, dim), frost };
 }
 function paintDim(d = display()) {
   if (typeof document === 'undefined' || !document.documentElement.classList.contains('wall')) return;
   d = lookToShow(d);
-  const v = String(wallDim(d).dim);
-  if (document.documentElement.style.getPropertyValue('--wall-dim') !== v) document.documentElement.style.setProperty('--wall-dim', v);
-  try { localStorage.setItem(DIM_KEY, v); } catch { /* storage blocked */ }
+  const root = document.documentElement, { dim, scrim, frost } = wallDim(d);
+  const set = (k, v) => { if (root.style.getPropertyValue(k) !== v) root.style.setProperty(k, v); };
+  set('--wall-dim', String(dim)); set('--wall-scrim', pct(scrim)); set('--card-alpha', pct(frost));
+  root.classList.toggle('wall-frost', frost < 1);
+  try { localStorage.setItem(DIM_KEY, String(dim)); localStorage.setItem(PAINT_KEY, `${pct(scrim)} ${frost < 1 ? pct(frost) : ''}`.trim()); } catch { /* storage blocked */ }
 }
+const pct = v => `${Math.round(v * 100)}%`;
+const PAINT_KEY = 'apmes-logbook-wall-paint';   // the backing and the card cover, for the first paint (index.html)
 const DIM_KEY = 'apmes-logbook-wall-dim';   // for the first paint (index.html), so a photo never shows undimmed
 // Themes (themes.js): the background tint, the top band, the heading font, spacing and tab style as one style sheet
 // after the colour's (so it wins), cached on the device for the first paint (index.html) like the colour's

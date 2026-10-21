@@ -1,7 +1,10 @@
 // Wallpaper (Settings → Themes → Wallpaper; theme-revamp S4, owner 20 Oct 2026): a built-in pattern or your own
-// photo behind every page, with a dim. Cards stay solid; text that sits on the page itself (hints, headings between
-// cards) stays at 4.5:1 or better because the dim never goes under the floor minDim works out from the wallpaper's
-// colours and the palette in use (light, dark, OLED, tints). The photo is kept on this device only (IndexedDB, like
+// photo behind every page, with a dim. Text that sits on the page itself (hints, the version line) stays at 4.5:1 or
+// better on its own soft backing (the scrim, scrimFor), so the picture itself is dimmed only as much as you choose
+// (TE S3, owner 21 Oct 2026: the old way raised the whole dim to the floor, often 70-90%, and washed photos out).
+// The floor is what minDim works out from the wallpaper's colours and the palette in use (light, dark, OLED, tints);
+// Flat cards (no card behind any text) still raise the whole dim to it. Pattern strength (wallInk) and see-through
+// cards (wallFrost: frosted, the panel at 80% or more as frostAlpha needs) are TE S3 too. The photo is kept on this device only (IndexedDB, like
 // uploaded fonts), made smaller first, and never uploaded or synced; a theme may set a pattern, never a photo.
 // Colours from the wallpaper (W2): the photo's main colour, or one tapped on it, becomes the accent (colors.js
 // works out the palettes). The pure part is unit-tested (test/wallpaper.test.mjs); style.css draws the layers
@@ -9,8 +12,8 @@
 
 import { contrast, mix, cleanAccent } from './colors.js';
 
-// pattern: CSS custom properties for html.wall::before; ink: [token, % of it over the page colour] at its strongest,
-// so the test (and minDim) can check text on it
+// pattern: CSS custom properties for html.wall::before; ink: [token, % of it over the page colour at the faintest
+// strength], so the test (and minDim) can check text on it; wallInk sets the % (INK_MIN to INK_MAX)
 export const PATTERNS = {
   dots: { label: 'Dots', ink: ['ink', 6], css: p => `--wall: radial-gradient(${p} 1.2px, transparent 1.7px); --wall-size: 18px 18px; --wall-repeat: repeat;` },
   grid: { label: 'Grid', ink: ['ink', 6], css: p => `--wall: linear-gradient(${p} 1px, transparent 1px), linear-gradient(90deg, ${p} 1px, transparent 1px); --wall-size: 24px 24px; --wall-repeat: repeat;` },
@@ -20,6 +23,10 @@ export const PATTERNS = {
 export const WALLPAPERS = [['none', 'None (default)'], ...Object.entries(PATTERNS).map(([k, p]) => [k, p.label]), ['photo', 'Your own photo']];
 export const cleanPattern = v => (typeof v === 'string' && Object.hasOwn(PATTERNS, v) ? v : null);
 export const cleanWall = v => (v === 'photo' ? 'photo' : cleanPattern(v));
+// pattern strength: the % of its ink colour (6, the faintest, unless set; steps of 6)
+export const INK_MIN = 6, INK_MAX = 36, INK_STEP = 6;
+export const cleanInk = v => (Number.isInteger(v) && v >= INK_MIN && v <= INK_MAX && v % INK_STEP === 0 ? v : null);
+export const inkOf = d => cleanInk(d?.wallInk) ?? INK_MIN;
 // the dim: the page colour laid over the wallpaper, in % (0 to 90, steps of 5); unset: 40 for a photo, none for a pattern
 export const DIM_MAX = 90;
 export const cleanDim = v => (Number.isInteger(v) && v >= 0 && v <= DIM_MAX && v % 5 === 0 ? v : null);
@@ -29,11 +36,10 @@ export const dimOf = d => cleanDim(d.wallDim) ?? (cleanWall(d.wallpaper) === 'ph
 export function patternCss(d = {}) {
   const k = cleanPattern(d.wallpaper);
   if (!k) return '';
-  const [token, pct] = PATTERNS[k].ink;
-  return `:root { ${PATTERNS[k].css(`color-mix(in srgb, var(--${token}) ${pct}%, transparent)`)} }`;
+  return `:root { ${PATTERNS[k].css(`color-mix(in srgb, var(--${PATTERNS[k].ink[0]}) ${inkOf(d)}%, transparent)`)} }`;
 }
-// a pattern's colours over a palette, at its strongest: what text on the page may sit on
-export const patternSamples = (k, pal) => { const p = PATTERNS[k]; return p && pal[p.ink[0]] ? [pal.bg, mix(pal.bg, pal[p.ink[0]], p.ink[1] / 100)] : [pal.bg]; };
+// a pattern's colours over a palette, at its strongest: what text on the page may sit on (pct: its strength)
+export const patternSamples = (k, pal, pct) => { const p = PATTERNS[k]; return p && pal[p.ink[0]] ? [pal.bg, mix(pal.bg, pal[p.ink[0]], (cleanInk(pct) ?? p.ink[1]) / 100)] : [pal.bg]; };
 
 // The lowest dim (0 to 1, in 0.05 steps) at which every text colour on the page (ink, muted, accent) reaches 4.5:1 on
 // every wallpaper colour once the page colour is laid over it at that strength; a text colour already under 4.5:1 on
@@ -48,6 +54,18 @@ export function minDim(samples, pal) {
   const ok = dim => samples.every(s => { const under = mix(s, pal.bg, dim); return texts.every((t, i) => contrast(t, under) >= need[i] - 1e-9); });
   for (let i = 0; i <= 20; i++) if (ok(i / 20)) return i / 20;
   return 1;
+}
+
+// The backing for text on the bare page (0 to 1, in 0.05 steps, rounded up): the page colour laid over what shows
+// through the dim, enough that together they reach the floor (1 - (1 - dim)(1 - scrim) >= floor)
+export const scrimFor = (floor, dim) => (dim >= floor || dim >= 1 ? 0 : Math.min(1, Math.ceil(((floor - dim) / (1 - dim)) * 20 - 1e-9) / 20));
+// See-through cards: how much of the card colour covers the wallpaper (FROST, more if that's what keeps every text
+// colour on a card at 4.5:1 over every wallpaper colour once dimmed). samples: #rrggbb; pal: { bg, panel, ink, muted,
+// accent }; dim: 0 to 1.
+export const FROST = 0.8;
+export function frostAlpha(samples, dim, pal) {
+  if (!cleanAccent(pal.panel) || !cleanAccent(pal.bg) || !samples.length) return FROST;
+  return Math.max(FROST, minDim(samples.map(s => mix(s, pal.bg, dim)), { ...pal, bg: pal.panel }));
 }
 
 // The photo's main colour (W2, "automatic"): the hue that covers most of it among colours with some colour in them

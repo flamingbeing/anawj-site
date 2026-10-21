@@ -18,11 +18,11 @@ for (const t of THEMES) assert.deepEqual(checkTheme(t), [], t.id);
 const probe = { id: 'probe', name: 'Probe', group: 'inspired', desc: 'Validation probe', look: { round: 9, btnStyle: 'unlisted' } };
 assert.equal(checkTheme(probe).length, 2);
 assert.deepEqual(lookOf(probe.look), {});
-for (const [k, bad] of [['round', 4], ['round', -1], ['borders', 4], ['lineHeight', '1.7'], ['contrast', 'max'], ['wallDim', 7], ['iconTintStrength', 5], ['ftGap', 40], ['spacing', 'huge'], ['flat', 'yes'], ['shadows', true], ['accent', 'red'], ['bgTint', 'toString']]) {
+for (const [k, bad] of [['round', 4], ['round', -1], ['borders', 4], ['lineHeight', '1.7'], ['contrast', 'max'], ['wallDim', 7], ['wallInk', 8], ['wallInk', 42], ['wallFrost', 1], ['iconTintStrength', 5], ['ftGap', 40], ['spacing', 'huge'], ['flat', 'yes'], ['shadows', true], ['accent', 'red'], ['bgTint', 'toString']]) {
   assert.equal(cleanLook(k, bad), null, `${k} ${bad}`);
   assert.ok(checkTheme({ ...probe, look: { [k]: bad } }).length, `${k} ${bad}`);
 }
-for (const [k, good] of [['round', 0], ['round', 3], ['borders', 3], ['lineHeight', '1.3'], ['wallDim', 90], ['ftGap', 6], ['spacing', 'roomy'], ['flat', true], ['shadows', false], ['accent', '#ABCDEF']])
+for (const [k, good] of [['round', 0], ['round', 3], ['borders', 3], ['lineHeight', '1.3'], ['wallDim', 90], ['wallInk', 36], ['wallFrost', true], ['ftGap', 6], ['spacing', 'roomy'], ['flat', true], ['shadows', false], ['accent', '#ABCDEF']])
   assert.notEqual(cleanLook(k, good), null, `${k} ${good}`);
 assert.equal(cleanLook('spacing', 'normal'), null, 'a facet at its default saves as unset');
 assert.equal(cleanLook('colourful', true), 'tabs', 'the old on/off Colourful');
@@ -66,7 +66,7 @@ assert.equal(new Set(cardIds).size, cardIds.length, 'a card listed twice');
 for (const f of LOOK) assert.ok(cardIds.includes(f.section), `${f.key}: no card (section) on the Themes pages`);
 assert.deepEqual(cardsOn('themes'), ['themes', 'mine', 'colour', 'wallpaper']);
 const on = page => LOOK.filter(f => cardsOn(page).includes(f.section)).map(f => f.key);
-assert.deepEqual(on('themes'), ['accent', 'bgTint', 'wallpaper', 'wallDim']);
+assert.deepEqual(on('themes'), ['accent', 'bgTint', 'wallpaper', 'wallDim', 'wallInk', 'wallFrost']);
 for (const k of ['round', 'fontUi', 'ftGap', 'colours', 'navStyle', 'tabStyle', 'statusBar', 'iconTint', 'colourful', 'band']) assert.ok(on('themesadv').includes(k), k + ' not on Advanced');
 assert.deepEqual(on('access'), ['contrast']);
 console.log('look-schema theme pages: ok');

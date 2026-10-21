@@ -86,6 +86,8 @@ assert.deepEqual(themeFromLink(hashOf(link)), { name: 'Fake ishift/i', look: { a
 // a bundled theme changed a little is written out in full, not as the theme plus changes, so editing that theme later
 // never changes what an old link shows
 assert.deepEqual(themeFromLink(hashOf(themeLink(B, { name: 'Fake', look: { ...lookOf(THEMES[1].look), round: 3 } }))).look, { ...lookOf(THEMES[1].look), round: 3 });
+// settings added later (TE S3: pattern strength, see-through cards) travel too, and older places don't move
+assert.deepEqual(themeFromLink(hashOf(themeLink(B, { name: 'Fake', look: { accent: '#112233', wallpaper: 'dots', wallInk: 24, wallFrost: true } }))).look, { accent: '#112233', wallpaper: 'dots', wallInk: 24, wallFrost: true });
 // links never go stale: the lists only grow at the end (test/fixtures/theme-links.json), and links made with them
 // still open as they did
 const { readFileSync } = await import('node:fs');
