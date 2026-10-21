@@ -20,7 +20,7 @@ SITES['ntfroster.anawj.com'] = { root: 'ntf-roster/' };
 SITES['prewarmstudy.anawj.com'] = { root: 'prewarm/' };
 const fileOf = p => { const d = Object.keys(SIBLING).find(k => p.startsWith(k)); return d ? path.join(SIB, SIBLING[d], p) : path.join(root, p); };
 const MIME = { html: 'text/html; charset=utf-8', js: 'text/javascript', css: 'text/css', json: 'application/json', svg: 'image/svg+xml', gif: 'image/gif', png: 'image/png', webmanifest: 'application/manifest+json' };
-// a page with versions to choose from, as a "show me versions" PR would add (edit/NOTES.md)
+// a page with versions to choose from, as a "show me versions" PR would add (its old notes: owner-tools git history, edit/NOTES.md "Feedback button")
 const VARIANT_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <meta name="anawj-variants" content="a,b,c"><title>Versions</title>
 <script>document.documentElement.dataset.variant = new URLSearchParams(location.search).get('variant') || 'a'</script>

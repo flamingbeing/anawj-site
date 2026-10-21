@@ -31,7 +31,7 @@ export const SHARED = ['/nuhsdesign/', '/feedback/'];
 export const KIT = ['nuhsdesign/', 'feedback/'];
 export const kitCors = file => KIT.some(dir => String(file || '').startsWith(dir));
 
-// The feedback button (edit/NOTES.md): on PR previews (any *.workers.dev host) it is on for every page; on the real
+// The feedback button (its old notes: owner-tools git history, edit/NOTES.md "Feedback button"): on PR previews (any *.workers.dev host) it is on for every page; on the real
 // addresses only in a browser that turned it on with ?feedback=1 (a cookie; ?feedback=0 turns it off).
 export const FEEDBACK_COOKIE = 'anawj-feedback';
 export function feedback(host, search, cookie) {

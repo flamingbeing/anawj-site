@@ -24,7 +24,7 @@ notes; every step is done.
 | `beta-apmes.anawj.com/…` | (own repo `apmes`) | Beta: the `apmes` repo's `beta` branch, Worker `apmes-beta`, test Firebase project (moved 21 Oct 2026). |
 | `anawj.com/privacy/` | `privacy/` | Stays: the Google sign-in consent screen points here. |
 | `anawj.com/prewarm-update/` | `prewarm-update/` | Stays until no phone runs the old prewarm worker, then becomes a redirect. |
-| `anawj.com/edit/` (decided in step 5) | `edit/` | Stays on `anawj.com`: see "The page editor" below. |
+| `anawj.com/edit/` | (removed) | The page editor was dropped on 21 Oct 2026; `edit.anawj.com` is gone too. Ask Claude (owner-tools repo) is the only way to send page edits. |
 | `ask.anawj.com/` | (owner-tools repo) | Ask Claude moved to the owner-tools Worker (21 Oct 2026); this Worker no longer serves the host. `ask/` and `worker/ask.js` here are the old copies. |
 
 An app that moves to another site: give its host a `moved` entry in `worker/routes.js` (`{ moved: { '/bis/': 'https://anantf.com/bis/' } }`;
@@ -59,6 +59,5 @@ deploys it on every merge to `main` (build command `node tools/stamp-versions.mj
 
 ## The page editor
 
-`anawj.com/edit/` and `edit.anawj.com` stay on `anawj.com`: the editor frames the page and reads its text, so it can
-only edit pages from its own origin, and `anawj.com` still serves every app folder (forwarding only top-level visits).
-Do not stop serving the old folders there without moving the editor.
+Dropped on 21 Oct 2026 (repo split): `anawj.com/edit/` and `edit.anawj.com` no longer exist, so nothing here has to
+keep serving the old app folders for it.

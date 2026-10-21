@@ -44,7 +44,7 @@ r = await get('https://anawj-preview.example.workers.dev/'); assert.equal(r.stat
 r = await get('https://anawj-preview.example.workers.dev/nope/'); assert.equal(r.status, 404);
 console.log('worker tests passed');
 
-// the feedback button (edit/NOTES.md): every page of a PR preview gets the script; the real addresses only when
+// the feedback button (its old notes: owner-tools git history, edit/NOTES.md "Feedback button"): every page of a PR preview gets the script; the real addresses only when
 // that browser turned it on (?feedback=1 sets a cookie, ?feedback=0 clears it); never on non-HTML files
 {
   const TAG = '<script src="/feedback/overlay.js" defer></script>';
