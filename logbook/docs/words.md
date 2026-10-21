@@ -21,7 +21,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md).
   overall progress and shared summary counts use this same cap. Required JR cases and sub-types remain reminders.
 - **Back navigation** (`navigation.js`): tab buttons, menu items and screen links add browser history
   consistently. Browser Back/Forward restore screens; a screen's Back link retraces the same history
-  without adding a loop. Direct child-page links get a finite parent trail (Display → Settings → More);
+  without adding a loop. Direct child-page links get a finite parent trail (Layout → Settings → More);
   reload preserves it. The root screen can leave the app normally. The demo query stays on every screen.
   Pending Account/profile edits flush and Admin editing state clears on all screen transitions,
   including browser Back.

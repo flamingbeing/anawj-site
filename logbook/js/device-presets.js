@@ -1,7 +1,7 @@
 // Device options a profile switches on by default (the device half of a profile's preset, next to its tabs): the value
 // saved on this device, else the profile's default, else off. Pure: tested in device-presets.test.mjs.
 //
-// hideTabsTyping (Accessibility → "Hide the tab bar while typing"; phones): off unless switched on, and on by default
+// hideTabsTyping (Layout → "Hide the tab bar while typing"; phones): off unless switched on, and on by default
 // in the Personal profile (settings.mode 'personal').
 export const DEVICE_PRESETS = { personal: { hideTabsTyping: true } };
 // every device option a profile governs, with its name for the profile's list of changes

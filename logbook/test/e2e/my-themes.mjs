@@ -60,7 +60,7 @@ try { for (const width of [390, 1280]) {
   }
   // change something: Custom, and the card asks to save it
   await p.locator('input[type=range][aria-label="Corners"]').fill('0');
-  await p.getByRole('radio', { name: /Outlined/ }).check({ force: true });
+  await p.getByRole('radio', { name: /Outlined: thin lines/ }).check({ force: true });
   await poll(async () => /Custom/.test(await now()), 'custom');
   await card.locator('.tip', { hasText: 'it’s now Custom' }).waitFor();
   await card.getByLabel('Name for this look').fill('Fake square');

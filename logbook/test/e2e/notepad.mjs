@@ -160,7 +160,7 @@ try { for (const width of [390, 1280]) {
   assert.equal(await p.getByRole('button', { name: 'Add Notes to the tab bar' }).count(), 0);
   // the More pages can go on the bar too, and their own pages select them; seven tabs at most, so an eighth asks
   // which tab it replaces (and takes its place)
-  await p.evaluate(() => { location.hash = '#displayadv'; });
+  await p.evaluate(() => { location.hash = '#layout'; });
   await p.getByLabel('Show Analytics', { exact: true }).uncheck();   // (six tabs, as before Advanced put Analytics on the bar)
   await p.waitForFunction(() => !document.querySelector('[role=tab][data-tab=progress]'));
   await p.getByLabel('Show Settings', { exact: true }).check();

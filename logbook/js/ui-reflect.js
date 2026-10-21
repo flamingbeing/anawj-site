@@ -378,7 +378,7 @@ function list() {
   const filterChips = h('div', { class: 'chips refl-filters' }, [['all', 'All'], ['draft', 'Drafts'], ['complete', 'Complete'], ['uncat', 'Uncategorised']].map(([k, t]) =>
     h('span', { class: `chip ${rv.filter === k ? 'on' : ''}`, role: 'button', tabindex: '0', 'aria-pressed': String(rv.filter === k), onclick: () => { rv.filter = k; hooks.render(); } }, t)));
 
-  // the search row: pinned under the top with Settings → Display → "Pin the search box" (the title and counts
+  // the search row: pinned under the top with Settings → Layout → "Pin the search box" (the title and counts
   // above it scroll away; refl-top's sticky top is minus their height, measured in pinHead below)
   const searchPart = em ? null : h('div', { class: 'refl-top-search' },
     h('div', { class: 'bar', style: 'gap:8px;margin:8px 0 0;flex-wrap:nowrap' }, search,
@@ -1142,7 +1142,7 @@ function editor() {
       rv.editing = null; rv.thumbs = {}; lsSet(null); hooks.render();
     } }, 'Delete') : null));
 
-  const editor = h('div', { class: 'refl-editor' }, fields, body, actions, legacy || !headingsOn ? null : guide);   // the APMES notes last, small (owner)   // .refl-editor: the logging font (Settings → Display)
+  const editor = h('div', { class: 'refl-editor' }, fields, body, actions, legacy || !headingsOn ? null : guide);   // the APMES notes last, small (owner)   // .refl-editor: the logging font (Settings → Themes)
   // Settings → Reflections: no spelling underlines on this device (html class from applyLook)
   if (document.documentElement.classList.contains('refl-spell-off')) editor.querySelectorAll('textarea, input:not([type]), input[type=text]').forEach(f => { f.spellcheck = false; });
   // Settings → Reflections → Formatting buttons (this device, off by default): Bold, bullets and numbers above each box

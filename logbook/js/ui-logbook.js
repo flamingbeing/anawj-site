@@ -332,7 +332,7 @@ export function renderLogbook() {
       ...(sb => [counter, h('span', { class: 'grow', style: sb ? 'min-width:0' : null }), sb])(syncButton()), selectBtn,
       h('div', { class: 'seg' }, modes().map(([m, l]) =>
         h('button', { 'aria-pressed': String(view.mode === m), onclick: () => setMode(m) }, l)))));
-  // pinned (Settings → Display): the month headings in List stick just under it
+  // pinned (Settings → Layout): the month headings in List stick just under it
   if ('ResizeObserver' in window) new ResizeObserver(() => wrap.style.setProperty('--lb-top-h', top.offsetHeight + 'px')).observe(top);
   add(wrap, top, h('section', { class: 'card' }, list), selBar);
   // a press and hold (or the row menu's Select) starts selecting from that row
@@ -451,7 +451,7 @@ function pager(rows, repaint) {
 }
 
 // One case: date, details, procedure tags, flags. Tap to edit. Shared by the list and the calendar.
-// Advanced display → Fewer buttons on Logbook rows: one ⋯ that opens Copy / Reflect / Edit; a ✓ marks a reflection
+// Layout → Fewer buttons on Logbook rows: one ⋯ that opens Copy / Reflect / Edit; a ✓ marks a reflection
 // the ⋯ menu's sheet; also opened by pressing and holding a row (Accessibility → Press and hold, html.row-hold)
 function openRowMenu(c) {
   const has = (S.reflections || []).some(r => r.caseId === c.id);
@@ -547,7 +547,7 @@ function caseRow(c, flagsOf) {
         (c.tags || []).map(t => h('span', { class: 'flag sc-tag', title: 'Your tag' }, tagName(t))),
         caseHasNotes(c.id) ? h('button', { class: 'flag note-flag', type: 'button', title: 'Open your notes on this case', 'aria-label': 'Open your notes on this case', onclick: e => { e.stopPropagation(); openNotes({ caseId: c.id }); } }, ic('note'), 'note') : null)),
         document.documentElement.classList.contains('row-menu') ? rowMenu(c) : h('span', { class: 'acts' },
-          // to your own notes (paste into WhatsApp, Notes, Obsidian); off unless switched on (Advanced display, row-copy)
+          // to your own notes (paste into WhatsApp, Notes, Obsidian); off unless switched on (Layout, row-copy)
           !document.documentElement.classList.contains('row-copy') ? null : h('button', { class: 'small row-btn', title: 'Copy this case', 'aria-label': 'Copy this case', onclick: e => { e.stopPropagation(); copyText(shareCaseText(c), 'Case copied: paste it into your notes'); } }, rowIcon('copy'), h('span', { class: 'lbl' }, 'Copy')),
           // ✓ and filled once the case has a reflection (opens it); the same width either way, so the row never wraps.
           // Basic: logbook only has no Reflect button (unless turned back on).
@@ -635,7 +635,7 @@ function calendarView(rows, flagsOf, repaint) {
           dayCases.length || dayNotes ? h('button', { class: 'small ib', title: 'Share this day', 'aria-label': 'Share this day', onclick: async () => shareText(await dayTextWithNotes(view.day, dayCases)) }, ...ib('share', 'Share')) : null,
           // Send to…: only once a place to send to is set up (Settings → Send to)
           (dayCases.length || dayNotes) && destinations().length ? h('button', { class: 'small ib', title: 'Send this day to another app', 'aria-label': 'Send this day', onclick: async () => openSend({ text: await dayTextWithNotes(view.day, dayCases), title: view.day, date: view.day }) }, ...ib('share', 'Send')) : null,
-          // Copy for the day: off unless switched on (Advanced display → Logbook rows; owner, 13 Oct 2026)
+          // Copy for the day: off unless switched on (Layout → Logbook rows; owner, 13 Oct 2026)
           (dayCases.length || dayNotes) && document.documentElement.classList.contains('day-copy') ? h('button', { class: 'small ib', title: 'Copy this day (format in Settings → Markdown)', 'aria-label': 'Copy this day', onclick: async () => copyText(await dayTextWithNotes(view.day, dayCases), 'Day copied: paste it into your notes') }, ...ib('copy', 'Copy')) : null,
           dayNotes ? h('button', { class: 'small ib', title: 'Notes', onclick: () => openNotes({ day: view.day }) }, ic('note'), h('span', { class: 'ib-l' }, 'Notes')) : null,
           // log on this day (the Log page opens with the date already picked): last, at the right like a main action

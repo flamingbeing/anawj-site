@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createNavigation } from '../js/navigation.js';
+import { createNavigation, movedSetting } from '../js/navigation.js';
 
 function browser(hash = '#log') {
   const location = { pathname: '/logbook/', search: '?demo', hash };
@@ -49,5 +49,21 @@ function browser(hash = '#log') {
   assert.equal(b.visited.at(-1)[0], 'account');
   b.nav.sync('account'); assert.equal(b.visited.length, 1, 'popstate/hashchange pair renders once');
   b.nav.back('more'); b.nav.sync('log'); assert.equal(b.visited.at(-1)[0], 'log');
+}
+// theme-revamp S3: Display and Advanced display are gone; old links and copied links to a setting land on its new page
+{
+  assert.deepEqual(movedSetting('display', ''), ['layout', '']);
+  assert.deepEqual(movedSetting('displayadv', ''), ['themes', '']);
+  assert.deepEqual(movedSetting('display', 'Display'), ['layout', ''], 'the old heading just opens the page');
+  assert.deepEqual(movedSetting('display', 'Compact mode (Tight spacing)'), ['themes', 'Spacing'], 'a renamed setting by its new name');
+  assert.deepEqual(movedSetting('displayadv', 'Page width'), ['layout', 'Page width']);
+  assert.deepEqual(movedSetting('displayadv', 'Page'), ['layout', 'Page']);
+  assert.deepEqual(movedSetting('displayadv', 'Page titles in the header'), ['themes', 'Page titles in the header'], 'not taken for Page');
+  assert.deepEqual(movedSetting('displayadv', 'Tab bar'), ['layout', 'Tab bar']);
+  assert.deepEqual(movedSetting('displayadv', 'Icons only in the tab bar'), ['themes', 'Icons only in the tab bar']);
+  assert.deepEqual(movedSetting('displayadv', 'Custom CSS (advanced)'), ['themes', 'Custom CSS (advanced)']);
+  assert.deepEqual(movedSetting('access', 'Swipe left or right to change tab'), ['layout', 'Swipe left or right to change tab']);
+  assert.deepEqual(movedSetting('access', 'Text size'), ['access', 'Text size'], 'what stayed stays');
+  assert.deepEqual(movedSetting('logging', 'Teach it from an example'), ['logging', 'Teach it from an example']);
 }
 console.log('navigation tests passed');

@@ -66,8 +66,8 @@ try { for (const width of [390, 1280]) {
   await p.locator('[role=tab][data-tab=more]').click();
   await p.locator('.more-list a[data-go=progress]').waitFor();
   // settings stay: the advanced settings links and cards are all there
-  await p.evaluate(() => { location.hash = '#display'; });
-  await p.locator('a[data-go=displayadv]').waitFor();
+  await p.evaluate(() => { location.hash = '#logging'; });
+  await p.locator('a[data-go=loggingadv]').waitFor();
   await p.evaluate(() => { location.hash = '#settings'; });
   await p.locator('section:has(h2:text("Connect Claude (advanced)"))').waitFor();
   await p.locator('[role=tab][data-tab=log]').click(); await p.waitForSelector('textarea.details');
@@ -114,7 +114,7 @@ try { for (const width of [390, 1280]) {
   await p.locator('main .seg button').filter({ hasText: /^List$/ }).click();
   await p.locator('ul.cases li').first().waitFor();
   assert.equal(await p.locator('main button[aria-label*="reflection on this case"]').count(), 0);
-  // Copy on each row is off by default (Advanced display), so a logbook-only row has no buttons
+  // Copy on each row is off by default (Layout), so a logbook-only row has no buttons
   assert.equal(await p.locator('main button[aria-label="Copy this case"]').count(), 0);
   await p.locator('[role=tab][data-tab=more]').click();
   await p.locator('.more-list a[data-go=reflect]').click();

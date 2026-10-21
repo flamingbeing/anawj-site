@@ -67,10 +67,10 @@ async function run(label, ctxOpts) {
   const sub = () => p.evaluate(() => document.getElementById('sub').textContent);
   const nCases = async () => parseInt(await p.evaluate(() => document.body.dataset.cases), 10);
   // Account, Settings, Export / Import, Admin and Analytics live under More; Settings is a menu of pages
-  const SETTINGS_PAGES = ['themes', 'display', 'access', 'logging', 'tags', 'reflset', 'sharefmt'];
+  const SETTINGS_PAGES = ['themes', 'layout', 'access', 'logging', 'tags', 'reflset', 'sharefmt'];
   const tab = async t => {
     // a settings page's Advanced page: open the page, then its Advanced link
-    if (t === 'displayadv' || t === 'loggingadv') { await tab(t.replace('adv', '')); await p.locator(`a[data-go="${t}"]`).click(); await nap(350); return; }
+    if (t === 'loggingadv') { await tab(t.replace('adv', '')); await p.locator(`a[data-go="${t}"]`).click(); await nap(350); return; }
     // the recycle bin: Recover → Recently deleted (15 Oct 2026)
     if (t === 'bin') { await p.evaluate(() => { location.hash = '#recovery'; }); await p.locator('.recover-sec[data-sec=deleted][open] .bin-view').waitFor(); await nap(350); return; }
     if (SETTINGS_PAGES.includes(t)) { await tab('settings'); await p.locator(`.more-list a[data-go="${t}"]`).click(); }
@@ -153,15 +153,15 @@ async function run(label, ctxOpts) {
       const lastCard = await p.locator('main section.card').last().innerText();
       assert(/Sign out/.test(lastCard), 'sign out not the last card on More: ' + lastCard.slice(0, 80));
       await p.goto(BASE + '?demo#settings', { waitUntil: 'networkidle' });
-      await p.waitForSelector('.more-list a[data-go="display"]', { timeout: 6000 });
+      await p.waitForSelector('.more-list a[data-go="layout"]', { timeout: 6000 });
       assert(p.url().endsWith('#settings'), 'hash rewritten: ' + p.url());
       assert(await p.locator('.acct').count() === 0, 'portfolio details on Settings');
       assert(await p.locator('.more-list a[data-go="bin"]').count() === 0, 'the recycle bin is on Recover now, not in Settings');
-      await tab('display');
-      assert(await p.locator('.card', { hasText: 'Compact mode' }).count() === 1, 'no Compact mode on Display');
+      await tab('themes');
+      assert(await p.locator('fieldset.pick legend', { hasText: /^Spacing$/ }).count() === 1, 'no Spacing (the old Compact mode) on Themes');
       await tab('account');
       await p.waitForSelector('.acct', { timeout: 6000 });
-      assert(await p.locator('.card', { hasText: 'Compact mode' }).count() === 0, 'settings still under Account');
+      assert(await p.locator('.card', { hasText: /^Spacing/ }).count() === 0, 'settings still under Account');
       assert(await p.locator('button', { hasText: 'Sign out' }).count() === 0, 'sign out on Account (it is on More)');
       assert(await p.locator('button', { hasText: 'Delete account' }).count() === 1, 'no Delete account on Account');
     });
@@ -1734,7 +1734,7 @@ async function run(label, ctxOpts) {
     await hit.click();
     await p.waitForURL(/#loggingadv$/);
     await p.locator('fieldset.pick.flash', { hasText: 'Undo window' }).waitFor();
-    await tab('displayadv');
+    await tab('themes');
     await p.locator('input[type=range][aria-label="Line strength"]').fill('0'); await nap(150);
     await tab('themes');
     assert(await p.locator('.display-preview .row-btn').count() >= 1, 'no Display preview');
@@ -1750,13 +1750,13 @@ async function run(label, ctxOpts) {
     assert(await p.evaluate(() => !document.documentElement.classList.contains('shadows')), 'shadows not off');
     await choose('Card style', 'raised'); await nap(150);
     assert(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--round').trim() === '0' && document.documentElement.classList.contains('shadows')), 'corners or shadows not applied');
-    await tab('displayadv');
+    await tab('layout');
     await p.getByLabel('Show Reflections').uncheck();
     await p.locator('.tab-order li', { hasText: 'Logbook' }).getByRole('button', { name: 'Move up' }).click(); await nap(150);
     assert(JSON.stringify(await p.locator('.tabs button').evaluateAll(bs => bs.map(b => b.dataset.tab))) === JSON.stringify(['logbook', 'log', 'totals', 'progress', 'more']), 'tab bar not rearranged');
     await p.locator('.tabs button[data-tab="more"]').click(); await nap(300);
     assert(/Reflections/.test((await p.locator('.more-list').first().locator('li').allInnerTexts()).slice(0, 2).join(' ')), 'hidden tab not first on More');   // (with Notes, also off the bar)
-    await tab('displayadv');
+    await tab('layout');
     await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
     await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);
     assert(await p.locator('.tabs button').count() === 6, 'reset did not bring the tab back');
@@ -1767,9 +1767,9 @@ async function run(label, ctxOpts) {
   });
 
   await step('optional: ⋯ menu on Logbook rows; swipe between tabs (not from the case box)', async () => {
-    await tab('access');
+    await tab('layout');
     assert(await p.getByLabel('Swipe left or right to change tab').isChecked(), 'swipe between tabs not on by default');
-    await tab('displayadv');
+    await tab('layout');
     await p.getByLabel('Fewer buttons on Logbook rows (a ⋯ menu)').check(); await nap(150);
     try {
       await tab('logbook'); await lbList();
@@ -1788,31 +1788,31 @@ async function run(label, ctxOpts) {
       await tab('log'); await p.waitForSelector('textarea.details');
       await swipe(300, 100, 'textarea.details'); await nap(300);
       assert(/#log$/.test(p.url()), 'a swipe in the case box changed tab');
-      // a page under a tab counts as that tab: Settings → Display is under More, so a swipe right goes to the tab
+      // a page under a tab counts as that tab: Settings → Layout is under More, so a swipe right goes to the tab
       // before More (Analytics in Advanced, 15 Oct 2026)
-      await tab('display');
+      await tab('layout');
       await swipe(100, 300, 'main section.card'); await p.waitForURL(/#progress$/);
       await until(async () => !(await p.locator('main#app').evaluate(el => el.style.transform)), 'page left mid-slide');
       // switched off: no change of tab
-      await tab('access');
+      await tab('layout');
       await p.getByLabel('Swipe left or right to change tab').uncheck(); await nap(150);
       await tab('logbook');
       await swipe(300, 100, 'main section.card'); await nap(400);
       assert(/#logbook$/.test(p.url()), 'swiped with the switch off');
     } finally {
-      await tab('access');
+      await tab('layout');
       await p.getByLabel('Swipe left or right to change tab').check();
-      await tab('displayadv');
+      await tab('layout');
       await p.getByLabel('Fewer buttons on Logbook rows (a ⋯ menu)').uncheck();
     }
   });
 
   await step('page width Full; the demo: header can hide, Leave / Reset demo by Sign out', async () => {
-    await tab('displayadv');
+    await tab('layout');
     await choose('Page width', 'full'); await nap(150);
     try {
       assert(await p.evaluate(() => document.documentElement.classList.contains('lw-full')), 'Full page width not applied');
-      await p.getByLabel('Hide the header (the app name bar)').check(); await nap(150);
+      await tab('themes'); await p.getByLabel('Hide the header (the app name bar)').check(); await nap(150);
       await tab('more');
       await until(async () => !(await p.locator('header.top').isVisible()), 'header still shown in the demo');
       assert(await p.locator('main a.btn', { hasText: 'Leave demo' }).count() === 1, 'no Leave demo by Sign out');
@@ -1821,9 +1821,9 @@ async function run(label, ctxOpts) {
       await p.locator('dialog[open]').getByRole('button', { name: 'Cancel' }).click(); await nap(150);
       await shot3('more-demo-no-header');
     } finally {
-      await tab('displayadv');
+      await tab('themes');
       await p.getByLabel('Hide the header (the app name bar)').uncheck();
-      await choose('Page width', 'normal'); await nap(150);
+      await tab('layout'); await choose('Page width', 'normal'); await nap(150);
     }
   });
 
@@ -1873,11 +1873,11 @@ async function run(label, ctxOpts) {
     await tab('themes');
     await choose('Card style', 'flat'); await nap(150);
     assert(await cls('flat') && await cls('edges-fill'), 'Flat not applied');
-    await tab('displayadv');
+    await tab('themes');
     await choose('Button style', 'tinted');
     const sw = l => p.getByLabel(l, { exact: true });
     for (const l of ['Icons instead of words on common buttons', 'Plain calendar', 'Page titles in the header', 'Shorter Logbook rows']) await sw(l).check();
-    await tab('access');
+    await tab('layout');
     await sw('Press and hold a Logbook row for its menu').check();
     try {
       for (const k of ['btn-tinted', 'icon-btns', 'cal-plain', 'page-titles', 'rows-short', 'row-hold']) assert(await cls(k), k + ' not applied');
@@ -1904,8 +1904,8 @@ async function run(label, ctxOpts) {
       await shot3('logbook-clean');
     } finally {
       for (let i = 0; i < 3 && await p.locator('dialog[open]').count(); i++) { await p.keyboard.press('Escape'); await nap(200); }
-      await tab('access'); await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click(); await nap(200);
-      await tab('displayadv'); await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click(); await nap(200);
+      await tab('layout'); await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click(); await nap(200);
+      await tab('themes'); await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click(); await nap(200);
       await tab('themes'); await choose('Card style', 'raised'); await nap(150);
     }
     for (const k of ['flat', 'btn-tinted', 'icon-btns', 'cal-plain', 'page-titles', 'rows-short', 'row-hold']) assert(!(await cls(k)), k + ' not reset');
@@ -1962,9 +1962,9 @@ async function run(label, ctxOpts) {
   });
 
   await step('compact mode is per device and persists after reload', async () => {
-    await tab('display');
-    const sw = p.locator('label.check', { hasText: 'Compact mode' }).locator('input');
-    if (!(await sw.isChecked())) await sw.check();
+    await tab('themes');
+    // the old Compact mode is Spacing: Tight on Themes (theme-revamp S3: Display is gone)
+    await choose(/^Spacing$/, 'compact');
     await nap(600);
     assert(await p.evaluate(() => document.body.classList.contains('compact')), 'no body.compact');
     await shot3('settings-compact');
@@ -1982,8 +1982,8 @@ async function run(label, ctxOpts) {
     await nap(300);
     await shot3('log-compact');
     await p.locator('textarea.details').fill('');
-    await tab('display');
-    assert(await p.locator('label.check', { hasText: 'Compact mode' }).locator('input').isChecked(), 'switch not checked after reload');
+    await tab('themes');
+    assert(await p.locator('fieldset.pick', { has: p.locator('legend', { hasText: /^Spacing$/ }) }).locator('input[value=compact]').isChecked(), 'Tight not picked after reload');
     const w = await p.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
     assert(w[0] <= w[1], 'compact h-scroll');
     // an old device that still has compact: true opens Tight, and the old key is folded away
@@ -2006,11 +2006,11 @@ async function run(label, ctxOpts) {
     await p.getByRole('button', { name: 'Reset Fine-tune' }).click();
     await nap(300);
     const g0 = await gapOf(); assert(g0 === before, 'Reset Fine-tune left the gap: ' + g0);
-    await tab('display');
-    await p.locator('label.check', { hasText: 'Compact mode' }).locator('input').uncheck();
+    await tab('themes');
+    await choose(/^Spacing$/, 'normal');
     await nap(300);
-    assert(!(await p.evaluate(() => document.body.classList.contains('compact'))), 'Compact mode switch did not turn Tight off');
-    await p.locator('label.check', { hasText: 'Compact mode' }).locator('input').check();
+    assert(!(await p.evaluate(() => document.body.classList.contains('compact'))), 'Spacing: Normal did not turn Tight off');
+    await choose(/^Spacing$/, 'compact');
     await nap(300);
   });
 
@@ -2019,7 +2019,7 @@ async function run(label, ctxOpts) {
     const check = l => p.locator('label.check', { hasText: l }).locator('input');
     await choose('First day of the week', '0'); await nap(300);
     await check('Suggested tags as you type').uncheck(); await check('Quick picks').uncheck(); await check('Autocorrect').check(); await nap(300);
-    await tab('displayadv');
+    await tab('layout');
     await check('Pin the case box').check(); await check('Pin the search box').check(); await nap(200);
     // Card style Flat: lines gone, fields filled
     await tab('themes');
@@ -2048,7 +2048,7 @@ async function run(label, ctxOpts) {
       await tab('loggingadv');
       await choose('First day of the week', '1');
       await check('Suggested tags as you type').check(); await check('Quick picks').check(); await check('Autocorrect').uncheck(); await nap(300);
-      await tab('displayadv');
+      await tab('layout');
       await check('Pin the case box').uncheck(); await check('Pin the search box').uncheck(); await nap(200);
       await tab('themes');
       await choose('Card style', 'raised'); await nap(200);
@@ -2134,7 +2134,7 @@ async function run(label, ctxOpts) {
     await configure('newline');
   });
   await step('logging: separate initials box, optional autodetection and month shorthand', async () => {
-    if (phone) { await tab('displayadv'); await p.getByLabel('Case tab upside down (phones)', { exact: true }).check(); }
+    if (phone) { await tab('layout'); await p.getByLabel('Case tab upside down (phones)', { exact: true }).check(); }
     // Settings → Advanced logging → Separate initials box (device)
     const setSeparate = async on => { await tab('loggingadv'); await p.getByLabel('Separate initials box', { exact: true }).setChecked(on); };
     await setSeparate(true);
@@ -2192,7 +2192,7 @@ async function run(label, ctxOpts) {
     await summary.fill('AB 80M hernia'); await debounced();
     assert(await p.locator('.sugg-row [data-code="21"]').count() === 1, 'geriatric detection not restored');
     await summary.fill('');
-    if (phone) { await tab('displayadv'); await p.getByLabel('Case tab upside down (phones)', { exact: true }).uncheck(); await tab('log'); }
+    if (phone) { await tab('layout'); await p.getByLabel('Case tab upside down (phones)', { exact: true }).uncheck(); await tab('log'); }
   });
   await step('navigation: demo Account, browser Back/Forward and app Back agree', async () => {
     const q = await ctx.newPage();
@@ -2209,15 +2209,15 @@ async function run(label, ctxOpts) {
       await q.waitForSelector('textarea.details');
       await q.goForward(); await q.waitForURL(/#more$/);
       await q.locator('a[data-go=settings]').click();
-      await q.locator('a[data-go=display]').click();
-      await q.waitForURL(/#display$/);
+      await q.locator('a[data-go=layout]').click();
+      await q.waitForURL(/#layout$/);
       const length = await q.evaluate(() => history.length);
       await q.locator('.back-row a', { hasText: 'Settings' }).click();
       await q.waitForURL(/#settings$/);
       assert(await q.evaluate(() => history.length) === length, 'app Back added a loop');
       await q.goBack(); await q.waitForURL(/#more$/);
       await q.goForward(); await q.waitForURL(/#settings$/);
-      await q.goForward(); await q.waitForURL(/#display$/);
+      await q.goForward(); await q.waitForURL(/#layout$/);
       await q.waitForSelector('.back-row a');
       await q.screenshot({ path: DIR + `navigation-${label}.png`, fullPage: true });
       // A root screen does not trap the browser in the app.
@@ -2230,7 +2230,7 @@ async function run(label, ctxOpts) {
   await step('navigation: direct Display link and reload retain a parent trail', async () => {
     const q = await ctx.newPage();
     try {
-      await q.goto(BASE + '?demo#display');
+      await q.goto(BASE + '?demo#layout');
       await q.waitForSelector('.back-row a');
       const length = await q.evaluate(() => history.length);
       await q.reload(); await q.waitForSelector('.back-row a');

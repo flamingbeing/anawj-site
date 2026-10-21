@@ -208,7 +208,7 @@ const svgIcon = (k, cls) => {
 };
 export const rowIcon = k => svgIcon(k, 'ico');
 export const ic = k => svgIcon(k, 'ico i');
-// a common button's contents: its icon (shown only with Advanced display → Icons instead of words, html.icon-btns)
+// a common button's contents: its icon (shown only with Themes → Icons instead of words, html.icon-btns)
 // and its word (then kept for screen readers only); the button gets class ib and a title
 export const ib = (k, word) => [svgIcon(k, 'ico i ib-ico'), h('span', { class: 'ib-l' }, word)];
 // Show or hide a panel (Filter, its Dates / Tags / More folds) by growing or shrinking it, like a fold; with

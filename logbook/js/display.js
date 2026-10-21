@@ -1,4 +1,4 @@
-// This device's display settings (Settings → Display, Accessibility, Advanced display): stored, applied to the page
+// This device's display settings (Settings → Themes, Layout, Accessibility): stored, applied to the page
 // and the tab bar's arrangement. Split from ui-settings.js so the Case tab (ui-log.js, ui-notepad.js) and app.js can
 // start without loading the settings pages (they load on first use).
 
@@ -211,7 +211,7 @@ export function applyLook(d = {}) {
   c.toggle('day-copy', !!d.dayCopy);
   // word counts on the Reflections list: on unless switched off (Settings → Reflections; owner, 13 Oct 2026)
   c.toggle('no-wc', !!d.hideWords);
-  // the seven Clean looks (owner, 13 Oct 2026; Advanced display and Accessibility, all off by default): button style,
+  // the seven Clean looks (owner, 13 Oct 2026; Themes, Layout and Accessibility, all off by default): button style,
   // icons instead of words, the plain calendar, page titles in the header, shorter Logbook rows, press and hold
   for (const b of BUTTON_STYLES.slice(1)) c.toggle('btn-' + b[0], d.btnStyle === b[0]);
   c.toggle('icon-btns', !!d.iconBtns); c.toggle('cal-plain', !!d.calPlain); c.toggle('page-titles', !!d.pageTitles);
@@ -247,13 +247,13 @@ export const NUH_TAB_COLOURS = { log: '#e57200', logbook: '#e4002b', reflect: '#
 export const APP_TITLE = 'APMES Logbook';
 // without APMES in the name (Profile → APMES; the Personal profile)
 export const defaultTitle = () => (shows('apmesTitle') ? APP_TITLE : 'Logbook');
-// Borders (Display, per device): how strong the lines around cards, fields, buttons and chips are; the last is the default
+// Borders (Themes, per device): how strong the lines around cards, fields, buttons and chips are; the last is the default
 export const BORDERS = ['Borderless', 'Faint', 'Light', 'Soft', 'Normal (default)'];
 export const BORDER_MIX = [0, 25, 50, 75];
-// Corners (Display, per device): every border-radius in style.css is multiplied by --round; Normal is the default
+// Corners (Themes, per device): every border-radius in style.css is multiplied by --round; Normal is the default
 export const ROUNDS = [['Square', 0], ['Slightly rounded', 0.5], ['Normal (default)', 1], ['Very round', 1.7]];
 export const roundLevel = d => (Number.isInteger(d.round) && d.round >= 0 && d.round < ROUNDS.length ? d.round : 2);
-// The tab bar (Advanced display, per device): the order of its tabs and which are hidden. More always stays
+// The tab bar (Layout, per device): the order of its tabs and which are hidden. More always stays
 // (Settings live there), at least two and at most seven (MAX_BAR, More included) stay on the bar; hidden main tabs
 // are listed first on the More page. Every page in the More list can go on the bar too (Admin portal: admins only).
 export const BAR_TABS = [['caselogs', 'Case logs'], ['log', 'Case'], ['logbook', 'Logbook'], ['totals', 'Totals'], ['notes', 'Notes'], ['reflect', 'Reflections'], ['progress', 'Analytics'],
@@ -301,24 +301,25 @@ export function setTabOnBar(id, show, then = () => {}) {
 }
 // Card style (Themes; owner, 16 Oct 2026): one choice over the switches it sets. Raised = soft shadows (the default),
 // Outlined = lines around cards, Flat = no lines and no page cards. The line strength stays its own slider
-// (Advanced display), kept while Flat is on.
+// (Themes → Shape and type), kept while Flat is on.
 export const CARD_STYLES = [['raised', 'Raised: soft shadows (default)'], ['outlined', 'Outlined: thin lines'], ['flat', 'Flat: no lines, no cards']];
 export const cardStyle = d => (d.flat ? 'flat' : d.shadows === false ? 'outlined' : 'raised');
 export const cardPatch = v => (v === 'flat' ? { flat: true } : v === 'outlined' ? { flat: null, shadows: false } : { flat: null, shadows: null });
 export const borderLevel = d => (Number.isInteger(d.borders) && d.borders >= 0 && d.borders < BORDERS.length - 1 ? d.borders : BORDERS.length - 1);
 export const cleanTitle = s => String(s || '').replace(/[\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
-// Custom CSS (custom-css.js): only CSS that passes checkCss, never on the Display pages (basic and advanced), and off with ?nocss
+// Custom CSS (custom-css.js): only CSS that passes checkCss, never on Themes (where it is edited) or Layout, and off with ?nocss
+const CSS_FREE = ['themes', 'themesall', 'layout'];
 export function applyCustomCss(d = display()) {
   if (typeof document === 'undefined') return;
   let el = document.getElementById('user-css');
   const res = checkCss(d.customCss);
-  const on = !!d.customCssOn && res.ok && !!res.css && !/[?&]nocss\b/.test(location.search) && S.tab !== 'display' && S.tab !== 'displayadv';
+  const on = !!d.customCssOn && res.ok && !!res.css && !/[?&]nocss\b/.test(location.search) && !CSS_FREE.includes(S.tab);
   if (!on) { if (el) el.textContent = ''; return; }
   if (!el) { el = document.createElement('style'); el.id = 'user-css'; document.head.append(el); }
   const css = layered('custom', res.css);   // the last layer: wins over every look
   if (el.textContent !== css) el.textContent = css;
 }
-// Settings → Accessibility (#access; owner, 13 Oct 2026): size, contrast, motion and the gestures, gathered from
-// Display and Advanced display. All this device's.
+// Settings → Accessibility (#access; owner, 13 Oct 2026): size, contrast and motion (the gestures moved to Layout in
+// theme-revamp S3). All this device's.
 export const IPHONE_APP = () => (/iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)) && (navigator.standalone === true || matchMedia('(display-mode: standalone)').matches);
 export const START_TABS = [['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics']];

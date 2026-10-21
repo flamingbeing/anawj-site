@@ -26,7 +26,7 @@ import { resetLink, help, toggle } from './settings-rows.js';
 // (the display helpers are still exported from here: the e2e tests import them from this file)
 export * from './display.js';
 
-// Settings is a short menu (app.js) of these pages: Display, Logging, the Tag editor and the Recycle bin.
+// Settings is a short menu (app.js) of these pages: Themes, Layout, Accessibility, Logging, the Tag editor and more.
 // Residency year (for people not on the programme list) is on Account; reflection settings on the
 // Reflections tab (#reflset).
 export function residencyCard() {
@@ -83,22 +83,6 @@ const slider = (label, names, level, dflt, onLevel) => {
     h('input', { type: 'range', min: '0', max: String(names.length - 1), step: '1', value: String(level), 'aria-label': label, 'aria-valuetext': names[level],
       oninput: e => { const n = Number(e.target.value); e.target.setAttribute('aria-valuetext', names[n]); note.textContent = names[n]; onLevel(n === dflt ? null : n); } })), note);
 };
-
-export function renderDisplay() {
-  const st = display();
-  return h('div', { class: 'set-page' },
-    displayPreview(),
-    h('section', { class: 'card' },
-      h('h2', {}, 'Display'),
-      h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Colours, light or dark, corners, fonts and ready-made looks are in ', h('a', { href: '#themes' }, 'Themes'), '.'),
-      // the old Compact mode is Spacing: Tight (Themes → Shape and type)
-      toggle('Compact mode (Tight spacing)', st.spacing === 'compact', v => { applyDisplay(setDisplay({ spacing: v ? 'compact' : null })); }, 'Smaller chips, rows and spacing, so more tags fit. The same as Spacing: Tight in Themes.'),
-      // the tab the app opens on (a link or shortcut to a tab still opens that tab)
-      pick('Open the app on', START_TABS, st.startTab || 'log', v => { setDisplay({ startTab: v }); toast('Saved'); }),
-      DEVICE_NOTE()),
-    resetLink('compact mode and the start tab on this device', () => { applyDisplay(setDisplay({ ...(display().spacing === 'compact' ? { spacing: null } : {}), startTab: null })); }),
-    advancedLink('displayadv', 'Advanced display settings', 'The header and tab bar, Logbook rows, page width, the Case tab layout, custom CSS'));
-}
 
 // Settings → Themes (#themes; owner, 15 Oct 2026): ready-made looks (themes.js) and the look settings themselves,
 // moved here from Display. Picking a theme sets its bundle of settings at once (Undo in the toast); changing any
@@ -158,6 +142,7 @@ export function renderThemesAll() {
 }
 export function renderThemes() {
   const st = display(), { theme, custom } = themeState(st);
+  const set = (k, off = null) => v => applyDisplay(setDisplay({ [k]: v || off }));
   const look = (k, label, opts, dflt, line) => pick(label, opts, st[k] ?? dflt, v => applyDisplay(setDisplay({ [k]: v === dflt ? null : v })) || hooks.render(), line);
   // one theme-engine facet (theme-engine.js): a switch or a ✓ list; the default saves as null
   const facetRow = f => (f.bool ? toggle(f.label, st[f.key], v => { applyDisplay(setDisplay({ [f.key]: v || null })); hooks.render(); }, f.line)
@@ -165,6 +150,9 @@ export function renderThemes() {
   const facetsOf = g => FACETS.filter(f => f.group === g).map(facetRow);
   return h('div', { class: 'set-page themes-page' },
     displayPreview(),
+    // themes live in this browser only (owner, 20 Oct 2026): say so first, with Export to move them
+    h('p', { class: 'tip device-only', role: 'note', style: 'display:flex;align-items:center;gap:8px' }, h('span', { class: 'grow' }, 'Themes are kept on this device only.'),
+      h('button', { type: 'button', class: 'small', onclick: () => exportThemes(display()) }, 'Export…')),
     h('section', { class: 'card' },
       h('h2', {}, 'Themes'),
       h('p', { class: 'theme-now' }, 'Now: ', h('b', {}, matchMine(st.myThemes, st) && custom ? `${matchMine(st.myThemes, st).name} (yours)` : themeLabel(st))),
@@ -189,7 +177,9 @@ export function renderThemes() {
       look('band', 'Top band', BANDS, 'theme', 'The four-colour strip along the top. NUHS keeps the NUH stripe; other themes bring their own.')),
     h('section', { class: 'card' },
       h('h2', {}, 'Shape and type'),
-      pick('Card style', CARD_STYLES, cardStyle(st), v => { applyDisplay(setDisplay(cardPatch(v))); hooks.render(); }, 'How cards and lists stand off the page. How strong the lines are: Advanced display.'),
+      pick('Card style', CARD_STYLES, cardStyle(st), v => { applyDisplay(setDisplay(cardPatch(v))); hooks.render(); }, 'How cards and lists stand off the page. How strong the lines are: Line strength, just below.'),
+      // the strength of the lines around cards, fields, buttons and chips (Flat, in Card style, hides them all)
+      slider('Line strength', BORDERS, borderLevel(st), BORDERS.length - 1, n => applyDisplay(setDisplay({ borders: n }))),
       slider('Corners', ROUNDS.map(([n]) => n), roundLevel(st), 2, n => applyDisplay(setDisplay({ round: n }))),
       facetsOf('shape'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Heading font',
@@ -198,12 +188,29 @@ export function renderThemes() {
       fontPicker('ui'),
       fontPicker('log'),
       lookPick('lineHeight', 'Line spacing', LINE_HEIGHTS, '1'),
+      h('h3', {}, 'Buttons'),
+      lookPick('btnStyle', 'Button style', BUTTON_STYLES, 'outlined', 'The buttons that aren’t the main one on a screen.'),
+      toggle('Icons instead of words on common buttons', st.iconBtns, set('iconBtns'), 'Share, Copy, Notes and Filter.', 'Each still says its name to screen readers, and on a computer when you point at it.'),
+      toggle('Plain calendar', st.calPlain, set('calPlain'), 'Numbers with the count under them, no tiles.', 'Today in a coloured circle, the day you picked in a dark one.'),
       DEVICE_NOTE()),
     fineTuneCard(st),
     h('section', { class: 'card' },
-      h('h2', {}, 'Layout'),
+      h('h2', {}, 'Header and tab bar'),
+      h('label', { class: 'field' }, 'Name in the header',
+        h('input', { type: 'text', value: st.appTitle || '', placeholder: defaultTitle(), maxlength: '40', 'aria-label': 'Name in the header',
+          onchange: e => { const t = cleanTitle(e.target.value); e.target.value = t; applyDisplay(setDisplay({ appTitle: t && t !== defaultTitle() ? t : null })); } })),
+      help(`Also the name in the browser tab. Empty: ${defaultTitle()}.`),
+      toggle('Page titles in the header', st.pageTitles, set('pageTitles'), '“Logbook”, “Reflections”… instead of the app’s name.'),
+      toggle('Hide the header (the app name bar)', st.hideHeader, v => applyDisplay(setDisplay({ hideHeader: v })),
+        'It comes back when something needs you.', 'It comes back by itself when something isn’t synced yet, when there’s no signal, and in the demo.'),
+      toggle('Icons only in the tab bar', st.tabIcons, v => applyDisplay(setDisplay({ tabIcons: v }))),
+      help('Where the tab bar sits and which tabs it shows: ', h('a', { href: '#layout' }, 'Layout'), '.'),
+      DEVICE_NOTE()),
+    h('section', { class: 'card' },
+      h('h2', {}, 'Rows and forms'),
       lookPick('navStyle', 'Navigation layout', NAV_STYLES, 'tabs', 'The rail appears above 900 px; smaller windows keep tabs.'),
       lookPick('rowLayout', 'Logbook row layout', ROW_LAYOUTS, 'card'),
+      toggle('Shorter Logbook rows', rowLayoutOf(st) === 'compact', v => { applyDisplay(setDisplay({ rowShort: v, rowLayout: null })); hooks.render(); }, 'One line for the case, one grey line of tags, no buttons.', 'The initials and case in bold, the short date at the right. Tap a row to open it; press and hold (Layout) for Copy and Reflect.'),
       lookPick('formLayout', 'Case form layout', FORM_LAYOUTS, 'page'),
       DEVICE_NOTE()),
     h('section', { class: 'card' },
@@ -212,8 +219,9 @@ export function renderThemes() {
       FACET_GROUPS.filter(([g, title]) => title).map(([g, title]) => [h('h3', {}, title), facetsOf(g)]),
       DEVICE_NOTE()),
     editColours(st),
-    resetLink('the theme and every look setting on this page (light, the NUHS colours, lines, corners, fonts and spacing) on this device', () => {
-      applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'fontUiName', 'fontLogName'].map(k => [k, null])) }));
+    customCssCard(),
+    resetLink('the theme and every look setting on this page (light, the NUHS colours, lines, corners, fonts, spacing, the header and custom CSS: switched off, your CSS is kept) on this device', () => {
+      applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'fontUiName', 'fontLogName', 'appTitle', 'hideHeader', 'customCssOn'].map(k => [k, null])) }));
     }));
 }
 // Fine-tune (theme-revamp S2): a slider for each single size (theme-engine.js FINE_TUNE), unset until moved; the
@@ -234,8 +242,6 @@ function fineTuneCard(st) {
     h('div', { class: 'bar', style: 'margin:10px 0 0' }, h('button', { type: 'button', class: 'small', onclick: () => { applyThemeLook(setDisplay(Object.fromEntries(TUNE_KEYS.map(k => [k, null])))); hooks.render(); } }, 'Reset Fine-tune')),
     DEVICE_NOTE());
 }
-// Settings → Display → Advanced display settings (#displayadv), under headings (owner, 13 Oct 2026): the header and
-// tab bar, Logbook rows, text, the Case tab layout, then custom CSS
 // Draft both palettes together, so a foreground and background can be changed before checking Save.
 function editColours(st) {
   let side = 'light', draft = cleanColours(st.colours);
@@ -280,6 +286,12 @@ function editColours(st) {
 
 // Your themes (owner, 16 Oct 2026; my-themes.js): once anything on this page changes the look is Custom, and this card
 // offers to keep it under a name. Saved themes are picked like any other; Export and Import move them as a file.
+// Export: your themes, or with none saved the look you have now, as a file (also at the top of Themes)
+function exportThemes(st) {
+  const mine = cleanMine(st.myThemes);
+  download('my-logbook-themes.json', new Blob([exportText(mine.length ? mine : [{ name: themeLabel(st).slice(0, 40), look: lookOf(st) }])], { type: 'application/json' }));
+  toast(mine.length ? 'Themes saved as a file' : 'This look saved as a file');
+}
 function myThemesCard(st, custom) {
   const mine = cleanMine(st.myThemes), now = matchMine(mine, st);
   const put = list => { setDisplay({ myThemes: list.length ? list : null }); hooks.render(); };
@@ -298,7 +310,6 @@ function myThemesCard(st, custom) {
     put(cleanMine(before).filter(x => x.id !== t.id));
     toast(`Deleted “${t.name}”`, { action: 'Undo', onaction: () => put(cleanMine(before)) });
   };
-  const exportAll = () => { download('my-logbook-themes.json', new Blob([exportText(mine.length ? mine : [{ name: themeLabel(st).slice(0, 40), look: lookOf(st) }])], { type: 'application/json' })); toast(mine.length ? 'Themes saved as a file' : 'This look saved as a file'); };
   const importBtn = fileButton('Import…', '.json,application/json', async file => {
     try { const r = importText(await file.text(), display().myThemes); put(r.list); toast(`${r.added} theme${r.added === 1 ? '' : 's'} added`); }
     catch (err) { toast(err.message); }
@@ -313,52 +324,51 @@ function myThemesCard(st, custom) {
         themeSwatch({ look: t.look, mode: t.mode === 'dark' || t.mode === 'oled' ? t.mode : null }), h('span', { class: 'mt' }, h('b', {}, t.name), h('small', {}, t.mode ? `Yours · ${t.mode}` : 'Yours'))),
       h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Delete ${t.name}`, title: 'Delete', onclick: () => drop(t) }, '×')))) : null,
     h('div', { class: 'bar', style: 'margin:10px 0 0' },
-      h('button', { type: 'button', class: 'small', onclick: exportAll }, 'Export…'), importBtn),
+      h('button', { type: 'button', class: 'small', onclick: () => exportThemes(st) }, 'Export…'), importBtn),
     help('Export saves your themes (or, with none saved, the look you have now) as a file to keep or send to someone; Import adds themes from such a file. Only look settings travel, never cases or names.'));
 }
 
-export function renderDisplayAdvanced() {
+// Settings → Layout (#layout; theme-revamp S3, 21 Oct 2026): how the app works on this device, where Themes is how it
+// looks. Took over Display and Advanced display with Themes (old links land on the new page: navigation.js MOVED_SETTINGS), and the
+// gestures and keyboard from Accessibility.
+export function renderLayout() {
   const st = display();
   const set = (k, off = null) => v => applyDisplay(setDisplay({ [k]: v || off }));
   return h('div', { class: 'set-page' },
     displayPreview(),
     h('section', { class: 'card' },
-      h('h2', {}, 'Advanced display'),
-      h('h3', {}, 'Look'),
-      help('Card style, corners, colours and fonts are in ', h('a', { href: '#themes' }, 'Themes'), '.'),
-      // the strength of the lines around cards, fields, buttons and chips (Flat, in Card style, hides them all)
-      slider('Line strength', BORDERS, borderLevel(st), BORDERS.length - 1, n => applyDisplay(setDisplay({ borders: n }))),
-      lookPick('btnStyle', 'Button style', BUTTON_STYLES, 'outlined', 'The buttons that aren’t the main one on a screen.'),
-      toggle('Icons instead of words on common buttons', st.iconBtns, set('iconBtns'), 'Share, Copy, Notes and Filter.', 'Each still says its name to screen readers, and on a computer when you point at it.'),
-      toggle('Plain calendar', st.calPlain, set('calPlain'), 'Numbers with the count under them, no tiles.', 'Today in a coloured circle, the day you picked in a dark one.'),
-      h('h3', {}, 'Header and tab bar'),
-      h('label', { class: 'field' }, 'Name in the header',
-        h('input', { type: 'text', value: st.appTitle || '', placeholder: defaultTitle(), maxlength: '40', 'aria-label': 'Name in the header',
-          onchange: e => { const t = cleanTitle(e.target.value); e.target.value = t; applyDisplay(setDisplay({ appTitle: t && t !== defaultTitle() ? t : null })); } })),
-      help(`Also the name in the browser tab. Empty: ${defaultTitle()}.`),
-      toggle('Page titles in the header', st.pageTitles, set('pageTitles'), '“Logbook”, “Reflections”… instead of the app’s name.'),
-      toggle('Hide the header (the app name bar)', st.hideHeader, v => applyDisplay(setDisplay({ hideHeader: v })),
-        'It comes back when something needs you.', 'It comes back by itself when something isn’t synced yet, when there’s no signal, and in the demo.'),
+      h('h2', {}, 'Layout'),
+      help('How the app works on this device. How it looks (colours, fonts, spacing, the header) is in ', h('a', { href: '#themes' }, 'Themes'), '.'),
+      // the tab the app opens on (a link or shortcut to a tab still opens that tab)
+      pick('Open the app on', START_TABS, st.startTab || 'log', v => { setDisplay({ startTab: v }); toast('Saved'); }),
+      h('h3', {}, 'Tab bar'),
       lookPick('tabBar', 'Tab bar', TAB_BARS, 'auto'),
-      toggle('Icons only in the tab bar', st.tabIcons, v => applyDisplay(setDisplay({ tabIcons: v }))),
       tabArranger(),
       h('h3', {}, 'Logbook rows'),
       toggle('Fewer buttons on Logbook rows (a ⋯ menu)', st.rowMenu, set('rowMenu'), 'Copy and Reflect move into one ⋯ button.', 'A ✓ still shows cases with a reflection.'),
-      toggle('Shorter Logbook rows', rowLayoutOf(st) === 'compact', v => { applyDisplay(setDisplay({ rowShort: v, rowLayout: null })); hooks.render(); }, 'One line for the case, one grey line of tags, no buttons.', 'The initials and case in bold, the short date at the right. Tap a row to open it; press and hold (Accessibility) for Copy and Reflect.'),
       toggle('Copy button on each Logbook row', st.rowCopy, set('rowCopy'), 'Off unless you switch it on.', 'The ⋯ menu, if you use it, still copies one case.'),
       toggle('Copy button for each day', st.dayCopy, set('dayCopy'), 'Beside Share when you pick a day in the calendar.', 'Off unless you switch it on. Share already sends the whole day (or copies it, where sharing isn’t possible).'),
       h('h3', {}, 'Page'),
-      help('Fonts and line spacing are in Themes.'),
       lookPick('lineWidth', 'Page width', LINE_WIDTHS, 'normal', 'How wide the app gets on a computer or tablet.', 'Was “Line width”. Phones always use the full screen. The Case tab keeps its two panes.'),
       h('h3', {}, 'Case tab layout'),
       toggle('Case tab upside down (phones)', st.caseInverted, v => applyDisplay(setDisplay({ caseInverted: v })),
         'The case box at the bottom, by the keyboard, like a chat app.', 'Save sits beside it and the suggestions just above it; scroll up for all the tags.'),
       toggle('Pin the case box at the top of the Case tab', st.pinBox, set('pinBox')),
       toggle('Pin the search box at the top of the Logbook and Reflections', st.pinSearch, set('pinSearch'), 'They stay in view while the list scrolls under them.'),
+      h('h3', {}, 'Gestures'),
+      toggle('Swipe left or right to change tab', st.swipeTabs !== false, v => applyDisplay(setDisplay({ swipeTabs: v ? null : false })),
+        'The page follows your finger to the next tab.', 'On unless you switch it off. Also from pages under a tab. Not while typing, from the screen’s edges, or on tables and lists that scroll sideways.'),
+      toggle('Swipe from the left edge to go back (iPhone app)', st.edgeBack !== false, v => applyDisplay(setDisplay({ edgeBack: v ? null : false })),
+        IPHONE_APP() ? 'From a page under a tab, drag from the left edge.' : 'Only in the app added to an iPhone or iPad home screen.',
+        IPHONE_APP() ? 'On unless you switch it off.' : 'Android phones use their own Back gesture from the edges.'),
+      toggle('Press and hold a Logbook row for its menu', st.rowHold, v => applyDisplay(setDisplay({ rowHold: v || null })), 'Copy, Reflect and Edit, without the row’s buttons.', 'Hold for half a second without moving. A right-click does the same on a computer.'),
+      h('h3', {}, 'Keyboard'),
+      // the device's own value, else the profile's default (device-presets.js: on in the Personal profile)
+      toggle('Hide the tab bar while typing', deviceOn(st, profile(), 'hideTabsTyping'), v => { applyDisplay(setDisplay({ hideTabsTyping: v })); toast('Saved on this device'); },
+        'Phones: more room above the keyboard for the box you’re typing in and its Save button.', 'The tab bar comes back when the keyboard goes down. Off unless you switch it on (on in the Personal profile).'),
       DEVICE_NOTE()),
-    customCssCard(),
-    resetLink('the line strength, the name in the header, the page width, the tab bar (order and hidden tabs) and header options, the Logbook row buttons, upside down, pinning and custom CSS (switched off; your CSS is kept), and the button style, icons, plain calendar, page titles and shorter rows on this device', () =>
-      applyDisplay(setDisplay({ borders: null, appTitle: null, lineWidth: null, tabBar: null, tabIcons: null, hideHeader: null, caseInverted: null, pinBox: null, pinSearch: null, customCssOn: null, tabOrder: null, tabHidden: null, rowMenu: null, rowCopy: null, dayCopy: null, btnStyle: null, iconBtns: null, calPlain: null, pageTitles: null, rowShort: null }))));
+    resetLink('the start tab, the tab bar (place, order and hidden tabs), the Logbook row buttons, the page width, upside down, pinning, the gestures and the tab bar while typing on this device', () =>
+      applyDisplay(setDisplay({ startTab: null, tabBar: null, tabOrder: null, tabHidden: null, rowMenu: null, rowCopy: null, dayCopy: null, lineWidth: null, caseInverted: null, pinBox: null, pinSearch: null, swipeTabs: null, edgeBack: null, rowHold: null, hideTabsTyping: null }))));
 }
 export function renderAccessibility() {
   const st = display();
@@ -376,22 +386,12 @@ export function renderAccessibility() {
       h('h3', {}, 'Contrast and motion'),
       lookPick('contrast', 'Contrast', CONTRASTS, 'auto', 'Higher: darker text and stronger lines (lighter in dark mode).'),
       lookPick('motion', 'Motion', MOTIONS, 'auto', 'Reduce: pages, folds and swipes switch at once instead of sliding.'),
-      h('h3', {}, 'Gestures'),
-      toggle('Swipe left or right to change tab', st.swipeTabs !== false, v => applyDisplay(setDisplay({ swipeTabs: v ? null : false })),
-        'The page follows your finger to the next tab.', 'On unless you switch it off. Also from pages under a tab. Not while typing, from the screen’s edges, or on tables and lists that scroll sideways.'),
-      toggle('Swipe from the left edge to go back (iPhone app)', st.edgeBack !== false, v => applyDisplay(setDisplay({ edgeBack: v ? null : false })),
-        IPHONE_APP() ? 'From a page under a tab, drag from the left edge.' : 'Only in the app added to an iPhone or iPad home screen.',
-        IPHONE_APP() ? 'On unless you switch it off.' : 'Android phones use their own Back gesture from the edges.'),
-      toggle('Press and hold a Logbook row for its menu', st.rowHold, v => applyDisplay(setDisplay({ rowHold: v || null })), 'Copy, Reflect and Edit, without the row’s buttons.', 'Hold for half a second without moving. A right-click does the same on a computer.'),
-      h('h3', {}, 'Keyboard'),
-      // the device's own value, else the profile's default (device-presets.js: on in the Personal profile)
-      toggle('Hide the tab bar while typing', deviceOn(st, profile(), 'hideTabsTyping'), v => { applyDisplay(setDisplay({ hideTabsTyping: v })); toast('Saved on this device'); },
-        'Phones: more room above the keyboard for the box you’re typing in and its Save button.', 'The tab bar comes back when the keyboard goes down. Off unless you switch it on (on in the Personal profile).'),
+      help('Swiping, press and hold, and the tab bar while typing are in ', h('a', { href: '#layout' }, 'Layout'), '.'),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only.')),
-    resetLink('zoom, text size, bigger tap targets, swiping, contrast, motion, edge swipe, press and hold and the tab bar while typing on this device', () =>
-      applyDisplay(setDisplay({ zoom: null, textSize: null, bigTaps: null, swipeTabs: null, contrast: null, motion: null, edgeBack: null, rowHold: null, hideTabsTyping: null }))));
+    resetLink('zoom, text size, bigger tap targets, contrast and motion on this device', () =>
+      applyDisplay(setDisplay({ zoom: null, textSize: null, bigTaps: null, contrast: null, motion: null }))));
 }
-// Advanced display → the tab bar's order and hidden tabs (arrangeTabs): ↑ ↓ to move, a switch to show or hide
+// Layout → the tab bar's order and hidden tabs (arrangeTabs): ↑ ↓ to move, a switch to show or hide
 function tabArranger() {
   const wrap = h('div', { class: 'tab-arranger field', style: 'margin-top:10px' });
   const paint = () => {
@@ -857,7 +857,7 @@ export function profileCard() {
 }
 
 // Settings → Profile: the profile, then every switch that shows or hides part of the app, grouped by area, each group
-// with its own reset. The same settings as on their own pages (Logging, Display, Reflections), gathered in one place.
+// with its own reset. The same settings as on their own pages (Logging, Themes, Layout, Reflections), gathered in one place.
 // question: for a group whose reset turns something off (an opt-in extra), not "back to the defaults?"
 const groupReset = (what, run, question = `Put ${what} back to the profile’s defaults?`) => h('p', { class: 'reset-row' }, h('button', { class: 'small linkish', type: 'button', onclick: async () => {
   if (!await confirmBox('Reset this group', question, 'Reset')) return;
@@ -915,7 +915,7 @@ export function renderShowHide() {
       sw('Show the header (the app’s name and your name)', !d.hideHeader, v => applyDisplay(setDisplay({ hideHeader: !v }))),
       sw('Swipe left or right to change tab', d.swipeTabs !== false, v => applyDisplay(setDisplay({ swipeTabs: v ? null : false }))),
       barTabs().filter(([id]) => id !== 'more').map(([id, label]) => sw(`${label} on the tab bar`, !hidden.includes(id), v => setTabOnBar(id, v, () => hooks.render()))),
-      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, `Up to ${MAX_BAR} tabs fit, More included. Hidden tabs are first in More. The order is in Display → Advanced, and Edit on More.`),
+      h('p', { class: 'hint help', style: 'margin:0 0 6px' }, `Up to ${MAX_BAR} tabs fit, More included. Hidden tabs are first in More. The order is in Layout, and Edit on More.`),
       groupReset('the header, swiping and the profile’s tabs (Notes and the More pages go back into More, unless the profile puts them on the bar)', () => { applyDisplay(setDisplay({ hideHeader: null, swipeTabs: null, tabHidden: null, tabOrder: null })); hooks.paintTabs?.(); })),
     h('section', { class: 'card', 'data-group': 'tips' },
       h('h3', { style: 'margin-top:0' }, 'Tips and help'),
