@@ -1847,3 +1847,5 @@ html.wall::after { background: var(--bg); opacity: var(--wall-dim, 0); }
 dialog.theme-offer { margin: auto auto max(16px, env(safe-area-inset-bottom, 0px)); }
 dialog.theme-offer::backdrop { background: transparent; }
 input.theme-link { width: 100%; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+.theme-qr { margin: 12px auto 0; width: min(220px, 70vw); color: var(--muted); font-size: 13px; text-align: center; }
+.theme-qr svg { display: block; width: 100%; height: auto; border-radius: 8px; }

@@ -7,7 +7,16 @@ import { themeLink, themeFromLink, minePatch, saveMine, cleanMine } from './my-t
 
 const base = () => location.origin + location.pathname;
 
-// Share: the link, with Share (the phone's share sheet, so WhatsApp) where there is one, and Copy
+// the QR code of a link (the shared generator in /feedback/, loaded on first use and kept for offline by sw.js)
+function qrBox(link) {
+  const box = h('div', { class: 'theme-qr', role: 'img', 'aria-label': 'QR code of the theme link' });
+  import('../../feedback/qr.js').then(m => box.replaceChildren(m.qrSvg(link, 'QR code of the theme link')))
+    .catch(() => { box.textContent = 'QR code unavailable offline: use Copy link.'; });
+  return box;
+}
+
+// Share: the link and its QR code (to scan from the other phone), with Share (the phone's share sheet, so WhatsApp)
+// where there is one, and Copy
 export function shareThemeDialog(t) {
   const link = themeLink(base(), t);
   const box = h('input', { type: 'text', readonly: true, value: link, 'aria-label': 'Theme link', class: 'theme-link', onfocus: e => e.target.select() });
@@ -19,6 +28,7 @@ export function shareThemeDialog(t) {
   const m = modal(`Share “${t.name}”`, [
     h('p', { class: 'hint', style: 'margin:0 0 8px' }, 'Only the look travels (colours, fonts, spacing and the like), never cases, names, a photo or your own font file.'),
     box,
+    qrBox(link),
     h('div', { class: 'bar', style: 'margin-top:12px' }, h('span', { class: 'grow' }), h('button', { type: 'button', onclick: () => m.close() }, 'Close'),
       h('button', { type: 'button', class: share ? '' : 'primary', onclick: copy }, 'Copy link'), share),
   ]);

@@ -2,6 +2,7 @@
 // Your themes: save the look under a name, match it again, export to a file and import it back (checked values only).
 import assert from 'node:assert/strict';
 import { THEMES } from '../js/themes.js';
+import { TAB_ICONS } from '../js/theme-engine.js';
 import { lookOf, cleanMine, saveMine, minePatch, matchMine, exportText, importText, MAX_MINE, FILE_KIND, themeLink, themeFromLink, lookNow, nightRef } from '../js/my-themes.js';
 
 // every built-in theme's look survives the checks unchanged
@@ -62,7 +63,18 @@ const B = 'https://fake.example/logbook/';
 const hashOf = l => l.slice(B.length);
 for (const t of THEMES) assert.deepEqual(themeFromLink(hashOf(themeLink(B, t))).look, lookOf(t.look), t.id);
 const link = themeLink(B, { name: 'Fake <i>shift</i>', look: { accent: '#112233', spacing: 'roomy', fontUi: 'nunito' }, mode: 'dark' });
-assert.ok(link.startsWith(B + '#theme=') && /^[A-Za-z0-9_=#-]+$/.test(hashOf(link)), 'URL-safe');
+assert.ok(link.startsWith(B + '#t=') && /^[A-Za-z0-9_=#-]+$/.test(hashOf(link)), 'URL-safe');
+// short (owner, 21 Oct 2026): a bundled theme is a few characters, a fully custom one fits a small QR code
+for (const t of THEMES) assert.ok(hashOf(themeLink(B, t)).length <= 10, t.id + ' ' + hashOf(themeLink(B, t)));
+const custom = { name: 'Fake fully custom', mode: 'auto', look: { ...THEMES[0].look, accent: '#123456', round: 3, ftGap: 6, ftLetter: -0.02, wallpaper: 'dots', tabIcon: { log: Object.keys(TAB_ICONS)[0] },
+  colours: { light: { bg: '#fafafa', panel: '#ffffff', ink: '#101418', muted: '#4a5560', line: '#d0d6dc', accent: '#123456', accentInk: '#ffffff' },
+    dark: { bg: '#0b0e12', panel: '#161b22', ink: '#f0f3f6', muted: '#a8b3bf', line: '#2c333c', accent: '#7fb2ff', accentInk: '#000000' } } } };
+const customLink = themeLink(B, custom);
+assert.deepEqual(themeFromLink(hashOf(customLink)), { name: custom.name, mode: 'auto', look: lookOf(custom.look) });
+assert.ok(hashOf(customLink).length < 160, 'custom: ' + hashOf(customLink).length);
+// links made before an update that changes the lists ask for a new one; old #theme= JSON links still open
+const bytes = Buffer.from(hashOf(link).slice(3), 'base64url'); bytes[0] ^= 1;
+assert.throws(() => themeFromLink('#t=' + bytes.toString('base64url')), /older version/);
 assert.deepEqual(themeFromLink(hashOf(link)), { name: 'Fake ishift/i', look: { accent: '#112233', spacing: 'roomy', fontUi: 'nunito' }, mode: 'dark' });
 assert.equal(themeFromLink('#themes'), null); assert.equal(themeFromLink(''), null);
 const enc = o => '#theme=' + Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -70,7 +82,7 @@ const enc = o => '#theme=' + Buffer.from(JSON.stringify(o)).toString('base64url'
 const got = themeFromLink(enc({ v: 1, n: 'Fake', m: 'neon', l: { accent: 'url(x)', fontUi: 'file', fontLog: 'named', headFont: 'comic', spacing: 'huge', ftGap: 99,
   round: 1, wallpaper: 'photo', iconTint: 'red', tabIcon: { log: 'nope' }, customCss: 'body{}', colours: { light: { ink: '#ffffff', bg: '#ffffff' } }, bgTint: 'sepia' } }));
 assert.deepEqual(got, { name: 'Fake', look: { round: 1, bgTint: 'sepia' } }, 'bad values dropped, unreadable colours too');
-for (const broken of ['#theme=', '#theme=%%%', '#theme=' + 'A'.repeat(7000), enc({ v: 2, l: {} }), enc([1]), enc({ v: 1, l: 'x' }), '#theme=bm90IGpzb24'])
+for (const broken of ['#t=', '#t=%%%', '#t=QQ', hashOf(customLink).slice(0, 40), '#theme=', '#theme=%%%', '#theme=' + 'A'.repeat(7000), enc({ v: 2, l: {} }), enc([1]), enc({ v: 1, l: 'x' }), '#theme=bm90IGpzb24'])
   assert.throws(() => themeFromLink(broken), /broken or cut short/, broken.slice(0, 30));
 console.log('my-themes links: ok');
 

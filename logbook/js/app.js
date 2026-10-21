@@ -1319,8 +1319,8 @@ const sharedIn = (() => {
 // "Today's note" (the app's shortcut, ./#today): open today's daily note once signed in
 let wantToday = location.hash === '#today';
 if (wantToday) history.replaceState(null, '', location.pathname + location.search + '#notes');
-// a theme link (./#theme=…; ui-theme-link.js): offered once signed in (or in the demo), on Themes
-const isThemeLink = hash => /^#theme=/.test(hash);
+// a theme link (./#t=…, or an old ./#theme=…; ui-theme-link.js): offered once signed in (or in the demo), on Themes
+const isThemeLink = hash => /^#(t|theme)=/.test(hash);
 let wantTheme = isThemeLink(location.hash) ? location.hash : null;
 if (wantTheme) history.replaceState(null, '', location.pathname + location.search + '#themes');
 const offerTheme = hash => import('./ui-theme-link.js').then(m => m.offerSharedTheme(hash));
