@@ -34,8 +34,13 @@ A theme **never** sets light or dark (no `mode`): give it both palettes and it m
   `iconTintStrength` (10-100 in steps of 10), `tabIcon` (`{ tabId: name }`, names from `TAB_ICONS`, keys sorted). The
   app raises the dim by itself if a pattern would bring text on the page under 4.5:1 with the theme's colours.
 - **Fonts** (theme-revamp S5): `fontUi`, `fontLog` (or `same`) and `headFont` must be bundled (`THEME_FONTS`,
-  `HEAD_FONTS`): never `file` or `named`, which stay on their device. Theme links (`#theme=`) go through `checkTheme`
-  and lose any setting it rejects.
+  `HEAD_FONTS`): never `file` or `named`, which stay on their device. Theme links (`#t=`, old `#theme=`) go through
+  `checkTheme` and lose any setting it rejects.
+- **Short theme links** (my-themes.js `themeLink`; owner, 21 Oct 2026): a link packs the bundled theme it starts from
+  plus only the settings that differ, by their place in `THEME_KEYS`, the colour tokens and a word list built from
+  `FACETS`, `PATTERNS`, `TINTS` and the bundled themes. The link carries a 12-bit fingerprint of those lists, so any
+  change to them (a new key, choice or bundled-theme edit) makes older links say "ask for a new one". That is
+  intended; no format bump is needed. A bundled theme is ~41 characters with the address, a fully custom one ~150.
 - **Facets** (theme-engine.js `FACETS`; each off by default; the value must be one of its choices):
 
 | Key | Choices | What it changes |

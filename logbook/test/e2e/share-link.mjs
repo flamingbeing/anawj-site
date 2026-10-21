@@ -1,4 +1,4 @@
-// Fake data only. Themes that travel (theme-revamp S5): Share as a link, opening one (preview, Cancel, Use, a broken
+// Fake data only. Themes that travel (theme-revamp S5): Share as a link (short, with a QR code), opening one (preview, Cancel, Use, a broken
 // link), the night theme on Auto, case text size, and an uploaded font carried by an exported theme.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -24,8 +24,9 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('button', { name: 'Share as a link…' }).click();
   const box = p.locator('dialog[open] input.theme-link');
   const link = await box.inputValue();
-  assert.match(link, /\/logbook\/#theme=[A-Za-z0-9_-]+$/);
-  assert.ok(link.length < 2000, 'short enough for a chat message');
+  assert.match(link, /\/logbook\/#t=[A-Za-z0-9_-]+$/);
+  assert.ok(link.length - link.indexOf('#') < 100, 'short: a few changes from a bundled theme ' + link);
+  await p.locator('dialog[open] .theme-qr svg').waitFor();   // and its QR code, drawn on the phone
   await p.locator('dialog[open]').getByRole('button', { name: 'Close' }).click();
   assert.deepEqual(errors, []);
   await ctx.close();
@@ -53,7 +54,7 @@ try { for (const width of [390, 1280]) {
   assert.equal(cleanList(d.myThemes).length, 1, 'kept in Your themes');
   await p.locator('section.my-themes .theme-row').first().waitFor();
   // 4. a broken link: a message, nothing applied
-  await p.evaluate(() => { location.hash = '#theme=eyJ2IjoxLCJs'; });
+  await p.evaluate(() => { location.hash = '#t=QQ'; });
   await poll(() => p.locator('#toast').innerText().then(t => /broken or cut short/.test(t)).catch(() => false), 'broken link message');
 
   // 5. day and night: Auto, a night theme from Your themes; the phone going dark swaps the look
