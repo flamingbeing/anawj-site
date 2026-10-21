@@ -17,12 +17,8 @@ notes; every step is done.
 | `nuhroster.anawj.com/` | `nuh-roster/` | Own Firebase project `nuh-roster`. |
 | `nuhjuniormonthly.anawj.com/` | `nuh-junior-monthly/` | NUH junior monthly roster helper (15 Oct 2026). Data in the browser. |
 | `ntfroster.anawj.com/` | `ntf-roster/` | NTF anaesthesia monthly duty roster (15 Oct 2026). Data in the browser until its own Firebase project `ntf-roster` exists. |
-| `apmes.anawj.com/logbook/` | `logbook/` | With evals: one Firebase project (`apmes-logbook`), one sign-in. |
-| `apmes.anawj.com/evals/` | `evals/` | |
-| `apmes.anawj.com/people/` | `people/` | The people lists logbook and evals share (admins and PDs; 13 Oct 2026). |
-| `apmes.anawj.com/applicants/` | `applicants/` | Confidential feedback on residency applicants, by the same residents and faculty (17 Oct 2026). |
-| `apmes.anawj.com/360/` | `360/` | CCC 360: scholarly projects and multisource feedback nominees, collected from residents for the programme coordinators before a CCC meeting (17 Oct 2026). |
-| `beta-apmes.anawj.com/…` | same as apmes | Beta: the `beta` branch on the test Firebase project, for trying a change signed in before it goes live (PREVIEWS.md, "Beta"; 18 Oct 2026). |
+| `apmes.anawj.com/…` | (own repo `apmes`) | The APMES apps (logbook, evals, people, applicants, 360): moved to the `apmes` repo and its Worker `apmes` on 21 Oct 2026; the old folders here stay until removed. |
+| `beta-apmes.anawj.com/…` | (own repo `apmes`) | Beta: the `apmes` repo's `beta` branch, Worker `apmes-beta`, test Firebase project (moved 21 Oct 2026). |
 | `anawj.com/privacy/` | `privacy/` | Stays: the Google sign-in consent screen points here. |
 | `anawj.com/prewarm-update/` | `prewarm-update/` | Stays until no phone runs the old prewarm worker, then becomes a redirect. |
 | `anawj.com/edit/` (decided in step 5) | `edit/` | Stays on `anawj.com`: see "The page editor" below. |
@@ -51,10 +47,9 @@ deploys it on every merge to `main` (build command `node tools/stamp-versions.mj
 - `design.anawj.com/v1/` is the same kit for apps in other repos: `/v1/` = `nuhsdesign/`, `/v1/feedback/` = `feedback/`.
   Kit files (on every host) carry `Access-Control-Allow-Origin: *`. A breaking kit change goes in `/v2/`; `/v1/` stays.
   The custom domain is added to `anawj-preview` in Cloudflare by the owner.
-- `apmes.anawj.com` serves Firebase's sign-in helper pages (`/__/auth/`, `/__/firebase/`; `apmes-auth/firebase/init.json`)
-  and just `apmes/guidebook/` from `apmes/`.
+- `ntfroster.anawj.com` serves Firebase's sign-in helper pages (`/__/auth/`, `/__/firebase/`; `ntf-auth/firebase/init.json`).
 - Any other address (PR previews, the copy of main) serves the whole repo. To try a subdomain on a preview, use
-  `<preview>/_sites/apmes.anawj.com/evals/`.
+  `<preview>/_sites/ntfroster.anawj.com/`.
 - No data or storage in the Worker. The one API is owner-only, on `ask.anawj.com` (`worker/ask.js`); its secrets live
   in Cloudflare, never in the repo; previews never answer it.
 - Tests: `node worker/test/routes.test.mjs` and `node worker/test/sites.test.mjs`.

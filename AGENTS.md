@@ -8,11 +8,11 @@ patient data, real evaluation data, secrets or tokens.** Anything private goes i
 
 | App | Folder | Host | Start with |
 |---|---|---|---|
-| APMES case logbook | `logbook/` | `apmes.anawj.com/logbook/` | `NOTES.md`, `README.md` |
-| APMES assessments (evals) | `evals/` | `apmes.anawj.com/evals/` | `NOTES.md`, `README.md` |
-| APMES People | `people/` | `apmes.anawj.com/people/` | `NOTES.md` |
-| Applicants feedback | `applicants/` | `apmes.anawj.com/applicants/` | `NOTES.md`, `PLAN.md` |
-| CCC 360 | `360/` | `apmes.anawj.com/360/` | `NOTES.md` |
+| APMES case logbook | `logbook/` (old copy) | `apmes.anawj.com/logbook/` (served from the `apmes` repo since 21 Oct 2026; this folder stays until removed) | the `apmes` repo |
+| APMES assessments (evals) | `evals/` (old copy) | `apmes.anawj.com/evals/` (served from the `apmes` repo since 21 Oct 2026; this folder stays until removed) | the `apmes` repo |
+| APMES People | `people/` (old copy) | `apmes.anawj.com/people/` (served from the `apmes` repo since 21 Oct 2026; this folder stays until removed) | the `apmes` repo |
+| Applicants feedback | `applicants/` (old copy) | `apmes.anawj.com/applicants/` (served from the `apmes` repo since 21 Oct 2026; this folder stays until removed) | the `apmes` repo |
+| CCC 360 | `360/` (old copy) | `apmes.anawj.com/360/` (served from the `apmes` repo since 21 Oct 2026; this folder stays until removed) | the `apmes` repo |
 | NUH daily roster | `nuh-roster/` | `nuhroster.anawj.com` | `NOTES.md` |
 | NTF monthly roster | `ntf-roster/` | `ntfroster.anawj.com` | `NOTES.md`, `SPEC.md` |
 | NUH junior monthly | `nuh-junior-monthly/` | `nuhjuniormonthly.anawj.com` | `NOTES.md` |
@@ -20,7 +20,7 @@ patient data, real evaluation data, secrets or tokens.** Anything private goes i
 | Hand surgery pages | `hand-babies/`, `hand-log/`, `cmcj/` | `hand.anawj.com` (served from the `hand` repo since 21 Oct 2026; these folders are old copies) | the `hand` repo |
 | Page editor | `edit/` | `anawj.com/edit/` | `edit/NOTES.md` |
 | Ask Claude | `ask/`, `worker/ask.js` | `ask.anawj.com` | `edit/NOTES.md` |
-| Programme documents | `apmes/` | not served (guidebook only) | `apmes/README.md` |
+| Programme documents | `apmes/` (old copy) | not served from here | the `apmes` repo |
 | Design tokens, app kit | `nuhsdesign/` | every host, `/nuhsdesign/` | `README.md` |
 
 The BIS to DSA and OT simulators live in the anantf site repo (`NTF-Anaesthesia/anantf-site`); work on them there.
@@ -31,9 +31,9 @@ Hosts: [SUBDOMAINS.md](SUBDOMAINS.md). Security: [OPERATIONS.md](OPERATIONS.md).
 - **Apps stay unlisted.** The homepage (`index.html`) only shows whether the server is up. Never link apps from it, and
   give each app page `<meta name="robots" content="noindex, nofollow">` (GitHub Pages ignores `_headers`).
 - **Subdomains** (owner, 13 Oct 2026): an app that saves data or signs people in gets its own subdomain (apps sharing
-  data or sign-in share one, like `apmes.`); static pages share one by topic (`hand.`). Never put a data app on a
+  data or sign-in share one, like `apmes.`, now served by the `apmes` repo); static pages share one by topic (`hand.`). Never put a data app on a
   subdomain with apps it doesn't need to share with.
-- **Firestore rules deploy live on merge** (`deploy-firestore-rules.yml`; the logbook's file also covers evals, people, applicants, 360). Run `tools/test-rules.sh` (local emulator, never the live projects), merge
+- **Firestore rules deploy live on merge** (`deploy-firestore-rules.yml`; `logbook/firestore.rules` is no longer deployed from here: the `apmes` repo deploys it since 21 Oct 2026). Run `tools/test-rules.sh` (local emulator, never the live projects), merge
   only when Checks are green, confirm the "Deploy Firestore rules" run, and report what the rules now allow or deny.
   Never loosen rules on real-data collections to pass a test. A manual run deploys over live rules: ask the owner.
   The workflow compiles the rules first, so a syntax error leaves the live rules as they were. A new Firestore-backed app
@@ -57,8 +57,7 @@ Hosts: [SUBDOMAINS.md](SUBDOMAINS.md). Security: [OPERATIONS.md](OPERATIONS.md).
 
 GitHub runs these on every PR ("Checks"; red means don't merge). Merge your own PRs once they pass, by the number the
 PR creation returned (never a guess), and report with the link. Handover PRs wait for the owner's approval.
-Beta (PREVIEWS.md, "Beta") is opt-in: only when the owner asks for it, or for sign-in or Firestore-rules changes,
-point `beta` at the branch, send him the beta link and merge on his "ship it". Otherwise PRs merge once Checks pass.
+Beta for the APMES apps now lives in the `apmes` repo (PREVIEWS.md, "Beta"); nothing here needs it. PRs merge once Checks pass.
 
 ```
 node tools/check.mjs

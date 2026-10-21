@@ -1,5 +1,7 @@
 # APMES CCC 360
 
+> **Moved (21 Oct 2026):** the live app is now served from the `apmes` repo (flamingbeing/apmes, apmes.anawj.com). This folder is an old copy until it is removed: edit there, not here.
+
 What the programme coordinators (PCs) collect from residents before a CCC (a residency meeting): the **scholar projects**
 each resident is doing, and the people who should give each resident **multisource feedback (MSF)**. It replaces the
 department's Google Form "CCC Projects & MSF" (owner, 17 Oct 2026). At `apmes.anawj.com/360/` (folder `360/`; `?demo` for

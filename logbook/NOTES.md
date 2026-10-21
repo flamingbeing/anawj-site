@@ -1,5 +1,7 @@
 # Logbook: working notes
 
+> **Moved (21 Oct 2026):** the live app is now served from the `apmes` repo (flamingbeing/apmes, apmes.anawj.com). This folder is an old copy until it is removed: edit there, not here.
+
 Decisions, conventions and how to work on the APMES logbook (`logbook/`). What's happening now (sessions, open
 work, what waits on the owner, the next steps, a dated decisions log) is in `STATUS.md`. Read this, then `README.md`
 (data model, Firestore layout, rules). Public repo: never commit real names, emails, case details or
