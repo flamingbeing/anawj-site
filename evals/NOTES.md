@@ -1,5 +1,7 @@
 # What we have learnt: MedHub, APMES evaluations and this project
 
+> **Moved (21 Oct 2026):** the live app is now served from the `apmes` repo (flamingbeing/apmes, apmes.anawj.com). This folder is an old copy until it is removed: edit there, not here.
+
 This file collects what was learnt while building `/evals` (October 2026), so the next person or agent doesn't have to rediscover it. It sits alongside [`README.md`](README.md) (how to run the app and the data model), [`SPEC.md`](SPEC.md) (module contracts), [`PLAN.md`](PLAN.md) (the original UX plan) and [`/apmes/`](../apmes/) at the repo root (programme documents, transcribed, and the blank portfolio template). If this file disagrees with the code, the code wins; if it disagrees with the EPA Guidebook v8, the guidebook wins. Decisions, status, operations and open items are in the owner's private notes.
 
 ## 1. Conventions that matter in code

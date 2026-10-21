@@ -16,23 +16,23 @@ const ASSETS = { async fetch(req) {
 const get = (url, method = 'GET') => worker.fetch(new Request(url, { method, redirect: 'manual' }), { ASSETS });
 const text = async r => (await r.text());
 
-// shared host: each app under its path (the hand pages moved to their own repo, 21 Oct 2026)
-let r = await get('https://apmes.anawj.com/logbook/');
+// apmes.anawj.com moved to the apmes repo (21 Oct 2026): this Worker no longer lists it or its beta twin
+import { SITES } from '../routes.js';
+assert.equal(SITES['apmes.anawj.com'], undefined); assert.equal(SITES['beta-apmes.anawj.com'], undefined);
+// a one-app host: the app at the root, with the folder-index page, noindex header, trailing-slash redirect (query kept) and 404s
+let r = await get('https://ntfroster.anawj.com/');
 assert.equal(r.status, 200); assert.match(await text(r), /<html/i);
 assert.equal(r.headers.get('X-Robots-Tag'), 'noindex, nofollow');
-r = await get('https://apmes.anawj.com/logbook/sw.js'); assert.equal(r.status, 200);
-r = await get('https://apmes.anawj.com/evals/'); assert.equal(r.status, 200);
-// no trailing slash: sent to the address with one, query kept
-r = await get('https://apmes.anawj.com/evals?x=1'); assert.equal(r.status, 301); assert.equal(r.headers.get('Location'), 'https://apmes.anawj.com/evals/?x=1');
+r = await get('https://ntfroster.anawj.com/sw.js'); assert.equal(r.status, 200);
+r = await get('https://ntfroster.anawj.com/ntf-roster/'); assert.equal(r.status, 200);
+r = await get('https://ntfroster.anawj.com/ntf-roster?x=1'); assert.equal(r.status, 301); assert.equal(r.headers.get('Location'), 'https://ntfroster.anawj.com/ntf-roster/?x=1');
 // a missing file and a missing folder are 404s
-r = await get('https://apmes.anawj.com/evals/nothing.js'); assert.equal(r.status, 404);
-r = await get('https://apmes.anawj.com/evals/nothing'); assert.equal(r.status, 404);
-// ... and a folder with an index but no slash redirects
-r = await get('https://apmes.anawj.com/logbook'); assert.equal(r.status, 301); assert.equal(r.headers.get('Location'), 'https://apmes.anawj.com/logbook/');
+r = await get('https://ntfroster.anawj.com/nothing.js'); assert.equal(r.status, 404);
+r = await get('https://ntfroster.anawj.com/nothing'); assert.equal(r.status, 404);
 // a subdomain never serves another app's files, the repo's notes or the root
 for (const [h, p] of [['nuhjuniormonthly.anawj.com', '/logbook/index.html'], ['nuhjuniormonthly.anawj.com', '/AGENTS.md'], ['nuhjuniormonthly.anawj.com', '/hand-babies/'],
-  ['apmes.anawj.com', '/nuh-roster/index.html'], ['apmes.anawj.com', '/nuh-roster/'], ['nuhroster.anawj.com', '/logbook/index.html'], ['nuhroster.anawj.com', '/AGENTS.md'],
-  ['nuhroster.anawj.com', '/prewarm/'], ['nuhroster.anawj.com', '/logbook/js/app.js'], ['apmes.anawj.com', '/evals/..%2flogbook/index.html'], ['apmes.anawj.com', '/evals/%2e%2e/prewarm/index.html']]) {
+  ['design.anawj.com', '/nuh-roster/index.html'], ['design.anawj.com', '/nuh-roster/'], ['ntfroster.anawj.com', '/nuh-roster/index.html'], ['nuhroster.anawj.com', '/logbook/index.html'], ['nuhroster.anawj.com', '/AGENTS.md'],
+  ['nuhroster.anawj.com', '/prewarm/'], ['nuhroster.anawj.com', '/logbook/js/app.js'], ['design.anawj.com', '/v1/..%2flogbook/index.html'], ['design.anawj.com', '/v1/%2e%2e/prewarm/index.html']]) {
   r = await get(`https://${h}${p}`);
   assert.equal(r.status, 404, `${h}${p} -> ${r.status}`);
 }
@@ -43,7 +43,7 @@ r = await get('https://nuhroster.anawj.com/nuh-roster/sw.js'); assert.equal(r.st
 r = await get('https://nuhroster.anawj.com/nuh-roster'); assert.equal(r.status, 301);
 r = await get('https://nuhroster.anawj.com/'); assert.equal(r.status, 200);
 // the shared design folder is served on every subdomain (apps link ../nuhsdesign/tokens.css); the old /design/ is gone
-for (const h of ['nuhjuniormonthly.anawj.com', 'apmes.anawj.com', 'nuhroster.anawj.com', 'nuhroster.anawj.com']) {
+for (const h of ['nuhjuniormonthly.anawj.com', 'ntfroster.anawj.com', 'nuhroster.anawj.com', 'nuhroster.anawj.com']) {
   r = await get(`https://${h}/nuhsdesign/tokens.css`); assert.equal(r.status, 200, h);
   r = await get(`https://${h}/nuhsdesign`); assert.equal(r.status, 301, h);
   assert.equal(r.headers.get('Location'), `https://${h}/nuhsdesign/`);
@@ -57,20 +57,19 @@ for (const u of ['https://design.anawj.com/v1/tokens.css', 'https://design.anawj
 }
 r = await get('https://design.anawj.com/v1'); assert.equal(r.status, 301); assert.equal(r.headers.get('Location'), 'https://design.anawj.com/v1/');
 r = await get('https://design.anawj.com/logbook/'); assert.equal(r.status, 404);
-r = await get('https://apmes.anawj.com/evals/'); assert.equal(r.headers.get('Access-Control-Allow-Origin'), null);
-// apmes.anawj.com also serves Firebase's sign-in helper pages at /__/auth/ (handler is handler.html, as on GitHub Pages)
-r = await get('https://apmes.anawj.com/__/auth/handler?apiKey=x&mode=y'); assert.equal(r.status, 200);
-r = await get('https://apmes.anawj.com/__/auth/handler.js'); assert.equal(r.status, 200);
-r = await get('https://apmes.anawj.com/__/auth/iframe?apiKey=x'); assert.equal(r.status, 200);
-r = await get('https://apmes.anawj.com/__/firebase/init.json'); assert.equal(r.status, 200);
-assert.equal(JSON.parse(await r.text()).authDomain, 'apmes.anawj.com');
-assert.equal((await get('https://apmes.anawj.com/__/auth/handler.html')).status, 200);
-r = await get('https://apmes.anawj.com/apmes/guidebook/dops-expectations.md'); assert.equal(r.status, 200);
-for (const u of ['https://apmes.anawj.com/apmes/', 'https://apmes.anawj.com/apmes/originals/x', 'https://apmes.anawj.com/apmes/README.md', 'https://nuhroster.anawj.com/apmes/guidebook/dops-expectations.md', 'https://nuhroster.anawj.com/apmes/guidebook/dops-expectations.md']) {
+r = await get('https://ntfroster.anawj.com/'); assert.equal(r.headers.get('Access-Control-Allow-Origin'), null);
+// ntfroster.anawj.com also serves Firebase's sign-in helper pages at /__/auth/ (handler is handler.html, as on GitHub Pages)
+r = await get('https://ntfroster.anawj.com/__/auth/handler?apiKey=x&mode=y'); assert.equal(r.status, 200);
+r = await get('https://ntfroster.anawj.com/__/auth/handler.js'); assert.equal(r.status, 200);
+r = await get('https://ntfroster.anawj.com/__/auth/iframe?apiKey=x'); assert.equal(r.status, 200);
+r = await get('https://ntfroster.anawj.com/__/firebase/init.json'); assert.equal(r.status, 200);
+assert.equal(JSON.parse(await r.text()).authDomain, 'ntfroster.anawj.com');
+assert.equal((await get('https://ntfroster.anawj.com/__/auth/handler.html')).status, 200);
+for (const u of ['https://nuhroster.anawj.com/apmes/guidebook/dops-expectations.md', 'https://ntfroster.anawj.com/apmes/guidebook/dops-expectations.md']) {
   assert.equal((await get(u)).status, 404, u);
 }
 // ... and only there, only those two folders
-for (const u of ['https://nuhroster.anawj.com/__/auth/handler', 'https://nuhroster.anawj.com/__/firebase/init.json', 'https://nuhroster.anawj.com/__/auth/handler', 'https://apmes.anawj.com/__/', 'https://apmes.anawj.com/apmes-auth/firebase/init.json']) {
+for (const u of ['https://nuhroster.anawj.com/__/auth/handler', 'https://nuhroster.anawj.com/__/firebase/init.json', 'https://design.anawj.com/__/auth/handler', 'https://ntfroster.anawj.com/__/', 'https://ntfroster.anawj.com/ntf-auth/firebase/init.json']) {
   assert.equal((await get(u)).status, 404, u);
 }
 // only GET and HEAD
@@ -85,10 +84,10 @@ r = await get('https://anawj-preview.example.workers.dev/hand-babies/'); assert.
 r = await get('https://anawj-preview.example.workers.dev/logbook/js/app.js'); assert.equal(r.status, 200);
 r = await get('https://anawj-preview.example.workers.dev/nope/'); assert.equal(r.status, 404);
 // trying a subdomain on a preview
-r = await get('https://anawj-preview.example.workers.dev/_sites/apmes.anawj.com/evals/'); assert.equal(r.status, 200);
-r = await get('https://anawj-preview.example.workers.dev/_sites/apmes.anawj.com/evals'); assert.equal(r.status, 301);
-assert.equal(r.headers.get('Location'), 'https://anawj-preview.example.workers.dev/_sites/apmes.anawj.com/evals/');
-r = await get('https://anawj-preview.example.workers.dev/_sites/apmes.anawj.com/prewarm/'); assert.equal(r.status, 404);
+r = await get('https://anawj-preview.example.workers.dev/_sites/ntfroster.anawj.com/js/app.js'); assert.equal(r.status, 200);
+r = await get('https://anawj-preview.example.workers.dev/_sites/ntfroster.anawj.com/ntf-roster'); assert.equal(r.status, 301);
+assert.equal(r.headers.get('Location'), 'https://anawj-preview.example.workers.dev/_sites/ntfroster.anawj.com/ntf-roster/');
+r = await get('https://anawj-preview.example.workers.dev/_sites/design.anawj.com/prewarm/'); assert.equal(r.status, 404);
 r = await get('https://anawj-preview.example.workers.dev/_sites/nuhroster.anawj.com/'); assert.equal(r.status, 200);
 console.log('worker tests passed');
 
@@ -100,9 +99,9 @@ console.log('worker tests passed');
   r = await get(prev + '/hand-babies/'); assert.ok((await text(r)).includes(TAG + '</body>'), 'preview page has the button');
   assert.equal(r.headers.get('Set-Cookie'), null);
   r = await get(prev + '/hand-babies/app.js'); assert.ok(!(await text(r)).includes(TAG), 'not in scripts');
-  r = await get('https://apmes.anawj.com/evals/'); assert.ok(!(await text(r)).includes(TAG), 'off by default on the real address');
+  r = await get('https://ntfroster.anawj.com/'); assert.ok(!(await text(r)).includes(TAG), 'off by default on the real address');
   assert.equal(r.headers.get('Set-Cookie'), null);
-  r = await get('https://apmes.anawj.com/evals/?feedback=1'); assert.ok((await text(r)).includes(TAG), 'on with ?feedback=1');
+  r = await get('https://ntfroster.anawj.com/?feedback=1'); assert.ok((await text(r)).includes(TAG), 'on with ?feedback=1');
   assert.match(r.headers.get('Set-Cookie'), /^anawj-feedback=1; Max-Age=2592000; Path=\/; Secure; SameSite=Lax$/);
   assert.equal(r.headers.get('X-Robots-Tag'), 'noindex, nofollow');
   const withCookie = (url, cookie) => worker.fetch(new Request(url, { headers: { Cookie: cookie } }), { ASSETS });
@@ -111,7 +110,7 @@ console.log('worker tests passed');
   assert.match(r.headers.get('Set-Cookie'), /^anawj-feedback=; Max-Age=0;/);
   r = await withCookie('https://nuhroster.anawj.com/', 'anawj-feedback=0'); assert.ok(!(await text(r)).includes(TAG));
   // the script itself is served on every subdomain (a shared folder, like the design files)
-  for (const h of ['nuhjuniormonthly.anawj.com', 'apmes.anawj.com', 'nuhroster.anawj.com', 'nuhroster.anawj.com']) {
+  for (const h of ['nuhjuniormonthly.anawj.com', 'ntfroster.anawj.com', 'nuhroster.anawj.com', 'nuhroster.anawj.com']) {
     r = await get(`https://${h}/feedback/overlay.js`); assert.equal(r.status, 200, h);
   }
 }

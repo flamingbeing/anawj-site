@@ -4,7 +4,6 @@
 // wrangler.jsonc: "run_worker_first" sends every request here.
 import { resolve, feedback, FEEDBACK_COOKIE, kitCors } from './routes.js';
 import { handleAsk, ASK_HOST } from './ask.js';
-import { handleGuest, GUEST_HOST, GUEST_PATH } from './guest.js';
 
 const NOINDEX = 'noindex, nofollow';
 
@@ -12,7 +11,6 @@ export default {
   async fetch(request, env) {
     const u0 = new URL(request.url);
     if (u0.hostname === ASK_HOST && u0.pathname === '/api/ask') return handleAsk(request, env);
-    if (u0.hostname === GUEST_HOST && u0.pathname === GUEST_PATH) return handleGuest(request, env);
     if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
     const url = new URL(request.url);
     const r = resolve(url.hostname, url.pathname);

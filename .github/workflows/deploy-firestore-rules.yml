@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
     paths:
-      - 'logbook/firestore.rules'
       - 'nuh-roster/firestore.rules'
       - 'prewarm/firestore.rules'
       - 'nuh-junior-monthly/firestore.rules'
@@ -15,7 +14,6 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      logbook: ${{ steps.filter.outputs.logbook }}
       roster: ${{ steps.filter.outputs.roster }}
       prewarm: ${{ steps.filter.outputs.prewarm }}
       junior: ${{ steps.filter.outputs.junior }}
@@ -26,7 +24,6 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
-            logbook: 'logbook/firestore.rules'
             roster: 'nuh-roster/firestore.rules'
             prewarm: 'prewarm/firestore.rules'
             junior: 'nuh-junior-monthly/firestore.rules'
@@ -39,9 +36,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dir: logbook
-            project: apmes-logbook
-            changed: logbook
           - dir: nuh-roster
             project: nuh-roster
             changed: roster

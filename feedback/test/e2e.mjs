@@ -27,7 +27,7 @@ const SHOTS = process.env.SHOTS;
 
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, serviceWorkers: 'block' });
-await ctx.route(/^https:\/\/([a-z0-9-]+\.kohwenjun\.workers\.dev|(apmes|prewarmstudy|nuhroster)\.anawj\.com)\//, async route => {
+await ctx.route(/^https:\/\/([a-z0-9-]+\.kohwenjun\.workers\.dev|(ntfroster|prewarmstudy|nuhroster)\.anawj\.com)\//, async route => {
   const req = route.request();
   const res = await worker.fetch(new Request(req.url(), { headers: req.headers(), redirect: 'manual' }), { ASSETS });
   const headers = Object.fromEntries(res.headers);
@@ -39,7 +39,7 @@ await ctx.route('https://api.github.com/repos/flamingbeing/anawj-site/pulls?stat
   body: JSON.stringify([{ number: 7, title: 'Something else', head: { ref: 'claude/other' }, html_url: 'https://github.com/flamingbeing/anawj-site/pull/7' },
     { number: 9, title: 'A longer branch name', head: { ref: 'claude/try-feedback-2' }, html_url: 'https://github.com/flamingbeing/anawj-site/pull/9' },
     { number: 412, title: 'Try the feedback button', head: { ref: 'claude/try-feedback' }, html_url: 'https://github.com/flamingbeing/anawj-site/pull/412' }]) }));
-await ctx.route(/^https:\/\/(?!api\.github\.com|[a-z0-9-]+\.kohwenjun\.workers\.dev|(apmes|prewarmstudy|nuhroster)\.anawj\.com)/, r => r.abort());
+await ctx.route(/^https:\/\/(?!api\.github\.com|[a-z0-9-]+\.kohwenjun\.workers\.dev|(ntfroster|prewarmstudy|nuhroster)\.anawj\.com)/, r => r.abort());
 
 const fb = page => page.locator('[data-anawj-feedback]');
 try {
@@ -232,21 +232,21 @@ try {
 
   // ---- a real address: off unless turned on
   const live = await ctx.newPage();
-  await live.goto('https://apmes.anawj.com/evals/');
+  await live.goto('https://ntfroster.anawj.com/');
   await live.waitForLoadState('load');
   assert.equal(await fb(live).count(), 0, 'off by default');
-  await live.goto('https://apmes.anawj.com/evals/?feedback=1');
+  await live.goto('https://ntfroster.anawj.com/?feedback=1');
   await fb(live).locator('#fab').waitFor();
-  await live.goto('https://apmes.anawj.com/people/');           // the cookie keeps it on for the whole host
+  await live.goto('https://ntfroster.anawj.com/ntf-roster/');           // the cookie keeps it on for the whole host
   await fb(live).locator('#fab').waitFor();
   await fb(live).locator('#fab').click();
   await fb(live).locator('#mShare').click();
   await fb(live).locator('#qr svg path').waitFor();
-  assert.match(await fb(live).locator('#shareLink').textContent(), /^https:\/\/apmes\.anawj\.com\/people\/\?feedback=1(#\w+)?$/);
+  assert.match(await fb(live).locator('#shareLink').textContent(), /^https:\/\/ntfroster\.anawj\.com\/ntf-roster\/\?feedback=1(#\w+)?$/);
   await fb(live).locator('#shareClose').click();
   await fb(live).locator('#fab').click();
   await fb(live).locator('#mOff').click();                  // "Turn off" clears it
-  await live.goto('https://apmes.anawj.com/evals/');
+  await live.goto('https://ntfroster.anawj.com/');
   await live.waitForLoadState('load');
   assert.equal(await fb(live).count(), 0, 'turned off');
 

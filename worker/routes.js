@@ -14,23 +14,15 @@ export const SITES = {
   'anaes.anawj.com': { moved: { '/bis/': 'https://anantf.com/bis/', '/ot/': 'https://anantf.com/ot/' } },
   'nuhroster.anawj.com': { root: 'nuh-roster/' },
   // NTF anaesthesia monthly duty roster (its own data, so its own host). /__/auth/ and /__/firebase/ are Firebase's
-  // sign-in helper pages on this host (authDomain ntfroster.anawj.com, as apmes does): ntf-auth/ holds its init.json.
+  // sign-in helper pages on this host (authDomain ntfroster.anawj.com): ntf-auth/ holds its init.json.
   'ntfroster.anawj.com': { root: 'ntf-roster/', prefixes: { '/__/auth/': '__/auth/', '/__/firebase/': 'ntf-auth/firebase/' } },
   // NUH junior monthly roster helper (cardiac and ICU calls into the department's Google Sheet; its own data)
   'nuhjuniormonthly.anawj.com': { root: 'nuh-junior-monthly/' },
-  // /people/ is the shared people lists (residents, faculty, PDs) the logbook and evals both use.
-  // /apmes/guidebook/ is the programme guidebook text the evals app reads (just that folder of apmes/).
-  // /__/auth/ and /__/firebase/ are Firebase's sign-in helper pages (the auth domain of logbook and evals). The helper
-  // scripts are the same files anawj.com serves; init.json is this host's own copy (authDomain apmes.anawj.com).
-  'apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/people/': 'people/', '/applicants/': 'applicants/', '/360/': '360/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth/firebase/' } },
-  // The beta copy of apmes (PREVIEWS.md, "Beta"): served by the anawj-beta Worker from the beta branch. Same folders,
-  // but the apps pick the test Firebase project on beta- hosts (firebase-config.js), so nothing here touches live data.
-  // Its sign-in helper pages use their own init.json (apmes-auth-beta/: the test project apmes-logbook-beta).
+  // apmes.anawj.com and beta-apmes.anawj.com moved to the apmes repo (its own Workers) on 21 Oct 2026: not listed here.
   // The NUHS design kit for every app, also in other repos (repo split, 21 Oct 2026): /v1/ is nuhsdesign/ and
   // /v1/feedback/ the feedback button's script. Kit files carry a CORS header (kitCors), so pages on other hosts
   // can load them. A new kit version that breaks pages goes in /v2/ beside it; /v1/ stays as it is.
   'design.anawj.com': { prefixes: { '/v1/feedback/': 'feedback/', '/v1/': 'nuhsdesign/' } },
-  'beta-apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/people/': 'people/', '/applicants/': 'applicants/', '/360/': '360/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth-beta/firebase/' } },
 };
 
 // The one folder every host serves as it is: the shared design files (styles only, no data), so a subdomain's apps can

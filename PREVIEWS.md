@@ -12,7 +12,7 @@ projects with Workers".)
   everything in the browser.
 - **Signing in does not work on previews, on purpose.** Google sign-in only works from domains listed in each
   Firebase project, and the previews aren't listed, so preview code can never read or change real data. Saving
-  to Google Drive / Dropbox doesn't work there either (both are registered to apmes.anawj.com only).
+  to Google Drive / Dropbox doesn't work there either (both are registered to apmes.anawj.com only, now served by the `apmes` repo).
 - **Firestore rules** are not previewed: they deploy on merge to `main`. Test rule changes with the emulator
   (`logbook/NOTES.md`, "Working on it").
 - Previews are public if someone has the link, and are kept out of search engines (`_headers`). Fake data only,
@@ -53,27 +53,13 @@ settings are in the dashboard.
 
 ## Beta: try a change signed in, before it goes live
 
-PR previews can't sign in. **Beta** can, against a separate **test** Firebase project (test data only), so a change to
-the logbook or evals can be tried for real before it reaches `apmes.anawj.com` (owner, 18 Oct 2026).
+PR previews can't sign in. **Beta** can, against a separate **test** Firebase project (test data only). Since
+21 Oct 2026 beta belongs to the **`apmes` repo**: its `beta` branch is served at `beta-apmes.anawj.com` by that repo's
+Worker `apmes-beta` (see that repo's `NOTES.md`, "Beta"). It is opt-in (owner, 20 Oct 2026): only when the owner asks,
+or for sign-in or rules changes; then the PR waits for his "ship it".
 
-- **Address:** `https://beta-apmes.anawj.com/logbook/` (and `/evals/`, `/people/`, `/applicants/`, `/360/`): the live
-  address with `beta-` in front. Its browser storage is separate from the live site's.
-- **What it serves:** the `beta` branch, through a second Worker, `anawj-beta` (`wrangler.jsonc`, `env.beta`), with its
-  own Workers Builds: production branch `beta`, deploy command `npx wrangler deploy --env beta`. The folders are the
-  same as apmes (`beta-apmes.anawj.com` in `worker/routes.js`).
-- **Which data:** `logbook/js/firebase-config.js` and `evals/js/firebase-config.js` pick the test project
-  `apmes-logbook-beta` (`TEST`) on any `beta-` host, so the code tried on beta is the code that goes live, unchanged.
-  Its sign-in helper pages are served from beta-apmes.anawj.com (`apmes-auth-beta/firebase/init.json`). It is on the
-  free plan: no backups, test data only.
-- **Trying a PR:** point `beta` at the PR's branch (`git push --force origin <branch>:beta`); `beta` is disposable,
-  nothing ever merges from it. Wait for the anawj-beta build, then send the owner the beta link.
-- **Opt-in** (owner, 20 Oct 2026): beta is used only when the owner asks, or for sign-in or rules changes; then the PR
-  waits for his "ship it" (AGENTS.md, "Before merging"). The `anawj-beta` Worker builds only `beta`, not every branch
-  (Settings → Builds: non-production branch builds off), so PRs get one preview, from `anawj-preview`.
-- **Firestore rules:** test the rules with the emulator as before; deploy them to the test project before live.
-
-Still to set up (once): Google sign-in on the test project, with `beta-apmes.anawj.com` in its authorised domains and
-`https://beta-apmes.anawj.com/__/auth/handler` on its OAuth client, and the `anawj-beta` Worker with its Workers Builds.
+This repo's `anawj-beta` Worker (`wrangler.jsonc`, `env.beta`) has **no address** (`routes: []`), so a deploy from the
+old `beta` branch here can never take `beta-apmes.anawj.com` back. Nothing here needs beta any more.
 
 ## Build minutes
 
