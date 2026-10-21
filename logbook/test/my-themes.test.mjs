@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import { THEMES } from '../js/themes.js';
 import { TAB_ICONS } from '../js/theme-engine.js';
-import { lookOf, cleanMine, saveMine, minePatch, matchMine, exportText, importText, MAX_MINE, FILE_KIND, themeLink, themeFromLink, lookNow, nightRef } from '../js/my-themes.js';
+import { lookOf, cleanMine, saveMine, minePatch, matchMine, exportText, importText, MAX_MINE, FILE_KIND, themeLink, themeFromLink, LINK_KEYS, lookNow, nightRef } from '../js/my-themes.js';
+import { lookField } from '../js/look-schema.js';
 
 // every built-in theme's look survives the checks unchanged
 for (const t of THEMES) assert.deepEqual(lookOf(t.look), Object.fromEntries(Object.entries(t.look).filter(([, v]) => v != null)), t.id);
@@ -58,31 +59,57 @@ assert.throws(() => saveMine([], 'Fake bad', bad), /Light ink on bg/);
 assert.throws(() => importText(JSON.stringify({ kind: FILE_KIND, version: 1, themes: [{ name: 'Fake bad', look: bad }] }), []), /Light ink on bg/);
 console.log('my-themes colours: ok');
 
-// Theme links (theme-revamp S5): every theme makes the trip unchanged; anything checkTheme rejects is dropped
+// Theme links (theme-revamp S5; format 2, 21 Oct 2026): every theme makes the trip unchanged; anything checkTheme
+// rejects is dropped
 const B = 'https://fake.example/logbook/';
 const hashOf = l => l.slice(B.length);
-for (const t of THEMES) assert.deepEqual(themeFromLink(hashOf(themeLink(B, t))).look, lookOf(t.look), t.id);
+for (const t of THEMES) assert.deepEqual(themeFromLink(hashOf(themeLink(B, t))), { name: t.name, look: lookOf(t.look) }, t.id);
 const link = themeLink(B, { name: 'Fake <i>shift</i>', look: { accent: '#112233', spacing: 'roomy', fontUi: 'nunito' }, mode: 'dark' });
 assert.ok(link.startsWith(B + '#t=') && /^[A-Za-z0-9_=#-]+$/.test(hashOf(link)), 'URL-safe');
-// short (owner, 21 Oct 2026): a bundled theme is a few characters, a fully custom one fits a small QR code
-for (const t of THEMES) assert.ok(hashOf(themeLink(B, t)).length <= 10, t.id + ' ' + hashOf(themeLink(B, t)));
+// short: a bundled theme is its id (a few characters), a fully custom one fits a small QR code
+for (const t of THEMES) assert.ok(hashOf(themeLink(B, t)).length <= 32, t.id + ' ' + hashOf(themeLink(B, t)));
 const custom = { name: 'Fake fully custom', mode: 'auto', look: { ...THEMES[0].look, accent: '#123456', round: 3, ftGap: 6, ftLetter: -0.02, wallpaper: 'dots', tabIcon: { log: Object.keys(TAB_ICONS)[0] },
   colours: { light: { bg: '#fafafa', panel: '#ffffff', ink: '#101418', muted: '#4a5560', line: '#d0d6dc', accent: '#123456', accentInk: '#ffffff' },
     dark: { bg: '#0b0e12', panel: '#161b22', ink: '#f0f3f6', muted: '#a8b3bf', line: '#2c333c', accent: '#7fb2ff', accentInk: '#000000' } } } };
 const customLink = themeLink(B, custom);
 assert.deepEqual(themeFromLink(hashOf(customLink)), { name: custom.name, mode: 'auto', look: lookOf(custom.look) });
 assert.ok(hashOf(customLink).length < 160, 'custom: ' + hashOf(customLink).length);
-// links made before an update that changes the lists ask for a new one; old #theme= JSON links still open
-const bytes = Buffer.from(hashOf(link).slice(3), 'base64url'); bytes[0] ^= 1;
-assert.throws(() => themeFromLink('#t=' + bytes.toString('base64url')), /older version/);
 assert.deepEqual(themeFromLink(hashOf(link)), { name: 'Fake ishift/i', look: { accent: '#112233', spacing: 'roomy', fontUi: 'nunito' }, mode: 'dark' });
+// a bundled theme changed a little is written out in full, not as the theme plus changes, so editing that theme later
+// never changes what an old link shows
+assert.deepEqual(themeFromLink(hashOf(themeLink(B, { name: 'Fake', look: { ...lookOf(THEMES[1].look), round: 3 } }))).look, { ...lookOf(THEMES[1].look), round: 3 });
+// links never go stale: the lists only grow at the end (test/fixtures/theme-links.json), and links made with them
+// still open as they did
+const { readFileSync } = await import('node:fs');
+const fx = JSON.parse(readFileSync(new URL('./fixtures/theme-links.json', import.meta.url), 'utf8'));
+assert.deepEqual(LINK_KEYS.slice(0, fx.keys.length), fx.keys, 'LINK_KEYS: add new settings at the end only');
+for (const [k, was] of Object.entries(fx.lists)) {
+  const f = lookField(k);
+  if (Array.isArray(was)) assert.deepEqual(f.values.slice(0, was.length), was, `${k}: add new choices at the end only`);
+  else assert.deepEqual({ min: f.min, step: f.step }, was, `${k}: keep its lowest value and step`);
+}
+for (const l of fx.links) assert.deepEqual(themeFromLink('#t=' + l.link), { name: l.name, look: l.look, ...(l.mode ? { mode: l.mode } : {}) }, l.link);
+// a setting or a value this phone doesn't know (a link from a newer app) is skipped, the rest kept
+const bitsLink = write => {
+  const w = []; const put = (v, n) => { for (let i = n - 1; i >= 0; i--) w.push(Math.floor(v / 2 ** i) % 2); };
+  const num = v => { do { put(v > 15 ? 1 : 0, 1); put(v % 16, 4); v = Math.floor(v / 16); } while (v > 0); };
+  const text = s => { num(s.length); for (const c of s) put(c.charCodeAt(0), 8); };
+  write(put, num, text);
+  return '#t=' + Buffer.from(Uint8Array.from({ length: Math.ceil(w.length / 8) }, (_, i) => w.slice(i * 8, i * 8 + 8).reduce((a, x, j) => a | (x << (7 - j)), 0))).toString('base64url');
+};
+assert.deepEqual(themeFromLink(bitsLink((put, num, text) => {
+  put(2, 2); put(0, 3); put(0, 1); text('Fake'); num(3);
+  num(500); put(0, 2); num(7);   // an unknown setting
+  num(LINK_KEYS.indexOf('spacing')); put(0, 2); num(90);   // an unknown choice
+  num(LINK_KEYS.indexOf('round')); put(0, 2); num(1);
+})), { name: 'Fake', look: { round: 1 } });
+// format 1 links (and the JSON #theme= ones before them) ask for a new one; a theme this app doesn't have says so
+const old = Buffer.from(hashOf(link).slice(3), 'base64url'); old[0] = (old[0] & 0x3f) | 0x40;
+assert.throws(() => themeFromLink('#t=' + old.toString('base64url')), /older version/);
+assert.throws(() => themeFromLink('#theme=' + Buffer.from(JSON.stringify({ v: 1, n: 'Fake', l: {} })).toString('base64url')), /older version/);
+assert.throws(() => themeFromLink(bitsLink((put, num, text) => { put(2, 2); put(0, 3); put(1, 1); text('nosuchtheme'); })), /isn’t in this version/);
 assert.equal(themeFromLink('#themes'), null); assert.equal(themeFromLink(''), null);
-const enc = o => '#theme=' + Buffer.from(JSON.stringify(o)).toString('base64url');
-// bad values from a stranger's link: dropped, the rest kept
-const got = themeFromLink(enc({ v: 1, n: 'Fake', m: 'neon', l: { accent: 'url(x)', fontUi: 'file', fontLog: 'named', headFont: 'comic', spacing: 'huge', ftGap: 99,
-  round: 1, wallpaper: 'photo', iconTint: 'red', tabIcon: { log: 'nope' }, customCss: 'body{}', colours: { light: { ink: '#ffffff', bg: '#ffffff' } }, bgTint: 'sepia' } }));
-assert.deepEqual(got, { name: 'Fake', look: { round: 1, bgTint: 'sepia' } }, 'bad values dropped, unreadable colours too');
-for (const broken of ['#t=', '#t=%%%', '#t=QQ', hashOf(customLink).slice(0, 40), '#theme=', '#theme=%%%', '#theme=' + 'A'.repeat(7000), enc({ v: 2, l: {} }), enc([1]), enc({ v: 1, l: 'x' }), '#theme=bm90IGpzb24'])
+for (const broken of ['#t=', '#t=%%%', '#t=gA', hashOf(customLink).slice(0, 40), '#t=' + 'A'.repeat(3000)])
   assert.throws(() => themeFromLink(broken), /broken or cut short/, broken.slice(0, 30));
 console.log('my-themes links: ok');
 

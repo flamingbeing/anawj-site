@@ -54,7 +54,7 @@ try { for (const width of [390, 1280]) {
   assert.equal(cleanList(d.myThemes).length, 1, 'kept in Your themes');
   await p.locator('section.my-themes .theme-row').first().waitFor();
   // 4. a broken link: a message, nothing applied
-  await p.evaluate(() => { location.hash = '#t=QQ'; });
+  await p.evaluate(() => { location.hash = '#t=gA'; });
   await poll(() => p.locator('#toast').innerText().then(t => /broken or cut short/.test(t)).catch(() => false), 'broken link message');
 
   // 5. day and night: Auto, a night theme from Your themes; the phone going dark swaps the look

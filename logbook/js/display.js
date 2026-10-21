@@ -11,6 +11,8 @@ import { checkCss } from './custom-css.js';
 import { applyFonts } from './fonts.js';
 import { cleanWall, dimOf, minDim, patternSamples, cssHex, getPhoto } from './wallpaper.js';
 import { rowLayoutOf } from './device-presets.js';
+import { LINE_HEIGHTS, CONTRASTS, BUTTON_STYLES, BORDERS, ROUNDS } from './look-schema.js';
+export { LINE_HEIGHTS, CONTRASTS, BUTTON_STYLES, BORDERS, ROUNDS };   // (look-schema.js: with the values a theme may hold)
 import { offBar } from './profiles.js';
 
 
@@ -103,9 +105,9 @@ export const DISPLAY_KEYS = ['colours', 'listHeight', 'myThemes', 'pageSize', 'l
   'theme', 'themeMode', 'headFont', 'bgTint', 'spacing', 'tabStyle', 'band', 'barBlur', 'tabActiveLabel', 'listStyle', 'titleAlign', 'switchStyle', 'pressStyle', 'iconWeight', 'typeStyle',
   'statusBar', 'headerStyle', 'tabIconFill', 'iconSet', 'pageMotion', 'sheetStyle', 'toastStyle', 'fieldStyle', 'checkStyle', 'headingTone', 'tabTone',
   'ftBtn', 'ftGap', 'ftLine', 'ftShadow', 'ftCases', 'ftDays', 'ftLetter', 'ftWeight',
-  'wallpaper', 'wallDim', 'iconTint', 'iconTintStrength', 'tabIcon', 'nightTheme', 'caseSize'];
+  'wallpaper', 'wallDim', 'iconTint', 'iconTintStrength', 'tabIcon', 'nightTheme', 'caseSize', 'themeKeep'];
 // (the last lines: Fine-tune, theme-engine.js TUNE_KEYS; wallpaper.js and the icon tint, theme-revamp S4; the theme when
-// the phone is dark, my-themes.js lookNow, and case text size, theme-revamp S5)
+// the phone is dark, my-themes.js lookNow, and case text size, theme-revamp S5; what stays when changing theme, look-schema.js)
 export function deviceDisplay() {
   try { const d = JSON.parse(localStorage.getItem(DISPLAY_KEY) || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; } catch { return null; }
 }
@@ -238,8 +240,6 @@ if (typeof window !== 'undefined' && window.matchMedia) matchMedia('(prefers-col
 // page width (lineWidth), line spacing, contrast, motion, icons-only tabs: classes on <html> and --lh (style.css, end); also set at
 // first paint from the same localStorage entry (index.html)
 export const LINE_WIDTHS = [['narrow', 'Narrow (easier to read on a big screen)'], ['normal', 'Normal (default)'], ['wide', 'Wide'], ['full', 'Full (no limit)']];
-export const LINE_HEIGHTS = [['0.9', 'Tight'], ['1', 'Normal (default)'], ['1.15', 'Relaxed'], ['1.3', 'Loose']];
-export const CONTRASTS = [['auto', 'Follow the device (default)'], ['normal', 'Normal'], ['high', 'Higher contrast']];
 export const MOTIONS = [['auto', 'Follow the device (default)'], ['full', 'Animations on'], ['reduce', 'Reduce motion']];
 export function applyLook(d = {}) {
   d = lookToShow(d);
@@ -309,7 +309,6 @@ function applyNavOrientation() {
   document.getElementById('tabs')?.setAttribute('aria-orientation', rail ? 'vertical' : 'horizontal');
 }
 if (typeof window !== 'undefined') window.addEventListener('resize', applyNavOrientation);
-export const BUTTON_STYLES = [['outlined', 'Outlined (default)'], ['filled', 'Filled'], ['tinted', 'Tinted'], ['plain', 'Plain']];
 // the header's words: the app's name, or with Page titles the page's ("Logbook"); render() in app.js says which page
 let pageLabel = '';
 export function setPageLabel(l) { pageLabel = l || ''; paintTitle(); }
@@ -328,10 +327,8 @@ export const APP_TITLE = 'APMES Logbook';
 // without APMES in the name (Profile → APMES; the Personal profile)
 export const defaultTitle = () => (shows('apmesTitle') ? APP_TITLE : 'Logbook');
 // Borders (Themes, per device): how strong the lines around cards, fields, buttons and chips are; the last is the default
-export const BORDERS = ['Borderless', 'Faint', 'Light', 'Soft', 'Normal (default)'];
 export const BORDER_MIX = [0, 25, 50, 75];
 // Corners (Themes, per device): every border-radius in style.css is multiplied by --round; Normal is the default
-export const ROUNDS = [['Square', 0], ['Slightly rounded', 0.5], ['Normal (default)', 1], ['Very round', 1.7]];
 export const roundLevel = d => (Number.isInteger(d.round) && d.round >= 0 && d.round < ROUNDS.length ? d.round : 2);
 // The tab bar (Layout, per device): the order of its tabs and which are hidden. More always stays
 // (Settings live there), at least two and at most seven (MAX_BAR, More included) stay on the bar; hidden main tabs

@@ -10,10 +10,9 @@ import { cleanExportOpts } from './export-opts.js';
 import { cleanDestinations } from './destinations.js';
 import { SWITCH_KEYS } from './profiles.js';
 import { cleanSync } from './sync-md.js';
-import { cleanColours, cleanAccent } from './colors.js';
 import { cleanMine } from './my-themes.js';
-import { FACET_KEYS, cleanFacet, TUNE_KEYS, cleanTune, cleanTintStrength, cleanTabIcons } from './theme-engine.js';
-import { cleanPattern, cleanDim } from './wallpaper.js';
+import { FACET_KEYS, TUNE_KEYS } from './theme-engine.js';
+import { cleanLook, KEEP_GROUPS } from './look-schema.js';
 import { cleanLayout } from './analytics.js';
 import { cleanLabels, cleanCaseTemplate } from './parts.js';
 import { cleanListFormat } from './list-format.js';
@@ -26,16 +25,10 @@ const SKIP = new Set(['sharedSeen', 'rYear', 'rYearAY', 'importMap', 'cloudBacku
 const str = (v, n = 200) => (typeof v === 'string' ? v.slice(0, n) : '');
 const strs = v => (Array.isArray(v) ? v.filter(x => typeof x === 'string').map(x => x.slice(0, 80)).slice(0, 300) : []);
 const OBJECTS = {
-  navStyle: v => ['tabs', 'rail'].includes(v) ? v : null,
-  rowLayout: v => ['card', 'compact', 'chat', 'timeline'].includes(v) ? v : null,
-  formLayout: v => ['page', 'sections'].includes(v) ? v : null,
-  colours: v => { const c = cleanColours(v); return Object.keys(c).length ? c : null; },
-  // the theme engine's facets: only their listed choices (theme-engine.js)
-  ...Object.fromEntries(FACET_KEYS.map(k => [k, v => cleanFacet(k, v)])),
-  ...Object.fromEntries(TUNE_KEYS.map(k => [k, v => cleanTune(k, v)])),   // Fine-tune: numbers in range
-  // Wallpaper (wallpaper.js): a pattern only (a photo never leaves its device), the dim; the icon tint and tab icons
-  wallpaper: v => cleanPattern(v), wallDim: v => cleanDim(v), iconTint: v => cleanAccent(v), iconTintStrength: v => cleanTintStrength(v),
-  tabIcon: v => { const t = cleanTabIcons(v); return Object.keys(t).length ? t : null; },
+  // look settings a theme may hold: only the values the Themes page can show (look-schema.js; a wallpaper photo never
+  // leaves its device), and which of them stay when changing theme
+  ...Object.fromEntries(['navStyle', 'rowLayout', 'formLayout', 'colours', ...FACET_KEYS, ...TUNE_KEYS, 'wallpaper', 'wallDim', 'iconTint', 'iconTintStrength', 'tabIcon'].map(k => [k, v => cleanLook(k, v)])),
+  themeKeep: v => (Array.isArray(v) ? KEEP_GROUPS.map(([g]) => g).filter(g => v.includes(g)) : null),
   // the theme when the phone is dark (a theme's id or 'mine:<id>'), case text size (theme-revamp S5)
   nightTheme: v => (typeof v === 'string' && /^(mine:)?[a-z0-9]{1,20}$/.test(v) ? v : null),
   caseSize: v => (['0.9', '1.15', '1.3', '1.5'].includes(String(v)) ? String(v) : null),

@@ -140,11 +140,11 @@ const ft = readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: { ft
 assert.equal(ft.ftCases, 4); assert.equal(ft.ftWeight, null); assert.equal(ft.spacing, 'compact');
 // fonts in a theme (theme-revamp S5): bundled ones only, so a link can't name a font file or a typed font
 assert.match(checkTheme({ ...themeById('nuhs'), look: { fontUi: 'file' } }).join(), /fontUi: a bundled font/);
-assert.match(checkTheme({ ...themeById('nuhs'), look: { fontLog: 'named', headFont: 'comic' } }).join(), /fontLog.*headFont/);
+assert.match(checkTheme({ ...themeById('nuhs'), look: { fontLog: 'named', headFont: 'comic' } }).join(), /(?=.*fontLog)(?=.*headFont)/);
 assert.deepEqual(checkTheme({ ...themeById('nuhs'), look: { fontUi: 'sourceserif', fontLog: 'same', headFont: 'jetbrains' } }), []);
 // links: bad values dropped (a stranger's link is checked like a theme), good ones kept
 const shared = themeFromLink(themeLink('https://fake.example/', { name: 'Fake', look: { spacing: 'roomy', ftGap: 6, fontUi: 'plex' } }).split('/')[3]);
 assert.deepEqual(shared.look, { spacing: 'roomy', ftGap: 6, fontUi: 'plex' });
-const raw = '#theme=' + Buffer.from(JSON.stringify({ v: 1, n: 'Fake', l: { spacing: 'cramped', ftGap: 40, fontUi: 'file', tabStyle: 'pill' } })).toString('base64url');
-assert.deepEqual(Object.keys(themeFromLink(raw).look).filter(k => k !== 'tabStyle'), [], 'bad facet, tune and font values dropped');
+const raw = themeLink('https://fake.example/', { name: 'Fake', look: { fontUi: 'file', fontLog: 'named', tabStyle: 'pill' } }).split('/')[3];
+assert.deepEqual(themeFromLink(raw).look, { tabStyle: 'pill' }, 'fonts that aren’t bundled dropped');
 console.log('theme engine tests passed');

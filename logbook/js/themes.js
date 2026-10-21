@@ -6,45 +6,25 @@
 
 import { coloursCss, checkColours } from './colors.js';
 import { STACKS, THEME_FONTS } from './fonts.js';
-import { FACETS, FACET_KEYS, facetCss, cleanFacet, TUNE_KEYS, cleanTune, tuneCss, iconTintCss, cleanTintStrength, cleanTabIcons } from './theme-engine.js';
-import { patternCss, cleanPattern, cleanDim } from './wallpaper.js';
+import { facetCss, tuneCss, iconTintCss } from './theme-engine.js';
+import { patternCss } from './wallpaper.js';
+import { LOOK_KEYS, lookField, cleanLook, keptKeys, TINTS, BANDS, HEAD_FONTS } from './look-schema.js';
+// (the background tints, top bands and heading fonts live in look-schema.js, with every look setting's allowed values)
+export { TINTS, BANDS, HEAD_FONTS };
 
-// the display keys a theme sets; anything a theme doesn't list goes back to its default (null), unless it keeps it
-export const THEME_KEYS = ['colours', 'accent', 'colourful', 'borders', 'flat', 'round', 'shadows', 'fontUi', 'fontLog', 'headFont', 'lineHeight',
-  'btnStyle', 'iconBtns', 'tabIcons', 'pageTitles', 'calPlain', 'rowShort', 'navStyle', 'rowLayout', 'formLayout', 'contrast', 'bgTint', 'band',
-  ...FACET_KEYS,   // the theme engine's facets (theme-engine.js): spacing, tab style, header, icons, motion, pop-ups, controls…
-  ...TUNE_KEYS,   // Fine-tune values (theme-engine.js): numbers, unset by default
-  'wallpaper', 'wallDim', 'iconTint', 'iconTintStrength', 'tabIcon'];   // wallpaper.js (a pattern, never a photo), icon tint, a tab's icon
+// the display keys a theme sets (look-schema.js LOOK); anything a theme doesn't list goes back to its default (null),
+// unless the theme or the device keeps it
+export const THEME_KEYS = LOOK_KEYS;
 // A photo wallpaper is this device's own (wallpaper.js): a theme or a saved theme that sets no wallpaper keeps it
 export function keepPhoto(patch, current = {}) {
   return current.wallpaper === 'photo' && patch.wallpaper == null ? { ...patch, wallpaper: 'photo', wallDim: current.wallDim ?? null } : patch;
 }
-
-// Background tints: the page ground (and for some the cards and text) in light and dark
-export const TINTS = {
-  auto: { label: 'From the colour (default)' },
-  white: { label: 'White', light: { bg: '#ffffff', line: '#e3e3e3' }, dark: { bg: '#111111', panel: '#191919' } },
-  grey: { label: 'Light grey', light: { bg: '#f3f2f1' }, dark: { bg: '#161616', panel: '#202020' } },
-  cream: { label: 'Cream', light: { bg: '#f7f3ec', panel: '#fffdf9', line: '#e6dfd3' }, dark: { bg: '#1b1916', panel: '#24211d', line: '#3a352e' } },
-  sepia: { label: 'Sepia (eye comfort)', light: { bg: '#efe6d2', panel: '#faf4e6', ink: '#3b352c', muted: '#6b6152', line: '#ddd1b8' }, dark: { bg: '#1d1915', panel: '#26211b', ink: '#e8dfcf', muted: '#b5a993', line: '#3d362c' } },
-  beige: { label: 'Beige', light: { bg: '#efeae2', line: '#ddd6cb' }, dark: { bg: '#0b141a', panel: '#111b21', line: '#26343d' } },
-  bluegrey: { label: 'Blue-grey', light: { bg: '#e7ebf0', line: '#d5dce4' }, dark: { bg: '#0e1621', panel: '#17212b', line: '#2b3846' } },
-  iosgrey: { label: 'Grouped grey', light: { bg: '#f2f2f7', line: '#d8d8dc' }, dark: { bg: '#000000', panel: '#1c1c1e', line: '#38383a' } },
-  graphite: { label: 'Graphite', light: { bg: '#f2f2f2' }, dark: { bg: '#1e1e1e', panel: '#262626', line: '#363636' } },
-  navy: { label: 'Navy night', light: { bg: '#eef2f8' }, dark: { bg: '#0a1628', panel: '#10223b', line: '#22385a' } },
-  obsidian: { label: 'Obsidian', light: { bg: '#f6f6f6', panel: '#ffffff', line: '#e3e3e3' }, dark: { bg: '#1e1e1e', panel: '#262626', line: '#363636' } },
-  notion: { label: 'Notion', light: { bg: '#ffffff', panel: '#ffffff', ink: '#37352f', muted: '#6b6a67', line: '#e9e9e7' }, dark: { bg: '#191919', panel: '#252525', ink: '#ebebea', muted: '#9b9b9b', line: '#373737' } },
-  instagram: { label: 'Instagram', light: { bg: '#ffffff', panel: '#ffffff', ink: '#262626', muted: '#737373', line: '#dbdbdb' }, dark: { bg: '#000000', panel: '#121212', ink: '#f5f5f5', muted: '#a8a8a8', line: '#262626' } },
-  xblack: { label: 'X', light: { bg: '#ffffff', panel: '#ffffff', ink: '#0f1419', muted: '#536471', line: '#eff3f4' }, dark: { bg: '#000000', panel: '#000000', ink: '#e7e9ea', muted: '#71767b', line: '#2f3336' } },
-  spotify: { label: 'Spotify', light: { bg: '#ffffff', panel: '#f6f6f6', line: '#e5e5e5' }, dark: { bg: '#121212', panel: '#1f1f1f', ink: '#ffffff', muted: '#b3b3b3', line: '#2a2a2a' } },
-  youtube: { label: 'YouTube', light: { bg: '#ffffff', panel: '#ffffff', ink: '#0f0f0f', muted: '#606060', line: '#e5e5e5' }, dark: { bg: '#0f0f0f', panel: '#212121', ink: '#f1f1f1', muted: '#aaaaaa', line: '#303030' } },
-  gmail: { label: 'Gmail', light: { bg: '#f6f8fc', panel: '#ffffff', ink: '#202124', muted: '#5f6368', line: '#dadce0' }, dark: { bg: '#131314', panel: '#1e1f20', ink: '#e3e3e3', muted: '#c4c7c5', line: '#444746' } },
-  materialgrey: { label: 'Material grey', light: { bg: '#fafafa', panel: '#ffffff', line: '#e0e0e0' }, dark: { bg: '#121212', panel: '#1e1e1e', line: '#333333' } },
-  tiktok: { label: 'TikTok', light: { bg: '#ffffff', panel: '#ffffff', ink: '#161823', muted: '#6a6b7e', line: '#e3e3e4' }, dark: { bg: '#000000', panel: '#121212', ink: '#ffffff', muted: '#a6a6ab', line: '#2f2f2f' } },
-  black: { label: 'Black', light: { bg: '#f4f4f4' }, dark: { bg: '#000000', panel: '#121212', line: '#2a2a2a' } },
-};
-export const BANDS = [['theme', 'The theme’s colours (default)'], ['shades', 'Shades of my colour'], ['nuh', 'The NUH stripe'], ['none', 'None']];
-export const HEAD_FONTS = [['same', 'Same as the interface (default)'], ['serif', 'Serif'], ['system', 'This device’s font'], ['inter', 'Inter'], ['lexend', 'Lexend'], ['atkinson', 'Atkinson Hyperlegible'], ['nunito', 'Nunito'], ['plex', 'IBM Plex Sans'], ['sourceserif', 'Source Serif'], ['jetbrains', 'JetBrains Mono'], ['mono', 'Monospace']];
+// Keep when changing theme (look-schema.js KEEP_GROUPS): the device's kept settings stay as they are, then the photo
+export function keepKept(patch, current = {}) {
+  const out = { ...patch };
+  for (const k of keptKeys(current)) out[k] = current[k] ?? null;
+  return keepPhoto(out, current);
+}
 export const NUH_BAND = ['#e57200', '#e4002b', '#178fd7', '#002f6c'];
 
 // round is a Corners level (0 square … 3 very round; 2, the default, is left out). group: classic | inspired. look: the keys it sets (the rest go back to their defaults). keep: keys it leaves as
@@ -1555,7 +1535,7 @@ export const themeById = id => THEMES.find(t => t.id === id) || THEMES[0];
 export function themePatch(theme, current = {}) {
   const patch = { theme: theme.id === 'nuhs' ? null : theme.id };
   for (const k of THEME_KEYS) patch[k] = (theme.keep || []).includes(k) ? current[k] ?? null : theme.look[k] ?? null;
-  return keepPhoto(patch, current);
+  return keepKept(patch, current);
 }
 // does the device's look still match its theme? -> { theme, custom }
 export function themeState(d = {}) {
@@ -1564,12 +1544,15 @@ export function themeState(d = {}) {
   // (colours is an object: compared by its contents)
   const val = (o, k) => (o[k] === false && k !== 'shadows' ? null : o[k] && typeof o[k] === 'object' ? JSON.stringify(o[k]) : o[k] ?? null);
   const photo = d.wallpaper === 'photo' && !theme.look.wallpaper;   // (kept by keepPhoto: not a change)
-  const custom = THEME_KEYS.some(k => !(theme.keep || []).includes(k) && val(d, k) !== val(theme.look, k)
+  const kept = keptKeys(d);   // (Keep when changing theme: the device's own, not a change either)
+  const custom = THEME_KEYS.some(k => !(theme.keep || []).includes(k) && !kept.has(k) && val(d, k) !== val(theme.look, k)
     && !(k === 'borders' && d.flat && theme.look.flat) && !(photo && (k === 'wallpaper' || k === 'wallDim')));
   return { theme, custom };
 }
 // The problems with a theme (an empty list when it is fine): run over every theme by the tests, so a new one can't
 // set an unknown key or value, leave text hard to read, or have an empty display name (docs/theme-engine.md)
+const canon = v => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
+const WHY = { enum: 'is not one of its choices', int: 'is out of range', tune: 'is out of range', colour: 'is not #rrggbb', icons: 'is not tab ids to icons in TAB_ICONS', bool: 'is not true', off: 'is not false' };
 export function checkTheme(t) {
   const bad = [];
   if (!/^[a-z0-9]{1,20}$/.test(t.id || '')) bad.push('id: lower-case letters and digits');
@@ -1577,22 +1560,15 @@ export function checkTheme(t) {
   if (!['classic', 'inspired'].includes(t.group)) bad.push('group: classic or inspired');
   if (!t.desc || t.desc.length > 90) bad.push('desc: one short line');
   if (t.mode) bad.push('mode: themes never set light or dark');
+  // every value one the Themes page can show (look-schema.js), as the page saves it (a facet's default is unset)
   for (const [k, v] of Object.entries(t.look || {})) {
     if (!THEME_KEYS.includes(k)) bad.push(`look.${k}: not a look setting`);
-    else if (FACETS.some(f => f.key === k) && cleanFacet(k, v) === null) bad.push(`look.${k}: ${JSON.stringify(v)} is not one of its choices`);
-    else if (TUNE_KEYS.includes(k) && cleanTune(k, v) === null) bad.push(`look.${k}: ${JSON.stringify(v)} is out of range`);
+    else if (canon(cleanLook(k, v)) !== canon(v)) bad.push(`look.${k}: ${JSON.stringify(v)} ${WHY[lookField(k).kind] || 'is not allowed'}${k === 'wallpaper' ? ' (a pattern, never a photo)' : ''}`);
   }
-  if (t.look?.bgTint && !TINTS[t.look.bgTint]) bad.push(`look.bgTint: no tint ${t.look.bgTint}`);
   const lk = t.look || {};
   // fonts: the bundled ones and the device's own only (a typed font name or an uploaded file never travels in a theme)
   if (lk.fontUi != null && !THEME_FONTS.includes(lk.fontUi)) bad.push('look.fontUi: a bundled font');
   if (lk.fontLog != null && lk.fontLog !== 'same' && !THEME_FONTS.includes(lk.fontLog)) bad.push('look.fontLog: a bundled font or "same"');
-  if (lk.headFont != null && !HEAD_FONTS.some(([v]) => v === lk.headFont)) bad.push('look.headFont: one of HEAD_FONTS');
-  if (lk.wallpaper != null && !cleanPattern(lk.wallpaper)) bad.push('look.wallpaper: a pattern (never a photo)');
-  if (lk.wallDim != null && cleanDim(lk.wallDim) === null) bad.push('look.wallDim: 0 to 90 in steps of 5');
-  if (lk.iconTint != null && !/^#[0-9a-f]{6}$/.test(lk.iconTint)) bad.push('look.iconTint: #rrggbb');
-  if (lk.iconTintStrength != null && cleanTintStrength(lk.iconTintStrength) === null) bad.push('look.iconTintStrength: 10 to 100 in steps of 10');
-  if (lk.tabIcon != null && JSON.stringify(cleanTabIcons(lk.tabIcon)) !== JSON.stringify(lk.tabIcon)) bad.push('look.tabIcon: tab ids to icons in TAB_ICONS, in order');
   if (t.band && !(t.band.length === 4 && t.band.every(c => /^#[0-9a-f]{6}$/.test(c)))) bad.push('band: four #rrggbb colours');
   try { checkColours(t.look || {}, TINTS[t.look?.bgTint] || {}); } catch (err) { bad.push('colours: ' + err.message); }
   return bad;

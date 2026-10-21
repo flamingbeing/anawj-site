@@ -87,6 +87,16 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click();
   await poll(async () => (await now()) === 'NUHS', 'reset');
   assert.equal(await p.locator('section.my-themes .theme-row', { hasText: 'Fake square' }).count(), 1, 'your themes kept');
+  // Keep when changing theme (look-schema.js): wallpaper and layout on; switching Layout off lets a theme bring its rows
+  const keep = name => p.getByRole('switch', { name, exact: true });
+  assert.ok(await keep('Wallpaper').isChecked() && await keep('Layout').isChecked() && !(await keep('Fonts and text').isChecked()));
+  const dsp = () => p.evaluate(async () => (await import('./js/display.js')).display());
+  await p.evaluate(async () => { const m = await import('./js/display.js'); m.setDisplay({ rowLayout: 'timeline' }); });
+  await keep('Layout').click();
+  await poll(async () => JSON.stringify((await dsp()).themeKeep) === '["wallpaper"]', 'Layout off');
+  assert.equal((await dsp()).rowLayout, 'timeline', 'switching it off changes nothing on its own');
+  await keep('Layout').click();
+  await poll(async () => JSON.stringify((await dsp()).themeKeep) === '["wallpaper","layout"]', 'Layout on again');
   assert.deepEqual(errors, []);
   await ctx.close();
   console.log('ok', width);

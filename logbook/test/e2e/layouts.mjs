@@ -45,7 +45,8 @@ try { for (const width of [390, 1200]) {
   assert.equal(await layout.getByRole('radio').count(), 8);
   await layout.locator('input[value=chat]').check();
   assert.ok(await p.locator('html.rows-chat').count());
-  assert.match(await p.locator('.theme-now').innerText(), /Custom/);
+  // layout is kept when changing theme (on by default): yours, so the theme isn't Custom
+  assert.doesNotMatch(await p.locator('.theme-now').innerText(), /Custom/);
   await layout.locator('input[value=card]').check(); passed++;
   await tab('logbook'); await p.locator('.seg button', { hasText: 'List' }).click();
   await p.getByLabel('Search cases').fill('Layout sample');
