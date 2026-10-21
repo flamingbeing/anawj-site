@@ -217,12 +217,16 @@ try {
   assert.equal((await page.textContent('#haemolink')).trim(), 'BP, HR, BIS', 'second tab is BP, HR, BIS');
   await page.click('.links.three a:has-text("Pre-op")');
   await page.waitForSelector('details.sect');
-  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 4, 'Pre-op page: Subject ID and group, pre-op, meds, bloods, all open');
+  assert.deepEqual(await page.$$eval('details.sect[open]', x => x.map(d => d.dataset.pg)), ['preop'], 'Pre-op page: only the first unfinished section starts open');
+  assert.equal(await page.$$eval('details.sect', x => x.length), 4, 'Pre-op page: Subject ID and group, pre-op, meds, bloods');
+  assert.match(await page.textContent('details.sect[data-pg="meds"] summary'), /Not started|\d+ of \d+ filled/, 'a folded header still says how much is filled');
   const pid3 = (await page.evaluate(() => location.hash)).split('/')[2];
   await page.evaluate(h => { location.replace(h); }, `#/p/${pid3}/data/day1`); await page.waitForSelector('details.sect');
-  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 2, 'POD1 page: chart review and analgesia');
+  assert.equal(await page.$$eval('details.sect', x => x.length), 2, 'POD1 page: chart review and analgesia');
+  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 1, 'POD1 page: one section open');
   await page.evaluate(h => { location.replace(h); }, `#/p/${pid3}/data/day2`); await page.waitForSelector('details.sect');
-  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 3, 'POD2 page: chart review, analgesia, discharge');
+  assert.equal(await page.$$eval('details.sect', x => x.length), 3, 'POD2 page: chart review, analgesia, discharge');
+  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 1, 'POD2 page: one section open');
   await page.evaluate(h => { location.replace(h); }, `#/p/${pid3}/data`); await page.waitForSelector('details.sect');
   await page.fill('#f-age', '67'); await page.keyboard.press('Enter');
   assert.match(await page.textContent('details.sect[data-pg="preop"] summary'), /1 of \d+ filled/, 'Enter saves the answer');
@@ -236,7 +240,9 @@ try {
     assert.equal(await page.getAttribute(`.chip[data-f="${nextKey}"][data-v]:nth-child(2)`, 'aria-pressed'), 'true', '→ then Enter picks the second choice');
   }
   await page.click('details.sect[data-pg="preop"] summary');
-  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 3, 'a header folds its section');
+  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 0, 'a header folds its section');
+  await page.click('details.sect[data-pg="meds"] summary');
+  assert.deepEqual(await page.$$eval('details.sect[open]', x => x.map(d => d.dataset.pg)), ['meds'], 'a header unfolds its section');
   await axe('other data'); await shot('other-data');
   await page.goBack(); await page.waitForSelector('input[data-in="sbp"]');
   await page.goBack(); await page.waitForSelector('.textlinks a[href$="/sheet"]');
@@ -299,6 +305,8 @@ try {
   await page.click('.chip[data-f="nd_dis"][data-v="1"]');
   await page.click('.chip[data-f="nd_psy"][data-v="2"]');
   assert.equal(await page.inputValue('#f-pacu_nudesc'), '3');
+  // from the top: mid-scroll, axe counts a chip half under the sticky top bar as too small
+  await page.evaluate(() => scrollTo(0, 0));
   await axe('pacu'); await shot('pacu');
 
   // settings and export

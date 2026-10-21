@@ -209,6 +209,10 @@ input.num { border: 2px solid var(--navy); border-radius: var(--r); background: 
 .comfort.done { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 0 6px 0 10px; font-size: 13px; }
 .comfort5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
 .comfort5 .chip { font-size: 11px; line-height: 1.15; padding: 2px; min-width: 0; hyphens: manual; }
+/* PACU: two per row with Neutral alone in the middle, whole words, still short enough to keep the key controls near the top */
+.comfort5.roomy { grid-template-columns: 1fr 1fr; }
+.comfort5.roomy .chip { font-size: 14px; line-height: 1.2; padding: 4px 8px; hyphens: none; }
+.comfort5.roomy .chip:nth-child(3) { grid-column: 1 / -1; }
 
 /* forms */
 .fld { display: grid; gap: 6px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 10px 12px; }
@@ -241,6 +245,10 @@ body.ro main::before { content: "Locked: read only. Unlock it on the home page t
 body.ro #save, body.ro [data-done], body.ro [data-undone], body.ro [data-sign], body.ro [data-unsign], body.ro #addix, body.ro [data-rmix] { display: none !important; }
 body.ro main .k, body.ro main .num, body.ro main .chip, body.ro main .tchip, body.ro main input, body.ro main select, body.ro main textarea, body.ro main [data-use], body.ro main [data-map] { pointer-events: none; opacity: .65; }
 .list a.locked { background: var(--bg); border-style: dashed; color: var(--muted); }
+.list a.declined { background: var(--bg); color: var(--muted); border-left: 6px solid var(--muted); }
+.list a.declined b { color: var(--muted); text-decoration: line-through; }
+.list .declline { color: var(--muted); font-style: italic; }
+.fld textarea { width: 100%; box-sizing: border-box; min-height: 84px; font: inherit; padding: 8px; border: 1px solid var(--line-input); border-radius: var(--r); resize: vertical; }
 .listhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .listhead .link { font-size: 14px; }
 .seltools { position: sticky; top: calc(56px + env(safe-area-inset-top, 0px)); z-index: 4; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px; background: var(--card); border: 1px solid var(--navy); border-radius: var(--r-card); }
@@ -437,9 +445,10 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 .syncchip[data-busy] { opacity: .6; }
 
 /* patient list: admin Form view shortcut on each line; select to lock / export (owner, 13 Oct 2026) */
-.list li.rowact { display: flex; gap: 6px; align-items: stretch; }
-.list li.rowact > a:first-child { flex: 1 1 auto; min-width: 0; }
-.list a.formlink { display: grid; place-items: center; flex: none; width: 52px; padding: 0; color: var(--navy); }
+/* the Form view shortcut is a small icon button at the card's top right, not a full-height tile (owner, 21 Oct 2026) */
+.list li.rowact { display: flex; gap: 6px; align-items: flex-start; }
+.list li.rowact > a:first-child { flex: 1 1 auto; min-width: 0; align-self: stretch; }
+.list a.formlink { display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0; color: var(--navy); }
 .headlinks { display: inline-flex; gap: 14px; }
 .seltools { display: grid; gap: 8px; }
 .seltools .selcount { flex: none; }
@@ -486,7 +495,7 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
   .stack:has(> .fld) > .fld > small { font-size: 11px; line-height: 1.2; }
   .stack:has(> .fld) > .fld > input { min-height: 42px; min-width: 0; width: 100%; box-sizing: border-box; padding-left: 8px; padding-right: 8px; }
   /* answers: full row, label left and buttons right for a Yes / No pair; stacked for longer lists */
-  .stack:has(> .fld) > .fld:has(> .seg) { grid-column: 1 / -1; }
+  .stack:has(> .fld) > .fld:has(> .seg), .stack:has(> .fld) > .fld.wide { grid-column: 1 / -1; }
   .stack:has(> .fld) > .fld.short, .stack:has(> .fld) > .fld:has(> .seg > .chip:nth-child(2):last-child):not(.longopt) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: center; column-gap: 10px; row-gap: 0; padding: 6px 10px; }
   .stack:has(> .fld) > .fld.short > .lab, .stack:has(> .fld) > .fld.short > small, .stack:has(> .fld) > .fld:has(> .seg > .chip:nth-child(2):last-child):not(.longopt) > .lab, .stack:has(> .fld) > .fld:has(> .seg > .chip:nth-child(2):last-child):not(.longopt) > small { grid-column: 1; }
   .stack:has(> .fld) > .fld.short > .seg, .stack:has(> .fld) > .fld:has(> .seg > .chip:nth-child(2):last-child):not(.longopt) > .seg { grid-column: 2; grid-row: 1 / span 2; min-width: 0; }

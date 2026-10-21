@@ -605,13 +605,13 @@ function home() {
       const e = lastEdit(p), locked = p.lock?.on, sa = ` data-sid="${esc(sid(p).toLowerCase())}"`;
       // the same Subject ID on two records (e.g. made on two phones without signal): readings are split between them
       const twin = list.some(q => q !== p && String(val(q, 'enrol_id') || '').toLowerCase() === String(val(p, 'enrol_id') || '').toLowerCase() && (val(q, 'site') || '') === (val(p, 'site') || ''));
-      const body = `<b>${esc(sidL(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b>${twin ? '<span class="twinline">Same Subject ID twice: readings may be split. Fill in one and correct the other’s ID (Pre-op and patient details), or delete it in Settings.</span>' : ''}<span${locked ? ' class="lockline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : esc(status(p))}</span>
+      const body = `<b>${esc(sidL(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b>${twin ? '<span class="twinline">Same Subject ID twice: readings may be split. Fill in one and correct the other’s ID (Pre-op and patient details), or delete it in Settings.</span>' : ''}<span${locked ? ' class="lockline"' : declined(p) ? ' class="declline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : declined(p) ? 'Declined to participate' : esc(status(p))}</span>
         ${pending[p.id] || failed[p.id] ? `<span class="unsent">${failed[p.id] ? 'Not saved to the team' : 'Not sent yet'}</span>` : ''}<span class="dueline" data-due="${p.id}" hidden></span>${podDue(p) ? `<span class="podline">${esc(podDue(p))}</span>` : ''}${progressHtml(p)}<small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
       if (selecting) return `<li${sa}><label class="selrow"><input type="checkbox" data-sel="${p.id}" ${selecting.has(p.id) ? 'checked' : ''}><span>${body}</span></label></li>`;
       // admins also get a shortcut to the patient's Form view on every line (owner, 13 Oct 2026)
       const formLink = canLock() ? `<a class="formlink" href="#/p/${p.id}/form" aria-label="Form view of ${esc(sidL(p))}" title="Form view">${FORM_ICON}</a>` : '';
       if (locked) return `<li${sa} class="${formLink ? 'rowact' : ''}"><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a>${formLink}</li>`;
-      return `<li${sa} class="${formLink ? 'rowact' : ''}"><a href="#/p/${p.id}"${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a>${formLink}</li>`;
+      return `<li${sa} class="${formLink ? 'rowact' : ''}"><a href="#/p/${p.id}"${declined(p) ? ' class="declined"' : ''}${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a>${formLink}</li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
     <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`}</p>${refreshHtml()}`);
   $('#psearch')?.addEventListener('input', e => { const q = e.target.value.trim().toLowerCase(); view.querySelectorAll('.list li[data-sid]').forEach(li => { li.hidden = !!q && !li.dataset.sid.includes(q); }); });
@@ -671,6 +671,7 @@ function podDue(p) {
   for (const [n, sign] of [[1, 'sign_pod1'], [2, 'sign_pod2']]) if (days >= n && !val(p, sign)) out.push(`POD${n} ${days > n ? 'overdue' : 'due today'}`);
   return out.join(' · ');
 }
+const declined = p => String(val(p, 'consent_st')) === '0';
 function status(p) {
   if (val(p, 'done')) return '✓ Data collection complete';
   if (val(p, 'pacu_in')) return 'PACU';
@@ -813,13 +814,14 @@ function openTarget(t, pad = true) {
 // on the PACU page; one line once answered
 const COMFORT = BY_ID.sat_pre.opts;
 let satEdit = null;
-function comfortHtml(p, id, label) {
+// roomy (PACU, owner 21 Oct 2026): two answers per row, Neutral alone, so the words never split; the Pre-warming tab keeps one row
+function comfortHtml(p, id, label, roomy = false) {
   const v = val(p, id);
   if (v != null && satEdit !== id) {
     return `<div class="comfort done"><span>${label}: <b>${esc(COMFORT.find(o => String(o[0]) === String(v))?.[1] || v)}</b></span><button class="link" data-satedit="${id}">Change</button><button class="link" data-satclear="${id}">Clear</button></div>`;
   }
   return `<div class="comfort"><span class="lab">${label}<small>ask the patient</small></span>
-    <div class="seg comfort5">${COMFORT.map(([ov, ol]) => `<button class="chip" data-sat="${id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${ol.replace('omfortable', 'omfort&shy;able')}</button>`).join('')}</div></div>`;
+    <div class="seg comfort5${roomy ? ' roomy' : ''}">${COMFORT.map(([ov, ol]) => `<button class="chip" data-sat="${id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${roomy ? ol : ol.replace('omfortable', 'omfort&shy;able')}</button>`).join('')}</div></div>`;
 }
 // true when the tap was a comfort answer, Change or Clear
 function comfortTap(p, t, draw, put = (k, v) => set(p, k, v)) {
@@ -1498,8 +1500,10 @@ route(/^\/p\/(\w+)\/data(?:\/(day1|day2))?$/, (id, day) => {
   header(sidL(p) + ' · ' + part.title, `#/p/${id}/haemo`);
   topBar(p, defaultSeries(p));
   const get = k => val(p, k);
-  const closed = new Set();
   const filled = pg => FORM[pg].filter(([k]) => val(p, k) != null).length;
+  // sections start folded except the first unfinished one (owner, 21 Oct 2026); each header keeps its "x of y filled"
+  const firstOpen = part.pages.find(pg => filled(pg) < FORM[pg].length);
+  const closed = new Set([...(part.study ? ['study'] : []), ...part.pages.filter(pg => pg !== firstOpen)]);
   const draw = () => {
     const y = window.scrollY;
     const sl = sealedBy(p, SIGN);
@@ -1519,7 +1523,12 @@ route(/^\/p\/(\w+)\/data(?:\/(day1|day2))?$/, (id, day) => {
   const stopOf = el => el.closest('.fld');
   const keyOf = fld => fld.querySelector('[data-f]')?.dataset.f;
   const focusStop = fld => { if (!fld) return; const t = fld.querySelector('input, .chip[aria-pressed="true"]') || fld.querySelector('.chip'); t.focus(); if (t.select && t.type === 'text') t.select(); };
-  const move = (k, by) => { const all = stops(); const i = all.findIndex(f => keyOf(f) === k); focusStop(all[i + by]); };
+  const move = (k, by) => {
+    const all = stops(), i = all.findIndex(f => keyOf(f) === k);
+    // past the last question of a section: unfold the next folded one and carry on there
+    if (!all[i + by] && by > 0) { const nx = all[i]?.closest('details')?.nextElementSibling; if (nx?.matches('details.sect:not([open])')) { nx.open = true; return focusStop(nx.querySelector('.fld')); } }
+    focusStop(all[i + by]);
+  };
   const pick = b => {
     const f = field(b.dataset.f); const v = f.type === 'code' ? +b.dataset.v : b.dataset.v;
     // the group can be corrected, never cleared; it sets the pre-warming due times
@@ -1592,8 +1601,10 @@ const FORM = {
 // the rest of the study's data (owner, 12 Oct 2026): every field of these pages, in template order
 const OTHER_PAGES = ['preop', 'meds', 'bloods', 'pod1', 'pod1an', 'pod2', 'pod2an', 'dc'];
 // "Downloaded" (pre-op and day 2) is no longer asked (owner, 13 Oct 2026); its template columns stay empty in the export
-const NOT_ASKED = new Set(['pre_dl', 'd2_dl']);
+// nor the Screening ID on Pre-op (owner, 21 Oct 2026): its column stays, blank for new patients
+const NOT_ASKED = new Set(['pre_dl', 'd2_dl', 'screen_id']);
 for (const pg of OTHER_PAGES) FORM[pg] = PAGES.find(x => x.id === pg).fields.filter(f => f.id !== 'enrol_id' && !NOT_ASKED.has(f.id)).map(f => [f.id]);
+FORM.preop.unshift(['consent_st']);
 // Reset a subject: clears every time, reading and answer, keeping the Subject ID, group and hospital (asks twice)
 const KEEP_ON_RESET = new Set(['enrol_id', 'arm', 'site', 'restored']);
 function resetSubject(p) {
@@ -1630,7 +1641,7 @@ function formPage(id, pg, back) {
     const pt = pg === 'pacu' ? `<div class="times pacutimes">${[['pacu_in', 'PACU in'], ['pacu_out', 'To ward']].map(([f, l]) =>
       `<button class="tchip ${get(f) ? 'set' : ''}" data-pev="${f}" aria-label="${EVENT_FULL[f] || l}: ${get(f) ? get(f) + ', tap to change' : 'tap to set now'}"><span>${l}</span><b>${get(f) ? esc(get(f)) : 'tap'}</b></button>`).join('')}</div>` : '';
     const sl = sealedBy(p, pg);
-    paint(`<div class="${sl ? 'sealed' : ''}">${pt}${pg === 'pacu' ? comfortHtml(p, 'sat_post', 'Comfortable after surgery?') : ''}<div class="stack">${FORM[pg].map(group => {
+    paint(`<div class="${sl ? 'sealed' : ''}">${pt}${pg === 'pacu' ? comfortHtml(p, 'sat_post', 'Comfortable after surgery?', true) : ''}<div class="stack">${FORM[pg].map(group => {
       if (group[0] === 'h') return `<h2>${group[1]}</h2>`;
       if (group[0] === 'tx') return txTable(p);
       if (group[0] === 'ix') return ixTable(p);
@@ -1708,6 +1719,7 @@ function fieldHtml(f, get) {
     return `<div class="fld${cls}"><span class="lab">${esc(f.label)}</span>${hint}<div class="seg ${opts.length > 4 ? 'many' : ''}">${opts.map(([ov, ol]) =>
       `<button class="chip" data-f="${f.id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${esc(ol)}</button>`).join('')}</div></div>`;
   }
+  if (f.long) return `<div class="fld wide"><label class="lab" for="${idA}">${esc(f.label)}</label>${hint}<textarea id="${idA}" data-f="${f.id}" rows="3" autocomplete="off">${esc(v ?? '')}</textarea></div>`;
   const mode = f.type === 'text' ? 'text' : f.type === 'int' ? 'numeric' : 'decimal';
   const type = f.type === 'date' ? 'date' : f.type === 'time' ? 'time' : 'text';
   return `<div class="fld"><label class="lab" for="${idA}">${esc(f.label)}${f.unit ? ` <small>${esc(f.unit)}</small>` : ''}</label>${hint}
@@ -1749,7 +1761,7 @@ route(/^\/nurse\/(\w{20,64})$/, token => {
     paint(`<p class="note">You can fill in only this participant’s PACU details here. Changes reach the study team as you go.</p>
       <div class="fld"><label class="lab" for="ninit">Your initials</label><input id="ninit" value="${esc(settings.me)}" maxlength="6" autocomplete="off" autocapitalize="characters"></div>
       <div class="${locked() ? 'sealed' : ''}"><div class="times pacutimes">${tchip('pacu_in', 'PACU in')}${tchip('pacu_out', 'To ward')}</div>
-      ${comfortHtml(rec, 'sat_post', 'Comfortable after surgery?')}
+      ${comfortHtml(rec, 'sat_post', 'Comfortable after surgery?', true)}
       <div class="stack">${FORM.pacu.map(group => group[0] === 'h' ? `<h2>${group[1]}</h2>` : group.map(k => fieldHtml(field(k), get)).join('')).join('')}</div></div>
       ${locked() ? sealNote({ f: rec.f }, 'pacu') : ''}${tickHtml(locked(), 'PACU', get('sign_pacu') || '', 'data-unsign', 'data-sign')}
       <p class="muted small" id="nstat" role="status">${esc(status)}</p>`);

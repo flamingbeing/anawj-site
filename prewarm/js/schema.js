@@ -253,7 +253,9 @@ export const EXTRA = [
   ...[['rbc', 'RBC'], ['plt', 'Platelets'], ['ffp', 'FFP'], ['cryo', 'Cryoprecipitate']].map(([k, l]) => ({ id: `io_${k}_ml`, label: l + ' volume', type: 'int', unit: 'mL' })),
   { id: 'io_ix_rows', label: 'Intra-op investigations', type: 'rows' },
   // free text for anything off-protocol (14 Oct 2026): a reading missed and why, monitor fault, warming stopped early
-  { id: 'io_dev', label: 'Anything unusual or off-protocol (missed reading and why, equipment fault)', type: 'text' },
+  { id: 'io_dev', label: 'Anything unusual or off-protocol (missed reading and why, equipment fault)', type: 'text', long: true },
+  // consent (owner, 21 Oct 2026): first on Pre-op; a declined patient looks different on the home list
+  { id: 'consent_st', label: 'Consent', type: 'code', opts: [[1, 'Patient consented, duplicate form given to patient'], [0, 'Declined to participate']] },
   yn('pacu_tx', 'Need for transfusion in PACU'),
   { id: 'done', label: 'Data collection complete (initials, date, time)', type: 'text' },
   ...[['dis', 'Disorientation'], ['beh', 'Inappropriate behaviour'], ['com', 'Inappropriate communication'], ['ill', 'Illusions / hallucinations'], ['psy', 'Psychomotor retardation']]
