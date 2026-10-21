@@ -284,29 +284,58 @@ try {
   // the admin sees the NUH patient
   await ad.goto(BASE + '#/');
   await ad.waitForFunction(() => /SYNC-01/.test(document.querySelector('.list')?.textContent || ''), null, { timeout: 15000 });
-  // Share subject (owner, 19 Oct 2026): the admin's subject link opens SYNC-01 on a new phone, which joins NUH first
+  // Share subject (owner, 21 Oct 2026): a one-subject link; a phone on no team opens only SYNC-01 and can fill it in
   await ad.click('.list a[href^="#/p/"]:not(.rowbtn)');
   await ad.click('.caseshare a[href$="/share"]');
-  await ad.waitForSelector('#suburl', { timeout: 15000 });
+  await ad.waitForSelector('#suburl', { timeout: 20000 });
   const subLink = await ad.inputValue('#suburl');
-  assert.match(subLink, /#\/join\/NUH\/NUH-TEST-CODE\/p\/\w+$/, 'the subject link: ' + subLink);
+  assert.match(subLink, /#\/s\/[a-z2-9]{24}$/, 'the subject link: ' + subLink);
   assert.ok(await ad.$('.paculink svg'), 'and a QR code');
+  assert.ok(await ad.$('[data-share-stop]'), 'an admin can stop it');
   if (SHOTS) await ad.screenshot({ path: SHOTS + '/share-subject.png' });
   const onSubject = pg => pg.waitForFunction(() => /SYNC-01/.test(document.querySelector('#title')?.textContent || '') && /^#\/p\/\w+$/.test(location.hash), null, { timeout: 25000 });
   const e = await (await b.newContext({ viewport: { width: 390, height: 844 } })).newPage();
   e.on('pageerror', x => errors.push('E: ' + x.message));
   await e.goto(subLink);
-  await e.waitForSelector('body[data-cloud=ready]');
-  await e.waitForSelector('#joinlink');
-  await e.fill('#me', 'ee'); await e.click('#joinlink');
   await onSubject(e);
-  assert.doesNotMatch(e.url(), /NUH-TEST-CODE/, 'the code leaves the address bar');
+  const subId = e.url().match(/#\/p\/(\w+)$/)[1];
+  await e.goto(BASE + '#/');
+  await e.waitForSelector('.list a');
+  assert.deepEqual(await e.$$eval('.list li b', x => x.map(y => y.textContent.replace(/\s+/g, ' ').trim())), ['Subject ID: SYNC-01 NUH'], 'only the shared subject on that phone');
+  assert.match(await e.textContent('main'), /only the subjects shared with this phone/);
+  // it fills in a PACU answer; the team gets it
+  await e.goto(`${BASE}#/p/${subId}/form/pacu`);
+  await e.waitForSelector('#f-pacu_temp');
+  await e.fill('#f-pacu_temp', '36.9'); await e.keyboard.press('Tab');
+  await e.waitForTimeout(500); await e.goto(BASE + '#/');
+  await e.waitForFunction(() => /^Synced/.test(document.querySelector('.syncline')?.textContent || ''), null, { timeout: 25000 })
+    .catch(async () => { throw new Error('guest phone: ' + (await e.textContent('main')).replace(/\s+/g, ' ').slice(0, 400)); });
+  // (the form page doesn't redraw by itself: open it again until the value is there)
+  const seesTemp = async (pg, v) => { for (let i = 0; i < 25; i++) { await pg.goto(`${BASE}#/p/${subId}/sheet`); await pg.goto(`${BASE}#/p/${subId}/form/pacu`); await pg.waitForSelector('#f-pacu_temp'); if (await pg.inputValue('#f-pacu_temp') === v) return; await pg.waitForTimeout(1000); } throw new Error('never saw ' + v); };
+  await seesTemp(ad, '36.9');
+  // and the team's changes reach it
+  await ad.fill('#f-pacu_temp', '37.0'); await ad.keyboard.press('Tab');
+  await seesTemp(e, '37.0');
+  // it is still on no team
+  await e.goto(BASE + '#/settings'); await e.waitForSelector('#code', { timeout: 15000 });
   // a phone already on the team goes straight to it, and a member's own Share subject gives the same link
   await bb.goto(subLink);
   await onSubject(bb);
   await bb.click('.caseshare a[href$="/share"]');
   await bb.waitForSelector('#suburl', { timeout: 15000 });
   assert.equal(await bb.inputValue('#suburl'), subLink);
+  assert.equal(await bb.$('[data-share-stop]'), null, 'only an admin can stop it');
+  // the admin stops the link: the guest phone loses the subject, and the link says it was stopped
+  await ad.goto(`${BASE}#/p/${subId}/share`);
+  await ad.waitForSelector('[data-share-stop]', { timeout: 15000 });
+  ad.once('dialog', d => d.accept());
+  await ad.click('[data-share-stop]');
+  await ad.waitForSelector('#suburl:not([value="' + subLink + '"]), [data-share-make]', { timeout: 20000 });
+  await e.goto(BASE + '#/');
+  await e.reload();
+  await e.waitForFunction(() => !document.querySelector('.list a'), null, { timeout: 25000 });
+  await e.goto(subLink);
+  await e.waitForFunction(() => /was stopped/.test(document.querySelector('main')?.textContent || ''), null, { timeout: 25000 });
   await ad.goto(BASE + '#/');
   await ad.waitForFunction(() => /SYNC-01/.test(document.querySelector('.list')?.textContent || ''), null, { timeout: 15000 });
   // the admin locks it: phone A sees it locked and can't open it; then the admin unlocks it

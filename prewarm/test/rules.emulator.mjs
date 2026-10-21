@@ -156,6 +156,62 @@ await t('another hospital cannot delete the link', assertFails(deleteDoc(doc(c, 
 await t('the member stops the link', assertSucceeds(deleteDoc(doc(a, 'pacu', TK))));
 await t('a stopped link is gone', assertSucceeds(getDoc(doc(nurse, 'pacu', TK)).then(s => { if (s.exists()) throw new Error('still there'); })));
 
+// the Share subject link: shares/{token} + a guest pass guests/{uid}_{pid} opens one patient only (owner, 21 Oct 2026)
+const PAY_G = { site: 'NUH', sid: 'S-07', email: 'pt@example.com', paynow: '91234567', setAt: 1, setBy: 'GG' };
+const SK = 'shr7k2m9q4x8w3v6n5b2c7d9', SK2 = 'shr7k2m9q4x8w3v6n5b2c7d0';
+await env.withSecurityRulesDisabled(async ctx => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'patients', 'g1'), pat('NUH', { enrol_id: { v: 'S-07', t: 1, by: 'AB' } }));
+  await setDoc(doc(db, 'patients', 'g2'), pat('NUH'));
+  await setDoc(doc(db, 'patients', 'g3'), { site: 'NUH', created: 1, locked: true, lock: { on: true, t: 1, by: ADMIN }, f: {} });
+});
+const share = (extra = {}) => ({ site: 'NUH', pid: 'g1', sid: 'S-07', created: 1, by: 'AB', ...extra });
+const pass = (db, uid, pid, token = SK) => setDoc(doc(db, 'guests', uid + '_' + pid), { token, pid, joinedAt: 1 });
+const guest = anonUser('phoneG'), other = anonUser('phoneH');
+await t('member makes a Share subject link', assertSucceeds(setDoc(doc(a, 'shares', SK), share())));
+await t('another hospital cannot make one for its site', assertFails(setDoc(doc(c, 'shares', SK2), share())));
+await t('a stranger cannot make one', assertFails(setDoc(doc(guest, 'shares', SK2), share())));
+await t('a short share token is refused', assertFails(setDoc(doc(a, 'shares', 'short'), share())));
+await t('a share with extra fields is refused', assertFails(setDoc(doc(a, 'shares', SK2), share({ all: true }))));
+await t('anyone signed in opens a share', assertSucceeds(getDoc(doc(guest, 'shares', SK))));
+await t('signed out cannot open a share', assertFails(getDoc(doc(nobody, 'shares', SK))));
+await t('nobody lists shares', assertFails(getDocs(collection(a, 'shares'))));
+await t('admin lists shares', assertSucceeds(getDocs(collection(adm, 'shares'))));
+await t('before the pass, the guest cannot read the patient', assertFails(getDoc(doc(guest, 'patients', 'g1'))));
+await t('a pass for another patient is refused', assertFails(pass(guest, 'phoneG', 'g2')));
+await t('a pass in someone else’s name is refused', assertFails(pass(guest, 'phoneH', 'g1')));
+await t('a pass with a made-up token is refused', assertFails(pass(guest, 'phoneG', 'g1', SK2)));
+await t('the guest takes a pass with the link', assertSucceeds(pass(guest, 'phoneG', 'g1')));
+await t('the guest takes it again (opening the link twice)', assertSucceeds(pass(guest, 'phoneG', 'g1')));
+await t('the guest reads that patient', assertSucceeds(getDoc(doc(guest, 'patients', 'g1'))));
+await t('the guest edits that patient', assertSucceeds(setDoc(doc(guest, 'patients', 'g1'), { site: 'NUH', created: 1, locked: false, f: { prewarm_0_core: { v: '36.5', t: 3, by: 'GG' } } }, { merge: true })));
+await t('the guest cannot read another patient', assertFails(getDoc(doc(guest, 'patients', 'g2'))));
+await t('the guest cannot edit another patient', assertFails(setDoc(doc(guest, 'patients', 'g2'), { f: { x: { v: 1, t: 1, by: 'G' } } }, { merge: true })));
+await t('the guest cannot list the hospital', assertFails(getDocs(query(collection(guest, 'patients'), where('site', '==', 'NUH'), where('locked', '==', false)))));
+await t('the guest cannot create a patient', assertFails(setDoc(doc(guest, 'patients', 'g9'), pat('NUH'))));
+await t('the guest cannot delete it', assertFails(setDoc(doc(guest, 'patients', 'g1'), { deleted: 9 }, { merge: true })));
+await t('the guest cannot lock it', assertFails(setDoc(doc(guest, 'patients', 'g1'), { lock: { on: true, t: 9, by: 'G' }, locked: true }, { merge: true })));
+await t('the guest cannot move it', assertFails(setDoc(doc(guest, 'patients', 'g1'), { site: 'SGH' }, { merge: true })));
+await t('the guest saves email and PayNow for it', assertSucceeds(setDoc(doc(guest, 'payments', 'g1'), { ...PAY_G, pid: 'g1' }, { merge: true })));
+await t('the guest cannot read them back', assertFails(getDoc(doc(guest, 'payments', 'g1'))));
+await t('the guest makes its PACU link', assertSucceeds(setDoc(doc(guest, 'pacu', TK2), pacuDoc({ pid: 'g1' }))));
+await t('the guest cannot make a PACU link for another patient', assertFails(setDoc(doc(guest, 'pacu', TK), pacuDoc({ pid: 'g2' }))));
+await t('the guest cannot stop the share', assertFails(deleteDoc(doc(guest, 'shares', SK))));
+await t('a member cannot stop it either', assertFails(deleteDoc(doc(a, 'shares', SK))));
+await t('a member corrects the shown Subject ID', assertSucceeds(updateDoc(doc(a, 'shares', SK), { sid: 'S-07b' })));
+await t('a member cannot move the share to another patient', assertFails(updateDoc(doc(a, 'shares', SK), { pid: 'g2' })));
+// a share whose site doesn't match the patient's opens nothing (an SGH phone naming an NUH patient)
+const sgh = anonUser('phoneS');
+await t('another SGH phone joins', assertSucceeds(join(sgh, 'phoneS', 'SGH', 'SGH-CODE-1')));
+await t('an SGH phone makes a share naming an NUH patient', assertSucceeds(setDoc(doc(sgh, 'shares', SK2), share({ site: 'SGH' }))));
+await t('…a pass with it is taken', assertSucceeds(pass(other, 'phoneH', 'g1', SK2)));
+await t('…but it opens nothing', assertFails(getDoc(doc(other, 'patients', 'g1'))));
+await t('a locked patient is closed to its guest', assertSucceeds(setDoc(doc(a, 'shares', 'shr-locked-0000000000001'), share({ pid: 'g3' }))).then(() => pass(guest, 'phoneG', 'g3', 'shr-locked-0000000000001')).then(() => assertFails(getDoc(doc(guest, 'patients', 'g3')))));
+await t('admin stops the share', assertSucceeds(deleteDoc(doc(adm, 'shares', SK))));
+await t('a stopped share closes the patient to its guest', assertFails(getDoc(doc(guest, 'patients', 'g1'))));
+await t('…and its edits', assertFails(setDoc(doc(guest, 'patients', 'g1'), { f: { prewarm_0_core: { v: '36.6', t: 4, by: 'GG' } } }, { merge: true })));
+await t('the team still reads the patient', assertSucceeds(getDoc(doc(a, 'patients', 'g1'))));
+
 // scan imports (Firetop writes them with its own sign-in, which bypasses rules; the app only reads and approves)
 await env.withSecurityRulesDisabled(async ctx => {
   await setDoc(doc(ctx.firestore(), 'scanImports', 'scan1'), { scan: 'scan1', createdAt: 1, status: 'pending', pages: [], fields: { age: { v: '67', flags: [] } } });

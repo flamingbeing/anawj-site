@@ -4,6 +4,7 @@
 //   members/{uid}  { site, initials, code, joinedAt }       codes/{site}  { code, setAt, setBy }   (admins only)
 //   admins/{email} {}                                       patients/{id} { site, created, deleted?, lock?, f: { id: {v,t,by} } }
 //   pacu/{token}   { site, pid, sid, created, f }      (the PACU nurse's link: the token is the secret; see firestore.rules)
+//   shares/{token} { site, pid, sid, created, by }  guests/{uid}_{pid} { token, pid, joinedAt }  (the Share subject link; see firestore.rules)
 //   scanImports/{id} { scan, subject?, createdAt, status, pages, fields: { id: { v, flags, page?, box? } }, reviewedBy?, reviewedAt? }  (Firetop writes, admins read and approve)
 //   forms/blank    { b64, name, size, setAt, setBy }        (the blank paper form, .docx; admins upload, members read)
 //   payments/{patient id} { site, pid, sid, email?, paynow?, setAt, setBy, emailSent?, paid?, cleared? }  (the team writes,
@@ -302,4 +303,36 @@ export async function pacuWatch(token, cb, onError) {
 export async function pacuStop(token) {
   const { db, F } = await sdk();
   await F.deleteDoc(F.doc(db, 'pacu', token));
+}
+
+// ---- Share subject link (owner, 21 Oct 2026): shares/{token} names one patient; a phone that opens it signs in
+// anonymously and records a guest pass (guests/{uid}_{pid}), which lets it read and edit only that patient.
+export async function shareCreate(token, data) {
+  const { db, F } = await sdk();
+  await F.setDoc(F.doc(db, 'shares', token), plain(data));
+}
+// the link's { site, pid, sid } from the server (null: stopped or never made)
+export async function shareGet(token) {
+  const { db, F } = await sdk();
+  try { const s = await F.getDocFromServer(F.doc(db, 'shares', token)); return s.exists() ? s.data() : null; }
+  catch (e) { if (e?.code === 'permission-denied') return null; throw e; }
+}
+export async function shareStop(token) {
+  const { db, F } = await sdk();
+  await F.deleteDoc(F.doc(db, 'shares', token));
+}
+// resolves once the server has the pass (the patient can't be read before that)
+export async function guestJoin(token, pid) {
+  const { auth, db, F, A } = await sdk();
+  if (!auth.currentUser) await A.signInAnonymously(auth);
+  await F.setDoc(F.doc(db, 'guests', auth.currentUser.uid + '_' + pid), { token, pid, joinedAt: Date.now() });
+}
+// one patient by id, for a guest phone; cb as in watchPatients (removed: the patient is gone)
+export async function watchPatient(pid, cb, onError) {
+  const { db, F } = await sdk();
+  return F.onSnapshot(F.doc(db, 'patients', pid), { includeMetadataChanges: true }, snap => {
+    const server = !snap.metadata.fromCache && !snap.metadata.hasPendingWrites;
+    if (snap.exists()) cb([{ id: snap.id, ...snap.data() }], { server, removed: [] });
+    else cb([], { server, removed: server ? [pid] : [] });
+  }, onError);
 }
