@@ -78,7 +78,17 @@
   "dark.warn",
   "dark.err",
   "wallInk",
-  "wallFrost"
+  "wallFrost",
+  "light.fill",
+  "light.onFill",
+  "light.link",
+  "light.focus",
+  "light.selection",
+  "dark.fill",
+  "dark.onFill",
+  "dark.link",
+  "dark.focus",
+  "dark.selection"
  ],
  "lists": {
   "colourful": [

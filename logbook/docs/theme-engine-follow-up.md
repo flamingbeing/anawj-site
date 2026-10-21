@@ -28,6 +28,14 @@ Read [theme-engine.md](theme-engine.md) and [the catalogue review](theme-catalog
   before, grid colours as their place, snapped colours in 18 bits, white and black pre-sent, tab icons as list places,
   6-bit names): a fully custom theme went from 178 to about 120 characters with the address. Format 2 links still open.
   Next: TE S3, wallpaper that can be seen.
+- 21 Oct 2026, TE S3: wallpaper that can be seen (text backing, pattern strength, see-through cards).
+- 21 Oct 2026, TE S4: one `resolvePalette(look, appearance, tint)` (colors.js) after explicit overrides, used by the
+  page's CSS (`paletteCss`, cached for the first paint, NUHS's too), the contrast checks, theme previews and the
+  status bar; the light tint no longer leaks onto auto-dark pages; soft accent, chips and info colours follow a
+  theme's own accent and card. Roles `fill`/`onFill`, `link`, `focus`, `selection`, defaulting to today's colours,
+  editable in Edit colours, checked once set, appended to theme links. NUHS is a written-out palette (`NUHS`); the
+  `DEFAULT_ACCENT` deletions in `schemeCss` and `colourPalette` are gone. `test/e2e/nuhs-baseline.mjs` holds NUHS to
+  its earlier colours (every element and variable, 80 screens). Next: TE S5, interaction states and layout fixes.
 
 ## Observed problems and recommended order
 
