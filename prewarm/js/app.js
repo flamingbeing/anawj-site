@@ -866,18 +866,20 @@ function comfortHtml(p, id, label, roomy = false, aside = '') {
 }
 // the top of the Induction room tab, one card tall so Save stays on screen: consent first; once consented, the
 // before-surgery comfort question with the consent answer on its label line; a declined patient is asked nothing more
+// The Email and PayNow button sits under consent (owner, 21 Oct 2026; it was at the bottom of the tab), once comfort is
+// answered too: a payment is for participants only, and earlier it would push Save off a phone screen
 function inductionAsks(p) {
   const c = val(p, 'consent_st');
   if (c == null || satEdit === 'consent_st' || declined(p)) return comfortHtml(p, 'consent_st', 'Consent');
   if (val(p, 'sat_pre') == null || satEdit === 'sat_pre') return comfortHtml(p, 'sat_pre', 'Comfortable before surgery?', false,
     `<span class="consentok">✓ Consented <button class="link" data-satedit="consent_st">Change</button></span>`);
-  return comfortHtml(p, 'consent_st', 'Consent') + comfortHtml(p, 'sat_pre', 'Comfortable before surgery?');
+  return comfortHtml(p, 'consent_st', 'Consent') + payButton(p) + comfortHtml(p, 'sat_pre', 'Comfortable before surgery?');
 }
 // the Email and PayNow page's button (owner, 21 Oct 2026): says whether they were saved, never what they are
 function payButton(p) {
   const saved = p.f.pay_saved, cleared = p.f.pay_cleared;
   const st = cleared ? '✓ Paid, deleted' : saved ? `✓ Saved${saved.by ? ' by ' + esc(saved.by) : ''}` : 'for the payment';
-  return `<a class="secondary paybtn" href="#/p/${p.id}/pay">Email and PayNow<small>${st}</small></a>`;
+  return `<a class="paybtn" href="#/p/${p.id}/pay"><span>Email and PayNow</span><small>${st}</small></a>`;
 }
 // true when the tap was a comfort answer, Change or Clear
 function comfortTap(p, t, draw, put = (k, v) => set(p, k, v)) {
@@ -890,6 +892,8 @@ function comfortTap(p, t, draw, put = (k, v) => set(p, k, v)) {
   if (se) { satEdit = se.dataset.satedit; draw(); return true; }
   return false;
 }
+const TS_SCALE = [[3, 'hot', 'intolerably warm'], [2, 'warm', 'too warm'], [1, 'slightly warm', 'tolerably uncomfortable, warm'],
+  [0, 'neutral', 'comfortable'], [-1, 'slightly cool', 'tolerably uncomfortable, cool'], [-2, 'cool', 'too cool'], [-3, 'cold', 'intolerably cool']];
 // every group opens on the Induction room tab until the patient is in OT (owner, 21 Oct 2026: consent is asked there)
 const defaultSeries = p => val(p, 'ev_ot') || val(p, 'io_knife') ? 'iotemp' : 'prewarm';
 route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s, key) => {
@@ -1088,6 +1092,11 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     return `<div class="card ${changed ? 'changed' : ''}${isDefault(c.key) ? ' dflt' : ''}${fill ? ' fill' : ''}${c.key === 'core' ? ' wide core' : ''}" ${fill ? `data-fill="${c.key}"` : ''}><div class="clab">${c.label}<small>${hint}</small></div>
       <div class="pm"><button class="k" data-step="-1" data-c="${c.key}" aria-label="${c.label} down">−</button><button class="num" data-type="${c.key}">${v ?? '<span class="muted">tap</span>'}</button><button class="k" data-step="1" data-c="${c.key}" aria-label="${c.label} up">+</button></div></div>`;
   }
+  // the original Thermal Sensation Scale (owner, 21 Oct 2026, from the study's paper copy), under Save so Save stays on screen; the picked row is marked
+  function tsScale(v) {
+    return `<table class="tsscale"><caption>Thermal Sensation Scale</caption><thead><tr><th colspan="2">Scale</th><th>Comments</th></tr></thead><tbody>${TS_SCALE.map(([n, w, cm]) =>
+      `<tr${String(v) === String(n) ? ' class="on"' : ''}><td>${n < 0 ? '−' + -n : n}</td><td>${w}</td><td>${cm}</td></tr>`).join('')}</tbody></table>`;
+  }
   function timesHtml() {
     // numbered in the order they happen (owner, 12 Oct 2026)
     return `<div class="times${val(p, 'done') ? ' sealed' : ''}">${EVENTS.filter(([f, , pw]) => !(pw && noWarming(p)) && !PACU_TIMES.includes(f)).map(([f, l], i) => {
@@ -1104,11 +1113,13 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       const n = ids.map(field).filter(f => f && isShown(f, k => val(p, k)) && val(p, f.id) == null).length;
       return n ? `${n} to answer` : '';
     };
-    return `<nav class="links two" aria-label="Other forms">
+    // Pre-op, Intra-op details, PACU on one line; POD1, POD2, Discharge under them (owner, 21 Oct 2026)
+    const data = d => `<a href="#/p/${id}/${d.path}"${done(d.sign, d.short)}>${d.short}</a>`;
+    return `<nav class="links three" aria-label="Other forms">${data(DATA_PARTS[0])}
       <a href="#/p/${id}/form/intraop"${done('intraop', 'Intra-op details')}>Intra-op details<small>${todo(INTRAOP_Q, 'io_done') || 'Blood, products, tests'}</small></a>
       <a href="#/p/${id}/form/pacu"${done('pacu', 'PACU')}>PACU<small>${todo(PACU_Q, 'pacu_in') || 'Temp, NuDESC, delay'}</small></a>
       </nav>
-      <nav class="links three" aria-label="Perioperative data">${DATA_PARTS.map(d => `<a href="#/p/${id}/${d.path}"${done(d.sign, d.short)}>${d.short}</a>`).join('')}</nav>
+      <nav class="links three" aria-label="Chart review">${DATA_PARTS.slice(1).map(data).join('')}</nav>
       <div class="textlinks"><a href="#/p/${id}/form">Form view</a><a href="#/p/${id}/sheet">Sheet view</a></div>
       <div class="sharerow caseshare"><a class="secondary" href="#/p/${id}/share">Share subject</a><a class="secondary" href="#/p/${id}/pacushare">Share to PACU</a></div>`;
   }
@@ -1143,14 +1154,15 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <div class="${sealed() ? 'sealed' : ''}">${isSaved ? `<p class="muted small tight">Taken ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' (saved by ' + esc(p.f['at_' + s + '_' + pt.key].by) + ')' : ''} <button class="link" data-attime>Change time</button>. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
       ${sealed() ? sealNote(p, s) : `<button class="save big" id="save">${isSaved ? 'Save changes' : `Save ${pt.label} reading`}</button>
-      <p class="resetline"><button class="link" id="clearall">Clear ${isSaved ? 'this saved reading' : 'all boxes'}</button></p>`}</div>`;
+      <p class="resetline"><button class="link" id="clearall">Clear ${isSaved ? 'this saved reading' : 'all boxes'}</button></p>`}
+      ${cols.some(c => c.key === 'ts') ? tsScale(draft.ts) : ''}</div>`;
     // three parts (owner, 12 Oct 2026): key times; the tab bar and its readings (swipe changes tab here only);
     // the other forms, Still to fill and Mark complete, the same on both tabs
     paint(`<section class="third top" aria-label="Key times">${val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${timesHtml()}</section>
       <section class="third mid">${ptabsHtml()}${s === 'prewarm' ? inductionAsks(p) : ''}${reading}
       ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
-      ${main && noPw ? '' : signoffHtml(p, s)}${s === 'prewarm' && !declined(p) ? payButton(p) : ''}</section>
+      ${main && noPw ? '' : signoffHtml(p, s)}</section>
       <section class="third bot" aria-label="Other forms and checks">${linksHtml()}${gapsHtml(p)}${doneHtml(p)}
       <p class="resetline"><button class="link" id="resetsub">Reset this subject</button></p></section>`);
     refreshBar();
@@ -1466,7 +1478,7 @@ function gaps(p) {
   if (get('pacu_in')) add('PACU unanswered', unanswered(PACU_Q), `#/p/${p.id}/form/pacu`);
   // chart review: POD1 / POD2 once due and not ticked complete (how many of the questions have an answer)
   const days = podDays(p);
-  for (const [n, sign, pages] of [[1, 'sign_pod1', ['pod1', 'pod1an']], [2, 'sign_pod2', ['pod2', 'pod2an', 'dc']]]) {
+  for (const [n, sign, pages] of [[1, 'sign_pod1', ['pod1', 'pod1an']], [2, 'sign_pod2', ['pod2', 'pod2an']]]) {
     if (days == null || days < n || get(sign)) continue;
     const all = pages.flatMap(pg => FORM[pg].map(([k]) => k)), done = all.filter(k => get(k) != null).length;
     add(`POD${n} chart review ${days > n ? 'overdue' : 'due today'}`, [`${done} of ${all.length} answered`], at('data/day' + n));
@@ -1496,7 +1508,7 @@ const disableSealed = () => view.querySelectorAll('.sealed input, .sealed select
 // which sections are marked complete, shown on the patient list (owner, 13 Oct 2026): read only, they just
 // mirror the existing complete ticks inside each section
 function progressHtml(p) {
-  const rows = [['prewarm', 'Pre-warm'], ['iotemp', 'Intra-op temps'], ['haemo', 'BP, HR, BIS'], ['intraop', 'Intra-op details'], ['pacu', 'PACU'], ['periop', 'Pre-op'], ['pod1', 'POD1'], ['pod2', 'POD2']]
+  const rows = [['prewarm', 'Pre-warm'], ['iotemp', 'Intra-op temps'], ['haemo', 'BP, HR, BIS'], ['intraop', 'Intra-op details'], ['pacu', 'PACU'], ['periop', 'Pre-op'], ['pod1', 'POD1'], ['pod2', 'POD2'], ['dc', 'Discharge']]
     .filter(([k]) => !(k === 'prewarm' && noWarming(p)));
   return `<span class="progress" role="list" aria-label="Sections marked complete">${rows.map(([k, l]) => { const on = !!val(p, 'sign_' + k);
     return `<span role="listitem" class="${on ? 'on' : ''}" aria-label="${l}: ${on ? 'complete' : 'not marked complete'}"><span class="tick" aria-hidden="true">${on ? '✓' : ''}</span>${l}</span>`; }).join('')}</span>`;
@@ -1507,7 +1519,7 @@ function doneHtml(p) {
 
 // ---------- section sign-off (replaces the paper form's Name / Signature / Date)
 // each sign-off names its section, and shows a ticked box once marked (owner, 12 Oct 2026)
-const SECTION = { periop: 'pre-op and patient details', pod1: 'POD1', pod2: 'POD2', prewarm: 'pre-warming temps', iotemp: 'intra-op temps', haemo: 'BP, HR, BIS', intraop: 'Intra-op details', pacu: 'PACU', satis: 'Patient comfort' };
+const SECTION = { periop: 'pre-op and patient details', pod1: 'POD1', pod2: 'POD2', dc: 'Discharge', prewarm: 'pre-warming temps', iotemp: 'intra-op temps', haemo: 'BP, HR, BIS', intraop: 'Intra-op details', pacu: 'PACU', satis: 'Patient comfort' };
 const tickHtml = (on, label, who, undo, mark) => on
   ? `<div class="sign on"><span class="tick" aria-hidden="true">✓</span><span><b>${esc(label)} complete</b><small>${esc(who)}</small></span><button class="link" ${undo}>Undo</button></div>`
   : `<div class="sign${label === 'PACU' ? ' big' : ''}"><button class="tickbtn" ${mark}><span class="tick" aria-hidden="true"></span>Mark ${esc(label)} complete</button></div>`;
@@ -1548,19 +1560,20 @@ const vitalsCollected = p => Object.keys(p.f).some(k => /^haemo_/.test(k) && val
 const DATA_PARTS = [
   { path: 'data', sign: 'periop', short: 'Pre-op', title: 'Pre-op and patient details', pages: ['preop', 'meds', 'bloods'], study: true },
   { path: 'data/day1', sign: 'pod1', short: 'POD1', title: 'POD1', pages: ['pod1', 'pod1an'] },
-  { path: 'data/day2', sign: 'pod2', short: 'POD2', title: 'POD2 and discharge', pages: ['pod2', 'pod2an', 'dc'] },
+  { path: 'data/day2', sign: 'pod2', short: 'POD2', title: 'POD2', pages: ['pod2', 'pod2an'] },
+  // Discharge has its own page and tick (owner, 21 Oct 2026; it was part of POD2, whose tick covered it)
+  { path: 'data/dc', sign: 'dc', short: 'Discharge', title: 'Discharge', pages: ['dc'] },
 ];
 const DATA_SIGNS = new Set(DATA_PARTS.map(d => d.sign));
-route(/^\/p\/(\w+)\/data(?:\/(day1|day2))?$/, (id, day) => {
+route(/^\/p\/(\w+)\/data(?:\/(day1|day2|dc))?$/, (id, day) => {
   const p = patients[id]; if (!p) return go('#/');
   const part = DATA_PARTS.find(d => d.path === (day ? 'data/' + day : 'data')), SIGN = part.sign;
   header(sidL(p) + ' · ' + part.title, `#/p/${id}/haemo`);
   topBar(p, defaultSeries(p));
   const get = k => val(p, k);
   const filled = pg => FORM[pg].filter(([k]) => val(p, k) != null).length;
-  // sections start folded except the first unfinished one (owner, 21 Oct 2026); each header keeps its "x of y filled"
-  const firstOpen = part.pages.find(pg => filled(pg) < FORM[pg].length);
-  const closed = new Set([...(part.study ? ['study'] : []), ...part.pages.filter(pg => pg !== firstOpen)]);
+  // every section starts open (owner, 21 Oct 2026: they were folded for a day); each header keeps its "x of y filled"
+  const closed = new Set();
   const draw = () => {
     const y = window.scrollY;
     const sl = sealedBy(p, SIGN);

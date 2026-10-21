@@ -232,6 +232,9 @@ try {
   await a.goto(`${BASE}#/p/${payPid}/pay`); await a.waitForSelector('#payemail');
   await a.fill('#payemail', 'pt@example.com'); await a.fill('#paynow', '+65 9123 4567'); await a.click('#payf button[type=submit]');
   await toastSays(a, /Saved for the study admins/);
+  // the button sits under consent once consent and the before-surgery comfort question are answered
+  await a.click('.chip[data-sat="consent_st"][data-v="1"]'); await a.waitForTimeout(800);
+  await a.click('.chip[data-sat="sat_pre"][data-v="2"]');
   await a.waitForSelector('a.paybtn'); assert.match(await a.textContent('a.paybtn'), /Saved by AA/);
   await a.goto(`${BASE}#/p/${payPid}/pay`); await a.waitForSelector('#payemail');
   assert.equal(await a.inputValue('#payemail'), '', 'the team phone never shows them again');

@@ -74,6 +74,7 @@ try {
   assert.match(await page.textContent('.comfort.done:has([data-satedit="sat_pre"])'), /Neutral/);
   assert.match(await page.textContent('.comfort.done:has([data-satedit="consent_st"])'), /Consented, copy given/);
   // Email and PayNow: a button on the Induction room tab opens their own page; saved, the button says so (never the values)
+  assert.ok(await page.$('.comfort.done:has([data-satedit="consent_st"]) + a.paybtn'), 'the Email and PayNow button sits right under consent');
   await page.waitForTimeout(800); // the tap guard after an answer
   await page.click('a.paybtn'); await page.waitForSelector('#payemail');
   await axe('email and PayNow');
@@ -154,6 +155,7 @@ try {
   await page.click('[data-step="-1"][data-c="chest"]');
   assert.equal((await page.textContent('.num[data-type="chest"]')).trim(), '32.4');
   await page.click('.chip[data-c="ts"][data-v="1"]');
+  assert.match(await page.textContent('.tsscale tr.on'), /slightly warm.*tolerably uncomfortable, warm/, 'the Thermal Sensation Scale under the chips marks the picked row');
   await axe('reading'); await shot('reading');
   // thigh and calf are still blank: Save asks first (Cancel keeps the reading open)
   let blanks = ''; page.once('dialog', d => { blanks = d.message(); d.dismiss(); });
@@ -245,22 +247,28 @@ try {
   assert.ok(await page.$('[data-done]'), 'Mark data collection as complete on this tab too');
   // other data: the rest of the study's pages on one page, under headers open by default, from the small box on the
   // BP, HR, BIS tab; Enter and the arrow keys move between questions
-  assert.deepEqual((await page.$$eval('.links.three a', as => as.map(a => a.textContent.replace(/\s*✓/, '').trim()))), ['Pre-op', 'POD1', 'POD2'], 'Perioperative data is three buttons on one line');
-  const ys = await page.$$eval('.links.three a', as => as.map(a => Math.round(a.getBoundingClientRect().y)));
-  assert.ok(ys.every(y => y === ys[0]), 'the three buttons share one line');
+  const rowsOf = () => page.$$eval('.links.three', ns => ns.map(n => [...n.querySelectorAll('a')].map(a => a.firstChild.textContent.replace(/\s*✓/, '').trim())));
+  assert.deepEqual(await rowsOf(), [['Pre-op', 'Intra-op details', 'PACU'], ['POD1', 'POD2', 'Discharge']], 'Pre-op left of Intra-op details; POD1, POD2, Discharge under them');
+  for (const row of await page.$$('.links.three')) {
+    const ys = await row.$$eval('a', as => as.map(a => Math.round(a.getBoundingClientRect().y)));
+    assert.ok(ys.every(y => y === ys[0]), 'each row of three shares one line');
+  }
   assert.equal((await page.textContent('#haemolink')).trim(), 'BP, HR, BIS', 'second tab is BP, HR, BIS');
   await page.click('.links.three a:has-text("Pre-op")');
   await page.waitForSelector('details.sect');
-  assert.deepEqual(await page.$$eval('details.sect[open]', x => x.map(d => d.dataset.pg)), ['preop'], 'Pre-op page: only the first unfinished section starts open');
+  assert.equal(await page.$$eval('details.sect:not([open])', x => x.length), 0, 'Pre-op page: every section starts open');
   assert.equal(await page.$$eval('details.sect', x => x.length), 4, 'Pre-op page: Subject ID and group, pre-op, meds, bloods');
-  assert.match(await page.textContent('details.sect[data-pg="meds"] summary'), /Not started|\d+ of \d+ filled/, 'a folded header still says how much is filled');
+  assert.match(await page.textContent('details.sect[data-pg="meds"] summary'), /Not started|\d+ of \d+ filled/, 'a header says how much is filled');
   const pid3 = (await page.evaluate(() => location.hash)).split('/')[2];
   await page.evaluate(h => { location.replace(h); }, `#/p/${pid3}/data/day1`); await page.waitForSelector('details.sect');
   assert.equal(await page.$$eval('details.sect', x => x.length), 2, 'POD1 page: chart review and analgesia');
-  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 1, 'POD1 page: one section open');
+  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 2, 'POD1 page: both sections open');
   await page.evaluate(h => { location.replace(h); }, `#/p/${pid3}/data/day2`); await page.waitForSelector('details.sect');
-  assert.equal(await page.$$eval('details.sect', x => x.length), 3, 'POD2 page: chart review, analgesia, discharge');
-  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 1, 'POD2 page: one section open');
+  assert.deepEqual(await page.$$eval('details.sect', x => x.map(d => d.dataset.pg)), ['pod2', 'pod2an'], 'POD2 page: chart review and analgesia');
+  assert.match(await page.textContent('[data-sign="pod2"]'), /Mark POD2 complete/);
+  await page.evaluate(h => { location.replace(h); }, `#/p/${pid3}/data/dc`); await page.waitForSelector('details.sect');
+  assert.deepEqual(await page.$$eval('details.sect', x => x.map(d => d.dataset.pg)), ['dc'], 'Discharge has its own page');
+  assert.match(await page.textContent('[data-sign="dc"]'), /Mark Discharge complete/, 'and its own tick');
   await page.evaluate(h => { location.replace(h); }, `#/p/${pid3}/data`); await page.waitForSelector('details.sect');
   await page.fill('#f-age', '67'); await page.keyboard.press('Enter');
   assert.match(await page.textContent('details.sect[data-pg="preop"] summary'), /1 of \d+ filled/, 'Enter saves the answer');
@@ -274,9 +282,9 @@ try {
     assert.equal(await page.getAttribute(`.chip[data-f="${nextKey}"][data-v]:nth-child(2)`, 'aria-pressed'), 'true', '→ then Enter picks the second choice');
   }
   await page.click('details.sect[data-pg="preop"] summary');
-  assert.equal(await page.$$eval('details.sect[open]', x => x.length), 0, 'a header folds its section');
-  await page.click('details.sect[data-pg="meds"] summary');
-  assert.deepEqual(await page.$$eval('details.sect[open]', x => x.map(d => d.dataset.pg)), ['meds'], 'a header unfolds its section');
+  assert.deepEqual(await page.$$eval('details.sect[open]', x => x.map(d => d.dataset.pg)), ['study', 'meds', 'bloods'], 'a header folds its section');
+  await page.click('details.sect[data-pg="preop"] summary');
+  assert.equal(await page.$$eval('details.sect:not([open])', x => x.length), 0, 'a header unfolds its section');
   await axe('other data'); await shot('other-data');
   await page.goBack(); await page.waitForSelector('input[data-in="sbp"]');
   await page.goBack(); await page.waitForSelector('.textlinks a[href$="/sheet"]');
