@@ -61,8 +61,8 @@ PR previews can't sign in. **Beta** can, against a separate **test** Firebase pr
 Worker `apmes-beta` (see that repo's `NOTES.md`, "Beta"). It is opt-in (owner, 20 Oct 2026): only when the owner asks,
 or for sign-in or rules changes; then the PR waits for his "ship it".
 
-This repo's `anawj-beta` Worker (`wrangler.jsonc`, `env.beta`) has **no address** (`routes: []`), so a deploy from the
-old `beta` branch here can never take `beta-apmes.anawj.com` back. Nothing here needs beta any more.
+This repo no longer has a beta Worker: `anawj-beta` was deleted on 21 Oct 2026 and its env removed from
+`wrangler.jsonc`. Nothing here needs beta any more.
 
 ## Build minutes
 
