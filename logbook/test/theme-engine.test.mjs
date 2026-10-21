@@ -2,7 +2,8 @@
 // check every theme passes (js/themes.js checkTheme).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { FACETS, FACET_KEYS, FACET_GROUPS, cleanFacet, facetCss, facetDefault, ICON_SETS, iconPath, PAGE_MOTIONS, pageMotion } from '../js/theme-engine.js';
+import { FACETS, FACET_KEYS, FACET_GROUPS, cleanFacet, facetCss, facetDefault, ICON_SETS, iconPath, PAGE_MOTIONS, pageMotion, foldCompact, FINE_TUNE, TUNE_KEYS, cleanTune, tuneCss } from '../js/theme-engine.js';
+import { migrateDisplay, DISPLAY_KEYS } from '../js/display.js';
 import { THEMES, THEME_KEYS, checkTheme, lookCss, themePatch, themeState, themeById } from '../js/themes.js';
 import { lookOf } from '../js/my-themes.js';
 import { readSettingsFile, SETTINGS_KIND } from '../js/settings-file.js';
@@ -18,7 +19,7 @@ for (const f of FACETS) {
   if (f.bool) { assert.ok(f.css || f.js, f.key); continue; }
   assert.equal(facetDefault(f), f.choices[0][0]);
   for (const [v] of f.choices.slice(1)) {
-    assert.ok(f.js || (f.css && typeof f.css[v] === 'string') || (f.key === 'iconSet' && !ICON_SETS[v].css) || (f.key === 'pageMotion' && !PAGE_MOTIONS[v].vars), `${f.key}: ${v} does something`);
+    assert.ok(f.js || (f.css && typeof f.css[v] === 'string') || (f.key === 'iconSet' && !ICON_SETS[v].css) || (f.key === 'pageMotion' && !PAGE_MOTIONS[v].vars) || (f.key === 'spacing' && v === 'compact'), `${f.key}: ${v} does something`);   // compact: body.compact (display.js)
   }
 }
 // values: listed choices only; the default and anything else saves as null
@@ -90,4 +91,51 @@ assert.deepEqual(lookOf({ headerStyle: 'large', sheetStyle: 'bogus', barBlur: tr
 const got = readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: { toastStyle: 'material', fieldStyle: '<b>' } })).settings;
 assert.equal(got.toastStyle, 'material');
 assert.equal(got.fieldStyle, null);
+
+// Sizes (theme-revamp S2): the old Compact mode is Spacing: Tight ('compact'), whatever spacing came with it
+assert.deepEqual(foldCompact({ compact: true, accent: '#123456' }), { spacing: 'compact', accent: '#123456' });
+assert.deepEqual(foldCompact({ compact: true, spacing: 'roomy' }), { spacing: 'compact' });
+assert.deepEqual(foldCompact({ compact: false, spacing: 'tight' }), { spacing: 'tight' });   // Snug stays Snug
+assert.deepEqual(foldCompact({ compact: null }), {});
+const plain = { spacing: 'roomy' };
+assert.equal(foldCompact(plain), plain);
+assert.equal(facetCss({ spacing: 'compact' }).length, 0);   // Tight is body.compact, not facet CSS
+assert.ok(facetCss({ spacing: 'tight' })[0].includes('padding: 11px'));   // Snug keeps the old Tight values
+// a device, an old account copy and saved themes fold once; Normal stays exactly as it was
+const mig = migrateDisplay({ v: 2, compact: true, spacing: null, myThemes: [{ id: 'a', name: 'Mine', look: { compact: true, round: 0 } }] });
+assert.equal(mig.spacing, 'compact');
+assert.ok(!('compact' in mig));
+assert.deepEqual(mig.myThemes[0].look, { round: 0, spacing: 'compact' });
+assert.equal(migrateDisplay({ v: 2, compact: false }).spacing, undefined);
+const same = { v: 2, spacing: 'tight' };
+assert.equal(migrateDisplay(same), same);
+assert.equal(migrateDisplay({ compact: true, textSize: '1.12' }).zoom, '1.1');   // the older text-size move still runs
+// a theme and a saved look carry the old switch as Tight
+assert.deepEqual(lookOf({ compact: true }), { spacing: 'compact' });
+assert.ok(!THEME_KEYS.includes('compact'));
+assert.ok(DISPLAY_KEYS.includes('compact'));   // still read from an account's settings, then folded
+
+// Fine-tune: per device, theme keys too, unset by default, in range and on the step only
+for (const k of TUNE_KEYS) { assert.ok(DISPLAY_KEYS.includes(k), k); assert.ok(THEME_KEYS.includes(k), k); }
+for (const t of FINE_TUNE) {
+  assert.equal(cleanTune(t.key, t.min), t.min); assert.equal(cleanTune(t.key, t.max), t.max); assert.equal(cleanTune(t.key, t.from), t.from, t.key);
+  assert.equal(cleanTune(t.key, t.max + t.step), null); assert.equal(cleanTune(t.key, t.min - t.step), null);
+  assert.equal(cleanTune(t.key, String(t.from)), null); assert.equal(cleanTune(t.key, NaN), null);
+  assert.equal(typeof t.css(t.from), 'string');
+}
+assert.equal(cleanTune('ftGap', 4.5), null);
+assert.equal(cleanTune('ftLetter', 0.02), 0.02);
+assert.equal(cleanTune('ftLine', 1.5), 1.5);
+assert.equal(tuneCss({}), '');
+assert.equal(lookCss({}), '');   // nothing set: no CSS at all, Normal is today's look
+const tc = tuneCss({ ftGap: 4, ftBtn: 99, ftDays: 12 });
+assert.ok(tc.startsWith('@layer tune {') && tc.includes('gap: 4px') && tc.includes('margin-top: 12px') && !tc.includes('99px'));
+assert.ok(lookCss({ ftGap: 4 }).includes('@layer tune'));
+assert.ok(tuneCss({ ftBtn: 32 }).includes('max(32px, 44px)'));   // Bigger taps keeps 44 px on the Case tab
+assert.deepEqual(checkTheme({ ...themeById('nuhs'), look: { ...themeById('nuhs').look, ftGap: 6, ftLetter: 0.01 } }), []);
+assert.match(checkTheme({ ...themeById('nuhs'), look: { ftGap: 40 } }).join(), /ftGap: 40 is out of range/);
+assert.match(checkTheme({ ...themeById('nuhs'), look: { compact: true } }).join(), /look.compact: not a look setting/);
+assert.deepEqual(lookOf({ ftGap: 6, ftBtn: 3 }), { ftGap: 6 });
+const ft = readSettingsFile(JSON.stringify({ kind: SETTINGS_KIND, settings: { ftCases: 4, ftWeight: 450, spacing: 'compact' } })).settings;
+assert.equal(ft.ftCases, 4); assert.equal(ft.ftWeight, null); assert.equal(ft.spacing, 'compact');
 console.log('theme engine tests passed');

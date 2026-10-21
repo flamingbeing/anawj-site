@@ -49,8 +49,9 @@ for (const t of THEMES) {
   assert.equal(themeLabel(d), t.name);
 }
 // a theme resets what it doesn't set
-const flat = themePatch(themeById('flat'), { compact: true, accent: '#123456' });
-assert.equal(flat.compact, null);
+const flat = themePatch(themeById('flat'), { spacing: 'compact', ftGap: 4, accent: '#123456' });
+assert.equal(flat.spacing, null);
+assert.equal(flat.ftGap, null);
 assert.equal(flat.accent, null);
 assert.equal(flat.theme, 'flat');
 assert.equal(themePatch(themeById('nuhs')).theme, null);

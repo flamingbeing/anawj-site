@@ -1969,8 +1969,9 @@ async function run(label, ctxOpts) {
     assert(await p.evaluate(() => document.body.classList.contains('compact')), 'no body.compact');
     await shot3('settings-compact');
     // display settings are this device's: saved in localStorage, never in the account
-    const where = await p.evaluate(() => [JSON.parse(localStorage.getItem('apmes-logbook-display') || '{}').compact, (JSON.parse(localStorage.getItem('apmes-logbook-demo-v1')).logbooks['demo@example.com'].doc.settings || {}).compact]);
-    assert(where[0] === true && !where[1], 'compact saved to the account, not the device: ' + where);
+    // (theme-revamp S2: Compact mode is Spacing: Tight, saved as spacing 'compact')
+    const where = await p.evaluate(() => [JSON.parse(localStorage.getItem('apmes-logbook-display') || '{}').spacing, (JSON.parse(localStorage.getItem('apmes-logbook-demo-v1')).logbooks['demo@example.com'].doc.settings || {}).spacing]);
+    assert(where[0] === 'compact' && !where[1], 'compact saved to the account, not the device: ' + where);
     await p.reload({ waitUntil: 'networkidle' });
     await p.waitForSelector('.tabs button[data-tab="log"]');
     await nap(600);
@@ -1985,6 +1986,32 @@ async function run(label, ctxOpts) {
     assert(await p.locator('label.check', { hasText: 'Compact mode' }).locator('input').isChecked(), 'switch not checked after reload');
     const w = await p.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
     assert(w[0] <= w[1], 'compact h-scroll');
+    // an old device that still has compact: true opens Tight, and the old key is folded away
+    await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('apmes-logbook-display') || '{}'); delete d.spacing; d.compact = true; localStorage.setItem('apmes-logbook-display', JSON.stringify(d)); });
+    await p.reload({ waitUntil: 'networkidle' });
+    await p.waitForSelector('.tabs button[data-tab="log"]');
+    await nap(600);
+    const old = await p.evaluate(() => [document.body.classList.contains('compact'), JSON.parse(localStorage.getItem('apmes-logbook-display')).spacing, 'compact' in JSON.parse(localStorage.getItem('apmes-logbook-display'))]);
+    assert(old[0] && old[1] === 'compact' && !old[2], 'old compact: true not moved to Tight: ' + old);
+    // Themes → Fine-tune: unset by default, a slider changes the live page, Reset puts it back
+    await tab('themes');
+    const gapRow = p.locator('[data-tune="ftGap"]');
+    assert((await gapRow.textContent()).includes('Not set'), 'Fine-tune gap set by default');
+    const gapOf = () => p.evaluate(() => getComputedStyle(document.querySelector('.bar')).columnGap);
+    const before = await gapOf();
+    await gapRow.locator('input[type=range]').fill('14');
+    await nap(300);
+    const g14 = await gapOf(); assert(g14 === '14px', 'gap slider did not change the page: ' + g14);
+    assert((await gapRow.textContent()).includes('14px'), 'slider value not shown');
+    await p.getByRole('button', { name: 'Reset Fine-tune' }).click();
+    await nap(300);
+    const g0 = await gapOf(); assert(g0 === before, 'Reset Fine-tune left the gap: ' + g0);
+    await tab('display');
+    await p.locator('label.check', { hasText: 'Compact mode' }).locator('input').uncheck();
+    await nap(300);
+    assert(!(await p.evaluate(() => document.body.classList.contains('compact'))), 'Compact mode switch did not turn Tight off');
+    await p.locator('label.check', { hasText: 'Compact mode' }).locator('input').check();
+    await nap(300);
   });
 
   await step('settings: week start, Case tab parts, case box keyboard, pinned box and search, borderless', async () => {

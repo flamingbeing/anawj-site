@@ -29,10 +29,10 @@
   })();
 </script>
 <!-- Cascade layers (docs/theme-engine.md): style.css is the base layer, then the look's facets and theme colours, then
-     the resident's custom CSS, so a later layer wins without :root stacking. This comes before the first-paint sheets
+     Fine-tune values (tune), then the resident's custom CSS, so a later layer wins without :root stacking. This comes before the first-paint sheets
      below so it sets the order. A browser without layers (before Safari 15.4, Chrome 99, Firefox 97) skips the @import
      and the layered sheets, and gets style.css on its own: the default look. -->
-<style>@layer base, facets, theme, custom; @import url("style.css") layer(base);</style>
+<style>@layer base, facets, theme, tune, custom; @import url("style.css") layer(base);</style>
 <script>if (!window.CSSLayerBlockRule) document.write('<link rel="stylesheet" href="style.css">');</script>
 <script>
   // back from Google or Dropbox after a Save to Drive / Dropbox or Sync sign-in (cloud-save.js): keep the answer for

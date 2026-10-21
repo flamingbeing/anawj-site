@@ -3,7 +3,7 @@
 // them to a file (.json) to keep or pass on; Import reads such a file back (only known look settings, checked).
 // Pure (test/my-themes.test.mjs); the page is ui-settings.js renderThemes.
 import { THEME_KEYS, TINTS } from './themes.js';
-import { FACET_KEYS, cleanFacet } from './theme-engine.js';
+import { FACET_KEYS, cleanFacet, TUNE_KEYS, cleanTune, foldCompact } from './theme-engine.js';
 import { cleanAccent, cleanColours, checkColours } from './colors.js';
 
 export const MAX_MINE = 12;
@@ -20,11 +20,13 @@ const OK = {
   borders: small, round: small, flat: v => v === true, shadows: v => v === false,
   colourful: v => v === true || word(v), lineHeight: v => typeof v === 'string' && /^\d(\.\d{1,2})?$/.test(v),
   ...Object.fromEntries(FACET_KEYS.map(k => [k, v => cleanFacet(k, v) !== null])),   // the theme engine's facets: listed choices only
+  ...Object.fromEntries(TUNE_KEYS.map(k => [k, v => cleanTune(k, v) !== null])),   // Fine-tune: numbers in range
 };
 const okValue = (k, v) => v != null && (OK[k] ? OK[k](v) : typeof v === 'boolean' || word(v));
 
 // the look settings of a display (only the set ones)
 export function lookOf(d = {}) {
+  d = foldCompact(d) || {};   // an old saved theme's Compact mode is Spacing: Tight
   const out = {};
   for (const k of THEME_KEYS) if (k !== 'colours' && okValue(k, d[k])) out[k] = k === 'accent' ? cleanAccent(d[k]) : d[k];
   const colours = cleanColours(d.colours);

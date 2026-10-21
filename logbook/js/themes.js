@@ -6,12 +6,13 @@
 
 import { coloursCss, checkColours } from './colors.js';
 import { STACKS } from './fonts.js';
-import { FACETS, FACET_KEYS, facetCss, cleanFacet } from './theme-engine.js';
+import { FACETS, FACET_KEYS, facetCss, cleanFacet, TUNE_KEYS, cleanTune, tuneCss } from './theme-engine.js';
 
 // the display keys a theme sets; anything a theme doesn't list goes back to its default (null), unless it keeps it
 export const THEME_KEYS = ['colours', 'accent', 'colourful', 'borders', 'flat', 'round', 'shadows', 'fontUi', 'fontLog', 'headFont', 'lineHeight',
-  'compact', 'btnStyle', 'iconBtns', 'tabIcons', 'pageTitles', 'calPlain', 'rowShort', 'navStyle', 'rowLayout', 'formLayout', 'contrast', 'bgTint', 'band',
-  ...FACET_KEYS];   // the theme engine's facets (theme-engine.js): spacing, tab style, header, icons, motion, pop-ups, controls…
+  'btnStyle', 'iconBtns', 'tabIcons', 'pageTitles', 'calPlain', 'rowShort', 'navStyle', 'rowLayout', 'formLayout', 'contrast', 'bgTint', 'band',
+  ...FACET_KEYS,   // the theme engine's facets (theme-engine.js): spacing, tab style, header, icons, motion, pop-ups, controls…
+  ...TUNE_KEYS];   // Fine-tune values (theme-engine.js): numbers, unset by default
 
 // Background tints: the page ground (and for some the cards and text) in light and dark
 export const TINTS = {
@@ -59,7 +60,7 @@ export const THEMES = [
       iconSet: 'sharp', pageMotion: 'fade', sheetStyle: 'material', toastStyle: 'material',
       fieldStyle: 'outlined', checkStyle: 'square', switchStyle: 'material', pressStyle: 'highlight', round: 1,
       borders: 2, shadows: false, btnStyle: 'tinted', fontUi: 'system', fontLog: 'system', headFont: 'system',
-      band: 'none', rowLayout: 'compact', navStyle: 'rail', spacing: 'tight', compact: true, headingTone: 'ink',
+      band: 'none', rowLayout: 'compact', navStyle: 'rail', spacing: 'compact', headingTone: 'ink',
       tabTone: 'ink', accent: '#7f6df2',
       colours: {
         light: { bg: '#ffffff', panel: '#f6f6f6', ink: '#222222', muted: '#666666', line: '#e3e3e3', accent: '#7f6df2', accentInk: '#000000' },
@@ -991,6 +992,7 @@ export function checkTheme(t) {
   for (const [k, v] of Object.entries(t.look || {})) {
     if (!THEME_KEYS.includes(k)) bad.push(`look.${k}: not a look setting`);
     else if (FACETS.some(f => f.key === k) && cleanFacet(k, v) === null) bad.push(`look.${k}: ${JSON.stringify(v)} is not one of its choices`);
+    else if (TUNE_KEYS.includes(k) && cleanTune(k, v) === null) bad.push(`look.${k}: ${JSON.stringify(v)} is out of range`);
   }
   if (t.look?.bgTint && !TINTS[t.look.bgTint]) bad.push(`look.bgTint: no tint ${t.look.bgTint}`);
   if (t.band && !(t.band.length === 4 && t.band.every(c => /^#[0-9a-f]{6}$/.test(c)))) bad.push('band: four #rrggbb colours');
@@ -1035,5 +1037,5 @@ export function lookCss(d = {}, shades = null) {
   rules.push(...facetCss(d));
   colours.push(coloursCss(d.colours));
   const layer = (name, css) => (css.filter(Boolean).length ? `@layer ${name} {\n${css.filter(Boolean).join('\n')}\n}` : '');
-  return [...rules, layer('theme', colours)].filter(Boolean).join('\n');
+  return [...rules, layer('theme', colours), tuneCss(d)].filter(Boolean).join('\n');
 }

@@ -143,7 +143,7 @@ const TABS = [
   // Settings' own pages (not in the More list)
   { id: 'themes', label: 'Themes', render: page(['settings'], m => m.settings.renderThemes()), hidden: true, under: 'settings', unlisted: true, desc: 'Ready-made looks, colour, light or dark, the top band' },
   { id: 'themesall', label: 'Browse all themes', render: page(['settings'], m => m.settings.renderThemesAll()), hidden: true, under: 'themes', unlisted: true, desc: 'Every theme, search, suggest a theme' },
-  { id: 'display', label: 'Display', render: page(['settings'], m => m.settings.renderDisplay()), hidden: true, under: 'settings', unlisted: true, desc: 'Compact mode, the screen it opens on; more under Advanced' },
+  { id: 'display', label: 'Display', render: page(['settings'], m => m.settings.renderDisplay()), hidden: true, under: 'settings', unlisted: true, desc: 'Compact mode (Tight spacing), the screen it opens on; more under Advanced' },
   { id: 'access', label: 'Accessibility', render: page(['settings'], m => m.settings.renderAccessibility()), hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion, swipe gestures' },
   { id: 'displayadv', label: 'Advanced display', render: page(['settings'], m => m.settings.renderDisplayAdvanced()), hidden: true, under: 'display', unlisted: true, desc: 'The header and tab bar, Logbook rows, fonts, custom CSS' },
   { id: 'loggingadv', label: 'Advanced logging', render: page(['settings'], m => m.settings.renderLoggingAdvanced()), hidden: true, under: 'logging', unlisted: true, desc: 'Case tab parts, labelled parts and a case template, the keyboard, search, the week, undo, tips' },

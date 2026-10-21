@@ -192,6 +192,14 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
 - Display keeps layout (compact, start tab, header and tab bar, rows); Themes holds looks: light or dark, colour
   swatches (NUH, muted, pastel, Custom), Colourful, background tint, Top band, card style, corners, spacing, tab
   bar style, heading font, fonts, line spacing. Advanced display keeps the fine controls (line strength, button style).
+- **Sizes** (theme-revamp S2, 21 Oct 2026): Spacing is Normal / Snug (`tight`) / Tight (`compact`, the old Compact mode,
+  still drawn by the `body.compact` rules in style.css) / Roomy. The Display switch "Compact mode (Tight spacing)" sets
+  the same value. The old `compact: true` key is folded to `spacing: 'compact'` wherever it turns up (device, account
+  copy, settings file, Your themes; display.js `migrateDisplay`, theme-engine.js `foldCompact`), so nobody's look
+  changes. **Fine-tune** card on Themes: eight sliders (`FINE_TUNE`: button height, gaps, line weight, shadow, space
+  between cases, space between days, letter spacing, text weight), unset by default, per device, themes may set
+  them; their CSS is the `tune` cascade layer (after the theme, before custom CSS). Bigger taps keeps Case tab
+  buttons at 44 px or more.
 - **App-style details** (owner, 19 Oct 2026; Themes card, `lookCss` in themes.js, CSS only so the first paint has it; unit tests in
   themes.test.mjs, e2e `app-style.mjs`): each its own device key, off by default, part of `THEME_KEYS` (so themes, Your themes and the
   settings file carry them): `barBlur` (see-through header and tab bar), `tabActiveLabel` (label only on the current tab),

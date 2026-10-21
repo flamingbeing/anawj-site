@@ -82,7 +82,7 @@ try {
       look: own('look-css'), accent: own('accent-css'), tabs: own('tab-colours'), user: own('user-css'),
       stacked: [...document.querySelectorAll('style')].some(s => /(:root){2}/.test(s.textContent)) };
   });
-  assert.deepEqual(sheets.order, ['base', 'facets', 'theme', 'custom']);
+  assert.deepEqual(sheets.order, ['base', 'facets', 'theme', 'tune', 'custom']);
   assert.equal(sheets.base, 'base'); assert.ok(sheets.baseRules > 500, 'style.css loaded into the base layer');
   for (const k of ['look', 'accent', 'tabs', 'user']) assert.ok(sheets[k].length && sheets[k].every(n => n === 'CSSLayerBlockRule'), k + ' sheet is layered');
   assert.equal(sheets.stacked, false, 'no :root stacking');
