@@ -105,13 +105,16 @@ try {
   await a.click('.list a');
   await a.click('.links a[href$="/form/pacu"]');
   await a.click('.paculink a[href$="/pacushare"]');
-  await a.waitForSelector('[data-pacu-make]');
-  await a.click('[data-pacu-make]');
+  // made by itself the first time the page opens, then the same link every time (owner, 21 Oct 2026)
   await a.waitForSelector('.pacuurl', { timeout: 20000 });
   const nurseLink = await a.inputValue('.pacuurl');
   assert.match(nurseLink, /#\/nurse\/[a-z2-9]{24}$/, 'a long random token in the link');
   assert.ok(await a.$('.paculink svg'), 'and a QR code');
+  assert.equal(await a.$('[data-pacu-stop]'), null, 'only an admin can stop it');
   if (SHOTS) await a.screenshot({ path: SHOTS + '/pacu-link.png' });
+  await a.goto(BASE + '#/'); await a.click('.list a.rowbtn[href$="/pacushare/h"]'); await a.waitForSelector('.pacuurl');
+  assert.equal(await a.inputValue('.pacuurl'), nurseLink, 'the list\'s PACU button shows the same link');
+  await a.goBack(); await a.goBack();
   await a.goBack(); await a.waitForSelector('[data-pev="pacu_in"]');
   const nctx = await b.newContext({ viewport: { width: 390, height: 844 } });
   const nu = await nctx.newPage();
@@ -134,14 +137,16 @@ try {
   // the nurse's phone has no patients and no other screens' data
   await nu.goto(BASE + '#/');
   assert.equal(await nu.$('.list a'), null, 'the nurse phone has no patient list');
-  // stopping the link ends access
-  await a.click('.paculink a[href$="/pacushare"]');
-  a.once('dialog', d => d.accept());
-  await a.click('[data-pacu-stop]');
-  await a.waitForSelector('[data-pacu-make]', { timeout: 20000 });
-  await nu.goto(nurseLink);
-  await nu.waitForFunction(() => /was stopped/.test(document.body.textContent), null, { timeout: 25000 });
-  await nctx.close();
+  const stopNurse = async ad => { // an admin stopping the link ends access (checked once the admin has signed in, below)
+    await ad.goto(BASE + '#/'); await ad.waitForSelector('.list a.rowbtn');
+    await ad.click('.list a.rowbtn[href$="/pacushare/h"]'); await ad.waitForSelector('[data-pacu-stop]', { timeout: 20000 });
+    ad.once('dialog', d => d.accept());
+    await ad.click('[data-pacu-stop]');
+    await ad.waitForSelector('[data-pacu-make], .pacuurl', { timeout: 20000 });
+    await nu.goto(nurseLink);
+    await nu.waitForFunction(() => /was stopped/.test(document.body.textContent), null, { timeout: 25000 });
+    await nctx.close();
+  };
 
   // an admin signs in with an emailed link and makes a join code
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
@@ -274,11 +279,13 @@ try {
   await d.waitForSelector('body[data-cloud=ready]');
   await d.fill('#me', 'dd'); await d.click('#joinlink');
   await toastSays(d, /isn’t right for WH/);
+  // the admin stops the PACU nurse link (only admins can)
+  await stopNurse(ad);
   // the admin sees the NUH patient
   await ad.goto(BASE + '#/');
   await ad.waitForFunction(() => /SYNC-01/.test(document.querySelector('.list')?.textContent || ''), null, { timeout: 15000 });
   // Share subject (owner, 19 Oct 2026): the admin's subject link opens SYNC-01 on a new phone, which joins NUH first
-  await ad.click('.list a[href^="#/p/"]:not(.formlink)');
+  await ad.click('.list a[href^="#/p/"]:not(.rowbtn)');
   await ad.click('.caseshare a[href$="/share"]');
   await ad.waitForSelector('#suburl', { timeout: 15000 });
   const subLink = await ad.inputValue('#suburl');

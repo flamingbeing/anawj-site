@@ -235,13 +235,14 @@ function pacuLinkHtml(p) {
   const head = '<h2>PACU nurse link</h2>', tk = pacuToken(p);
   if (!cloud.enabled) return `<div class="paculink">${head}<p class="muted small">Not available in demo mode.</p></div>`;
   if (!sharing()) return `<div class="paculink">${head}<p class="muted small">Join your hospital’s team (Settings) to make a link for the PACU nurse.</p></div>`;
-  if (!tk) return `<div class="paculink">${head}<p class="muted small">A link and QR code that open only this participant’s PACU page, so the PACU nurse can fill it in on their own phone. Anyone with the link can edit just those answers.</p>
-    <button class="secondary" data-pacu-make>Make a link for the PACU nurse</button></div>`;
+  if (!tk) return `<div class="paculink">${head}<p class="muted small">The link couldn’t be made just now (no signal?). It opens only this participant’s PACU page, so the PACU nurse can fill it in on their own phone.</p>
+    <button class="secondary" data-pacu-make>Try again</button></div>`;
   const url = pacuUrl(tk);
   return `<div class="paculink">${head}<div class="qr">${qrSvg(url, 'QR code of the PACU nurse link')}</div>
     <input class="pacuurl" readonly value="${esc(url)}" aria-label="PACU nurse link">
-    <div class="sharerow"><button class="secondary" data-pacu-copy>Copy link</button><button class="secondary" data-pacu-stop>Stop this link</button></div>
-    <p class="muted small">Opens only ${esc(sid(p))}’s PACU page. Show the QR code to the PACU nurse or send the link. Stopping it ends access.</p></div>`;
+    <div class="sharerow"><button class="primary" data-pacu-share>Share link</button><button class="secondary" data-pacu-copy>Copy link</button></div>
+    <p class="muted small">Opens only ${esc(sid(p))}’s PACU page. Show the QR code to the PACU nurse or send the link. It stays the same for this participant${shared.admin ? '' : '; only a study admin can stop it'}.</p>
+    ${shared.admin ? '<button class="link" data-pacu-stop>Stop this link (admin)</button>' : ''}</div>`;
 }
 
 // Refresh now (owner, 13 Oct 2026): fetch the team's latest data again and look for a new app version
@@ -574,7 +575,8 @@ const canLock = () => shared.admin || DEMO;
 const LOCK_ICON = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 // the update helper page: out of the app's service-worker scope on the old address, inside the app's folder on the new one
 const UPDATE_HELPER = location.hostname === 'prewarmstudy.anawj.com' ? 'update.html' : '../prewarm-update/';
-const FORM_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg>';
+const SHARE_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>';
+const PACU_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18V8M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="2"/></svg>';
 let selecting = null; // Set of patient ids while choosing which to lock / unlock, or to export
 let selMode = 'lock'; // what the selection is for: 'lock' or 'export'
 function setLock(ids, on) {
@@ -597,7 +599,7 @@ function home() {
   const latest = [...all].sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created))[0];
   paint(`
     ${settings.me && settings.site ? '' : `<div class="note">Add your ${settings.me ? '' : 'initials and '}hospital in <a href="#/settings">Settings</a>${settings.me ? '' : ' so each reading shows who entered it'}.</div>`}
-    <div class="newrow"><button class="primary big" id="new">+ New patient</button><a class="secondary big" id="pacuview" href="#/pacu" title="Hand the phone to the PACU nurse: tapping a participant opens only their PACU page">PACU view</a></div>
+    <div class="newrow"><button class="primary big" id="new">+ New patient</button><a class="secondary big" id="payview" href="#/paynow" title="Each participant's email and PayNow for their payment">Email / PayNow</a></div>
     <div class="listhead"><h2>Patients on this phone</h2>${list.length && !selecting ? `<span class="headlinks">${canLock() ? '<button class="link" id="select">Select to lock</button>' : ''}<button class="link" id="selexport">Select to export</button></span>` : ''}</div>
     ${selecting ? `<div class="seltools"><span class="selcount">${selecting.size} selected${selMode === 'export' ? ' to export' : ''}</span>
       <div class="selshort" role="group" aria-label="Quick selection"><button class="selchip" id="${selMode === 'export' ? 'selallx' : 'selall'}">${selMode === 'export' ? 'Select all' : latest && list.length > 1 ? `All but ${esc(sid(latest))} (latest)` : 'Select all'}</button><button class="selchip" id="selnone">Select none</button></div>
@@ -613,10 +615,10 @@ function home() {
       const body = `<b>${esc(sidL(p))}${val(p, 'site') ? ` <small>${esc(val(p, 'site'))}</small>` : ''}</b>${twin ? '<span class="twinline">Same Subject ID twice: readings may be split. Fill in one and correct the other’s ID (Pre-op and patient details), or delete it in Settings.</span>' : ''}<span${locked ? ' class="lockline"' : declined(p) ? ' class="declline"' : val(p, 'done') ? ' class="okline"' : ''}>${locked ? `${LOCK_ICON} Locked by the study admin${canLock() ? ' · read only' : ''}` : declined(p) ? 'Declined to participate' : esc(status(p))}</span>
         ${pending[p.id] || failed[p.id] ? `<span class="unsent">${failed[p.id] ? 'Not saved to the team' : 'Not sent yet'}</span>` : ''}<span class="dueline" data-due="${p.id}" hidden></span>${podDue(p) ? `<span class="podline">${esc(podDue(p))}</span>` : ''}${progressHtml(p)}<small>${e ? 'Last entry ' + new Date(e.t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (e.by ? ' by ' + esc(e.by) : '') : 'No entries yet'}</small>`;
       if (selecting) return `<li${sa}><label class="selrow"><input type="checkbox" data-sel="${p.id}" ${selecting.has(p.id) ? 'checked' : ''}><span>${body}</span></label></li>`;
-      // admins also get a shortcut to the patient's Form view on every line (owner, 13 Oct 2026)
-      const formLink = canLock() ? `<a class="formlink" href="#/p/${p.id}/form" aria-label="Form view of ${esc(sidL(p))}" title="Form view">${FORM_ICON}</a>` : '';
-      if (locked) return `<li${sa} class="${formLink ? 'rowact' : ''}"><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a>${formLink}</li>`;
-      return `<li${sa} class="${formLink ? 'rowact' : ''}"><a href="${isDraft(p) ? '#/new/' : '#/p/'}${p.id}"${declined(p) ? ' class="declined"' : isDraft(p) ? ' class="draft"' : ''}${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a>${formLink}</li>`;
+      // Share (this participant) and PACU (the nurse link) beside every line (owner, 21 Oct 2026; was the admins' Form view icon)
+      const acts = declined(p) ? '' : `<span class="rowbtns"><a class="rowbtn" href="#/p/${p.id}/share/h" aria-label="Share ${esc(sidL(p))}">${SHARE_ICON}<small>Share</small></a><a class="rowbtn" href="#/p/${p.id}/pacushare/h" aria-label="Share ${esc(sidL(p))} to PACU">${PACU_ICON}<small>PACU</small></a></span>`;
+      if (locked) return `<li${sa}><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a></li>`;
+      return `<li${sa} class="${acts ? 'rowact' : ''}"><a href="${isDraft(p) ? '#/new/' + p.id : nextHref(p)}"${declined(p) ? ' class="declined"' : isDraft(p) ? ' class="draft"' : ''}${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a>${acts}</li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
     <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`}</p>${refreshHtml()}`);
   $('#psearch')?.addEventListener('input', e => { const q = e.target.value.trim().toLowerCase(); view.querySelectorAll('.list li[data-sid]').forEach(li => { li.hidden = !!q && !li.dataset.sid.includes(q); }); });
@@ -1507,10 +1509,22 @@ const sealNote = (p, pg) => `<p class="sealnote">✓ ${esc(sealedMsg(p, pg))}</p
 const disableSealed = () => view.querySelectorAll('.sealed input, .sealed select, .sealed textarea').forEach(i => { i.disabled = true; });
 // which sections are marked complete, shown on the patient list (owner, 13 Oct 2026): read only, they just
 // mirror the existing complete ticks inside each section
+// the list's ticks, in fill-in order (owner, 21 Oct 2026: Pre-op after BP, HR, BIS; PayNow ticked once its details are saved)
+const SECTION_ORDER = [['prewarm', 'Pre-warm'], ['iotemp', 'Intra-op temps'], ['haemo', 'BP, HR, BIS'], ['periop', 'Pre-op'], ['intraop', 'Intra-op details'], ['pacu', 'PACU'], ['pod1', 'POD1'], ['pod2', 'POD2'], ['dc', 'Discharge'], ['pay', 'PayNow']];
+const sectionDone = (p, k) => k === 'pay' ? !!(p.f.pay_saved || p.f.pay_cleared) : !!val(p, 'sign_' + k);
+const SECTION_HREF = { haemo: 'haemo', periop: 'data', intraop: 'form/intraop', pacu: 'form/pacu', pod1: 'data/day1', pod2: 'data/day2', dc: 'data/dc', pay: 'pay' };
+// tapping a patient on the list opens the first section not yet ticked (owner, 21 Oct 2026). The temperature tabs open
+// the patient's chart as before (it picks Induction room or Intra-op itself); chart-review days only once they are due.
+function nextHref(p) {
+  if (val(p, 'done')) return '#/p/' + p.id;
+  const days = podDays(p) ?? 0;
+  const k = SECTION_ORDER.map(([x]) => x).find(x => !(x === 'prewarm' && noWarming(p)) && !(x === 'pay' && declined(p)) && !sectionDone(p, x)
+    && !(x === 'pod1' && days < 1) && !(x === 'pod2' && days < 2) && !(x === 'dc' && days < 1));
+  return '#/p/' + p.id + (SECTION_HREF[k] ? '/' + SECTION_HREF[k] : '');
+}
 function progressHtml(p) {
-  const rows = [['prewarm', 'Pre-warm'], ['iotemp', 'Intra-op temps'], ['haemo', 'BP, HR, BIS'], ['intraop', 'Intra-op details'], ['pacu', 'PACU'], ['periop', 'Pre-op'], ['pod1', 'POD1'], ['pod2', 'POD2'], ['dc', 'Discharge']]
-    .filter(([k]) => !(k === 'prewarm' && noWarming(p)));
-  return `<span class="progress" role="list" aria-label="Sections marked complete">${rows.map(([k, l]) => { const on = !!val(p, 'sign_' + k);
+  const rows = SECTION_ORDER.filter(([k]) => !(k === 'prewarm' && noWarming(p)) && !(k === 'pay' && declined(p)));
+  return `<span class="progress" role="list" aria-label="Sections marked complete">${rows.map(([k, l]) => { const on = sectionDone(p, k);
     return `<span role="listitem" class="${on ? 'on' : ''}" aria-label="${l}: ${on ? 'complete' : 'not marked complete'}"><span class="tick" aria-hidden="true">${on ? '✓' : ''}</span>${l}</span>`; }).join('')}</span>`;
 }
 function doneHtml(p) {
@@ -2138,8 +2152,19 @@ route(/^\/p\/(\w+)\/pay$/, async id => {
   };
   draw();
 });
+// Email / PayNow on the home page (owner, 21 Oct 2026; it was PACU view): admins get every participant's entry; a team
+// phone picks a participant and types theirs (team phones can't read entries back)
+route(/^\/paynow$/, () => {
+  if (shared.admin) { history.replaceState(history.state, '', location.pathname + location.search + '#/payments'); return render(); }
+  header('Email / PayNow', '#/');
+  const list = Object.values(patients).filter(p => !isGone(p) && !declined(p) && !isDraft(p) && !p.lock?.on)
+    .sort((a, b) => String(val(b, 'enrol_id') ?? '').localeCompare(String(val(a, 'enrol_id') ?? ''), undefined, { numeric: true, sensitivity: 'base' }));
+  const st = p => p.f.pay_cleared ? '✓ Paid' : p.f.pay_saved ? '✓ Saved' : 'Not yet';
+  paint(`<p class="muted small">Tap a participant to type their email and PayNow mobile for the payment. Only the study admins can see them.</p>
+    ${list.length ? `<ul class="list">${list.map(p => `<li><a href="#/p/${p.id}/pay"><b>${esc(sidL(p))}</b><span>${esc(st(p))}</span></a></li>`).join('')}</ul>` : '<p class="muted">No participants yet.</p>'}`);
+});
 route(/^\/payments$/, async () => {
-  header('Email and PayNow', '#/settings');
+  header('Email and PayNow', '#/');
   if (!shared.admin) return paint('<p class="note">Sign in as a study admin from Settings.</p>');
   paint('<p class="muted">Loading…</p>');
   let list = [];
@@ -2369,9 +2394,11 @@ route(/^\/open\/(\w+)$/, id => {
   }, 500);
   cleanup.push(() => clearInterval(iv));
 });
-route(/^\/p\/(\w+)\/share$/, async id => {
+// both pages also open from the home list's Share and PACU buttons (/h: back goes to the list)
+route(/^\/p\/(\w+)\/share(\/h)?$/, async (id, h) => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sidL(p) + ' · Share subject', (isDraft(p) ? '#/new/' : '#/p/') + id);
+  const here = location.hash;
+  header(sidL(p) + ' · Share subject', h ? '#/' : (isDraft(p) ? '#/new/' : '#/p/') + id);
   const box = body => paint(`<div class="paculink"><h2>Share subject</h2>${body}</div>`);
   if (!cloud.enabled) return box('<p class="muted small">Not available in demo mode.</p>');
   if (!sharing()) return box('<p class="muted small">Join your hospital’s team (Settings) to share a subject.</p>');
@@ -2381,7 +2408,7 @@ route(/^\/p\/(\w+)\/share$/, async id => {
   if (shared.admin) {
     box('<p class="muted">Loading…</p>');
     try { code = (await cloud.codes())[site]?.code || null; } catch (e) { return box(`<p class="note">${esc(cloud.friendly(e))}</p>`); }
-    if (location.hash !== '#/p/' + id + '/share') return;
+    if (location.hash !== here) return;
   }
   if (!code) return box(`<p class="muted small">${site} has no join code yet. ${shared.admin ? 'Make one on the <a href="#/admin">Study admin</a> screen first.' : 'Ask a study admin.'}</p>`);
   const url = subjectLink(site, code, id);
@@ -2397,18 +2424,28 @@ route(/^\/p\/(\w+)\/share$/, async id => {
   };
 });
 // Share to PACU: the PACU nurse link (it used to sit at the bottom of the PACU page)
-route(/^\/p\/(\w+)\/pacushare$/, id => {
+// one fixed link per participant (owner, 21 Oct 2026): made the first time this page opens, then the same link every
+// time, on every team phone (pacu_token syncs); only a study admin can stop it (a link sent to the wrong person)
+route(/^\/p\/(\w+)\/pacushare(\/h)?$/, (id, h) => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sidL(p) + ' · Share to PACU', (isDraft(p) ? '#/new/' : '#/p/') + id);
-  const draw = () => { paint(pacuLinkHtml(p)); };
-  draw();
+  header(sidL(p) + ' · Share to PACU', h ? '#/' : (isDraft(p) ? '#/new/' : '#/p/') + id);
+  const here = location.hash;
+  let making = false;
+  const make = () => { making = true; draw(); makePacuLink(p).finally(() => { making = false; if (location.hash === here) draw(); }); };
+  const draw = () => { paint(making ? '<div class="paculink"><h2>PACU nurse link</h2><p class="muted">Making the link…</p></div>' : pacuLinkHtml(p)); };
+  if (!pacuToken(p) && cloud.enabled && sharing()) make(); else draw();
   view.onclick = e => {
-    if (e.target.closest('[data-pacu-make]')) return void makePacuLink(p).then(draw);
+    if (e.target.closest('[data-pacu-make]')) return void make();
     if (e.target.closest('[data-pacu-stop]')) {
       if (confirm('Stop the PACU nurse link?\n\nThe link and its QR code stop working. A new one can be made.')) stopPacuLink(p).then(draw);
       return;
     }
-    if (e.target.closest('[data-pacu-copy]')) {
+    if (e.target.closest('[data-pacu-share]') && navigator.share) {
+      const u = pacuUrl(pacuToken(p));
+      navigator.share({ title: 'PACU: ' + sid(p), text: `Prewarming study: PACU page for ${sid(p)}`, url: u }).catch(() => {});
+      return;
+    }
+    if (e.target.closest('[data-pacu-copy], [data-pacu-share]')) {
       const u = pacuUrl(pacuToken(p));
       (navigator.clipboard?.writeText(u) || Promise.reject()).then(() => toast('Link copied'), () => { view.querySelector('.pacuurl')?.select(); toast('Select the link and copy it'); });
     }

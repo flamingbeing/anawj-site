@@ -399,7 +399,7 @@ dialog.ask p { margin: 0 0 6px; }
 .pacutimes { grid-template-columns: 1fr 1fr; margin-bottom: 8px; }
 /* home: New patient and PACU view side by side */
 .newrow { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
-#pacuview { font-weight: 600; color: var(--navy); border-color: var(--navy); }
+#payview { white-space: nowrap; font-size: 16px; padding-inline: 6px; font-weight: 600; color: var(--navy); border-color: var(--navy); }
 /* a section marked complete: read only until its tick is undone */
 .sealed .card, .sealed .fld, .sealed .tchip, .sealed table, .sealed .ixrow, .sealed #addix { opacity: .6; }
 .sealnote { margin: 4px 0; padding: 8px 12px; border-radius: var(--r); background: #e3f1e6; color: var(--ok); font-weight: 600; font-size: 14px; }
@@ -451,11 +451,12 @@ dialog.kp::backdrop { background: rgba(0, 0, 0, .4); }
 .syncchip[data-state="local"] { color: var(--muted); }
 .syncchip[data-busy] { opacity: .6; }
 
-/* patient list: admin Form view shortcut on each line; select to lock / export (owner, 13 Oct 2026) */
-/* the Form view shortcut is a small icon button at the card's top right, not a full-height tile (owner, 21 Oct 2026) */
+/* patient list: Share and PACU buttons stacked at each card's right (owner, 21 Oct 2026; was the admins' Form view icon) */
 .list li.rowact { display: flex; gap: 6px; align-items: flex-start; }
 .list li.rowact > a:first-child { flex: 1 1 auto; min-width: 0; align-self: stretch; }
-.list a.formlink { display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0; color: var(--navy); }
+.rowbtns { display: grid; gap: 6px; flex: none; }
+.list a.rowbtn { display: grid; place-items: center; gap: 0; width: 52px; min-height: 52px; padding: 4px 0; color: var(--navy); }
+.list a.rowbtn small { font-size: 11px; font-weight: 600; line-height: 1.1; }
 .headlinks { display: inline-flex; gap: 14px; }
 .seltools { display: grid; gap: 8px; }
 .seltools .selcount { flex: none; }

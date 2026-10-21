@@ -518,7 +518,7 @@ jobs.push(() => tryit(async () => {
   log(!pg.url().endsWith('/haemo'), 'a swipe on the key times doesn\'t change tab');
   log((await pg.$$('[data-sign="iotemp"], [data-sign="prewarm"]')).length === 1, 'one temps complete tick: the open sub-tab\'s');
   await pg.goto('http://localhost:8080/prewarm/?demo#/'); await pg.waitForTimeout(400);
-  await pg.click('a[href="#/pacu"]'); await pg.click('a[href^="#/pacu/"] >> nth=0'); await pg.waitForTimeout(500);
+  await pg.evaluate(() => { location.hash = '#/pacu'; }); await pg.click('a[href^="#/pacu/"] >> nth=0'); await pg.waitForTimeout(500);
   log(/· PACU$/.test(await pg.textContent('#title')) && /#\/pacu\/\w+$/.test(pg.url()), 'PACU view opens the PACU page: ' + await pg.textContent('#title'));
   // PACU in / To ward on the PACU page: a tap logs now
   await pg.click('[data-pev="pacu_in"]'); await pg.click('.kp [data-now]'); await pg.waitForTimeout(300);
@@ -649,12 +649,16 @@ jobs.push(() => tryit(async () => {
   await pg.reload(); await pg.waitForTimeout(600);
   await open(pg, 1);
   const id = (await pg.evaluate(() => location.hash)).split('/')[2];
-  const prog = async () => { await pg.evaluate(() => { location.hash = '#/'; }); await pg.waitForSelector('.list .progress'); return pg.$$eval(`.list a[href$="/${id}"] .progress > span`, as => as.map(a => (a.classList.contains('on') ? '+' : '-') + a.textContent.trim()).join('|')); };
+  const prog = async () => { await pg.evaluate(() => { location.hash = '#/'; }); await pg.waitForSelector('.list .progress'); return pg.$$eval(`.list a[href*="/${id}"]:not(.rowbtn) .progress > span`, as => as.map(a => (a.classList.contains('on') ? '+' : '-') + a.textContent.trim()).join('|')); };
   const back = async (h = '') => { await pg.evaluate(x => { location.hash = x; }, `#/p/${id}${h}`); await pg.waitForTimeout(500); };
-  log((await prog()).split('|').length === 9 && !(await prog()).includes('+'), 'list shows nine sections, none complete yet: ' + await prog());
+  log((await prog()) === '-Pre-warm|-Intra-op temps|-BP, HR, BIS|-Pre-op|-Intra-op details|-PACU|-POD1|-POD2|-Discharge|-PayNow', 'list shows ten sections in order (Pre-op after BP, HR, BIS; PayNow last), none complete yet: ' + await prog());
   await back(); log(await pg.$('.progress') === null, 'no extra tick boxes on the patient page');
   await pg.click('[data-sign="iotemp"]'); await pg.waitForTimeout(300);
   log(/\+✓Intra-op temps/.test(await prog()), 'a section marked complete shows its tick on the list');
+  const tapTo = async () => (await prog(), pg.$eval(`.list a[href*="/${id}"]:not(.rowbtn)`, a => a.getAttribute('href')));
+  log(await tapTo() === `#/p/${id}`, 'tapping the patient opens the chart while a temps section is open: ' + await tapTo());
+  for (const t of ['/prewarm', '/haemo']) { await back(t); const b = await pg.$(`[data-sign="${t.slice(1)}"]`); if (b) { await b.click(); await pg.waitForTimeout(300); } }
+  log(await tapTo() === `#/p/${id}/data` && /\+✓BP, HR, BIS/.test(await prog()), 'temps and BP, HR, BIS ticked: tapping the patient opens Pre-op: ' + await tapTo());
   await back('/data'); await pg.waitForSelector('#f-enrol_id', { state: 'attached' });
   const d0 = await pg.$eval('#f-enrol_id', i => i.disabled);
   await pg.click('[data-sign="periop"]'); await pg.waitForSelector('.sealnote');
@@ -726,11 +730,12 @@ jobs.push(() => tryit(async () => {
   log(!/20 min/.test(await strip()) && await pg.$('.sealnote') !== null, 'opening a hidden point goes to one that has data');
   await ctx.close();
 }));
-// AI. admin list shortcuts: Form view icon per line, Select to export with All / None, Select none apart from Lock / Unlock;
+// AI. list shortcuts: Share and PACU buttons per line, Select to export with All / None, Select none apart from Lock / Unlock;
 // "Downloaded" no longer asked; the "Study IDs only" line is gone
 jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
-  log(await pg.$$eval('.list li a.formlink', a => a.length) === 2 && /\/form$/.test(await pg.getAttribute('.list li a.formlink', 'href')), 'each patient line has a Form view shortcut (admin)');
+  log(await pg.$$eval('.list li a.rowbtn', a => a.map(x => x.getAttribute('href').replace(/\/p\/\w+/, '')).join(' ')) === '#/share/h #/pacushare/h #/share/h #/pacushare/h', 'each patient line has Share and PACU buttons');
+  log(/Email \/ PayNow/.test(await pg.textContent('#payview')) && !await pg.$('#pacuview'), 'Email / PayNow replaces PACU view at the top');
   log(!/Study IDs only/.test(await pg.textContent('main')), 'the Study IDs only line is gone');
   await pg.click('#selexport'); await pg.waitForSelector('.seltools');
   log(/0 selected to export/.test(await pg.textContent('.selcount')) && await pg.isDisabled('#exportsel'), 'Select to export starts with none and Export disabled');
@@ -748,9 +753,12 @@ jobs.push(() => tryit(async () => {
   log(await y('#selnone') !== await y('#lock') && await y('#selnone') < await y('#lock'), 'Select none is on its own line, above Lock / Unlock');
   log(await pg.$eval('#selnone', e => e.className) !== await pg.$eval('#unlock', e => e.className), 'Select none looks different from Lock / Unlock');
   await pg.click('#seldone');
-  await pg.click('.list li:first-child a.formlink'); await pg.waitForSelector('.fhead');
-  log(/Subject ID:/.test(await pg.textContent('.fhead')), 'the shortcut opens the Form view');
-  await pg.evaluate(() => { location.hash = '#/p/' + location.hash.split('/')[2] + '/data'; }); await pg.waitForSelector('details.sect');
+  await pg.click('.list li:first-child a.rowbtn[href$="/pacushare/h"]'); await pg.waitForSelector('.paculink');
+  log(/Share to PACU/.test(await pg.textContent('#title')) && /demo mode/.test(await pg.textContent('.paculink')), 'the PACU button opens Share to PACU');
+  await pg.click('#back'); await pg.waitForSelector('.list');
+  log(await pg.evaluate(() => location.hash) === '#/', 'its back button goes to the list');
+  const first = (await pg.getAttribute('.list li:first-child a.rowbtn', 'href')).split('/')[2];
+  await pg.evaluate(x => { location.hash = '#/p/' + x + '/data'; }, first); await pg.waitForSelector('details.sect');
   log(!(await pg.textContent('main')).includes('Downloaded'), 'Pre-op no longer asks Downloaded');
   await ctx.close();
 }));

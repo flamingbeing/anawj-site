@@ -21,8 +21,16 @@ How the patient screen, key times, sign-offs, forms and look work. Part of the n
   question until answered (one card tall, so Save stays on screen); once consented, the comfort question shows with
   "✓ Consented · Change" on its label line; a declined patient is asked nothing more there. A declined patient's home-list line is grey, the ID struck through,
   "Declined to participate". The Screening ID is no longer asked (`NOT_ASKED`); its column stays.
-- **Home list Form view shortcut** (admins): a 44 px icon button at the top right of each patient card (owner, 21 Oct
-  2026), no longer a full-height tile.
+- **Home list Share and PACU buttons** (owner, 21 Oct 2026; replaced the admins' Form view icon): stacked at the right of
+  every card except declined ones. Share opens Share subject, PACU opens Share to PACU (`#/p/<id>/share/h`,
+  `/pacushare/h`: back returns to the list). Both are fixed links per participant: the subject link is the hospital's join
+  code plus the patient (it changes only if an admin makes a new join code); the PACU nurse link is made the first time
+  its page opens and then stays the same on every team phone; only an admin can stop it.
+- **Email / PayNow** button beside New patient (owner, 21 Oct 2026; was PACU view): admins go to the payments list,
+  team phones to a list of participants that opens each one's Email and PayNow page. `#/pacu` (PACU view) still works.
+- **Tapping a patient** (owner, 21 Oct 2026) opens the first section in the tick order that isn't ticked: the chart while
+  a temperature section is open, then BP, HR, BIS, Pre-op, Intra-op details, PACU, POD1 / POD2 / Discharge once their
+  day has come, then Email and PayNow (`nextHref`). Completed patients open the chart (after the warning tap).
 - **Notes** on Intra-op details is a full-width text box (`long: true` fields). On PACU (and the nurse's page) the five
   comfort answers are two per row with Neutral alone in the middle (`roomy`); the Induction room tab keeps them in one row.
 - **Patient comfort** (owner, 20 Oct 2026): the before-surgery question is at the top of the Induction room tab
@@ -57,7 +65,7 @@ How the patient screen, key times, sign-offs, forms and look work. Part of the n
   own backgrounds (key times blue-grey; tab bar and readings; shared bottom part beige). Swipe changes tab only in
   the middle part (a touch starting on a −/+ button is its hold-to-repeat, not a swipe). The second tab is named
   "BP, HR, BIS". "Reset this subject" (small, bottom part) asks twice, then clears every entry except the Subject
-  ID, group and hospital, on every phone. "PACU view" button beside New patient: tapping a participant opens only their
+  ID, group and hospital, on every phone. PACU view (`#/pacu`, no longer on the home page): tapping a participant opens only their
   PACU page (to hand the phone to the PACU nurse); back returns to that list.
 - **PACU page times; temperature ticks**: the PACU page starts with PACU in / To ward boxes
   (tap logs now, tap again to change) so the PACU nurse logs them there. The Temperatures tab has "Mark pre-warming
@@ -68,8 +76,8 @@ How the patient screen, key times, sign-offs, forms and look work. Part of the n
   countdown stop. "Data collection complete" closes every op-day screen (key times, Log, readings, forms) but not
   Perioperative data (filled in later from the chart). Each temps tick shows only on its own sub-tab.
 - **Progress and Perioperative data tick** : the patient list shows a
-  list of ticks on each patient in the patient list (read only; they mirror the existing complete ticks, no new boxes: pre-warming temps, intra-op temps, BP HR BIS, Intra-op details, PACU,
-  Perioperative data). Perioperative data has its own tick (`sign_periop`, exported as
+  list of ticks on each patient in the patient list (read only; they mirror the existing complete ticks, in this order: pre-warming temps, intra-op temps, BP HR BIS, Pre-op,
+  Intra-op details, PACU, POD1, POD2, Discharge, and PayNow, ticked once the email and PayNow are saved, not for declined patients). Perioperative data has its own tick (`sign_periop`, exported as
   "Complete: Perioperative data") that locks only that page; "data collection complete" does not lock it.
 - **Warming time labels**: Gown on (pre-warming gown put on), Prewarm on, Prewarm off, Underbody
   warm, Gown warm (the intra-op Bair Huggers). Those are all the Bair Hugger items on the paper form. They are coloured warm

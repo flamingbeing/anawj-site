@@ -29,7 +29,9 @@ Team sharing (Firestore), admin sign-in, locking, the PACU nurse link, updates a
   shows only that participant's PACU in / To ward, answers and complete tick (the Subject ID in its title), with
   initials. Team phones subscribe to the `pacu_token` of their patients and merge newer fields (and push their own
   PACU edits to the link copy), so both directions settle on the newest write. `pacu_token` is a field on the patient.
-  Anyone holding the link can edit those PACU answers until the link is stopped. Tests: `rules.emulator.mjs` (24
+  Anyone holding the link can edit those PACU answers until the link is stopped. One fixed link per participant (owner,
+  21 Oct 2026): Share to PACU makes it by itself the first time it opens (Try again without signal) and shows the same
+  link after that; only an admin sees "Stop this link" (the rules still let members stop it; no rules change). Tests: `rules.emulator.mjs` (24
   checks), `sync.emulator.mjs` (a third phone opens the link). Rules deploy on merge to main.
 - **Email and PayNow** (owner, 21 Oct 2026; `js/pay.js`): a button under the Induction room tab's readings opens
   `#/p/<id>/pay` (not shown for a declined patient). The team types the email and a PayNow mobile (8 digits, 8 or 9;
