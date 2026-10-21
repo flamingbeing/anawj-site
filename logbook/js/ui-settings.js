@@ -9,7 +9,7 @@ import { MAX_TAGS, tagLinks as tagLinksIn, learnShorthand, cleanShorthand, short
 import { pickDialog, CASE_PARTS, AFTER_SAVE, RECENT_COUNTS } from './ui-log.js';
 import { recentCount as snapRecent } from './logging.js';
 import { OPERATOR_HELP } from './search-ops.js';
-import { DEFAULT_ACCENT, cleanAccent, SWATCHES, COLOUR_TOKENS, cleanColours, colourPalette, colourChecks, checkColours } from './colors.js';
+import { DEFAULT_ACCENT, cleanAccent, SWATCHES, EDIT_TOKENS, cleanColours, colourPalette, colourChecks, checkColours, resolvePalette } from './colors.js';
 import { THEMES, FEATURED, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, BANDS, HEAD_FONTS } from './themes.js';
 import { COLOURFUL, KEEP_GROUPS, keepGroups, cardsOn } from './look-schema.js';
 import { FACETS, FACET_GROUPS, facetDefault, FINE_TUNE, TUNE_KEYS, cleanTune, TAB_ICONS, cleanTabIcons, cleanTintStrength } from './theme-engine.js';
@@ -90,12 +90,11 @@ const slider = (label, names, level, dflt, onLevel) => {
 // of them afterwards makes it "Custom (based on …)". Everything on this device only.
 const themeSwatch = t => {
   const band = t.band || (t.look.band === 'none' ? null : ['#e57200', '#e4002b', '#178fd7', '#002f6c']);
-  const tint = TINTS[t.look.bgTint] || {};
   const dark = !!t.mode && t.mode !== 'auto';
-  const colours = cleanColours(t.look.colours)[dark ? 'dark' : 'light'] || {};
-  const bg = colours.bg || (dark ? tint.dark?.bg : tint.light?.bg) || (dark ? '#121417' : '#f3f3f3');
-  const panel = colours.panel || (dark ? tint.dark?.panel : tint.light?.panel) || (dark ? '#1b1e23' : '#ffffff');
-  return h('span', { class: 'theme-sw', 'aria-hidden': 'true', style: `--tb:${bg};--tp:${panel};--ta:${colours.accent || t.look.accent || (t.keep ? cleanAccent(display().accent) || DEFAULT_ACCENT : DEFAULT_ACCENT)}` },
+  // (the theme's palette as it will show: colors.js resolvePalette; a theme that keeps the colour shows this device's)
+  const look = t.keep && !t.look.accent ? { ...t.look, accent: display().accent } : t.look;
+  const { bg, panel, accent } = resolvePalette(look, dark ? 'dark' : 'light', TINTS[t.look.bgTint] || {});
+  return h('span', { class: 'theme-sw', 'aria-hidden': 'true', style: `--tb:${bg};--tp:${panel};--ta:${accent}` },
     h('span', { class: 'theme-band' }, (band || [panel, panel, panel, panel]).map(c => h('i', { style: `background:${c}` }))),
     h('span', { class: 'theme-card-in' }, h('i', { class: 'theme-dot' }), h('i', { class: 'theme-line' })));
 };
@@ -380,14 +379,14 @@ function editColours(st) {
   const tint = TINTS[st.bgTint] || {};
   const paintReport = () => {
     const checks = colourChecks(state(), tint).filter(p => p.side === side);
-    report.textContent = checks.map(p => `${p.fg} on ${p.bg}: ${p.ratio.toFixed(2)}:1${p.ratio < 4.5 ? ' (needs 4.5:1)' : ''}`).join('; ');
+    report.textContent = checks.map(p => `${p.fg} on ${p.bg}: ${p.ratio.toFixed(2)}:1${p.ratio < p.need ? ` (needs ${p.need}:1)` : ''}`).join('; ');
   };
   const paint = () => {
     for (const mode of ['light', 'dark']) buttons[mode].setAttribute('aria-pressed', String(mode === side));
     const palette = colourPalette(state(), side, tint);
     const sayFor = k => c => colourChecks({ ...st, colours: { ...draft, [side]: { ...draft[side], [k]: c } } }, tint).filter(p => p.side === side && (p.fg === k || p.bg === k))
-      .map(p => `${p.fg} on ${p.bg}: ${p.ratio.toFixed(2)}:1${p.ratio < 4.5 ? ' (needs 4.5:1)' : ''}`).join('; ') || 'Not checked for contrast.';
-    fill(body, COLOUR_TOKENS.map(k => {
+      .map(p => `${p.fg} on ${p.bg}: ${p.ratio.toFixed(2)}:1${p.ratio < p.need ? ` (needs ${p.need}:1)` : ''}`).join('; ') || 'Not checked for contrast.';
+    fill(body, EDIT_TOKENS.map(k => {
       const name = `${side === 'light' ? 'Light' : 'Dark'} ${k}`;
       const picker = h('button', { type: 'button', class: 'swatch token-swatch', style: `--sw:${palette[k]}`, 'aria-label': name, title: palette[k], onclick: async () => {
         const c = await sheet({ title: name, value: palette[k], note: sayFor(k) });
@@ -414,7 +413,7 @@ function editColours(st) {
   };
   paint();
   return h('section', { class: 'card' }, h('h2', {}, 'Edit colours'),
-    help('Edit light and dark separately. Reset uses the accent and background again. Text needs 4.5:1 contrast; existing colours stay as they are until you save.'),
+    help('Edit light and dark separately. Reset uses the accent and background again. Text needs 4.5:1 contrast; existing colours stay as they are until you save. fill and onFill are filled buttons and their words, link the links, focus the ring round what the keyboard is on (3:1), selection selected text: each follows the accent until you set it.'),
     modes, body, report, h('button', { type: 'button', onclick: save }, 'Save colours'));
 }
 

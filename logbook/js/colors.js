@@ -71,19 +71,71 @@ export function darkPalette(accent, oled = false) {
 }
 
 const decl = p => Object.entries(p).map(([k, v]) => `--${k}: ${v};`).join(' ');
-// The CSS for an accent: light, dark (data-theme dark, or auto with a dark phone) and OLED (data-oled).
-// display.js puts it in the theme layer (index.html: cascade layers), which wins over the base palettes in style.css.
-// The default accent keeps the NUHS stripe and light palette from style.css.
-export function schemeCss(accent) {
-  const c = cleanAccent(accent) || DEFAULT_ACCENT;
-  const L = lightPalette(c), D = darkPalette(c), O = darkPalette(c, true);
-  if (c === DEFAULT_ACCENT) { for (const k of ['bg', 'line', 'row-alt', 's1', 's2', 's3', 's4']) delete L[k]; delete D.s1; delete D.s2; delete D.s3; delete D.s4; delete O.s1; delete O.s2; delete O.s3; delete O.s4; }
+const STATUS = { light: { ok: '#1a7f37', warn: '#8a5a00', err: '#b42318' }, dark: { ok: '#74dd90', warn: '#f3c46e', err: '#ff9a8f' } };
+const NUH_STRIPE = { s1: '#e57200', s2: '#e4002b', s3: '#178fd7', s4: '#002f6c' };
+// NUHS, the default look (TE S4): its palettes written out in full, as any theme's would be, so nothing in the
+// generator below treats the navy specially. These are the colours NUHS has always shown (the light ink and the tints
+// made from the navy by lightPalette, the grey page and lines of style.css, the NUH stripe in every appearance);
+// test/e2e/nuhs-baseline.mjs holds the pages to them.
+export const NUHS = {
+  light: {
+    bg: '#f3f3f3', panel: '#ffffff', ink: '#2b2f33', muted: '#5f666e', line: '#dddddd',
+    accent: '#002f6c', 'accent-ink': '#ffffff', 'accent-soft': '#e0e6ed', chip: '#ebeef3', 'chip-on': '#002f6c',
+    info: '#002f6c', 'info-bg': '#e6eaf0', 'row-alt': '#f8f9fb', heading: '#002f6c', ...STATUS.light, ...NUH_STRIPE,
+  },
+  dark: {
+    bg: '#121417', panel: '#1b1e23', ink: '#eef0f3', muted: '#b8c0c9', line: '#363b43',
+    accent: '#69abff', 'accent-ink': '#0d0f12', 'accent-soft': '#2b3a4f', chip: '#242f3d', 'chip-on': '#69abff',
+    info: '#69abff', 'info-bg': '#263242', 'row-alt': '#202329', heading: '#69abff', 'input-bg': '#15181c', ...STATUS.dark, ...NUH_STRIPE,
+  },
+  oled: {
+    bg: '#000000', panel: '#000000', ink: '#eef0f3', muted: '#b8c0c9', line: '#30343b',
+    accent: '#4b99ff', 'accent-ink': '#000000', 'accent-soft': '#0f1f33', chip: '#09121f', 'chip-on': '#4b99ff',
+    info: '#4b99ff', 'info-bg': '#0b1524', 'row-alt': '#0a0a0b', heading: '#4b99ff', 'input-bg': '#0a0a0b', ...STATUS.dark, ...NUH_STRIPE,
+  },
+};
+// the colours made from the accent and the cards (as lightPalette and darkPalette make them)
+const fromAccent = (side, a, panel) => (side === 'light'
+  ? { 'accent-soft': mix(a, panel, 0.88), chip: mix(a, panel, 0.92), 'chip-on': a, info: a, 'info-bg': mix(a, panel, 0.9), heading: a }
+  : { 'accent-soft': mix(panel, a, 0.2), chip: mix(panel, a, 0.12), 'chip-on': a, info: a, 'info-bg': mix(panel, a, 0.14), heading: a });
+// Colour roles (TE S4): a filled button and the text on it, links, the focus ring and selected text. Each follows the
+// accent (focus: the heading colour on light pages, as before) unless a theme or Edit colours sets it.
+export const ROLE_TOKENS = ['fill', 'onFill', 'link', 'focus', 'selection'];
+const cssName = k => k.replace(/[A-Z]/g, c => '-' + c.toLowerCase());   // accentInk -> accent-ink
+function withRoles(p, side, own = {}) {
+  const out = { ...p, fill: own.fill || p.accent, 'on-fill': own.onFill || p['accent-ink'], link: own.link || p.accent, focus: own.focus || (side === 'light' ? p.heading : p.accent) };
+  if (own.selection) out.selection = own.selection;
+  return out;
+}
+// A colour other than the navy makes its own palettes; the navy (or none) is NUHS's
+const accentOf = look => { const c = cleanAccent(look?.accent); return c && c !== DEFAULT_ACCENT ? c : null; };
+// The one palette for an appearance ('light', 'dark' or 'oled'), after everything that can change it: NUHS's or the
+// accent's, then the background tint (not on OLED, which stays black), then the look's own colours; the colours made
+// from the accent and the cards are made again from the final ones if those changed (a theme's own dark accent, a
+// cream card), then the roles. Used for the page's CSS, the contrast checks, previews and the status bar.
+export function resolvePalette(look = {}, appearance = 'light', tint = {}) {
+  const side = appearance === 'light' ? 'light' : 'dark', a = accentOf(look);
+  const base = a ? { ...(side === 'light' ? lightPalette(a) : darkPalette(a, appearance === 'oled')), ...STATUS[side] } : NUHS[appearance] || NUHS.light;
+  const own = cleanColours(look?.colours)[side] || {};
+  const p = { ...base, ...(appearance === 'oled' ? {} : tint?.[side]) };
+  for (const k of COLOUR_TOKENS) if (own[k]) p[cssName(k)] = own[k];
+  if (p.accent !== base.accent || p.panel !== base.panel) Object.assign(p, fromAccent(side, p.accent, p.panel));
+  return withRoles(p, side, own);
+}
+// The page's colours (display.js puts them in the theme layer, index.html: cascade layers, which wins over the base
+// palettes in style.css): light, dark (data-theme dark, or auto with a dark phone) and OLED (data-oled), each complete.
+export function paletteCss(look = {}, tint = {}) {
+  const L = resolvePalette(look, 'light', tint), D = resolvePalette(look, 'dark', tint), O = resolvePalette(look, 'oled', tint);
+  // selected text: only when a look sets it (else the browser's own); the other appearance then uses its soft accent
+  const sel = L.selection || D.selection;
+  if (sel) for (const p of [L, D, O]) p.selection ||= p['accent-soft'];
   return [
     `:root { ${decl(L)} }`,
     `:root[data-theme="dark"] { ${decl(D)} }`,
     `:root[data-theme="dark"][data-oled] { ${decl(O)} }`,
     `@media (prefers-color-scheme: dark) { :root[data-theme="auto"] { ${decl(D)} } }`,
-  ].join('\n');
+    sel ? '::selection { background: var(--selection); color: var(--ink); }' : '',
+  ].filter(Boolean).join('\n');
 }
 
 // One colour per tab, everything in it (Settings → Themes → Colourful): the same palettes as the colour picker,
@@ -92,11 +144,12 @@ export function tabSchemeCss(accent, scope) {
   const c = cleanAccent(accent) || DEFAULT_ACCENT;
   const L = lightPalette(c), D = darkPalette(c), O = darkPalette(c, true);
   for (const p of [L, D, O]) for (const k of ['s1', 's2', 's3', 's4']) delete p[k];   // the stripe at the top stays as it is
+  // (the roles too, so the tab's buttons, links and focus ring follow its colour)
   return [
-    `html.colour-all ${scope} { ${decl(L)} }`,
-    `html.colour-all[data-theme="dark"] ${scope} { ${decl(D)} }`,
-    `html.colour-all[data-theme="dark"][data-oled] ${scope} { ${decl(O)} }`,
-    `@media (prefers-color-scheme: dark) { html.colour-all[data-theme="auto"] ${scope} { ${decl(D)} } }`,
+    `html.colour-all ${scope} { ${decl(withRoles(L, 'light'))} }`,
+    `html.colour-all[data-theme="dark"] ${scope} { ${decl(withRoles(D, 'dark'))} }`,
+    `html.colour-all[data-theme="dark"][data-oled] ${scope} { ${decl(withRoles(O, 'dark'))} }`,
+    `@media (prefers-color-scheme: dark) { html.colour-all[data-theme="auto"] ${scope} { ${decl(withRoles(D, 'dark'))} } }`,
   ].join('\n');
 }
 
@@ -108,48 +161,38 @@ export function tabVarsCss(colours) {
     `@media (prefers-color-scheme: dark) { html.colourful[data-theme="auto"] { ${dark} } }`].join('\n');
 }
 
-// Optional full colour tokens. Only known six-digit hex values reach CSS or a themes file.
+// Optional full colour tokens. Only known six-digit hex values reach CSS or a themes file. (The roles, ROLE_TOKENS,
+// are kept beside them; theme links list them after the rest, my-themes.js LINK_KEYS.)
 export const COLOUR_TOKENS = ['bg', 'panel', 'ink', 'muted', 'line', 'accent', 'accentInk', 'ok', 'warn', 'err'];
+export const EDIT_TOKENS = [...COLOUR_TOKENS, ...ROLE_TOKENS];
 export function cleanColours(value) {
   const out = {};
   for (const side of ['light', 'dark']) {
     const got = value?.[side];
     if (!got || typeof got !== 'object' || Array.isArray(got)) continue;
     const tokens = {};
-    for (const k of COLOUR_TOKENS) if (Object.hasOwn(got, k) && typeof got[k] === 'string' && cleanAccent(got[k])) tokens[k] = cleanAccent(got[k]);
+    for (const k of EDIT_TOKENS) if (Object.hasOwn(got, k) && typeof got[k] === 'string' && cleanAccent(got[k])) tokens[k] = cleanAccent(got[k]);
     if (Object.keys(tokens).length) out[side] = tokens;
   }
   return out;
 }
-const colourVars = tokens => Object.fromEntries(Object.entries(tokens).map(([k, v]) => [k === 'accentInk' ? 'accent-ink' : k, v]));
-export function coloursCss(value) {
-  const c = cleanColours(value), out = [];
-  if (c.light) {
-    const vars = decl(colourVars(c.light));
-    out.push(`:root[data-theme="light"], :root:not([data-theme]) { ${vars} }`);
-    out.push(`@media (prefers-color-scheme: light) { :root[data-theme="auto"] { ${vars} } }`);
-  }
-  if (c.dark) {
-    const vars = decl(colourVars(c.dark));
-    out.push(`:root[data-theme="dark"], :root[data-theme="dark"][data-oled] { ${vars} }`);
-    out.push(`@media (prefers-color-scheme: dark) { :root[data-theme="auto"] { ${vars} } }`);
-  }
-  return out.join('\n');
-}
-// The effective editable tokens, including defaults that schemeCss leaves in style.css.
+// The effective editable tokens (resolvePalette, with the names Edit colours uses: accentInk, onFill).
 export function colourPalette(d = {}, side = 'light', tint = {}, oled = false) {
-  const accent = cleanAccent(d.accent) || DEFAULT_ACCENT;
-  const p = side === 'dark' ? darkPalette(accent, oled) : lightPalette(accent);
-  if (side === 'light' && accent === DEFAULT_ACCENT) Object.assign(p, { bg: '#f3f3f3', line: '#dddddd' });
-  const status = side === 'dark' ? { ok: '#74dd90', warn: '#f3c46e', err: '#ff9a8f' } : { ok: '#1a7f37', warn: '#8a5a00', err: '#b42318' };
-  return { ...p, accentInk: p['accent-ink'], ...status, ...(side === 'dark' && oled ? {} : tint[side]), ...cleanColours(d.colours)[side] };
+  const p = resolvePalette(d, side === 'dark' ? (oled ? 'oled' : 'dark') : 'light', tint);
+  return { ...p, accentInk: p['accent-ink'], onFill: p['on-fill'] };
 }
+// The pairs checked for contrast: text 4.5:1 always; a role's pairs only once a look sets that role (the focus ring
+// 3:1 against the page, as WCAG asks of outlines)
+const PAIRS = [['ink', 'bg'], ['ink', 'panel'], ['muted', 'bg'], ['muted', 'panel'], ['accentInk', 'accent']];
+const ROLE_PAIRS = { fill: [['onFill', 'fill']], onFill: [['onFill', 'fill']], link: [['link', 'panel'], ['link', 'bg']], focus: [['focus', 'bg', 3]], selection: [['ink', 'selection']] };
 export function colourChecks(d = {}, tint = {}, oled = false) {
   const out = [];
   for (const side of ['light', 'dark']) {
     const p = colourPalette(d, side, tint, oled), overrides = cleanColours(d.colours)[side] || {};
-    for (const [fg, bg] of [['ink', 'bg'], ['ink', 'panel'], ['muted', 'bg'], ['muted', 'panel'], ['accentInk', 'accent']]) {
-      out.push({ side, fg, bg, ratio: contrast(p[fg], p[bg]), changed: !!(overrides[fg] || overrides[bg]) });
+    const roles = ROLE_TOKENS.filter(k => overrides[k]).flatMap(k => ROLE_PAIRS[k]);
+    const pairs = [...PAIRS, ...roles.filter((r, i) => roles.findIndex(x => x[0] === r[0] && x[1] === r[1]) === i)];
+    for (const [fg, bg, need = 4.5] of pairs) {
+      out.push({ side, fg, bg, need, ratio: contrast(p[fg], p[bg]), changed: !!(overrides[fg] || overrides[bg]) });
     }
   }
   return out;
@@ -157,6 +200,6 @@ export function colourChecks(d = {}, tint = {}, oled = false) {
 export function checkColours(d = {}, tint = {}) {
   // Existing looks stay unchanged; full colour looks must pass in both modes, including OLED.
   if (!Object.keys(cleanColours(d.colours)).length) return;
-  const failed = [...colourChecks(d, tint), ...colourChecks(d, tint, true).filter(p => p.side === 'dark')].find(p => p.ratio < 4.5);
-  if (failed) throw new Error(`${failed.side === 'light' ? 'Light' : 'Dark'} ${failed.fg} on ${failed.bg}: ${failed.ratio.toFixed(2)}:1 (needs 4.5:1)`);
+  const failed = [...colourChecks(d, tint), ...colourChecks(d, tint, true).filter(p => p.side === 'dark')].find(p => p.ratio < p.need);
+  if (failed) throw new Error(`${failed.side === 'light' ? 'Light' : 'Dark'} ${failed.fg} on ${failed.bg}: ${failed.ratio.toFixed(2)}:1 (needs ${failed.need}:1)`);
 }

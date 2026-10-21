@@ -70,7 +70,7 @@ try {
   assert.equal(await p.locator('.theme-list .theme-row').count(), 1, 'search narrows the list');
   await p.getByRole('button', { name: 'Suggest a theme' }).waitFor();
   await p.locator('.theme-row', { hasText: 'Spotify' }).click();
-  assert.match(await p.evaluate(() => document.getElementById('look-css').textContent), /#121212/);
+  assert.match(await p.evaluate(() => document.getElementById('accent-css').textContent), /#121212/);   // (its colours: the palette, colors.js resolvePalette)
   assert.equal(await p.evaluate(() => document.documentElement.dataset.theme), 'light', 'a theme leaves Light or dark alone');
   // cascade layers (index.html): the order first, style.css as the base layer, every look sheet in a layer, no :root
   // stacking anywhere; the look survives a reload (first paint from the cache)

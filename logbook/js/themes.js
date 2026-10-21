@@ -4,7 +4,7 @@
 // fonts) sit in a searchable list. Pure, unit-tested; the CSS for the new look settings (background tint, spacing,
 // tab bar style, heading font, the top band) is made here too, cached for the first paint (index.html).
 
-import { coloursCss, checkColours } from './colors.js';
+import { checkColours } from './colors.js';
 import { STACKS, THEME_FONTS } from './fonts.js';
 import { facetCss, tuneCss, iconTintCss } from './theme-engine.js';
 import { patternCss } from './wallpaper.js';
@@ -1586,30 +1586,21 @@ export function bandColours(d = {}) {
   return t.band || null;
 }
 
-// The CSS for the look settings that aren't classes: the tint, the band, the heading font, spacing and tab style.
+// The CSS for the look settings that aren't classes: the band, the heading font, spacing and tab style. (The tint and
+// the look's own colours are in its palette: colors.js resolvePalette, display.js applyPalette.)
 // shades: the four band colours worked out from the accent (colors.js lightPalette), used when the band says so.
-// Cascade layers (index.html: base, facets, theme, custom): the colours go in the theme layer, after the accent's
-// (display.js applyAccent), so they win over style.css's palettes without :root stacking; the band and the facets
+// Cascade layers (index.html: base, facets, theme, custom): the colours go in the theme layer, after the palette's
+// (display.js applyPalette), so they win over style.css's palettes without :root stacking; the band and the facets
 // say their own layer (facetCss). Browsers without layers skip it all and keep the default look.
 export function lookCss(d = {}, shades = null) {
   const colours = [], rules = [];
-  const tint = TINTS[d.bgTint] && d.bgTint !== 'auto' ? TINTS[d.bgTint] : null;
-  const vars = o => Object.entries(o).map(([k, v]) => `--${k}: ${v};`).join(' ');
-  if (tint) {
-    if (tint.light) colours.push(`:root:not([data-theme="dark"]) { ${vars(tint.light)} }`);
-    if (tint.dark) {
-      colours.push(`:root[data-theme="dark"] { ${vars(tint.dark)} }`);
-      colours.push(`@media (prefers-color-scheme: dark) { :root[data-theme="auto"] { ${vars(tint.dark)} } }`);
-    }
-  }
   const band = bandColours(d);
   const four = band === 'shades' ? shades : Array.isArray(band) ? band : null;
   if (band === 'none') rules.push('@layer base { .top { background: var(--panel); } .top, .top[class] { padding-top: max(12px, env(safe-area-inset-top, 0px)); } }');
-  else if (four && four.length === 4) colours.push(`:root, :root[data-theme="dark"] { --s1: ${four[0]}; --s2: ${four[1]}; --s3: ${four[2]}; --s4: ${four[3]}; }`);
+  else if (four && four.length === 4) colours.push(`:root, :root[data-theme="dark"], :root[data-theme="dark"][data-oled] { --s1: ${four[0]}; --s2: ${four[1]}; --s3: ${four[2]}; --s4: ${four[3]}; }`);
   if (d.headFont && d.headFont !== 'same' && STACKS[d.headFont]) colours.push(`:root { --font-head: ${STACKS[d.headFont]}; }`);
   // the theme engine's facets (theme-engine.js): App-style details, spacing, tab style; nothing unless chosen
   rules.push(...facetCss(d));
-  colours.push(coloursCss(d.colours));
   // after the colours, so they follow the palette: a wallpaper pattern (wallpaper.js) and the icon tint (theme-engine.js)
   colours.push(patternCss(d), iconTintCss(d));
   const layer = (name, css) => (css.filter(Boolean).length ? `@layer ${name} {\n${css.filter(Boolean).join('\n')}\n}` : '');

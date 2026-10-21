@@ -3,8 +3,8 @@
 // start without loading the settings pages (they load on first use).
 
 import { S, h, toast, modal, hooks, profile, facultyRole, shows } from './ui-core.js';
-import { DEFAULT_ACCENT, cleanAccent, schemeCss, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
-import { lookCss } from './themes.js';
+import { DEFAULT_ACCENT, cleanAccent, paletteCss, resolvePalette, lightPalette, tabSchemeCss, tabVarsCss } from './colors.js';
+import { lookCss, TINTS } from './themes.js';
 import { lookNow, nightRef } from './my-themes.js';
 import { cleanFacet, foldCompact } from './theme-engine.js';
 import { checkCss } from './custom-css.js';
@@ -62,23 +62,27 @@ export function stepZoom(dir) {
   applyZoom(v); setDisplay({ zoom: v });
   return v;
 }
-// Colour (this device's display settings): one accent colour; colors.js works out the
-// light, dark and OLED palettes. The CSS is cached on the device so the first paint has it (index.html).
+// Colour (this device's display settings): one accent colour, the background tint and a look's own colours, resolved
+// into one palette per appearance (colors.js resolvePalette: light, dark, OLED). The CSS is cached on the device so
+// the first paint has it (index.html), NUHS's too.
 // The look's style sheets go in the cascade layers that index.html sets up (theme, facets, custom), so they win over
 // style.css without :root stacking; the -v2 cache keys keep the old stacked, unlayered CSS from a first paint.
 export const layered = (name, css) => (css ? `@layer ${name} {\n${css}\n}` : '');
 const ACCENT_CSS_KEY = 'apmes-logbook-accent-css-v2';
 const OLD_CSS_KEYS = ['apmes-logbook-accent-css', 'apmes-logbook-look-css'];
 try { for (const k of OLD_CSS_KEYS) localStorage.removeItem(k); } catch { /* storage blocked */ }
-export function applyAccent(c) {
-  const accent = cleanAccent(c) || DEFAULT_ACCENT;
-  const css = layered('theme', schemeCss(accent));
+const tintOf = d => (d.bgTint && d.bgTint !== 'auto' && TINTS[d.bgTint]) || {};
+export function applyPalette(d = display()) {
+  d = lookToShow(d);
+  const css = layered('theme', paletteCss(d, tintOf(d)));
   let el = document.getElementById('accent-css');
   if (!el) { el = document.createElement('style'); el.id = 'accent-css'; document.head.append(el); }
-  el.textContent = css;
-  const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute('content', lightPalette(accent).accent);
-  try { accent === DEFAULT_ACCENT ? localStorage.removeItem(ACCENT_CSS_KEY) : localStorage.setItem(ACCENT_CSS_KEY, css); } catch { /* storage blocked */ }
+  if (el.textContent !== css) el.textContent = css;
+  const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute('content', resolvePalette(d, 'light', tintOf(d)).accent);
+  try { localStorage.setItem(ACCENT_CSS_KEY, css); } catch { /* storage blocked */ }
 }
+// a colour tried in the colour sheet (or none: the look's own again)
+export const applyAccent = c => (c == null ? applyPalette() : applyPalette({ ...lookToShow(), accent: c, shown: true }));
 // Case text size (Accessibility; theme-revamp S5): the case box and case text in lists (the logging font's places)
 // bigger or smaller than the rest, as --cs (style.css); set at first paint from the display entry (index.html)
 export const CASE_SIZES = [['0.9', 'Smaller'], ['1', 'Same as the text (default)'], ['1.15', 'Larger'], ['1.3', 'Larger still'], ['1.5', 'Largest']];
@@ -151,7 +155,7 @@ export const nightShowing = () => !preview && !!nightRef(display()) && darkNow()
 export function previewLook(d) { preview = d ? { ...d, shown: true } : null; applyDisplay(); }
 export function applyDisplay(d = display()) {
   d = lookToShow(d);
-  applyCompact(d.spacing === 'compact'); applyTextSize(d.textSize || '1'); applyCaseSize(d.caseSize); applyZoom(d.zoom || '1'); applyAccent(d.accent); applyFonts(d); applyLook(d); applyThemeLook(d); applyWallpaper(d);
+  applyCompact(d.spacing === 'compact'); applyTextSize(d.textSize || '1'); applyCaseSize(d.caseSize); applyZoom(d.zoom || '1'); applyPalette(d); applyFonts(d); applyLook(d); applyThemeLook(d); applyWallpaper(d);
 }
 
 // Wallpaper (Themes → Wallpaper; wallpaper.js): <html class="wall"> turns on style.css's two layers behind the page,
@@ -221,6 +225,7 @@ const DIM_KEY = 'apmes-logbook-wall-dim';   // for the first paint (index.html),
 const LOOK_CSS_KEY = 'apmes-logbook-look-css-v2';
 export function applyThemeLook(d = display()) {
   d = lookToShow(d);
+  // (Shades of my colour: the four made from the accent, the navy's too)
   const p = lightPalette(cleanAccent(d.accent) || DEFAULT_ACCENT);
   const css = lookCss(d, [p.s1, p.s2, p.s3, p.s4]);
   let el = document.getElementById('look-css');
@@ -240,7 +245,7 @@ export function paintStatusBar(d = display()) {
   const mode = d.statusBar === 'header' || d.statusBar === 'page' ? d.statusBar : null;
   const root = getComputedStyle(document.documentElement);
   const token = mode === 'page' || (mode === 'header' && document.documentElement.classList.contains('no-header')) ? '--bg' : d.headerStyle === 'filled' ? '--accent' : '--panel';
-  const colour = (mode && root.getPropertyValue(token).trim()) || lightPalette(cleanAccent(d.accent) || DEFAULT_ACCENT).accent;
+  const colour = (mode && root.getPropertyValue(token).trim()) || resolvePalette(d, 'light', tintOf(d)).accent;
   if (meta.getAttribute('content') !== colour) meta.setAttribute('content', colour);
   try { mode ? localStorage.setItem(STATUS_KEY, colour) : localStorage.removeItem(STATUS_KEY); } catch { /* storage blocked */ }
 }

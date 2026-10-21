@@ -101,9 +101,7 @@ assert.equal(themeById('whatsapp').look.headerStyle, undefined, 'modern WhatsApp
 assert.match(lookCss({ band: 'shades' }, ['#111111', '#222222', '#333333', '#444444']), /--s4: #444444/);
 assert.equal(lookCss({ band: 'shades' }), '');   // no shades worked out: the usual band
 assert.match(lookCss({ band: 'none' }), /\.top \{ background: var\(--panel\); \}/);
-const cream = lookCss({ bgTint: 'cream' });
-assert.match(cream, /:root:not\(\[data-theme="dark"\]\) \{ --bg: #f7f3ec;/);
-assert.match(cream, /prefers-color-scheme: dark/);
+assert.equal(lookCss({ bgTint: 'cream' }), '', 'the tint is in the palette (colors.js resolvePalette), not here');
 assert.equal(lookCss({ bgTint: 'auto' }), '');
 assert.match(lookCss({ headFont: 'serif' }), /--font-head: ui-serif/);
 assert.equal(lookCss({ headFont: 'nonsense' }), '');

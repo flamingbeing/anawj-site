@@ -7,7 +7,7 @@ import { cleanFontFile } from './fonts.js';
 import { foldCompact, TAB_ICONS } from './theme-engine.js';
 import { GRID, gridIndex, isSnapped, bits18, fromBits18 } from './colour-grid.js';
 import { LOOK, lookField, cleanLook, keptKeys } from './look-schema.js';
-import { checkColours, COLOUR_TOKENS } from './colors.js';
+import { checkColours, COLOUR_TOKENS, ROLE_TOKENS, EDIT_TOKENS } from './colors.js';
 
 export const MAX_MINE = 12;
 export const FILE_KIND = 'apmes-logbook-themes';
@@ -100,9 +100,11 @@ const MAX_LINK = 2000;
 const bytesOf = str => Uint8Array.from(atob(str.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 const b64uOf = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const SIDES = ['light', 'dark'];
-// (settings added to the look after tabIcon, from TE S3, come after the colour tokens, so older places never move)
-const LATE = LOOK.findIndex(f => f.key === 'tabIcon') + 1;
-export const LINK_KEYS = [...LOOK.slice(0, LATE).filter(f => f.kind !== 'colours').map(f => f.key), ...SIDES.flatMap(s => COLOUR_TOKENS.map(k => `${s}.${k}`)), ...LOOK.slice(LATE).map(f => f.key)];
+// (settings added to the look after tabIcon, from TE S3, come after the colour tokens, so older places never move; the
+// colour roles, TE S4, after wallFrost; look settings newer than that after the roles)
+const LATE = LOOK.findIndex(f => f.key === 'tabIcon') + 1, ROLES_AT = LOOK.findIndex(f => f.key === 'wallFrost') + 1;
+export const LINK_KEYS = [...LOOK.slice(0, LATE).filter(f => f.kind !== 'colours').map(f => f.key), ...SIDES.flatMap(s => COLOUR_TOKENS.map(k => `${s}.${k}`)),
+  ...LOOK.slice(LATE, ROLES_AT).map(f => f.key), ...SIDES.flatMap(s => ROLE_TOKENS.map(k => `${s}.${k}`)), ...LOOK.slice(ROLES_AT).map(f => f.key)];
 class Bits {
   constructor(bytes) { this.b = bytes ? [...bytes].flatMap(x => [7, 6, 5, 4, 3, 2, 1, 0].map(i => (x >> i) & 1)) : []; this.i = 0; }
   put(v, n) { for (let i = n - 1; i >= 0; i--) this.b.push(Math.floor(v / 2 ** i) % 2); }
@@ -192,7 +194,7 @@ function readName(r) {
 // a look with its colours as flat keys ('light.bg'), and back
 const flatLook = look => {
   const { colours, ...rest } = look;
-  for (const s of SIDES) for (const k of COLOUR_TOKENS) if (colours?.[s]?.[k]) rest[`${s}.${k}`] = colours[s][k];
+  for (const s of SIDES) for (const k of EDIT_TOKENS) if (colours?.[s]?.[k]) rest[`${s}.${k}`] = colours[s][k];
   return rest;
 };
 const unflatLook = flat => {

@@ -25,7 +25,11 @@ setting gets an entry there (and its key in `display.js` `DISPLAY_KEYS`); `check
 
 - **Colours:** `accent` (one hex; colors.js works out readable light, dark and OLED shades), `bgTint` (a key of
   `TINTS`) and `colours: { light: {…}, dark: {…} }`, which overrides any of `bg`, `panel`, `ink`, `muted`, `line`,
-  `accent`, `accentInk`, `ok`, `warn`, `err` (#rrggbb). Prefer `colours` for a new app's own ground, cards, text and
+  `accent`, `accentInk`, `ok`, `warn`, `err` (#rrggbb), and the roles `fill`, `onFill` (filled buttons and their words),
+  `link`, `focus` (the keyboard ring, 3:1) and `selection` (selected text), which follow the accent until set. All of
+  it is resolved into one palette per appearance by `colors.js resolvePalette` (NUHS's or the accent's, then the tint,
+  then `colours`; the soft accent, chips and info colours are made again from the final accent and card), used for the
+  CSS, the contrast checks, previews and the status bar. NUHS is its written-out `NUHS` palette. Prefer `colours` for a new app's own ground, cards, text and
   lines; add a `TINTS` entry only when the Background menu should offer it too. `colourful`, `contrast`.
 - **Shape and type:** `round` (0 square, 1 slight, 3 very round; leave out for normal), `borders` (0–3 line strength),
   `flat`, `shadows: false` (outlined cards), `btnStyle` (outlined / filled / tinted / plain), `compact`,
@@ -87,7 +91,7 @@ wins whatever the selectors, so **never repeat `:root`** to win; plain selectors
 | `base` | `style.css` (today's look) | index.html |
 | `base` (again) | most facets and band "none", after style.css: they compete with it by specificity as before, so the app's own special cases (the bold reflection tick, the Display preview) stay | `facetCss`, `lookCss` |
 | `facets` | facets with `wins: true` (header style, see-through bars, tab tone, heading tone, pop-ups, text boxes), each in its own sub-layer in `FACETS` order (a later one wins) | `facetCss` |
-| `theme` | colour tokens: the accent's palettes, then tints, band colours, heading font, `colours` | `schemeCss`, `lookCss`, tab colours |
+| `theme` | the resolved palette (accent or NUHS, tint, `colours`, roles), then band colours, heading font | `paletteCss` (display.js `applyPalette`), `lookCss`, tab colours |
 | `custom` | the resident's custom CSS | display.js `applyCustomCss` |
 
 High contrast (`html.hc`) uses `!important` in `base` so it still wins over a theme's colours. Browsers without layers
