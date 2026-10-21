@@ -59,9 +59,9 @@ r = await get('https://design.anawj.com/v1'); assert.equal(r.status, 301); asser
 r = await get('https://design.anawj.com/logbook/'); assert.equal(r.status, 404);
 r = await get('https://ntfroster.anawj.com/'); assert.equal(r.headers.get('Access-Control-Allow-Origin'), null);
 // ntfroster.anawj.com also serves Firebase's sign-in helper pages at /__/auth/ (handler is handler.html, as on GitHub Pages)
-r = await get('https://ntfroster.anawj.com/__/auth/handler?apiKey=x&mode=y'); assert.equal(r.status, 200);
+r = await get('https://ntfroster.anawj.com/__/auth/handler?mode=y&hl=en'); assert.equal(r.status, 200);
 r = await get('https://ntfroster.anawj.com/__/auth/handler.js'); assert.equal(r.status, 200);
-r = await get('https://ntfroster.anawj.com/__/auth/iframe?apiKey=x'); assert.equal(r.status, 200);
+r = await get('https://ntfroster.anawj.com/__/auth/iframe?hl=en'); assert.equal(r.status, 200);
 r = await get('https://ntfroster.anawj.com/__/firebase/init.json'); assert.equal(r.status, 200);
 assert.equal(JSON.parse(await r.text()).authDomain, 'ntfroster.anawj.com');
 assert.equal((await get('https://ntfroster.anawj.com/__/auth/handler.html')).status, 200);
