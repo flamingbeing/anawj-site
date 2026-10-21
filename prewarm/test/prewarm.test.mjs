@@ -232,4 +232,22 @@ function unzip(bytes) {
   assert.ok(!PACU_KEYS.some(k => /^(prewarm|iotemp|haemo|io_|pw_|arm|enrol)/.test(k)), 'nothing from the other pages');
 }
 
+// Email and PayNow (js/pay.js)
+{
+  const { checkPay, cleanPaynow, payOrder, ticksHtml } = await import('../js/pay.js');
+  assert.equal(checkPay('', ''), 'Enter the email or the PayNow number.');
+  assert.equal(checkPay('pt@example.com', ''), '');
+  assert.equal(checkPay('', '9123 4567'), '');
+  assert.equal(checkPay('', '+65 8123-4567'), '');
+  assert.match(checkPay('', '6123 4567'), /8 digits/);
+  assert.match(checkPay('', '912345'), /8 digits/);
+  assert.match(checkPay('not an email', ''), /email/);
+  assert.equal(cleanPaynow('+65 9123 4567'), '91234567');
+  assert.deepEqual(payOrder([{ pid: 'c', cleared: {}, paid: {} }, { pid: 'b', paid: {} }, { pid: 'a1', setAt: 1 }, { pid: 'a2', setAt: 2 }]).map(d => d.pid), ['a2', 'a1', 'b', 'c']);
+  const esc = s => String(s);
+  assert.match(ticksHtml({ pid: 'x', email: 'e@x.y' }, esc), /data-payclear="x" disabled/, 'Delete waits for Payment sent');
+  assert.doesNotMatch(ticksHtml({ pid: 'x', email: 'e@x.y', paid: { t: 1, by: 'a' } }, esc), /data-payclear="x" disabled/);
+  assert.doesNotMatch(ticksHtml({ pid: 'x', paid: { t: 1, by: 'a' }, cleared: { t: 2, by: 'a' } }, esc), /data-payclear/, 'nothing to delete once deleted');
+}
+
 console.log('prewarm: ok');

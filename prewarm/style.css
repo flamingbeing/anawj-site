@@ -253,6 +253,7 @@ body.ro main .k, body.ro main .num, body.ro main .chip, body.ro main .tchip, bod
 .list a.locked { background: var(--bg); border-style: dashed; color: var(--muted); }
 .list a.declined { background: var(--bg); color: var(--muted); border-left: 6px solid var(--muted); }
 .list a.declined b { color: var(--muted); text-decoration: line-through; }
+.list a.draft { border-left: 6px dashed var(--line); }
 .list .declline { color: var(--muted); font-style: italic; }
 .fld textarea { width: 100%; box-sizing: border-box; min-height: 84px; font: inherit; padding: 8px; border: 1px solid var(--line-input); border-radius: var(--r); resize: vertical; }
 .listhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
@@ -601,3 +602,10 @@ button.scst-retake { width: 100%; min-height: var(--tap); margin-top: 4px; backg
   .sirow > * { grid-column: 2; }
   .sirow > .sicrop { grid-column: 1; grid-row: 1 / span 6; align-items: start; }
 }
+/* Email and PayNow (js/pay.js) */
+.paybtn { flex-direction: column; gap: 0; margin-top: 8px; }
+.paybtn small { color: var(--muted); font-size: 12px; }
+.paylist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.paylist h3 { margin: 0 0 4px; }
+.payids { display: grid; gap: 2px; margin: 0 0 6px; word-break: break-all; }
+.paytick { margin-top: 6px; }

@@ -34,7 +34,24 @@ try {
   assert.match(await page.textContent('.list'), /DEMO-01/);
   await axe('home'); await shot('home');
 
-  // new patient
+  // new patient screen (owner, 21 Oct 2026): Save draft and Patient declined need only the Subject ID; drafts reopen the
+  // form from the list; the list is by Subject ID, largest on top; Share buttons are here too
+  await page.click('#new');
+  assert.ok(await page.$('#nshare') && await page.$('#npacu'), 'Share subject and Share to PACU on the new patient screen');
+  await page.fill('#sid', 'DEMO-10'); await page.click('#draft');
+  await page.waitForSelector('.list a.draft');
+  assert.match(await page.textContent('.list a.draft'), /Draft/);
+  assert.deepEqual(await page.$$eval('.list li[data-sid]', l => l.map(x => x.dataset.sid)), ['demo-10', 'demo-02', 'demo-01'], 'largest Subject ID on top, numbers as numbers');
+  await page.click('.list a.draft'); await page.waitForSelector('#sid');
+  assert.equal(await page.inputValue('#sid'), 'DEMO-10', 'a draft reopens the new patient form');
+  await page.fill('#sid', 'DEMO-9');
+  page.once('dialog', d => d.accept()); await page.click('#declined');
+  await page.waitForSelector('.list a.declined');
+  assert.match(await page.textContent('.list a.declined'), /DEMO-9[\s\S]*Declined to participate/);
+  assert.equal(await page.$('.list a.draft'), null, 'the draft became the declined patient');
+  await page.click('#new'); await page.fill('#sid', 'DEMO-9'); await page.click('#draft');
+  await toastSaysE(/already on this phone/);
+  await page.goto(BASE + '?demo#/'); await page.waitForSelector('.list a');
   await page.click('#new');
   await page.fill('#sid', 'TEST-02');
   await page.click('.seg .chip[data-v="2"]');
@@ -56,6 +73,16 @@ try {
   await page.click('.chip[data-sat="sat_pre"][data-v="2"]');
   assert.match(await page.textContent('.comfort.done:has([data-satedit="sat_pre"])'), /Neutral/);
   assert.match(await page.textContent('.comfort.done:has([data-satedit="consent_st"])'), /Consented, copy given/);
+  // Email and PayNow: a button on the Induction room tab opens their own page; saved, the button says so (never the values)
+  await page.waitForTimeout(800); // the tap guard after an answer
+  await page.click('a.paybtn'); await page.waitForSelector('#payemail');
+  await axe('email and PayNow');
+  await page.fill('#paynow', '6123 4567'); await page.click('#payf button[type=submit]');
+  await toastSaysE(/8 digits/);
+  await page.fill('#payemail', 'pt@example.com'); await page.fill('#paynow', '9123 4567'); await page.click('#payf button[type=submit]');
+  await page.waitForSelector('a.paybtn');
+  assert.match(await page.textContent('a.paybtn'), /Saved/);
+  assert.ok(!(await page.evaluate(() => JSON.stringify(localStorage))).includes('pt@example.com'), 'the email is never kept in the patient record');
   assert.equal(await page.$('.chip[data-sat="sat_post"]'), null, 'post-op comfort is not on the temperatures screen');
   assert.equal(await page.$('.links a[href$="/form/satis"]'), null, 'no separate satisfaction screen');
   assert.match(await page.textContent('.tabs2 [aria-selected="true"]'), /Induction room/);
@@ -358,9 +385,11 @@ try {
   // locking (demo mode lets anyone try it): select all but the latest, lock; locked rows can't be opened
   await page.goto(BASE + '?demo#/');
   await page.click('#select');
-  const latestId = await page.$eval('[data-sel]', c => c.dataset.sel);
+  // the list is by Subject ID (largest on top), so the latest edited one is named on the button
+  const latestSid = (await page.textContent('#selall')).match(/All but (.+) \(latest\)/)[1];
   await page.click('#selall');
-  assert.equal(await page.isChecked(`[data-sel="${latestId}"]`), false, 'the latest stays out');
+  const unticked = await page.$$eval('[data-sel]:not(:checked)', cs => cs.map(c => c.closest('label').textContent));
+  assert.ok(unticked.length === 1 && unticked[0].includes(latestSid), 'the latest stays out: ' + unticked);
   page.once('dialog', d => d.accept());
   await page.click('#lock');
   await page.waitForSelector('.list a.locked');

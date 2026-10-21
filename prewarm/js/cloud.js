@@ -6,6 +6,8 @@
 //   pacu/{token}   { site, pid, sid, created, f }      (the PACU nurse's link: the token is the secret; see firestore.rules)
 //   scanImports/{id} { scan, subject?, createdAt, status, pages, fields: { id: { v, flags, page?, box? } }, reviewedBy?, reviewedAt? }  (Firetop writes, admins read and approve)
 //   forms/blank    { b64, name, size, setAt, setBy }        (the blank paper form, .docx; admins upload, members read)
+//   payments/{patient id} { site, pid, sid, email?, paynow?, setAt, setBy, emailSent?, paid?, cleared? }  (the team writes,
+//                  only admins read, tick and delete the email and PayNow; js/pay.js)
 
 import { FIREBASE_CONFIG } from './firebase-config.js';
 
@@ -35,6 +37,7 @@ const plain = o => JSON.parse(JSON.stringify(o));
 // ctx 'save' (a patient save) and 'pacu' (the nurse link) say what to do; the default is the join / admin wording
 const friendly = (e, ctx) => {
   if (ctx === 'pacu' && (e?.code === 'permission-denied' || e?.code === 'not-found')) return 'This link has stopped working. Ask the study team for a new link.';
+  if (ctx === 'pay' && e?.code === 'permission-denied') return 'Not allowed: only this hospital’s team can save these, and only study admins can tick or delete them.';
   if (ctx === 'save' && e?.code === 'permission-denied') return 'Not saved to the team: this patient may be locked, or this phone is no longer on the team. Ask a study admin.';
   if (e?.code === 'permission-denied') return 'Not allowed. Check the hospital and code.';
   if (e?.code === 'unavailable') return 'No connection. Try again with signal.';
@@ -230,6 +233,35 @@ export async function scanImports() {
 export async function reviewScanImport(id, status) {
   const { auth, db, F } = await sdk();
   await F.updateDoc(F.doc(db, 'scanImports', id), { status, reviewedBy: auth.currentUser.email.toLowerCase(), reviewedAt: Date.now() });
+}
+// Email and PayNow (js/pay.js). The team's save merges into payments/{pid} without reading it (they can't); it resolves
+// once the server has it, so the caller shows "Saved" after a short wait without signal (Firestore sends it later).
+export async function payPut(pid, { site, sid, email, paynow, by }) {
+  const { db, F } = await sdk();
+  const body = { site, pid, sid, setAt: Date.now(), setBy: by };
+  if (email) body.email = email; else body.email = F.deleteField();
+  if (paynow) body.paynow = paynow; else body.paynow = F.deleteField();
+  await F.setDoc(F.doc(db, 'payments', pid), body, { merge: true });
+}
+// admins only: from the server, so a list never shows values already deleted elsewhere
+export async function payList() {
+  const { db, F } = await sdk();
+  const s = await F.getDocsFromServer(F.collection(db, 'payments'));
+  return s.docs.map(d => ({ ...d.data(), pid: d.id }));
+}
+export async function payGet(pid) {
+  const { db, F } = await sdk();
+  const s = await F.getDocFromServer(F.doc(db, 'payments', pid));
+  return s.exists() ? { ...s.data(), pid } : null;
+}
+const stamp = auth => ({ t: Date.now(), by: auth.currentUser.email.toLowerCase() });
+export async function payTick(pid, key, on) {
+  const { auth, db, F } = await sdk();
+  await F.updateDoc(F.doc(db, 'payments', pid), { [key]: on ? stamp(auth) : F.deleteField() });
+}
+export async function payClear(pid) {
+  const { auth, db, F } = await sdk();
+  await F.updateDoc(F.doc(db, 'payments', pid), { email: F.deleteField(), paynow: F.deleteField(), cleared: stamp(auth) });
 }
 export async function myEmail() {
   const { auth } = await sdk();

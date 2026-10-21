@@ -8,6 +8,7 @@ import { qrcode } from './vendor/qrcode.js';
 import * as wordview from './wordview.js';
 import * as scan from './scan.js';
 import * as scanImports from './scan-imports.js';
+import * as pay from './pay.js';
 
 const DEMO = new URLSearchParams(location.search).has('demo');
 const NS = DEMO ? 'prewarm-demo:' : 'prewarm:';
@@ -589,9 +590,11 @@ function setLock(ids, on) {
 let homeStop = null;
 function home() {
   header('Prewarming study' + (DEMO ? ' (demo)' : ''), null, `<a class="iconbtn" href="#/settings" aria-label="Settings">⚙</a>`);
-  const list = Object.values(patients).filter(p => !isGone(p)).sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created));
+  // largest Subject ID on top (owner, 21 Oct 2026), numbers compared as numbers (S-10 above S-9)
+  const all = Object.values(patients).filter(p => !isGone(p));
+  const list = [...all].sort((a, b) => String(val(b, 'enrol_id') ?? '').localeCompare(String(val(a, 'enrol_id') ?? ''), undefined, { numeric: true, sensitivity: 'base' }) || b.created - a.created);
   if (selecting && selMode === 'lock' && !canLock()) selecting = null;
-  const latest = list[0];
+  const latest = [...all].sort((a, b) => (lastEdit(b)?.t || b.created) - (lastEdit(a)?.t || a.created))[0];
   paint(`
     ${settings.me && settings.site ? '' : `<div class="note">Add your ${settings.me ? '' : 'initials and '}hospital in <a href="#/settings">Settings</a>${settings.me ? '' : ' so each reading shows who entered it'}.</div>`}
     <div class="newrow"><button class="primary big" id="new">+ New patient</button><a class="secondary big" id="pacuview" href="#/pacu" title="Hand the phone to the PACU nurse: tapping a participant opens only their PACU page">PACU view</a></div>
@@ -613,7 +616,7 @@ function home() {
       // admins also get a shortcut to the patient's Form view on every line (owner, 13 Oct 2026)
       const formLink = canLock() ? `<a class="formlink" href="#/p/${p.id}/form" aria-label="Form view of ${esc(sidL(p))}" title="Form view">${FORM_ICON}</a>` : '';
       if (locked) return `<li${sa} class="${formLink ? 'rowact' : ''}"><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a>${formLink}</li>`;
-      return `<li${sa} class="${formLink ? 'rowact' : ''}"><a href="#/p/${p.id}"${declined(p) ? ' class="declined"' : ''}${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a>${formLink}</li>`;
+      return `<li${sa} class="${formLink ? 'rowact' : ''}"><a href="${isDraft(p) ? '#/new/' : '#/p/'}${p.id}"${declined(p) ? ' class="declined"' : isDraft(p) ? ' class="draft"' : ''}${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a>${formLink}</li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
     <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`}</p>${refreshHtml()}`);
   $('#psearch')?.addEventListener('input', e => { const q = e.target.value.trim().toLowerCase(); view.querySelectorAll('.list li[data-sid]').forEach(li => { li.hidden = !!q && !li.dataset.sid.includes(q); }); });
@@ -663,7 +666,7 @@ function home() {
 // chart-review days (14 Oct 2026): POD1 / POD2 are due the first and second calendar day after surgery, until their
 // Complete tick. Surgery date = the Surgery date field, else the day the patient was started on this phone.
 function podDays(p) {
-  if (isGone(p) || status(p) === 'Not started') return null;
+  if (isGone(p) || declined(p) || isDraft(p) || status(p) === 'Not started') return null;
   const od = val(p, 'op_date'), start = od && /^\d{4}-\d{2}-\d{2}$/.test(od) ? new Date(od + 'T00:00:00') : new Date(new Date(p.created || Date.now()).toDateString());
   return Math.round((new Date(new Date().toDateString()) - start) / 864e5);
 }
@@ -679,29 +682,58 @@ function status(p) {
   if (val(p, 'pacu_in')) return 'PACU';
   if (val(p, 'io_knife') || val(p, 'ev_ot')) return 'In OT';
   if (val(p, 'pw_start') || val(p, 'pw_gown')) return 'Pre-warming';
+  if (val(p, 'arm') == null) return 'Draft: group not chosen yet';
   return 'Not started';
 }
 
-route(/^\/new$/, () => {
-  header('New patient', '#/');
+// New patient (owner, 21 Oct 2026): Start needs the group; Save draft and Patient declined need only the Subject ID;
+// Share subject / Share to PACU save a draft first, so a case can be shared before it starts. A draft (no group, not
+// declined) opens here again from the list.
+const isDraft = p => val(p, 'arm') == null && !declined(p);
+route(/^\/new(?:\/(\w+))?$/, draftId => {
+  const draft = draftId ? patients[draftId] : null;
+  if (draftId && (!draft || !isDraft(draft))) return go(draft ? '#/p/' + draftId : '#/');
+  header(draft ? 'Draft: ' + sid(draft) : 'New patient', '#/');
   paint(`<form id="f" class="stack">
-    <label class="lab" for="sid">Subject ID</label><input id="sid" required autocomplete="off" autocapitalize="characters">
+    <label class="lab" for="sid">Subject ID</label><input id="sid" required autocomplete="off" autocapitalize="characters" value="${esc(draft ? val(draft, 'enrol_id') || '' : '')}">
     <span class="lab">Randomisation group</span>
     <div class="seg col">${GROUPS.map(([v, l]) => `<button type="button" class="chip" data-v="${v}">${l}</button>`).join('')}</div>
-    <p class="muted small">After this, the group shows only on the pre-warming screen.</p>
-    <button class="primary big" type="submit">Start</button></form>`);
+    <p class="muted small">After this, the group shows only on the Induction room tab.</p>
+    <button class="primary big" type="submit">Start</button>
+    <div class="sharerow"><button type="button" class="secondary" id="draft">Save draft</button><button type="button" class="secondary" id="declined">Patient declined</button></div>
+    <div class="sharerow caseshare"><button type="button" class="secondary" id="nshare">Share subject</button><button type="button" class="secondary" id="npacu">Share to PACU</button></div>
+    <small class="muted">Share before the case starts: the patient is saved as a draft first.</small></form>`);
   let arm = null;
   view.querySelectorAll('.seg .chip').forEach(b => b.onclick = () => { arm = +b.dataset.v; view.querySelectorAll('.seg .chip').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+  // the record for what is on screen (the draft, or a new one); null with a message when the Subject ID won't do
+  const save = () => {
+    const id = $('#sid').value.trim();
+    if (!id) { toast('Enter the Subject ID.'); return null; }
+    if (Object.values(patients).some(p => p !== draft && !isGone(p) && String(val(p, 'enrol_id')).toLowerCase() === id.toLowerCase())) { toast('That Subject ID is already on this phone.'); return null; }
+    const p = draft || newRecord();
+    if (!draft) { patients[p.id] = p; if (settings.site) set(p, 'site', settings.site); }
+    if (val(p, 'enrol_id') !== id) set(p, 'enrol_id', id);
+    if (arm) set(p, 'arm', arm);
+    saveAll();
+    return p;
+  };
   $('#f').onsubmit = e => {
     e.preventDefault();
-    const id = $('#sid').value.trim();
-    if (!id) return toast('Enter the Subject ID.');
+    if (!$('#sid').value.trim()) return toast('Enter the Subject ID.');
     if (!arm) return toast('Choose the randomisation group.');
-    if (Object.values(patients).some(p => !isGone(p) && String(val(p, 'enrol_id')).toLowerCase() === id.toLowerCase())) return toast('That Subject ID is already on this phone.');
-    const p = newRecord(); set(p, 'enrol_id', id); set(p, 'arm', arm); if (settings.site) set(p, 'site', settings.site); patients[p.id] = p; saveAll();
+    const p = save(); if (!p) return;
     // Start opens the Induction room tab for every group, no pre-warming too (owner, 21 Oct 2026)
     go('#/p/' + p.id + '/prewarm');
   };
+  $('#draft').onclick = () => { const p = save(); if (!p) return; toast(val(p, 'arm') == null ? 'Draft saved: tap it on the list to choose the group and start' : 'Saved'); go(val(p, 'arm') == null ? '#/' : '#/p/' + p.id + '/prewarm'); };
+  $('#declined').onclick = () => {
+    if (!$('#sid').value.trim()) return toast('Enter the Subject ID.');
+    if (!confirm(`Record ${$('#sid').value.trim()} as declined to participate?`)) return;
+    const p = save(); if (!p) return;
+    set(p, 'consent_st', 0); toast('Recorded as declined'); go('#/');
+  };
+  $('#nshare').onclick = () => { const p = save(); if (p) go(`#/p/${p.id}/share`); };
+  $('#npacu').onclick = () => { const p = save(); if (p) go(`#/p/${p.id}/pacushare`); };
 });
 
 // ---------- patient main screen: event times, temperatures, then links to the other forms in the order they are
@@ -840,6 +872,12 @@ function inductionAsks(p) {
   if (val(p, 'sat_pre') == null || satEdit === 'sat_pre') return comfortHtml(p, 'sat_pre', 'Comfortable before surgery?', false,
     `<span class="consentok">✓ Consented <button class="link" data-satedit="consent_st">Change</button></span>`);
   return comfortHtml(p, 'consent_st', 'Consent') + comfortHtml(p, 'sat_pre', 'Comfortable before surgery?');
+}
+// the Email and PayNow page's button (owner, 21 Oct 2026): says whether they were saved, never what they are
+function payButton(p) {
+  const saved = p.f.pay_saved, cleared = p.f.pay_cleared;
+  const st = cleared ? '✓ Paid, deleted' : saved ? `✓ Saved${saved.by ? ' by ' + esc(saved.by) : ''}` : 'for the payment';
+  return `<a class="secondary paybtn" href="#/p/${p.id}/pay">Email and PayNow<small>${st}</small></a>`;
 }
 // true when the tap was a comfort answer, Change or Clear
 function comfortTap(p, t, draw, put = (k, v) => set(p, k, v)) {
@@ -1112,7 +1150,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
       <section class="third mid">${ptabsHtml()}${s === 'prewarm' ? inductionAsks(p) : ''}${reading}
       ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
-      ${main && noPw ? '' : signoffHtml(p, s)}</section>
+      ${main && noPw ? '' : signoffHtml(p, s)}${s === 'prewarm' && !declined(p) ? payButton(p) : ''}</section>
       <section class="third bot" aria-label="Other forms and checks">${linksHtml()}${gapsHtml(p)}${doneHtml(p)}
       <p class="resetline"><button class="link" id="resetsub">Reset this subject</button></p></section>`);
     refreshBar();
@@ -1624,7 +1662,7 @@ const OTHER_PAGES = ['preop', 'meds', 'bloods', 'pod1', 'pod1an', 'pod2', 'pod2a
 const NOT_ASKED = new Set(['pre_dl', 'd2_dl', 'screen_id']);
 for (const pg of OTHER_PAGES) FORM[pg] = PAGES.find(x => x.id === pg).fields.filter(f => f.id !== 'enrol_id' && !NOT_ASKED.has(f.id)).map(f => [f.id]);
 // Reset a subject: clears every time, reading and answer, keeping the Subject ID, group and hospital (asks twice)
-const KEEP_ON_RESET = new Set(['enrol_id', 'arm', 'site', 'restored']);
+const KEEP_ON_RESET = new Set(['enrol_id', 'arm', 'site', 'restored', 'pay_saved', 'pay_cleared']); // the payment marks stay: the entry lives on in payments/
 function resetSubject(p) {
   if (p.lock?.on) return toast('Locked: read only. Unlock it on the home page to change it.');
   if (!confirm(`Reset ${sid(p)}?\n\nThis clears every time, reading and answer entered for this subject. The Subject ID and group stay.`)) return;
@@ -2041,6 +2079,78 @@ function readyHtml() {
   return `<h2>Ready for a case?</h2><ul class="ready" role="list" aria-label="Checks before a case">${rows.map(([l, ok, fix]) => `<li class="${ok ? 'ok' : 'no'}"><span aria-hidden="true">${ok ? '✓' : '✗'}</span><span><b>${esc(l)}</b>${ok ? '' : `<small>${esc(fix)}</small>`}</span></li>`).join('')}</ul>
     <small class="muted">${bad ? `${bad} to fix before a case.` : 'All good.'} Also make a fresh PACU link per patient and test it once on a phone that is not on the team.</small>`;
 }
+// ---------- Email and PayNow (js/pay.js): typed here, sent only to payments/{id}; admins see, tick and delete them
+route(/^\/p\/(\w+)\/pay$/, async id => {
+  const p = patients[id]; if (!p) return go('#/');
+  header('Email and PayNow', `#/p/${id}/prewarm`);
+  const intro = `<p class="muted small">For ${esc(sid(p))}’s payment. Once saved, only study admins can see them; this phone can’t show them again.</p>`;
+  const stamp = k => p.f[k] ? `${new Date(p.f[k].t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${p.f[k].by ? ' by ' + esc(p.f[k].by) : ''}` : '';
+  const status = () => p.f.pay_cleared ? `<p class="okline small">✓ Paid; email and PayNow deleted (${stamp('pay_cleared')})</p>`
+    : p.f.pay_saved ? `<p class="okline small">✓ Saved ${stamp('pay_saved')}. Saving again replaces them.</p>` : '';
+  if (cloud.enabled && !shared.member && !shared.admin) return paint(`<div class="stack">${intro}<p class="note">Join the team in <a href="#/settings">Settings</a> first: the email and PayNow number go only to the study admins.</p></div>`);
+  let entry = null;
+  if (shared.admin) { paint(`<p class="muted">Loading…</p>`); try { entry = await cloud.payGet(id); } catch (err) { toast(cloud.friendly(err)); } }
+  if (location.hash !== `#/p/${id}/pay`) return;
+  const draw = () => {
+    paint(`<form id="payf" class="stack">${shared.admin ? '' : intro}${status()}
+      <label class="lab" for="payemail">Email</label><input id="payemail" type="email" inputmode="email" autocomplete="off" value="${esc(entry?.email || '')}">
+      <label class="lab" for="paynow">PayNow mobile number</label><input id="paynow" type="tel" inputmode="tel" autocomplete="off" value="${esc(entry?.paynow || '')}">
+      <button class="primary" type="submit">Save</button>
+      ${cloud.enabled ? '' : '<small class="muted">Demo: nothing is sent.</small>'}</form>
+      ${shared.admin ? `<section class="stack payticks" id="payticks"><h2>Payment</h2>${entry ? pay.ticksHtml(entry, esc) : '<p class="muted small">Nothing saved yet.</p>'}
+      <a class="secondary" href="#/payments">All participants’ email and PayNow</a></section>` : ''}`);
+    $('#payf').onsubmit = async e => {
+      e.preventDefault();
+      const email = $('#payemail').value.trim(), paynow = pay.cleanPaynow($('#paynow').value), why = pay.checkPay(email, paynow);
+      if (why) return toast(why);
+      if (p.lock?.on && !shared.admin) return toast('Locked: read only. Ask a study admin.');
+      const btn = e.submitter || $('#payf button'); btn.disabled = true;
+      if (cloud.enabled) {
+        const by = shared.admin ? shared.email : settings.me || '';
+        const w = cloud.payPut(id, { site: p.site || val(p, 'site') || shared.member?.site || settings.site, sid: sid(p), email, paynow, by });
+        // without signal Firestore keeps it and sends it later; only a refusal is worth waiting for
+        const res = await Promise.race([w.then(() => 'ok', err => err), new Promise(r => setTimeout(() => r('later'), 4000))]);
+        if (res !== 'ok' && res !== 'later') { btn.disabled = false; return toast(cloud.friendly(res, 'pay')); }
+        toast(res === 'ok' ? 'Saved for the study admins' : 'Saved: it goes to the study admins when there is signal');
+        if (shared.admin) { try { entry = await cloud.payGet(id); } catch { /* shown next time */ } }
+      } else toast('Demo: not sent');
+      set(p, 'pay_saved', Date.now());
+      if (shared.admin) draw(); else go(`#/p/${id}/prewarm`);
+    };
+    if (shared.admin && entry) pay.wireTicks($('#payticks'), { cloud, toast, list: () => [entry], after: async (pid, what) => {
+      if (what === 'cleared' && !p.lock?.on) set(p, 'pay_cleared', Date.now());
+      try { entry = await cloud.payGet(pid); } catch { /* keep */ }
+      draw();
+    } });
+  };
+  draw();
+});
+route(/^\/payments$/, async () => {
+  header('Email and PayNow', '#/settings');
+  if (!shared.admin) return paint('<p class="note">Sign in as a study admin from Settings.</p>');
+  paint('<p class="muted">Loading…</p>');
+  let list = [];
+  try { list = await cloud.payList(); } catch (err) { return paint(`<p class="note">${esc(cloud.friendly(err))}</p>`); }
+  if (location.hash !== '#/payments') return;
+  let showDone = false;
+  const draw = () => {
+    const rows = pay.payOrder(list).filter(d => showDone || pay.payStage(d) < 2);
+    const done = list.filter(d => pay.payStage(d) === 2).length;
+    paint(`<div class="stack"><p class="muted small">Typed in on the Induction room tab. Tick Email sent and Payment sent, then delete the email and PayNow.</p>
+      ${rows.length ? `<ul class="paylist">${rows.map(d => `<li class="setcard"><h3>${esc(d.sid)} <small>${esc(d.site)}</small></h3>
+        ${d.email || d.paynow ? `<p class="payids">${d.email ? `<span>${esc(d.email)}</span>` : ''}${d.paynow ? `<span>PayNow ${esc(d.paynow)}</span>` : ''}</p>` : ''}
+        ${pay.ticksHtml(d, esc)}</li>`).join('')}</ul>` : '<p class="muted">Nothing waiting.</p>'}
+      ${done ? `<button class="link" id="showdone">${showDone ? 'Hide' : 'Show'} ${done} done (deleted)</button>` : ''}</div>`);
+    $('#showdone')?.addEventListener('click', () => { showDone = !showDone; draw(); });
+    pay.wireTicks(view.querySelector('.stack'), { cloud, toast, list: () => list, after: async (pid, what) => {
+      const q = patients[pid];
+      if (what === 'cleared' && q && !q.lock?.on) set(q, 'pay_cleared', Date.now());
+      try { list = await cloud.payList(); } catch { /* keep */ }
+      draw();
+    } });
+  };
+  draw();
+});
 route(/^\/scan$/, () => {
   header('Scan pages', '#/settings');
   if (!settings.scan) return paint('<p class="note">Turn on Scan pages in <a href="#/settings">Settings</a> first.</p>');
@@ -2149,6 +2259,7 @@ function sharingHtml() {
   if (shared.admin) return `<p class="ok-box">Signed in as study admin (${esc(shared.email)}). You see every hospital’s patients.<br><span class="syncline">${esc(syncText())}</span></p>
     <label class="lab">Your hospital</label>${chips}<small class="muted">New patients you start on this phone are recorded at this hospital. Pick one before starting a patient.</small>
     <a class="secondary" href="#/admin">Join codes and members</a>
+    <a class="secondary" href="#/payments">Email and PayNow (payments)</a>
     <details class="sect"><summary><span>Password</span><small>sign in with it next time</small></summary><div class="stack">
       <label class="lab" for="newpw">New password <small>(8 or more characters)</small></label>
       <input id="newpw" type="password" autocomplete="new-password"><button class="secondary" id="setpw">Save password</button></div></details>
@@ -2247,7 +2358,7 @@ route(/^\/open\/(\w+)$/, id => {
 });
 route(/^\/p\/(\w+)\/share$/, async id => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sidL(p) + ' · Share subject', '#/p/' + id);
+  header(sidL(p) + ' · Share subject', (isDraft(p) ? '#/new/' : '#/p/') + id);
   const box = body => paint(`<div class="paculink"><h2>Share subject</h2>${body}</div>`);
   if (!cloud.enabled) return box('<p class="muted small">Not available in demo mode.</p>');
   if (!sharing()) return box('<p class="muted small">Join your hospital’s team (Settings) to share a subject.</p>');
@@ -2275,7 +2386,7 @@ route(/^\/p\/(\w+)\/share$/, async id => {
 // Share to PACU: the PACU nurse link (it used to sit at the bottom of the PACU page)
 route(/^\/p\/(\w+)\/pacushare$/, id => {
   const p = patients[id]; if (!p) return go('#/');
-  header(sidL(p) + ' · Share to PACU', '#/p/' + id);
+  header(sidL(p) + ' · Share to PACU', (isDraft(p) ? '#/new/' : '#/p/') + id);
   const draw = () => { paint(pacuLinkHtml(p)); };
   draw();
   view.onclick = e => {

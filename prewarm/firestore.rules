@@ -28,6 +28,11 @@ rules_version = '2';
 //                   No app user can create one: Firetop writes them with its own Google sign-in. Admins read them and can only
 //                   mark a pending one approved or rejected (nothing else in it changes). Approving copies values into a
 //                   patient through the patients rules below.
+//   payments/{pid}  the participant's email and PayNow number for their payment (owner, 21 Oct 2026), kept out of the
+//                   patient record: { site, pid, sid, email?, paynow?, setAt, setBy, emailSent?, paid?, cleared? }
+//                   (the last three { t, by }). The patient's hospital team (or an admin) creates it and may replace
+//                   the email, PayNow and Subject ID, but nobody except admins reads it, and only admins tick Email sent
+//                   / Payment sent, delete the email and PayNow (cleared), or delete the whole entry.
 service cloud.firestore {
   match /databases/{database}/documents {
     function sites() { return ['NTF', 'NUH', 'SGH', 'CGH', 'TTSH', 'KTPH', 'WH']; }
@@ -91,6 +96,27 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt'])
         && request.resource.data.status in ['approved', 'rejected']
         && request.resource.data.reviewedBy == email() && request.resource.data.reviewedAt is number;
+    }
+
+    match /payments/{pid} {
+      function stamp(d, k) {
+        return !(k in d) || (d[k] is map && d[k].keys().hasOnly(['t', 'by']) && d[k].t is number
+          && d[k].by is string && d[k].by.size() <= 120);
+      }
+      function payShape(d) {
+        return d.keys().hasOnly(['site', 'pid', 'sid', 'email', 'paynow', 'setAt', 'setBy', 'emailSent', 'paid', 'cleared'])
+          && d.site in sites() && d.pid == pid && pid.size() <= 40 && d.sid is string && d.sid.size() <= 60
+          && d.setAt is number && d.setBy is string && d.setBy.size() <= 120
+          && (!('email' in d) || (d.email is string && d.email.size() <= 120))
+          && (!('paynow' in d) || (d.paynow is string && d.paynow.size() <= 20))
+          && stamp(d, 'emailSent') && stamp(d, 'paid') && stamp(d, 'cleared');
+      }
+      allow read, delete: if admin();
+      allow create: if canUse(request.resource.data.site) && payShape(request.resource.data)
+        && (admin() || !request.resource.data.keys().hasAny(['emailSent', 'paid', 'cleared']));
+      allow update: if payShape(request.resource.data) && request.resource.data.site == resource.data.site
+        && (admin() || (canUse(resource.data.site)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sid', 'email', 'paynow', 'setAt', 'setBy'])));
     }
 
     match /pacu/{token} {
