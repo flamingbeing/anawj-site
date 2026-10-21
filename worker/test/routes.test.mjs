@@ -1,6 +1,6 @@
 // worker/routes.js: which folder each address serves, and what it must never serve. Run: node worker/test/routes.test.mjs
 import assert from 'node:assert/strict';
-import { resolve, SITES } from '../routes.js';
+import { resolve, SITES, kitCors } from '../routes.js';
 
 // shared hosts: one path per app
 assert.deepEqual(resolve('hand.anawj.com', '/cmcj/'), { file: 'cmcj/' });
@@ -83,6 +83,18 @@ for (const h of Object.keys(SITES)) {
 assert.deepEqual(resolve('x.workers.dev', '/_sites/prewarmstudy.anawj.com/nuhsdesign/tokens.css'), { file: 'nuhsdesign/tokens.css' });
 assert.deepEqual(resolve('x.workers.dev', '/nuhsdesign/tokens.css'), { file: 'nuhsdesign/tokens.css' });
 
+// design.anawj.com/v1/: the kit for every repo (nuhsdesign/ at /v1/, the feedback script at /v1/feedback/), nothing else
+assert.deepEqual(resolve('design.anawj.com', '/v1/tokens.css'), { file: 'nuhsdesign/tokens.css' });
+assert.deepEqual(resolve('design.anawj.com', '/v1/'), { file: 'nuhsdesign/' });
+assert.deepEqual(resolve('design.anawj.com', '/v1'), { redirect: '/v1/' });
+assert.deepEqual(resolve('design.anawj.com', '/v1/feedback/overlay.js'), { file: 'feedback/overlay.js' });
+assert.deepEqual(resolve('design.anawj.com', '/v1/../logbook/index.html'), { notFound: true });
+assert.deepEqual(resolve('design.anawj.com', '/logbook/'), { notFound: true });
+assert.deepEqual(resolve('x.workers.dev', '/_sites/design.anawj.com/v1/app.js'), { file: 'nuhsdesign/app.js' });
+// the CORS header goes on kit files only
+assert.ok(kitCors('nuhsdesign/tokens.css') && kitCors('feedback/overlay.js'));
+assert.ok(!kitCors('logbook/index.html') && !kitCors('prewarm/nuhsdesign/x') && !kitCors(''));
+
 // apmes.anawj.com: Firebase's sign-in helper pages
 assert.deepEqual(resolve('apmes.anawj.com', '/__/auth/handler'), { file: '__/auth/handler' });
 assert.deepEqual(resolve('apmes.anawj.com', '/__/firebase/init.json'), { file: 'apmes-auth/firebase/init.json' });
@@ -104,8 +116,9 @@ import path from 'node:path';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 for (const [h, s] of Object.entries(SITES)) {
   for (const [pre, f] of s.root ? [['/', s.root]] : Object.entries(s.prefixes || {})) {
-    // an app folder has an index.html; the sign-in helper folders have their own files
-    assert.ok(fs.existsSync(path.join(root, f, pre.startsWith('/__/') ? (pre === '/__/auth/' ? 'handler.html' : 'init.json') : pre === '/apmes/guidebook/' ? 'dops-expectations.md' : 'index.html')), `${h}: ${f} is missing its page`);
+    // an app folder has an index.html; the sign-in helper, guidebook and feedback folders have their own files
+    const own = { '/__/auth/': 'handler.html', '/__/firebase/': 'init.json', '/apmes/guidebook/': 'dops-expectations.md', '/v1/feedback/': 'overlay.js' };
+    assert.ok(fs.existsSync(path.join(root, f, own[pre] || 'index.html')), `${h}: ${f} is missing its page`);
   }
 }
 console.log('worker routes tests passed');

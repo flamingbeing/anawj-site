@@ -50,6 +50,9 @@ deploys it on every merge to `main` (build command `node tools/stamp-versions.mj
   `X-Robots-Tag: noindex, nofollow`. One-app hosts serve the app at the root (its folder name works too).
 - Every host also serves `/nuhsdesign/` (styles only) and `/feedback/` (the feedback button's script): `SHARED` in
   `worker/routes.js`. Nothing else is shared.
+- `design.anawj.com/v1/` is the same kit for apps in other repos: `/v1/` = `nuhsdesign/`, `/v1/feedback/` = `feedback/`.
+  Kit files (on every host) carry `Access-Control-Allow-Origin: *`. A breaking kit change goes in `/v2/`; `/v1/` stays.
+  The custom domain is added to `anawj-preview` in Cloudflare by the owner.
 - `apmes.anawj.com` serves Firebase's sign-in helper pages (`/__/auth/`, `/__/firebase/`; `apmes-auth/firebase/init.json`)
   and just `apmes/guidebook/` from `apmes/`.
 - Any other address (PR previews, the copy of main) serves the whole repo. To try a subdomain on a preview, use
