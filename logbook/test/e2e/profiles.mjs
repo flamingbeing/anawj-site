@@ -132,7 +132,7 @@ try { for (const width of [390, 1280]) {
   await group('logbook').getByRole('button', { name: 'Reset this group' }).click();
   await dlg.getByRole('button', { name: 'Reset' }).click();
   await p.locator('.profile-now', { hasText: 'Now: Personal' }).waitFor();
-  // a Case tab switch, then another group's reset: the Case tab change stays (the reset reads the settings as they are)
+  // a Add tab switch, then another group's reset: the Add tab change stays (the reset reads the settings as they are)
   await group('case').getByRole('switch', { name: /^Quick picks/ }).uncheck();
   await p.locator('.profile-now', { hasText: 'Custom' }).waitFor();
   await group('apmes').getByRole('switch', { name: 'Residency year' }).check();

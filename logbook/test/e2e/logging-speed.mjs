@@ -1,4 +1,4 @@
-// Fake data only. Logging speed and friction on the Case tab: Save takes the offered tags like a second Enter (and
+// Fake data only. Logging speed and friction on the Add tab: Save takes the offered tags like a second Enter (and
 // offers only confident ones), Basic's Enter in the empty tag search saves, the suggestions part apart from Same as
 // last (an older 'quick' still hides both), ticking confident suggestions automatically (untick sticks), the date
 // chips leaving the keyboard alone, several Same as last chips, a pasted list getting your own tags, the draft

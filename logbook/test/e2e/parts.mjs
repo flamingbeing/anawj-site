@@ -67,7 +67,7 @@ try { for (const width of [390, 1280]) {
   assert.deepEqual((await st()).partLabels.map(l => l.k), ['lp', 'dt', 'Plan', 'ASA']);
   await shot('settings');
 
-  // the Case tab: the box marks each label, the line under it says which parts it read
+  // the Add tab: the box marks each label, the line under it says which parts it read
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
   const ta = p.locator('textarea.details');
   await ta.fill('AB 72M lap chole\nASA 2: HTN\nPlan: GA ETT\nlp: check the cuff before any craniotomy');

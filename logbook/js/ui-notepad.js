@@ -10,7 +10,7 @@
 // them without reading any note. It used to live in settings.noteIndex, which the app owner can read; it moves on the
 // first sync and the old copy is cleared.
 // Daily notes: one note a day ("day-YYYY-MM-DD", notepad.js), opened from the Logbook's day, "Today's note" here, the
-// app's "Today's note" shortcut (#today), and (Settings → Notes, off by default) a small box on the Case tab. They
+// app's "Today's note" shortcut (#today), and (Settings → Notes, off by default) a small box on the Add tab. They
 // don't count towards the 100 notes.
 
 import { S, h, toast, fill, hooks, writes, cloud, transients, settings, patchLogbook, resetters, todayISO, modal, emptyState, download, ic } from './ui-core.js';
@@ -421,7 +421,7 @@ function holdToSelect(li, start) {
 function newNote() {
   let body = nv.initBody || '', rest = '';
   // more than a note holds (a shared file can be 100k): the note takes what fits, up to a line end, and the rest stays
-  // in the inbox for another note (counted as a file, so the chooser asks again instead of the Case tab taking it)
+  // in the inbox for another note (counted as a file, so the chooser asks again instead of the Add tab taking it)
   if (body.length > LIMITS.body) {
     const cut = body.lastIndexOf('\n', LIMITS.body);
     const at = cut > LIMITS.body / 2 ? cut : LIMITS.body;
@@ -458,7 +458,7 @@ function dropEditorEntry() {
   return editorClosing;
 }
 // edit: open straight in Edit (a daily note), not Preview; back: the tab Done goes back to
-// own: n is already a live copy with its session (the Case tab's daily note box), edited as it is, so there's only ever
+// own: n is already a live copy with its session (the Add tab's daily note box), edited as it is, so there's only ever
 // one copy of it open
 function openEditor(n, fresh = false, { edit = false, back = '', own = false } = {}) {
   const copy = own && sessions.has(n) ? n : JSON.parse(JSON.stringify(n));
@@ -488,11 +488,11 @@ async function closeEditor() {
 
 // ---------- daily notes ----------
 
-const BACK_LABEL = { logbook: 'Logbook', log: 'Case' };
+const BACK_LABEL = { logbook: 'Logbook', log: 'Add' };
 const joinText = (body, add) => (String(body || '').trim() ? String(body).trimEnd() + '\n\n' : '') + String(add || '').trim();
 // open a day's note in the editor (today's by default), made the first time; append: text to add at its end (shared to
 // the app). It waits for the notes, so an existing daily note is always opened (never a second copy with the same id):
-// when the offline cache doesn't have it, it waits a moment for the server's list too. The Case tab box's copy, when
+// when the offline cache doesn't have it, it waits a moment for the server's list too. The Add tab box's copy, when
 // it's the same day, is the one opened. Resolves to whether the editor opened (false: gone elsewhere meanwhile).
 export async function openDayNote(iso = todayISO(), { append = '' } = {}) {
   const me = mine();
@@ -545,9 +545,9 @@ export function dayNoteCard(iso) {
     view);
 }
 
-// The Case tab's daily note box (Settings → Notes → Show the daily note on the Case tab; off by default): today's note
+// The Add tab's daily note box (Settings → Notes → Show the daily note on the Add tab; off by default): today's note
 // in a small box that folds away, saving as you type like the editor. Its own copy of the note lives here between
-// renders, so a re-render of the Case tab never loses what's being typed.
+// renders, so a re-render of the Add tab never loses what's being typed.
 let inline = null, inlineOpen = false;   // { owner, iso, note }
 export function dayNoteBox() {
   const me = mine(), iso = todayISO();
@@ -589,7 +589,7 @@ export function dayNoteBox() {
   return box;
 }
 
-// Settings → Notes: the daily note on the Case tab, the paste cleaner, formatting buttons, and what shared text does
+// Settings → Notes: the daily note on the Add tab, the paste cleaner, formatting buttons, and what shared text does
 export function renderNoteSettings() {
   const st = settings(), d = display();
   const save = (patch, note = 'Saved') => patchLogbook({ settings: patch }).then(() => note && toast(note));
@@ -598,8 +598,8 @@ export function renderNoteSettings() {
       h('h2', {}, 'Notes'),
       help('Your own notes (More → Notes): private, never in your portfolio.'),
       h('h3', {}, 'Daily note'),
-      toggle('Show the daily note on the Case tab', st.dayNoteOnCase, v => save({ dayNoteOnCase: v || null }),
-        'A small box under the case box for today’s note, saving as you type.', 'Off by default. The notes are read when the Case tab opens, which adds a little to the app’s reads.'),
+      toggle('Show the daily note on the Add tab', st.dayNoteOnCase, v => save({ dayNoteOnCase: v || null }),
+        'A small box under the case box for today’s note, saving as you type.', 'Off by default. The notes are read when the Add tab opens, which adds a little to the app’s reads.'),
       h('h3', {}, 'Writing notes'),
       toggle('Clean rich text when pasting', st.pasteClean, v => save({ pasteClean: v || null }),
         'Text copied from a web page, Word, OneNote or UpNote becomes plain Markdown: headings, bold, lists, links.', 'Off: pasting keeps the plain text as it came. Clean up in a note’s ⋯ menu tidies a note already pasted.'),
@@ -607,8 +607,8 @@ export function renderNoteSettings() {
         'Bold, italic, heading, lists, to-do, link and undo above the note; on phones they sit on the keyboard.'),
       h('h3', {}, 'Shared to the app'),
       toggle('Ask what to do with shared text', st.shareAsk, v => save({ shareAsk: v || null }),
-        'Text shared to the installed app asks: add as cases, add to today’s note, or a new note.', 'Off: shared text goes to the Case tab’s paste-a-list, as before. Shared files always ask.')),
-    resetLink('everything on this page (the Case tab box, pasting, the formatting buttons and shared text)', async () => {
+        'Text shared to the installed app asks: add as cases, add to today’s note, or a new note.', 'Off: shared text goes to the Add tab’s paste-a-list, as before. Shared files always ask.')),
+    resetLink('everything on this page (the Add tab box, pasting, the formatting buttons and shared text)', async () => {
       await patchLogbook({ settings: { dayNoteOnCase: null, pasteClean: null, shareAsk: null } });
       setDisplay({ noteToolbar: null });
     }));

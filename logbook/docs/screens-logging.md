@@ -1,4 +1,4 @@
-# Logbook screens: Case tab and logging
+# Logbook screens: Add tab and logging
 
 Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where things are (screens), part 1.
 
@@ -22,7 +22,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   within 600 ms of a tap that made the offer is a double tap and is ignored, so the hint shows first. Enter in the empty tag search
   saves the case only in Basic (which, with no suggestion row, sends the focus there) or while an offer is pending;
   elsewhere it does nothing, as before.
-- **Case tab parts** (`settings.caseHide`, and Basic's `basicOn` `case:<part>`): `sugg` (the suggestion row) and
+- **Add tab parts** (`settings.caseHide`, and Basic's `basicOn` `case:<part>`): `sugg` (the suggestion row) and
   `recent` (Same as last, tag groups) used to be one part, `quick`; an older `quick` still means both and is
   rewritten as the two on the next change (`logging.js` `expandParts`). Basic hides both unless turned back on.
   The profile switches are `case:sugg` and `case:recent` (profiles.js reads an older `quick` in `caseHide`,
@@ -37,12 +37,12 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   text is written; a tag tap updates the list in place (`picker.sync`); `PROGRESS_BY_CODE` is memoised on
   `S.counts`; a write's state change that leaves the list as it was doesn't recount. Benchmark:
   `PORT=8080 node logbook/test/e2e/bench-logging.mjs` (Chrome busy time; numbers in the 13 Oct 2026 PR).
-- **Two panes** on the Case tab at >= 840px wide and >= 500px tall (tablets, unfolded foldables, computers; not
+- **Two panes** on the Add tab at >= 840px wide and >= 500px tall (tablets, unfolded foldables, computers; not
   landscape phones): `.log-card.panes` grid, left = date, case box, quick picks, Still needed, Save; right = all tags
   (sticky, own scroll). On phones `.lp-left` / `.lp-right` are display: contents, so the order is unchanged.
 - **Form view** (More → Form view, `#formview`, `ui-formview.js`): the old APMES Case Numbers Google Form's layout for residents
   moving to the logbook: Resident (the signed-in resident, read only), Date, Initials and case details, the 46 categories as
   checkboxes (all required, as in the Form), then "Your response has been recorded" with **Edit your response** (the form
   filled from the case; saving updates the same case) and Submit another response. It saves through `createCase` /
-  `updateCase` (the Case tab's path: same ID-number and double-entry questions, sync, sheet outbox), source `app`. Nothing
+  `updateCase` (the Add tab's path: same ID-number and double-entry questions, sync, sheet outbox), source `app`. Nothing
   goes through the Form inbox, so there is nothing to pick up, clear or drift-check. Test: `test/e2e/formview.mjs`.

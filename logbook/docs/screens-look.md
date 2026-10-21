@@ -8,7 +8,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   and light, Shape and type (now also Line strength, Button style, Icons instead of words, Plain calendar), Fine-tune,
   Header and tab bar (name in the header, page titles, hide header, icons only), Rows and forms (navigation, row and form
   layout, Shorter Logbook rows), App-style details, colours, Custom CSS. **Layout** (`#layout`, `renderLayout`) is how it
-  works: start tab, tab bar place, order and hidden tabs, Logbook row buttons, page width, the Case tab, gestures (swipe,
+  works: start tab, tab bar place, order and hidden tabs, Logbook row buttons, page width, the Add tab, gestures (swipe,
   edge back, press and hold) and the tab bar while typing. **Accessibility** (`#access`): zoom, text size, bigger taps,
   contrast, motion. The old Compact switch is Themes → Spacing: Tight. Custom CSS never applies on Themes, Browse all or
   Layout (`CSS_FREE`, display.js). Old links land on the new page: `#display` → Layout, `#displayadv` → Themes, and a
@@ -97,14 +97,14 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
 - **Look options** (Display, per device; `applyLook` in ui-settings.js, classes on `<html>`, also set at first paint in
   index.html): line spacing (`--lh`; every line-height in style.css is `calc(x * var(--lh, 1))`), **Page width** (key
   `lineWidth`, was "Line width"; narrow 760 px / normal 980 / wide 1400 / full = no limit; phones are always full; the
-  Case tab's panes keep theirs), contrast (follow the device's Increase contrast
+  Add tab's panes keep theirs), contrast (follow the device's Increase contrast
   by default, normal, or higher: darker text and lines), motion (follow the device's Reduce motion by default, on, or
   reduce), icons-only tab bar (buttons keep `aria-label`; on a computer the icons are shown for it), tab bar position
   (auto = bottom on phones / top on bigger screens, or always top `tabs-top`, or always bottom `tabs-bottom`), hide the
   header (`no-header`; it shows again while `who-alert` is set by paintWho: signed out, offline, unsynced; not for the demo since Oct 2026).
-  Case tab upside down on phones (`case-inverted`: CSS `order` on the log card's items, lp-left/right being
+  Add tab upside down on phones (`case-inverted`: CSS `order` on the log card's items, lp-left/right being
   display: contents; tags on top, the case box last above Save; app.js render() scrolls to the bottom on entering).
-  Keyboard on opening the Case tab (Logging page, device key `autoFocus`, html `no-autofocus` read by ui-log.js).
+  Keyboard on opening the Add tab (Logging page, device key `autoFocus`, html `no-autofocus` read by ui-log.js).
   Colourful 'tabs' / 'all' ('all' = `colour-all`: the colour picker's palettes per tab, `tabSchemeCss` in colors.js,
   scoped to `body[data-bar=…]`, the stripe untouched; with the default colour NUH_TAB_COLOURS follow the NUH stripe, else
   TAB_COLOURS; the --t-* shades come from `tabVarsCss`). Name in the header (`appTitle`, ≤ 40 characters, also the
@@ -120,20 +120,20 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   After Save (`afterSave`: next (default) / keepTags / closed = keyboard down / logbook = `hooks.showDay` set by
   ui-logbook.js, then #logbook on that day; Undo then puts the case back, and kept tags don't count as a new case);
   Undo window (`undoSecs` 5 default / 10 / 20 / 30: any toast with a button stays at least that long, ui-core `toast`);
-  Case tab card: parts to hide (`caseHide`, CASE_PARTS in ui-log.js: interesting, parsed, sugg, recent, still, groupsave,
+  Add tab card: parts to hide (`caseHide`, CASE_PARTS in ui-log.js: interesting, parsed, sugg, recent, still, groupsave,
   plan; `.log-card.hide-*` in style.css; the case box, All tags and Save always stay). Device (`DISPLAY_KEYS`, html
   classes from applyLook): case box keyboard (`boxCaps` false → `box-caps-off`, `boxCorrect` true → `box-correct`,
   `boxSpell` false → `box-spell-off`; read in renderOne), reflection spelling (`reflSpell` false → `refl-spell-off`,
   Reflections settings; ui-reflect.js sets spellcheck on the editor's fields and on focus), Display: Pin the case box
   (`pinBox` → `pin-box`: `.box-wrap` sticky at `--pin-top`, the phone top tab bar's height when it sits on top; not
-  when the Case tab is upside down) and Pin the search box (`pinSearch` → `pin-search`: `.lb-top` sticky, its height in
+  when the Add tab is upside down) and Pin the search box (`pinSearch` → `pin-search`: `.lb-top` sticky, its height in
   `--lb-top-h` so List's month headings stick under it; on Reflections `.refl-top` sticks at minus the height of its
   title and counts (`--refl-hide`, `pinHead` in ui-reflect.js) so only the search row stays, and an open topic's name
   sticks under it (`--refl-top-h`) while its reflections scroll; not in edit mode). All in the settings file.
 - **Settings pages: everyday first, Advanced below** (owner, Oct 2026). Look pages: Themes, Layout, Accessibility (see
   the top of this file). Logging (`#logging`): suggestions, age/gender detection, common tags first, Enter key,
   date for a new case, After Save; then **Advanced logging** (`#loggingadv`, `renderLoggingAdvanced`, under headings:
-  Case tab · Keyboard in the case box · Search · Dates and Undo · Help). Sub-pages are TABS entries `under` their page
+  Add tab · Keyboard in the case box · Search · Dates and Undo · Help). Sub-pages are TABS entries `under` their page
   (Back trail and the bar's tab follow); `advancedLink` in ui-settings.js draws the row. New options go on the
   Advanced page unless most people would change them. e2e: `tab('layout')` / `tab('loggingadv')`, and
   `choose(legend, value)` for a ✓ list.
@@ -159,7 +159,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
 - **Look options, Oct 2026** (device keys): **Corners** (Display, `round` 0 Square / 1 / 2 Normal / 3 Very round): every
   border-radius in style.css (and the reflection editor's inline ones) is `calc(Npx * var(--round, 1))`; tag tick
   boxes cap at 1.2 so they never look like radio buttons. **Card style** (Themes; owner, 16 Oct 2026; `cardStyle` / `cardPatch` in display.js): Raised = soft shadows (default; owner 12 Oct 2026), Outlined = lines (`shadows: false`), Flat = no lines and no page cards (`flat`). It replaced the Soft shadows switch and the Flat end of the Borders slider; the line strength (`borders`, Borderless … Normal) moved to Advanced display → Look as **Line strength**, kept while Flat is on.
-  **Bigger tap targets on the Case tab** (Advanced display, `bigTaps`). **Tab bar order and hidden tabs** (Advanced
+  **Bigger tap targets on the Add tab** (Advanced display, `bigTaps`). **Tab bar order and hidden tabs** (Advanced
   display, `tabOrder` / `tabHidden`, `arrangeTabs` in ui-settings.js): ↑ ↓ and a switch per tab; More can't be
   hidden, at least two and at most seven (`MAX_BAR`, More included; owner, Oct 2026) stay. Every page in the More list
   (Account, Settings, Recover drafts, Export / Import, Admin portal for admins; `bar: true` in TABS, a `short` label on
@@ -200,7 +200,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   and changing any afterwards shows "Custom (based on …)". Classic themes are cards; Inspired ones ("Obsidian-style",
   colours, corners and type only, never logos, paid fonts or brand names beyond "-style") are a searchable list.
   No celebrity or brand palettes (owner). New ideas come in through "Suggest a theme" (private feedback).
-- Layout keeps how it works (start tab, tab bar, row buttons, Case tab, gestures); Themes holds every look: light or
+- Layout keeps how it works (start tab, tab bar, row buttons, Add tab, gestures); Themes holds every look: light or
   dark, colour, Colourful, background tint, Top band, card style, line strength, corners, spacing, buttons, the header,
   tab bar style, heading font, fonts, line spacing, row and form layouts, custom CSS (theme-revamp S3).
 - **Wallpaper and icons** (theme-revamp S4, 21 Oct 2026; `wallpaper.js`, unit tests `wallpaper.test.mjs`, e2e
@@ -224,7 +224,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   copy, settings file, Your themes; display.js `migrateDisplay`, theme-engine.js `foldCompact`), so nobody's look
   changes. **Fine-tune** card on Themes: eight sliders (`FINE_TUNE`: button height, gaps, line weight, shadow, space
   between cases, space between days, letter spacing, text weight), unset by default, per device, themes may set
-  them; their CSS is the `tune` cascade layer (after the theme, before custom CSS). Bigger taps keeps Case tab
+  them; their CSS is the `tune` cascade layer (after the theme, before custom CSS). Bigger taps keeps Add tab
   buttons at 44 px or more.
 - **App-style details** (owner, 19 Oct 2026; Themes card, `lookCss` in themes.js, CSS only so the first paint has it; unit tests in
   themes.test.mjs, e2e `app-style.mjs`): each its own device key, off by default, part of `THEME_KEYS` (so themes, Your themes and the

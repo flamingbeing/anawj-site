@@ -48,7 +48,7 @@ export const settings = () => {
 // Profiles (settings.mode, the whole account; at the top of Settings → Profile). Each is a preset of switches
 // (profiles.js): picking one shows what it turns on and off, then sets them; any switch can be changed after, and the
 // profile then reads "Custom (based on …)". Basic is the default for everyone (owner, 12 Oct 2026): a simpler app, the
-// same tabs and buttons in the same places without the extras (the optional Case tab parts, the Logbook grid,
+// same tabs and buttons in the same places without the extras (the optional Add tab parts, the Logbook grid,
 // Analytics trends and forecasts, reflection figures and references), and Analytics in More. Basic: logbook only is
 // Basic without reflections, for residents who submit theirs separately (Reflections in More, for ones already
 // written; no Reflect buttons or ☆ Interesting). Advanced hides nothing. Personal is for logging outside APMES: the
@@ -75,12 +75,12 @@ export const profile = () => {
 export const facultyMode = () => profile() === 'faculty';
 export const basicMode = () => profile() === 'basic' || profile() === 'logbook';
 export const logbookOnly = () => profile() === 'logbook';
-// Each switch (profiles.js SWITCHES; Case tab parts are 'case:<part>'): its saved value, else the profile's default.
+// Each switch (profiles.js SWITCHES; Add tab parts are 'case:<part>'): its saved value, else the profile's default.
 // They hide interface only, never a setting.
 export const shows = key => shownIn(settings(), profile(), key);
 export const basicHides = key => !shows(key);
 export const setShown = (key, on, parts = []) => patchLogbook({ settings: switchPatch(settings(), key, on, parts) });
-// the Case tab parts (Advanced logging and Profile; their own switches, and the profile's defaults)
+// the Add tab parts (Advanced logging and Profile; their own switches, and the profile's defaults)
 export const caseShown = part => shows('case:' + part);
 export const setCaseShown = (part, show, parts) => setShown('case:' + part, show, parts);
 // The intake on the list, or the year the rid starts with.

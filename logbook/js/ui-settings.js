@@ -171,7 +171,7 @@ export function renderThemes() {
       h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
       help('Pastels show as a soft tint, with a deeper shade for text and buttons so everything stays easy to read.'),
       pick('Colourful', COLOURFUL, st.colourful === true ? 'tabs' : st.colourful || 'off', v => { applyDisplay(setDisplay({ colourful: v === 'off' ? null : v })); hooks.render(); },
-        'A colour for each tab.', 'With the default colour, the tabs follow the NUH stripe at the top: Case orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.'),
+        'A colour for each tab.', 'With the default colour, the tabs follow the NUH stripe at the top: Add orange, Logbook red, Reflections cyan, Analytics navy. With another colour: orange, teal, red, blue, purple. “Everything” also colours the buttons, chips and links on that tab’s pages, in shades that stay easy to read.'),
       h('label', { class: 'field', style: 'margin-top:10px' }, 'Background',
         h('select', { 'aria-label': 'Background', onchange: e => { applyDisplay(setDisplay({ bgTint: e.target.value === 'auto' ? null : e.target.value })); hooks.render(); } },
           Object.entries(TINTS).map(([k, t]) => h('option', { value: k, selected: (st.bgTint || 'auto') === k }, t.label)))),
@@ -306,7 +306,7 @@ function fineTuneCard(st) {
   };
   return h('section', { class: 'card fine-tune' },
     h('h2', {}, 'Fine-tune'),
-    help('Single sizes over the spacing above. Each is off until you move its slider; a theme can set them too. Bigger tap targets (Accessibility) keep Case tab buttons at 44 px or more.'),
+    help('Single sizes over the spacing above. Each is off until you move its slider; a theme can set them too. Bigger tap targets (Accessibility) keep Add tab buttons at 44 px or more.'),
     FINE_TUNE.map(row),
     h('div', { class: 'bar', style: 'margin:10px 0 0' }, h('button', { type: 'button', class: 'small', onclick: () => { applyThemeLook(setDisplay(Object.fromEntries(TUNE_KEYS.map(k => [k, null])))); hooks.render(); } }, 'Reset Fine-tune')),
     DEVICE_NOTE());
@@ -418,11 +418,11 @@ export function renderLayout() {
       toggle('Copy button on each Logbook row', st.rowCopy, set('rowCopy'), 'Off unless you switch it on.', 'The ⋯ menu, if you use it, still copies one case.'),
       toggle('Copy button for each day', st.dayCopy, set('dayCopy'), 'Beside Share when you pick a day in the calendar.', 'Off unless you switch it on. Share already sends the whole day (or copies it, where sharing isn’t possible).'),
       h('h3', {}, 'Page'),
-      lookPick('lineWidth', 'Page width', LINE_WIDTHS, 'normal', 'How wide the app gets on a computer or tablet.', 'Was “Line width”. Phones always use the full screen. The Case tab keeps its two panes.'),
-      h('h3', {}, 'Case tab layout'),
-      toggle('Case tab upside down (phones)', st.caseInverted, v => applyDisplay(setDisplay({ caseInverted: v })),
+      lookPick('lineWidth', 'Page width', LINE_WIDTHS, 'normal', 'How wide the app gets on a computer or tablet.', 'Was “Line width”. Phones always use the full screen. The Add tab keeps its two panes.'),
+      h('h3', {}, 'Add tab layout'),
+      toggle('Add tab upside down (phones)', st.caseInverted, v => applyDisplay(setDisplay({ caseInverted: v })),
         'The case box at the bottom, by the keyboard, like a chat app.', 'Save sits beside it and the suggestions just above it; scroll up for all the tags.'),
-      toggle('Pin the case box at the top of the Case tab', st.pinBox, set('pinBox')),
+      toggle('Pin the case box at the top of the Add tab', st.pinBox, set('pinBox')),
       toggle('Pin the search box at the top of the Logbook and Reflections', st.pinSearch, set('pinSearch'), 'They stay in view while the list scrolls under them.'),
       h('h3', {}, 'Gestures'),
       toggle('Swipe left or right to change tab', st.swipeTabs !== false, v => applyDisplay(setDisplay({ swipeTabs: v ? null : false })),
@@ -451,7 +451,7 @@ export function renderAccessibility() {
           ZOOMS.map(v => h('option', { value: v, selected: String(st.zoom || '1') === v }, `${Math.round(v * 100)}%${v === '1' ? ' (default)' : ''}`)))),
       help('Everything bigger or smaller, the header and tabs too.', 'On a computer: Ctrl + and Ctrl − (⌘ on a Mac), Ctrl 0 for 100%.'),
       pick('Text size', TEXT_SIZES, String(st.textSize || '1'), v => { applyTextSize(v); setDisplay({ textSize: v }); }, 'Only the words: buttons and spacing stay as they are.'),
-      toggle('Bigger tap targets on the Case tab', st.bigTaps, v => applyDisplay(setDisplay({ bigTaps: v || null })), 'Larger chips, tag rows, tick boxes and Save buttons.'),
+      toggle('Bigger tap targets on the Add tab', st.bigTaps, v => applyDisplay(setDisplay({ bigTaps: v || null })), 'Larger chips, tag rows, tick boxes and Save buttons.'),
       h('h3', {}, 'Contrast and motion'),
       lookPick('contrast', 'Contrast', CONTRASTS, 'auto', 'Higher: darker text and stronger lines (lighter in dark mode).'),
       lookPick('motion', 'Motion', MOTIONS, 'auto', 'Reduce: pages, folds and swipes switch at once instead of sliding.'),
@@ -794,10 +794,10 @@ export function renderLogging() {
     h('section', { class: 'card' }, preview, h('button', { onclick: async () => {
       try { await patchLogbook({ settings: { suggestions: true, autoTick: null, detectAgeSex: true, detectInitials: null, oneLetterInitials: null, skipStarts: null, listFormat: null, enterMode: 'newline', enterSaves: null, defaultDate: 'today', afterSave: null } }); setDisplay({ compactTags: null }); hooks.render(); toast('Everyday logging defaults restored'); } catch (err) { toast(err.message); }
     } }, 'Reset these logging defaults'), h('p', { class: 'hint' }, 'Resets only the choices on this page. Advanced logging settings keep their current values.')),
-    advancedLink('loggingadv', 'Advanced logging settings', 'The Case tab, the keyboard, search, dates and undo, tips'));
+    advancedLink('loggingadv', 'Advanced logging settings', 'The Add tab, the keyboard, search, dates and undo, tips'));
 }
 
-// Settings → Logging → Advanced logging settings (#loggingadv), under headings (owner, 13 Oct 2026): the Case tab,
+// Settings → Logging → Advanced logging settings (#loggingadv), under headings (owner, 13 Oct 2026): the Add tab,
 // the keyboard in the case box, search, dates and undo, help
 export function renderLoggingAdvanced() {
   const st = settings();
@@ -805,12 +805,12 @@ export function renderLoggingAdvanced() {
   return h('div', { class: 'set-page' },
     h('section', { class: 'card' },
       h('h2', {}, 'Advanced logging'),
-      h('h3', {}, 'Case tab'),
+      h('h3', {}, 'Add tab'),
       help('Switch off what you don’t use. The case box, All tags and Save always stay.'),
       CASE_PARTS.map(([part, label]) => toggle(label, caseShown(part), v => setCaseShown(part, v, partIds()))),
       pick('Same as last: how many recent cases', RECENT_COUNTS, snapRecent(st.recentCount), n => save({ recentCount: n === 1 ? null : n }),
         'Chips under the case box that copy a recent case’s procedure and tags.'),
-      h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Case tab',
+      h('label', { class: 'field', style: 'margin-top:8px' }, 'Case box height on the Add tab',
         h('select', { onchange: e => save({ boxLines: Number(e.target.value) }) },
           Array.from({ length: 19 }, (_, i) => i + 2).map(n => h('option', { value: String(n), selected: n === (Math.min(20, Math.max(2, Number(st.boxLines) || 3))) }, `${n} lines${n === 3 ? ' (default)' : ''}`)))),
       // the height dragged with the grab bar under the box (this device), and Grow as I type (on by default)
@@ -818,14 +818,14 @@ export function renderLoggingAdvanced() {
         display().boxHeight ? [' · ', h('button', { type: 'button', class: 'linkish', onclick: () => { setDisplay({ boxHeight: null }); hooks.render(); } }, 'Reset')] : null),
       toggle('Grow as I type (this device)', display().boxGrow !== false, v => { setDisplay({ boxGrow: v ? null : false }); },
         'On by default: the box grows with the text, up to two thirds of the screen.', 'Drag the bar under the box to set its starting height; double-tap the bar to reset it.'),
-      // a separate Initials box above the case box, where the Case tab starts (device; was "First field for a new case")
+      // a separate Initials box above the case box, where the Add tab starts (device; was "First field for a new case")
       toggle(['Separate initials box (this device)', 'Separate initials box'], display().firstField === 'initials', v => { setDisplay({ firstField: v ? 'initials' : null }); toast('Saved on this device'); },
-        'An Initials box above the case box.', 'The Case tab starts there and Enter moves on to the case. Off: type the initials at the start of the case, e.g. “AB 72M lap chole”.'),
-      toggle('Open the keyboard when the Case tab opens (this device)', display().autoFocus !== false, v => { applyDisplay(setDisplay({ autoFocus: v ? null : false })); hooks.render(); }),
+        'An Initials box above the case box.', 'The Add tab starts there and Enter moves on to the case. Off: type the initials at the start of the case, e.g. “AB 72M lap chole”.'),
+      toggle('Open the keyboard when the Add tab opens (this device)', display().autoFocus !== false, v => { applyDisplay(setDisplay({ autoFocus: v ? null : false })); hooks.render(); }),
       // phones and tablets: not when the app first opens (the keyboard would cover the page before anything was
-      // tapped), only on going to the Case tab, unless this asks for it (autoFocus true; ui-log.js wantFocus)
+      // tapped), only on going to the Add tab, unless this asks for it (autoFocus true; ui-log.js wantFocus)
       display().autoFocus === false ? null : toggle('Also when the app opens on a phone or tablet (this device)', display().autoFocus === true, v => applyDisplay(setDisplay({ autoFocus: v ? true : null })),
-        'Off by default: on a touch screen the keyboard opens once you go to the Case tab, not as the app starts.'),
+        'Off by default: on a touch screen the keyboard opens once you go to the Add tab, not as the app starts.'),
       // lp: / dt: parts in the case summary, and a template for the case box (ui-parts.js; both off by default)
       partsSettings(),
       h('h3', {}, 'Keyboard in the case box (this device)'),
@@ -846,8 +846,8 @@ export function renderLoggingAdvanced() {
       h('h3', {}, 'Help'),
       toggle('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }, null),
         'Off for experienced users.', 'Hides the explanations around the app (like the one at the top of the tag editor), the privacy and photo reminders, and the tips for the tags you pick.'),
-      toggle('Show last week’s summary on the Case tab (once a week)', st.weeklyDigest, v => save({ weeklyDigest: v }, null))),
-    resetLink('everything on this page (the Case tab parts, Same as last, box height, the initials box, labelled parts and the template (switched off; your labels and template are kept), keyboard, advanced search, the week, undo, tips and the weekly summary)', async () => {
+      toggle('Show last week’s summary on the Add tab (once a week)', st.weeklyDigest, v => save({ weeklyDigest: v }, null))),
+    resetLink('everything on this page (the Add tab parts, Same as last, box height, the initials box, labelled parts and the template (switched off; your labels and template are kept), keyboard, advanced search, the week, undo, tips and the weekly summary)', async () => {
       await patchLogbook({ settings: { boxLines: null, undoSecs: null, weekStart: null, weeklyDigest: null, hideTips: null, searchOps: null, recentCount: null, labelParts: null, caseTplOn: null, ...resetPatch(settings(), partIds().map(p => 'case:' + p)) } });
       applyDisplay(setDisplay({ autoFocus: null, firstField: null, boxCaps: null, boxCorrect: null, boxSpell: null }));
     }));
@@ -948,17 +948,17 @@ export function renderShowHide() {
   const caseParts = CASE_PARTS.filter(([p]) => p !== 'still');   // (Still needed is with the APMES parts)
   const { hidden } = arrangeTabs(barTabs().map(([id]) => id), d);
   const extrasReset = keys => resetPatch(settings(), keys);
-  // in the order of the tabs (owner, 15 Oct 2026): Case tab, Logbook, Reflections, Analytics, Header and tabs, Tips and
+  // in the order of the tabs (owner, 15 Oct 2026): Add tab, Logbook, Reflections, Analytics, Header and tabs, Tips and
   // help, APMES last; the extras sit with the area they belong to (no Extras card)
   return h('div', { class: 'showhide set-page' },
     profileCard(),
     h('h2', { class: 'set-heading' }, 'Show or hide'),
     h('p', { class: 'hint help', style: 'margin:0 6px 10px' }, 'Everything you can show or hide, by area, in the order of the tabs. Each group has its own reset. The same switches are on their own pages too. Off in the Basic profiles: the Logbook grid, figures and references, and (in Basic: logbook only) the reflections.'),
     h('section', { class: 'card', 'data-group': 'case' },
-      h('h3', { style: 'margin-top:0' }, 'Case tab'),
+      h('h3', { style: 'margin-top:0' }, 'Add tab'),
       h('p', { class: 'hint help', style: 'margin:0 0 6px' }, 'The case box, All tags and Save always stay. Still needed is under APMES.'),
       caseParts.map(([part, label]) => sw(label, caseShown(part), v => setCaseShown(part, v, partIds()).then(() => hooks.render()))),
-      groupReset('every part of the Case tab', () => save(resetPatch(settings(), caseParts.map(([p]) => 'case:' + p))))),
+      groupReset('every part of the Add tab', () => save(resetPatch(settings(), caseParts.map(([p]) => 'case:' + p))))),
     h('section', { class: 'card', 'data-group': 'logbook' },
       h('h3', { style: 'margin-top:0' }, 'Logbook'),
       extra('grid'),
@@ -989,7 +989,7 @@ export function renderShowHide() {
     h('section', { class: 'card', 'data-group': 'tips' },
       h('h3', { style: 'margin-top:0' }, 'Tips and help'),
       sw('Show tips and help text', !st.hideTips, v => save({ hideTips: !v }).then(() => hooks.render()), 'Explanations around the app, the privacy and photo reminders, and the tips for the tags you pick.'),
-      sw('Show last week’s summary on the Case tab', !!st.weeklyDigest, v => save({ weeklyDigest: v })),
+      sw('Show last week’s summary on the Add tab', !!st.weeklyDigest, v => save({ weeklyDigest: v })),
       groupReset('the tips and the weekly summary', () => save({ hideTips: null, weeklyDigest: null }))),
     h('section', { class: 'card', 'data-group': 'apmes' },
       h('h3', { style: 'margin-top:0' }, 'APMES'),
@@ -1044,7 +1044,7 @@ function tagGroupsCard() {
   const list = (S.logbook && S.logbook.templates) || [];
   return h('section', { class: 'card', id: 'tag-groups' },
     h('h2', {}, 'Tag groups'),
-    h('p', { class: 'hint help' }, 'Tags you often pick together, one tap in Quick picks on the Case tab, e.g. “LSCS spinal” = LSCS + CNB(Obs) + Spinal.'),
+    h('p', { class: 'hint help' }, 'Tags you often pick together, one tap in Quick picks on the Add tab, e.g. “LSCS spinal” = LSCS + CNB(Obs) + Spinal.'),
     list.length ? h('ul', { class: 'prog' }, list.map(t => h('li', { style: 'grid-template-columns:1fr auto', class: tev.lastGroup === t.id ? 'te-last' : '' },
       h('span', {}, h('b', {}, t.name), ' ', h('span', { class: 'muted' }, catPills(t.cats)), t.details ? h('span', { class: 'muted' }, ` · “${t.details}”`) : null),
       h('span', { class: 'row' },
@@ -1130,7 +1130,7 @@ export function categoryNamesCard() {
 // under section headers, and add your own tags (linked to APMES categories, or personal labels).
 // Share it as a CSV file (opens in Excel) or load someone else's.
 const saveTags = set => patchLogbook({ settings: { tagSet: cleanTagSet(set) } }).then(() => hooks.render());
-// view: the list (details, up/down) or pills (as on the Case tab, drag to reorder); a search narrows both
+// view: the list (details, up/down) or pills (as on the Add tab, drag to reorder); a search narrows both
 // (List or Pills is remembered with your account, like the Log page's switch)
 // last: the tag or header you last tapped (list or pills) — a new one goes right after it;
 // lastGroup: the tag group you last edited — a new group goes after it
@@ -1176,7 +1176,7 @@ export function renderTagEditor() {
     [['list', 'List'], ['pills', 'Pills']].map(([m, l]) => h('button', { class: 'small', 'aria-pressed': String(teMode() === m), onclick: () => { if (teMode() !== m) patchLogbook({ settings: { tagEditorView: m } }).then(() => hooks.render()); } }, l)));
   return h('div', {}, h('section', { class: 'card tag-editor' },
     h('h2', {}, 'Tag editor'),
-    h('p', { class: 'hint help' }, 'Lay out the Case tab’s list your way. APMES tags are the programme’s categories: rename (just for you), hide, move them or put them under section headers. Personal tags are your own: link one to APMES categories and choosing it ticks them, or leave it as a label only. A personal tag under an APMES one counts towards it. Totals and exports always use APMES.'),
+    h('p', { class: 'hint help' }, 'Lay out the Add tab’s list your way. APMES tags are the programme’s categories: rename (just for you), hide, move them or put them under section headers. Personal tags are your own: link one to APMES categories and choosing it ticks them, or leave it as a label only. A personal tag under an APMES one counts towards it. Totals and exports always use APMES.'),
     h('div', { class: 'bar', style: 'flex-wrap:wrap;gap:8px;margin:0 0 8px' },
       h('button', { class: 'small primary', onclick: () => editTag(null, 'tag') }, '+ Personal tag'),
       h('button', { class: 'small', onclick: () => editTag(null, 'head') }, '+ Section header'),
@@ -1225,7 +1225,7 @@ function selectTag(n) {
   const m = modal(name, [
     h('p', { class: 'hint' }, n.kind === 'head' ? 'Section header' : n.kind === 'cat' ? 'APMES · ' + catName(n.code) : 'Personal tag'),
     parent ? h('p', {}, 'Under ', nameOf(parent)) : null,
-    n.kind !== 'head' ? [h('p', {}, `${tagUsage()(n.e.k)} cases · ${n.e.hide ? 'Hidden (search still finds it)' : 'Shown on Case'}`),
+    n.kind !== 'head' ? [h('p', {}, `${tagUsage()(n.e.k)} cases · ${n.e.hide ? 'Hidden (search still finds it)' : 'Shown on Add'}`),
       h('p', {}, links.length ? 'Counts towards: ' + links.map(catName).join(', ') : 'Label only; no APMES credit'),
       shorthandOf(n.e).length ? h('p', { class: 'hint' }, 'Shorthand: ' + shorthandOf(n.e).join(', ')) : null] : null,
     h('div', { class: 'bar', style: 'flex-wrap:wrap;margin-bottom:0' },
@@ -1415,7 +1415,7 @@ function editTag(n, kind = n ? n.kind : 'tag') {
       paint();
       return box;
     })() : null,
-    kind !== 'head' ? h('label', { class: 'check', style: 'margin-top:8px' }, hide, 'Hide from the Case tab (still found by search)') : null,
+    kind !== 'head' ? h('label', { class: 'check', style: 'margin-top:8px' }, hide, 'Hide from the Add tab (still found by search)') : null,
     h('div', { class: 'bar', style: 'margin-top:12px' },
       n && kind !== 'cat' ? h('button', { class: 'danger', onclick: async () => { if (!current()) return; await m.close(); if (S.user?.email !== owner) return; await saveTags(removeTag(set, e.k)); toast('Removed (cases keep the tag)'); } }, 'Remove') : null,
       n && kind === 'tag' ? h('button', { onclick: async () => { if (!current()) return; await m.close(); if (S.user?.email === owner) mergeTag(n); } }, 'Merge…') : null,

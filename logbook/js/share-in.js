@@ -2,7 +2,7 @@
 //   - the old GET: ?share_title=…&share_text=…&share_url=… (app.js reads it)
 //   - POST (multipart, text and .md / .txt files): sw.js receives it, keeps it in Cache Storage (SHARE_CACHE) and opens
 //     ./?shared=1#log; readInbox() here picks it up once.
-// Either way the text waits in sessionStorage (SHARED_KEY) until the Case tab (paste-a-list) or the chooser
+// Either way the text waits in sessionStorage (SHARED_KEY) until the Add tab (paste-a-list) or the chooser
 // (#share, ui-share-in.js) takes it. The pure parts are tested in test/share-in.test.mjs.
 
 export const SHARED_KEY = 'logbook-shared';
@@ -34,7 +34,7 @@ export function fromQuery(search) {
   return { has, text, rest: q.toString().replace(/=(&|$)/g, '$1') };
 }
 
-// set once the chooser has been shown: leaving it for the Case tab then means "as cases" (never sent back to it)
+// set once the chooser has been shown: leaving it for the Add tab then means "as cases" (never sent back to it)
 export const shareState = { seen: false };
 
 // ---- waiting in this tab (sessionStorage survives a same-tab sign-in) ----

@@ -1,5 +1,5 @@
 // Fake data only. Form view (More → Form view): the old Google Form's layout saving straight into the logbook through
-// the Case tab's own path. A case entered there has the same record shape as one entered on the Case tab, shows in the
+// the Add tab's own path. A case entered there has the same record shape as one entered on the Add tab, shows in the
 // Logbook, nothing goes through the Form inbox, required questions are checked, "Edit your response" changes the same
 // case, and an ID number or a double entry is asked about first. SHOTS=<dir> saves a 390 px screenshot.
 import assert from 'node:assert/strict';
@@ -20,7 +20,7 @@ try {
   const casesOf = async () => Object.values(Object.values((await store()).logbooks)[0].cases);
   await p.goto(base + '?demo=reset#log'); await p.waitForSelector('textarea.details');
 
-  // a case from the Case tab, to compare with
+  // a case from the Add tab, to compare with
   const before = (await casesOf()).length;
   await p.locator('textarea.details').fill('FK 34F LSCS spinal');
   await p.locator('.chip', { hasText: /^16\)|LSCS/ }).first().click().catch(() => {});
@@ -30,7 +30,7 @@ try {
   await p.getByRole('button', { name: /^Save/ }).first().click();
   await p.getByText(/^Saved /).first().waitFor();
   const appCase = (await casesOf()).find(c => /FK/.test(c.initials + c.details));
-  assert.ok(appCase, 'the Case tab case is stored');
+  assert.ok(appCase, 'the Add tab case is stored');
 
   // More → Form view
   await p.evaluate(() => { location.hash = '#more'; });
@@ -57,8 +57,8 @@ try {
   const all = await casesOf();
   assert.equal(all.length, before + 2);
   const formCase = all.find(c => c.initials === 'GH');
-  assert.ok(formCase, 'stored with initials split off like the Case tab');
-  assert.deepEqual(Object.keys(formCase).sort(), Object.keys(appCase).sort(), 'same record shape as a Case tab case');
+  assert.ok(formCase, 'stored with initials split off like the Add tab');
+  assert.deepEqual(Object.keys(formCase).sort(), Object.keys(appCase).sort(), 'same record shape as a Add tab case');
   assert.equal(formCase.source, 'app'); assert.equal(formCase.date, '2026-10-12'); assert.deepEqual(formCase.cats, ['16']);
   assert.equal(formCase.details, '40F LSCS spinal');
   // nothing went through the Form inbox

@@ -201,7 +201,7 @@ const SCREENS = [
     await p.getByRole('button', { name: '+ New note' }).click();
     await p.getByRole('toolbar', { name: 'Formatting' }).waitFor();
   }, false],
-  ['Case tab daily note', async p => {
+  ['Add tab daily note', async p => {
     await p.evaluate(async () => { const { patchLogbook, hooks } = await import('./js/ui-core.js'); await patchLogbook({ settings: { dayNoteOnCase: true } }); hooks.render(); });
     await p.locator('.day-note-box summary').click();
     await p.waitForSelector('.day-note-text:not([disabled])');

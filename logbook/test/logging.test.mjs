@@ -1,4 +1,4 @@
-// Fake data only. The Case tab's pure helpers (js/logging.js).
+// Fake data only. The Add tab's pure helpers (js/logging.js).
 import assert from 'node:assert/strict';
 const { STRONG, confident, autoTick, rejectCodes, expandParts, hasPart, recentCases } = await import('../js/logging.js');
 const { suggest } = await import('../js/suggest.js');
@@ -45,7 +45,7 @@ const { suggest } = await import('../js/suggest.js');
   assert.deepEqual(autoTick({}, ['21']), { cats: ['21'], auto: ['21'] });
 }
 
-// Case tab parts: an older 'quick' still means both of the parts it was split into
+// Add tab parts: an older 'quick' still means both of the parts it was split into
 {
   assert.deepEqual(expandParts(['quick', 'still']), ['sugg', 'recent', 'still']);
   assert.deepEqual(expandParts(['sugg', 'quick']), ['sugg', 'recent']);
@@ -86,7 +86,7 @@ const { suggest } = await import('../js/suggest.js');
 {
   const { recentCount, RECENT_CHOICES } = await import('../js/logging.js');
   const engine = await import('../js/engine.js');
-  assert.equal(engine.STRONG, STRONG, 'parseBulk and the Case tab share one confident line');
+  assert.equal(engine.STRONG, STRONG, 'parseBulk and the Add tab share one confident line');
   assert.deepEqual(RECENT_CHOICES, [1, 2, 3, 5]);
   for (const [v, want] of [[undefined, 1], [null, 1], ['x', 1], [0, 1], [-3, 1], [1, 1], [2, 2], [2.6, 3], [3, 3], [4, 3], [4.6, 5], [5, 5], [9, 5], ['2', 2]]) assert.equal(recentCount(v), want, String(v));
 }

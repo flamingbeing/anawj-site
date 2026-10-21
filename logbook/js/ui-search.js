@@ -138,7 +138,7 @@ export function renderSearch() {
     if (kind === 'reflection') { const { reflBulkDialog } = await import('./ui-bulk-refl.js'); return reflBulkDialog(items, { onDone }); }
     const [{ bulkEditDialog }, lb] = await Promise.all([import('./ui-bulk.js'), import('./ui-logbook.js')]);
     const planned = items.filter(c => !(S.cases || []).some(x => x.id === c.id)).length;
-    if (planned) toast(`${planned} planned case${planned === 1 ? '' : 's'} left out: confirm them on the Case tab first`);
+    if (planned) toast(`${planned} planned case${planned === 1 ? '' : 's'} left out: confirm them on the Add tab first`);
     bulkEditDialog(items.filter(c => (S.cases || []).some(x => x.id === c.id)), { tags: lb.tagChoices(), name: lb.keyName, onDone });
   }
 
@@ -212,7 +212,7 @@ async function openRefl(r) { const { openReflection } = await import('./ui-refle
 async function open(d) {
   if (d.type === 'note') return openNote(d.item, 'search');
   if (d.type === 'reflection') return openRefl(d.item);
-  if (d.flags.planned) return hooks.navigate('log');   // planned cases are confirmed from the Case tab's plan
+  if (d.flags.planned) return hooks.navigate('log');   // planned cases are confirmed from the Add tab's plan
   const { editCaseDialog } = await import('./ui-log.js');
   editCaseDialog(d.item);
 }

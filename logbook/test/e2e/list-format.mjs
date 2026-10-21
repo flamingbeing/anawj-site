@@ -36,7 +36,7 @@ try { for (const width of [390, 1280]) {
   await p.waitForFunction(() => /3 cases found in the sample/.test(document.querySelector('.list-teach')?.textContent || ''), null, { timeout: 5000 });
   await p.getByRole('button', { name: 'Use this format' }).click();
   await p.waitForFunction(async () => { const { settings } = await import('./js/ui-core.js'); return settings().listFormat?.start === '{n}. === {initials} ('; }, null, { timeout: 5000 });
-  // the List box on the Case tab uses it
+  // the List box on the Add tab uses it
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
   await p.locator('button[data-mode="bulk"]').click();
   await p.locator('textarea.details').fill(blob);

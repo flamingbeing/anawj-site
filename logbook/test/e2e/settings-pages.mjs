@@ -10,9 +10,9 @@ const HOME = {
   themes: ['Spacing', 'Line strength', 'Button style', 'Icons instead of words on common buttons', 'Plain calendar', 'Name in the header',
     'Page titles in the header', 'Hide the header (the app name bar)', 'Icons only in the tab bar', 'Shorter Logbook rows', 'Custom CSS (advanced)'],
   layout: ['Open the app on', 'Tab bar', 'Tabs on the bar', 'Fewer buttons on Logbook rows (a ⋯ menu)', 'Copy button on each Logbook row', 'Copy button for each day',
-    'Page width', 'Case tab upside down (phones)', 'Pin the case box at the top of the Case tab', 'Pin the search box at the top of the Logbook and Reflections',
+    'Page width', 'Add tab upside down (phones)', 'Pin the case box at the top of the Add tab', 'Pin the search box at the top of the Logbook and Reflections',
     'Swipe left or right to change tab', 'Swipe from the left edge to go back (iPhone app)', 'Press and hold a Logbook row for its menu', 'Hide the tab bar while typing'],
-  access: ['Interface zoom', 'Text size', 'Bigger tap targets on the Case tab', 'Contrast', 'Motion'],
+  access: ['Interface zoom', 'Text size', 'Bigger tap targets on the Add tab', 'Contrast', 'Motion'],
 };
 try { for (const width of [390, 1280]) {
   const ctx = await b.newContext({ viewport: { width, height: 844 }, serviceWorkers: 'block', acceptDownloads: true });

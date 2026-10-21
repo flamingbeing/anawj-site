@@ -1,7 +1,7 @@
 // Form view (More → Form view, #formview): the old APMES Case Numbers Google Form's layout, for residents who are
 // moving from the Form to the logbook. One long page, the Form's questions in the Form's order (Resident, Date,
 // Initials and case details, Category), a confirmation with "Edit your response" and "Submit another response".
-// It saves through the Case tab's own path (createCase / updateCase in ui-core.js): the same ID-number and duplicate
+// It saves through the Add tab's own path (createCase / updateCase in ui-core.js): the same ID-number and duplicate
 // questions, the same sync, the same outbox to the response sheet. Nothing goes through the Form inbox, so there is
 // nothing to pick up and nothing to clear. The Form's "wrong entry" trick is not needed: Edit corrects the case.
 
@@ -59,7 +59,7 @@ function formCard() {
     try {
       if (!(await okNoIds(details))) return;
       if (!c) {
-        // the same text on the same date is probably a double entry (as on the Case tab)
+        // the same text on the same date is probably a double entry (as on the Add tab)
         const twin = (S.cases || []).find(x => x.date === iso && norm(caseText(x)) === norm(details));
         if (twin && !(await confirmBox('Possible duplicate', `You already logged “${caseText(twin).slice(0, 60)}” on ${fmtDate(twin.date)}. Save another one?`, 'Save anyway'))) return;
         last = await createCase({ date: iso, details, cats });
@@ -84,7 +84,7 @@ function formCard() {
       c ? null : h('button', { type: 'button', class: 'link', onclick: () => { form.reset(); [pDate, pText, pCat].forEach(p => show(p, false)); date.value = todayISO(); } }, 'Clear form')));
   return h('section', { class: 'card fv-card' },
     h('h2', {}, 'APMES Case Numbers'),
-    h('p', { class: 'hint' }, c ? 'Change your response and save it.' : 'Log a case the way the Google Form asked for it. It is saved straight into your logbook, the same as on the Case tab. Use Edit your response after submitting to correct it.'),
+    h('p', { class: 'hint' }, c ? 'Change your response and save it.' : 'Log a case the way the Google Form asked for it. It is saved straight into your logbook, the same as on the Add tab. Use Edit your response after submitting to correct it.'),
     h('p', { class: 'hint fv-req-note' }, '* Required'),
     form);
 }

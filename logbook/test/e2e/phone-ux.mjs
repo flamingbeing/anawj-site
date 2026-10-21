@@ -23,7 +23,7 @@ try { for (const width of [390, 1280]) {
   const tap = (loc, o) => (phone ? loc.tap(o) : loc.click(o));
   const focusedTag = () => p.evaluate(() => document.activeElement && document.activeElement.getAttribute('aria-label'));
 
-  // ---- the case box and the keyboard: on a phone not as the app opens, only on going to the Case tab ----
+  // ---- the case box and the keyboard: on a phone not as the app opens, only on going to the Add tab ----
   await p.goto(base + '?demo=reset#log'); await p.waitForSelector('textarea.details');
   await p.waitForTimeout(300);
   if (phone) {
