@@ -501,8 +501,9 @@ function resetAllCard() {
     if (Object.keys(patch).length) await patchLogbook({ settings: patch });
     hooks.paintTabs?.(); render();
     toast('All settings reset', { action: 'Undo', onaction: async () => {
+      if (photo) await putPhoto(photo).catch(() => {});   // first, so the look comes back in one step
       applyTheme(beforeMode);
-      if (photo) { await putPhoto(photo).catch(() => {}); photoChanged(photo); }
+      if (photo) photoChanged(photo);
       applyDisplay(setDisplay(Object.fromEntries(DISPLAY_KEYS.map(k => [k, beforeDev[k] ?? null]))));
       applyCustomCss();
       if (Object.keys(patch).length) await patchLogbook({ settings: Object.fromEntries(Object.keys(patch).map(k => [k, beforeAcct[k] ?? null])) });
