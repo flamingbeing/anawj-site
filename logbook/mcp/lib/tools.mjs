@@ -135,6 +135,8 @@ export function defineTools(getData, writer = null) {
 
 function writeTools(getData, writer) {
   const fresh = () => getData(true);
+  // a preview uses the one-minute cache (a read per case and reflection saved); the save itself reads fresh and checks again
+  const load = args => getData(args.confirm === true);
   return [
     {
       name: 'add_case',
@@ -143,7 +145,7 @@ function writeTools(getData, writer) {
       description: 'Add a case to your logbook, as if typed in the app (it also goes to the Google Form response sheet, as app cases do). First call without confirm to preview; save with confirm: true once the user agrees.',
       shape: { date: date.optional().describe('YYYY-MM-DD; default today'), initials: initials.optional(), details, tags: tags.optional(), interesting: z.boolean().optional().describe('Mark the case interesting (for a reflection later)'), confirm },
       async run(args) {
-        const d = await fresh();
+        const d = await load(args);
         const c = buildNewCase(args);
         const dup = d.cases.find(x => sameCase(x, c));
         if (!args.confirm) {
@@ -169,7 +171,7 @@ function writeTools(getData, writer) {
       description: 'Change one of your cases (id from list_cases or search_cases). Only the fields given change; tags replaces the whole tag list. Preview first; save with confirm: true once the user agrees. Cases cannot be deleted from here.',
       shape: { id: z.string().min(1).max(200), date: date.optional(), initials: initials.optional(), details: details.optional(), tags: tags.optional(), interesting: z.boolean().optional(), confirm },
       async run(args) {
-        const d = await fresh();
+        const d = await load(args);
         const before = d.cases.find(x => String(x.id) === args.id);
         if (!before) throw new Error(`No case with id "${args.id}". Use list_cases or search_cases to find ids.`);
         const after = buildCaseUpdate(before, args);
@@ -201,7 +203,7 @@ function writeTools(getData, writer) {
         confirm,
       },
       async run(args) {
-        const d = await fresh();
+        const d = await load(args);
         const existing = args.id ? d.reflections.find(x => String(x.id) === args.id) : null;
         if (args.id && !existing) throw new Error(`No reflection with id "${args.id}". Use list_reflections to find ids.`);
         if (args.case_id && !d.cases.some(x => String(x.id) === args.case_id)) throw new Error(`No case with id "${args.case_id}". Nothing was saved.`);
@@ -226,7 +228,7 @@ function writeTools(getData, writer) {
       },
       async run(args) {
         if (!!args.text === !!args.cases) throw new Error('Give text (a pasted list) or cases, one of the two.');
-        const d = await fresh();
+        const d = await load(args);
         const rows = checkRows(args.text ? parseList(args.text, d.logbook, { date: args.date }) : rowsFromCases(args.cases, { date: args.date }));
         const { cases, dups } = buildCases(rows, d.cases);
         if (!args.confirm) {
@@ -266,7 +268,7 @@ function writeTools(getData, writer) {
         const t = today();
         const day = args.date || today(new Date(Date.now() + 86_400_000));
         if (day < t) throw new Error('A plan is for today or a later day; use add_cases for cases already done. Nothing was saved.');
-        const d = await fresh();
+        const d = await load(args);
         const rows = checkRows(args.text ? parseList(args.text, d.logbook, { date: day }) : rowsFromCases(args.cases, { date: day }))
           .map(r => ({ ...r, date: day }));
         const plan = planOf(d.logbook);
@@ -289,7 +291,7 @@ function writeTools(getData, writer) {
       },
       async run(args) {
         if (!!args.ids === !!args.all_due) throw new Error('Give ids (from list_plan) or all_due: true, one of the two.');
-        const d = await fresh();
+        const d = await load(args);
         const items = pickDue(planOf(d.logbook), { ids: args.ids || null });
         const { cases, dups } = casesFromPlan(items, d.cases);
         if (!args.confirm) {

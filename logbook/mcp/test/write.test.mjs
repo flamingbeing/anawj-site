@@ -71,13 +71,14 @@ let res = await call('add_case', { date: '2026-10-20', initials: 'GH', details: 
 assert.match(res.content[0].text, /^New case:\nDate: 2026-10-20\nInitials: GH\nDetails: 30F LSCS GA\nTags: 16 /);
 assert.match(res.content[0].text, /Preview only: nothing is saved yet/);
 assert.equal(log.length, 0);
-assert.equal(fresh, 1, 'writes read fresh data');
+assert.equal(fresh, 0, 'a preview uses the cache');
 
 // confirm saves the case and its sheet entry
 res = await call('add_case', { date: '2026-10-20', initials: 'GH', details: '30F LSCS GA', tags: ['16'], confirm: true });
 assert.match(res.content[0].text, /^Saved case \S+:/);
 assert.match(res.content[0].text, /Queued for the response sheet/);
 assert.deepEqual(log.map(x => x[0]), ['case', 'sheet']);
+assert.equal(fresh, 1, 'the save reads fresh data');
 const saved = log[0][1];
 assert.deepEqual(log[1][1], { id: saved.id, email: 'res@example.com', rid: '2024001', date: '2026-10-20', initials: 'GH', details: '30F LSCS GA', cats: ['16'], createdAt: saved.createdAt });
 assert.equal(invalidated, 1);
