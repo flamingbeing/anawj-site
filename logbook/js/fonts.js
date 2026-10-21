@@ -9,7 +9,11 @@ export const FONTS = [
   ['atkinson', 'Atkinson Hyperlegible'],
   ['lexend', 'Lexend'],
   ['inter', 'Inter'],
+  ['nunito', 'Nunito (rounded)'],
+  ['plex', 'IBM Plex Sans'],
+  ['sourceserif', 'Source Serif'],
   ['serif', 'Serif'],
+  ['jetbrains', 'JetBrains Mono'],
   ['mono', 'Monospace'],
   ['named', 'A font installed on this device…'],
   ['file', 'Your own font file…'],
@@ -21,9 +25,15 @@ export const STACKS = {
   atkinson: `"Atkinson Hyperlegible Next", ${SANS}`,
   lexend: `"Lexend", ${SANS}`,
   inter: `"Inter", ${SANS}`,
+  nunito: `"Nunito", ${SANS}`,
+  plex: `"IBM Plex Sans", ${SANS}`,
+  sourceserif: '"Source Serif 4", ui-serif, Georgia, serif',
+  jetbrains: '"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace',
   serif: 'ui-serif, Charter, "Bitstream Charter", Georgia, "Noto Serif", "Times New Roman", serif',
   mono: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
 };
+// the fonts a theme (or a theme link) may set: the bundled ones and the device's own, never a typed name or a file
+export const THEME_FONTS = Object.keys(STACKS);
 export const MAX_FONT_BYTES = 3 * 1024 * 1024;
 export const FONT_TYPES = /\.(woff2?|ttf|otf)$/i;
 
@@ -38,6 +48,21 @@ export function fontStack(choice, name = '', slot = 'ui') {
 export const userFamily = slot => (slot === 'log' ? 'Logbook own font (logging)' : 'Logbook own font');
 // the logging font follows the interface font unless set (null / 'same')
 export const logChoice = d => (d.fontLog && d.fontLog !== 'same' ? d.fontLog : null);
+
+// An uploaded font in an exported themes file (my-themes.js; theme-revamp S5): { name, data } with the data as base64.
+// Checked on the way in: a font file's name, at most 3 MB, and the first bytes of a woff2, woff, TrueType or OpenType font.
+export const fontToFile = rec => ({ name: rec.name, data: b64(new Uint8Array(rec.data)) });
+function b64(bytes) { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); }
+const MAGIC = ['wOF2', 'wOFF', 'OTTO', 'true', '\u0000\u0001\u0000\u0000'];
+export function cleanFontFile(f) {
+  if (!f || typeof f !== 'object' || typeof f.name !== 'string' || typeof f.data !== 'string') return null;
+  const name = f.name.replace(/[\u0000-\u001f<>/\\]/g, '').trim().slice(0, 80);
+  if (!FONT_TYPES.test(name) || f.data.length > Math.ceil(MAX_FONT_BYTES / 3) * 4) return null;
+  let bytes;
+  try { bytes = Uint8Array.from(atob(f.data), c => c.charCodeAt(0)); } catch { return null; }
+  if (bytes.length < 12 || !MAGIC.includes(String.fromCharCode(...bytes.subarray(0, 4)))) return null;
+  return { name, data: bytes.buffer };
+}
 
 // ---- browser side ----
 
@@ -75,6 +100,32 @@ function db() {
 }
 const tx = async (mode, fn) => { const d = await db(); return new Promise((resolve, reject) => { const t = d.transaction('files', mode); const req = fn(t.objectStore('files')); t.oncomplete = () => resolve(req && req.result); t.onerror = () => reject(t.error); }); };
 export const getUserFont = slot => tx('readonly', s => s.get(slot)).catch(() => null);
+// Your themes keep their own copy of an uploaded font (key 'mine-<theme id>-<slot>'), so picking the theme later, or
+// exporting it, brings that font back even after the device's own font file has changed (theme-revamp S5)
+const mineKey = (id, slot) => `mine-${id}-${slot}`;
+const SLOTS = [['ui', 'fontUi'], ['log', 'fontLog']];
+export async function keepThemeFonts(t) {
+  for (const [slot, k] of SLOTS) if (t.look[k] === 'file') { const f = await getUserFont(slot); if (f?.data) await tx('readwrite', s => s.put(f, mineKey(t.id, slot))).catch(() => {}); }
+}
+// a saved theme's fonts as { ui, log } for a file (base64), from its own copy or else this device's font
+export async function themeFonts(t) {
+  const out = {};
+  for (const [slot, k] of SLOTS) if (t.look[k] === 'file') { const f = (await tx('readonly', s => s.get(mineKey(t.id, slot))).catch(() => null)) || await getUserFont(slot); if (f?.data) out[slot] = fontToFile(f); }
+  return out;
+}
+// fonts read from a file ({ ui, log } of { name, data: ArrayBuffer }), kept for the theme
+export async function putThemeFonts(id, fonts) {
+  for (const [slot, f] of Object.entries(fonts || {})) await tx('readwrite', s => s.put(f, mineKey(id, slot)));
+}
+// picking a saved theme: its font becomes this device's font file (shown at once)
+export async function useThemeFonts(t) {
+  for (const [slot, k] of SLOTS) {
+    if (t.look[k] !== 'file') continue;
+    const f = await tx('readonly', s => s.get(mineKey(t.id, slot))).catch(() => null);
+    if (f?.data) { await tx('readwrite', s => s.put(f, slot)); await addFace(slot, f.data).catch(() => {}); }
+  }
+}
+export const dropThemeFonts = id => Promise.all(['ui', 'log'].map(slot => tx('readwrite', s => s.delete(mineKey(id, slot))).catch(() => {})));
 export const deleteUserFont = slot => tx('readwrite', s => s.delete(slot));
 const loaded = {};
 async function addFace(slot, data) {

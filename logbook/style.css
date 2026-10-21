@@ -48,6 +48,14 @@ html, body { overscroll-behavior-y: none; }
 @font-face { font-family: "Lexend"; src: url(fonts/lexend-700.woff2) format("woff2"); font-weight: 600 700; font-display: swap; }
 @font-face { font-family: "Inter"; src: url(fonts/inter-400.woff2) format("woff2"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Inter"; src: url(fonts/inter-700.woff2) format("woff2"); font-weight: 600 700; font-display: swap; }
+@font-face { font-family: "Nunito"; src: url(fonts/nunito-400.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Nunito"; src: url(fonts/nunito-700.woff2) format("woff2"); font-weight: 600 700; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; src: url(fonts/plex-400.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; src: url(fonts/plex-700.woff2) format("woff2"); font-weight: 600 700; font-display: swap; }
+@font-face { font-family: "Source Serif 4"; src: url(fonts/sourceserif-400.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Source Serif 4"; src: url(fonts/sourceserif-700.woff2) format("woff2"); font-weight: 600 700; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url(fonts/jetbrains-400.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url(fonts/jetbrains-700.woff2) format("woff2"); font-weight: 600 700; font-display: swap; }
 :root { --font-ui: "Open Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --font-log: var(--font-ui); }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
@@ -197,7 +205,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 textarea.details { scroll-margin-top: 8px; }
 .chip.sugg.all { font-weight: 700; }
-textarea.details { min-height: 92px; font-size: max(16px, calc(17px * var(--fs, 1))); line-height: calc(1.4 * var(--lh, 1)); padding: 10px 12px; border-radius: calc(12px * var(--round, 1)); }
+textarea.details { min-height: 92px; font-size: max(16px, calc(17px * var(--fs, 1) * var(--cs, 1))); line-height: calc(1.4 * var(--lh, 1)); padding: 10px 12px; border-radius: calc(12px * var(--round, 1)); }
 .selected { min-height: 36px; align-items: center; }
 .selected .none { color: var(--muted); font-size: calc(13px * var(--fs, 1)); }
 .tip { margin: 8px 0 0; padding: 6px 10px; border-radius: calc(8px * var(--round, 1)); background: var(--info-bg); color: var(--info); font-size: calc(13px * var(--fs, 1)); }
@@ -253,7 +261,7 @@ ul.cases li { display: grid; grid-template-columns: 74px 1fr; gap: 4px 10px; pad
 ul.cases li:hover { background: var(--row-alt); }
 ul.cases .d { font-size: calc(13px * var(--fs, 1)); color: var(--muted); font-variant-numeric: tabular-nums; }
 ul.cases .d .wd { font-weight: 600; }
-ul.cases .t { white-space: pre-wrap; word-break: break-word; }
+ul.cases .t { white-space: pre-wrap; word-break: break-word; font-size: calc(1em * var(--cs, 1)); }
 ul.cases .c { grid-column: 2; display: flex; align-items: flex-start; gap: 6px 8px; }
 ul.cases .c-tags { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-top: 4px; }
 ul.cases .acts { flex: none; display: flex; gap: 6px; }
@@ -436,7 +444,7 @@ body.compact input[type="date"], body.compact input[type="number"], body.compact
   font-size: max(16px, calc(16px * var(--fs, 1))); min-height: 34px; padding: 4px 8px;
 }
 body.compact textarea { font-size: max(16px, calc(16px * var(--fs, 1))); padding: 6px 8px; }
-body.compact textarea.details { min-height: 64px; font-size: max(16px, calc(16px * var(--fs, 1))); padding: 6px 10px; }
+body.compact textarea.details { min-height: 64px; font-size: max(16px, calc(16px * var(--fs, 1) * var(--cs, 1))); padding: 6px 10px; }
 body.compact label.field { margin-bottom: 6px; gap: 2px; }
 body.compact label.check { min-height: 32px; }
 /* category picker: ~32px rows */
@@ -1581,7 +1589,7 @@ ul.points-list .point-btn { display: grid; gap: 2px; width: 100%; padding: 10px 
 ul.points-list .point-btn:hover { background: var(--row-alt); }
 .point-row .pt-head { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; font-size: calc(13px * var(--fs, 1)); color: var(--muted); }
 .point-row .pt-head .ini { color: var(--ink); }
-.point-row .t { white-space: pre-wrap; word-break: break-word; font-family: var(--font-log); }
+.point-row .t { white-space: pre-wrap; word-break: break-word; font-family: var(--font-log); font-size: calc(1em * var(--cs, 1)); }
 ul.points-list li.empty-li { cursor: default; }
 .label-editor { margin: 4px 0 8px; }
 .label-card { border: 1px solid var(--edge, var(--line)); border-radius: 10px; padding: 8px 10px; margin: 6px 0; }
@@ -1835,3 +1843,7 @@ html.wall::after { background: var(--bg); opacity: var(--wall-dim, 0); }
 .tab-icon-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .tab-icon-row .ico { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tab-icon-row label { flex: 1; margin: 0; }
+/* Theme links (theme-revamp S5; js/ui-theme-link.js): the offer sits low and clear so the theme shows behind it */
+dialog.theme-offer { margin: auto auto max(16px, env(safe-area-inset-bottom, 0px)); }
+dialog.theme-offer::backdrop { background: transparent; }
+input.theme-link { width: 100%; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }

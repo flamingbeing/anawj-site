@@ -1172,6 +1172,7 @@ async function onUser(user) {
   S.tab = tabFromHash() || (START_TABS.some(([v]) => v === start) && onBar.includes(start) ? start : onBar.find(id => id !== 'more') || 'log');
   navigation.initialize(S.tab);
   if (wantToday) { wantToday = false; setTimeout(() => { if (S.user === user) openDayNote(); }, 0); }
+  if (wantTheme) { const hash = wantTheme; wantTheme = null; setTimeout(() => { if (S.user === user) offerTheme(hash); }, 0); }
   // a POST share: the Add tab (or the chooser it forwards to) draws again once the service worker's copy is read
   if (sharedIn) sharedIn.then(() => { if (S.user === user && (S.tab === 'log' || S.tab === 'share')) render(); });
   // Settings → Backup: a one-tap reminder when the last Drive / Dropbox backup is over a week old (if asked for)
@@ -1318,8 +1319,16 @@ const sharedIn = (() => {
 // "Today's note" (the app's shortcut, ./#today): open today's daily note once signed in
 let wantToday = location.hash === '#today';
 if (wantToday) history.replaceState(null, '', location.pathname + location.search + '#notes');
-addEventListener('hashchange', () => { if (location.hash === '#today' && S.user) { history.replaceState(history.state, '', location.pathname + location.search + '#notes'); openDayNote(); } });
-applyTheme(cachedTheme());   // this device's choice (Settings → Themes → Light or dark)
+// a theme link (./#theme=…; ui-theme-link.js): offered once signed in (or in the demo), on Themes
+const isThemeLink = hash => /^#theme=/.test(hash);
+let wantTheme = isThemeLink(location.hash) ? location.hash : null;
+if (wantTheme) history.replaceState(null, '', location.pathname + location.search + '#themes');
+const offerTheme = hash => import('./ui-theme-link.js').then(m => m.offerSharedTheme(hash));
+addEventListener('hashchange', () => {
+  if (location.hash === '#today' && S.user) { history.replaceState(history.state, '', location.pathname + location.search + '#notes'); openDayNote(); }
+  else if (isThemeLink(location.hash) && S.user) { const hash = location.hash; history.replaceState(history.state, '', location.pathname + location.search + '#themes'); syncNavigation(); offerTheme(hash); }
+});
+applyTheme(cachedTheme());   // this device's choice (Settings → Themes → Light or dark); with a night theme, the look too
 applyTextSize(cachedTextSize());
 applyZoom(cachedZoom());
 // Interface zoom from the keyboard, like a notes app or a browser: Ctrl/Cmd + (or =), Ctrl/Cmd −, Ctrl/Cmd 0

@@ -5,7 +5,7 @@
 // tab bar style, heading font, the top band) is made here too, cached for the first paint (index.html).
 
 import { coloursCss, checkColours } from './colors.js';
-import { STACKS } from './fonts.js';
+import { STACKS, THEME_FONTS } from './fonts.js';
 import { FACETS, FACET_KEYS, facetCss, cleanFacet, TUNE_KEYS, cleanTune, tuneCss, iconTintCss, cleanTintStrength, cleanTabIcons } from './theme-engine.js';
 import { patternCss, cleanPattern, cleanDim } from './wallpaper.js';
 
@@ -44,7 +44,7 @@ export const TINTS = {
   black: { label: 'Black', light: { bg: '#f4f4f4' }, dark: { bg: '#000000', panel: '#121212', line: '#2a2a2a' } },
 };
 export const BANDS = [['theme', 'The theme’s colours (default)'], ['shades', 'Shades of my colour'], ['nuh', 'The NUH stripe'], ['none', 'None']];
-export const HEAD_FONTS = [['same', 'Same as the interface (default)'], ['serif', 'Serif'], ['system', 'This device’s font'], ['inter', 'Inter'], ['lexend', 'Lexend'], ['atkinson', 'Atkinson Hyperlegible'], ['mono', 'Monospace']];
+export const HEAD_FONTS = [['same', 'Same as the interface (default)'], ['serif', 'Serif'], ['system', 'This device’s font'], ['inter', 'Inter'], ['lexend', 'Lexend'], ['atkinson', 'Atkinson Hyperlegible'], ['nunito', 'Nunito'], ['plex', 'IBM Plex Sans'], ['sourceserif', 'Source Serif'], ['jetbrains', 'JetBrains Mono'], ['mono', 'Monospace']];
 export const NUH_BAND = ['#e57200', '#e4002b', '#178fd7', '#002f6c'];
 
 // round is a Corners level (0 square … 3 very round; 2, the default, is left out). group: classic | inspired. look: the keys it sets (the rest go back to their defaults). keep: keys it leaves as
@@ -1003,6 +1003,10 @@ export function checkTheme(t) {
   }
   if (t.look?.bgTint && !TINTS[t.look.bgTint]) bad.push(`look.bgTint: no tint ${t.look.bgTint}`);
   const lk = t.look || {};
+  // fonts: the bundled ones and the device's own only (a typed font name or an uploaded file never travels in a theme)
+  if (lk.fontUi != null && !THEME_FONTS.includes(lk.fontUi)) bad.push('look.fontUi: a bundled font');
+  if (lk.fontLog != null && lk.fontLog !== 'same' && !THEME_FONTS.includes(lk.fontLog)) bad.push('look.fontLog: a bundled font or "same"');
+  if (lk.headFont != null && !HEAD_FONTS.some(([v]) => v === lk.headFont)) bad.push('look.headFont: one of HEAD_FONTS');
   if (lk.wallpaper != null && !cleanPattern(lk.wallpaper)) bad.push('look.wallpaper: a pattern (never a photo)');
   if (lk.wallDim != null && cleanDim(lk.wallDim) === null) bad.push('look.wallDim: 0 to 90 in steps of 5');
   if (lk.iconTint != null && !/^#[0-9a-f]{6}$/.test(lk.iconTint)) bad.push('look.iconTint: #rrggbb');

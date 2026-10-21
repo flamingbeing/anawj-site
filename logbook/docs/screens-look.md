@@ -203,6 +203,24 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
 - Layout keeps how it works (start tab, tab bar, row buttons, Add tab, gestures); Themes holds every look: light or
   dark, colour, Colourful, background tint, Top band, card style, line strength, corners, spacing, buttons, the header,
   tab bar style, heading font, fonts, line spacing, row and form layouts, custom CSS (theme-revamp S3).
+- **Themes that travel** (theme-revamp S5, 21 Oct 2026; `my-themes.js` `themeLink` / `themeFromLink` / `lookNow`,
+  `ui-theme-link.js`; unit tests `my-themes.test.mjs`, `theme-engine.test.mjs`, `fonts.test.mjs`; e2e `share-link.mjs`):
+  **Share as a link…** in Your themes makes `…/logbook/#theme=<base64url JSON { v: 1, n, l, m }>` from the look now
+  (all built-in themes stay under 1.3 kB), with Share (the phone's share sheet) and Copy link. Opening one (after
+  sign-in, or in the demo; `app.js` `wantTheme`, also when tapped while the app is open) tidies the address to
+  `#themes` and shows the theme at once (`display.js` `previewLook`, nothing saved) with **Use** / **Cancel**; Use sets
+  it and keeps it in Your themes (a tick, on by default), Undo in the toast. A link is input from strangers: `lookOf`
+  first, then every setting `checkTheme` rejects is dropped (fonts: bundled only, never a typed name or a file); a
+  link that can't be read says "broken or cut short". No QR code: a 1-2 kB link makes a dense code and needs an
+  encoder. **Day and night:** with Light or dark on Auto, "Theme when the phone is dark" (`nightTheme`: a theme's id or
+  `mine:<id>`) shows that theme while the phone is dark; every look painter goes through `lookToShow`, so the day look
+  set on the page is untouched, and the page says when the night theme is showing. **Case text size** (Accessibility,
+  `caseSize`, `--cs`): the case box, case text in the Logbook and point rows, apart from Text size; first paint from
+  index.html. **More bundled fonts:** Nunito, IBM Plex Sans, Source Serif 4, JetBrains Mono (latin 400 and 700, OFL,
+  ~20 kB each, from Fontsource) for the interface, logging and heading fonts; themes may set any bundled font
+  (`THEME_FONTS`). **Exported themes carry an uploaded font:** Save this look keeps a copy of the font file per theme
+  (IndexedDB `mine-<id>-<slot>`); Export puts it in the file (`fonts: { ui, log }`, base64); Import checks name, size
+  and the font's first bytes (`cleanFontFile`), and picking the theme makes it this device's font file.
 - **Wallpaper and icons** (theme-revamp S4, 21 Oct 2026; `wallpaper.js`, unit tests `wallpaper.test.mjs`, e2e
   `wallpaper.mjs`): a **Wallpaper** card on Themes after Colour and light: None / Dots / Grid / Paper lines / Soft
   gradient / Your own photo, and a Dim slider (0-90%, unset = 40% for a photo, none for a pattern). style.css draws

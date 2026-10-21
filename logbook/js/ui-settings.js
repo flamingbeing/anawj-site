@@ -15,14 +15,14 @@ import { FACETS, FACET_GROUPS, facetDefault, FINE_TUNE, TUNE_KEYS, cleanTune, TA
 import { WALLPAPERS, cleanWall, dimOf, DIM_MAX, savePhoto, getPhoto, deletePhoto, mainColour, colourAt } from './wallpaper.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS, HEAD_STYLES, mdDate, fileDate } from './markdown.js';
 import { checkCss } from './custom-css.js';
-import { cleanMine, saveMine, minePatch, matchMine, exportText, importText, lookOf } from './my-themes.js';
-import { FONTS, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont } from './fonts.js';
+import { cleanMine, saveMine, minePatch, matchMine, exportText, importText, lookOf, nightRef } from './my-themes.js';
+import { FONTS, fontStack, fontAvailable, cleanFontName, logChoice, saveUserFont, getUserFont, deleteUserFont, keepThemeFonts, themeFonts, putThemeFonts, useThemeFonts, dropThemeFonts } from './fonts.js';
 import { SWITCHES, switchLabel, switchChanges, applyPatch, resetPatch, tabsAfter } from './profiles.js';
 import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.js';
 import { partsSettings } from './ui-parts.js';
 import { labelsOn } from './parts.js';
 import { NAV_STYLES, ROW_LAYOUTS, FORM_LAYOUTS, rowLayoutOf, deviceOn, deviceChanges, deviceReset, DEVICE_SWITCHES } from './device-presets.js';
-import { applyThemeLook, applyTheme, cachedTheme, TEXT_SIZES, ZOOMS, applyTextSize, applyZoom, applyAccent, display, setDisplay, applyDisplay, LINE_WIDTHS, LINE_HEIGHTS, CONTRASTS, MOTIONS, BUTTON_STYLES, defaultTitle, BORDERS, ROUNDS, roundLevel, BAR_TABS, barTabs, MAX_BAR, arrangeTabs, applyWallpaper, photoChanged, wallDim, setTabOnBar, borderLevel, cleanTitle, IPHONE_APP, START_TABS, CARD_STYLES, cardStyle, cardPatch } from './display.js';
+import { applyThemeLook, applyTheme, cachedTheme, nightShowing, CASE_SIZES, applyCaseSize, TEXT_SIZES, ZOOMS, applyTextSize, applyZoom, applyAccent, display, setDisplay, applyDisplay, LINE_WIDTHS, LINE_HEIGHTS, CONTRASTS, MOTIONS, BUTTON_STYLES, defaultTitle, BORDERS, ROUNDS, roundLevel, BAR_TABS, barTabs, MAX_BAR, arrangeTabs, applyWallpaper, photoChanged, wallDim, setTabOnBar, borderLevel, cleanTitle, IPHONE_APP, START_TABS, CARD_STYLES, cardStyle, cardPatch } from './display.js';
 import { resetLink, help, toggle } from './settings-rows.js';
 // (the display helpers are still exported from here: the e2e tests import them from this file)
 export * from './display.js';
@@ -168,6 +168,7 @@ export function renderThemes() {
     h('section', { class: 'card' },
       h('h2', {}, 'Colour and light'),
       pick('Light or dark', THEME_MODES, cachedTheme(), v => { applyTheme(v); setDisplay({ themeMode: null }); hooks.render(); }),
+      nightPick(st),
       h('div', { class: 'field', style: 'margin-top:10px' }, 'Colour', accentPicker()),
       help('Pastels show as a soft tint, with a deeper shade for text and buttons so everything stays easy to read.'),
       pick('Colourful', COLOURFUL, st.colourful === true ? 'tabs' : st.colourful || 'off', v => { applyDisplay(setDisplay({ colourful: v === 'off' ? null : v })); hooks.render(); },
@@ -223,8 +224,23 @@ export function renderThemes() {
     editColours(st),
     customCssCard(),
     resetLink('the theme and every look setting on this page (light, the NUHS colours, lines, corners, fonts, spacing, the header and custom CSS: switched off, your CSS is kept) on this device', () => {
-      applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'fontUiName', 'fontLogName', 'appTitle', 'hideHeader', 'customCssOn'].map(k => [k, null])) }));
+      applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'nightTheme', 'fontUiName', 'fontLogName', 'appTitle', 'hideHeader', 'customCssOn'].map(k => [k, null])) }));
     }));
+}
+// Day and night (theme-revamp S5; my-themes.js lookNow): on Auto, a theme of its own for when the phone is dark. The
+// rest of this page is the day look; at night it says so, as what's on screen then is the night theme.
+function nightPick(st) {
+  if (cachedTheme() !== 'auto') return help('Choose Auto to have a different theme when the phone is dark.');
+  const mine = cleanMine(st.myThemes), cur = nightRef(st) ? st.nightTheme : '';
+  return [
+    h('label', { class: 'field', style: 'margin-top:10px' }, 'Theme when the phone is dark',
+      h('select', { 'aria-label': 'Theme when the phone is dark', onchange: e => { applyDisplay(setDisplay({ nightTheme: e.target.value || null })); hooks.render(); } },
+        h('option', { value: '', selected: !cur }, 'The same as by day (default)'),
+        mine.length ? h('optgroup', { label: 'Your themes' }, mine.map(t => h('option', { value: 'mine:' + t.id, selected: cur === 'mine:' + t.id }, t.name))) : null,
+        h('optgroup', { label: 'Themes' }, THEMES.map(t => h('option', { value: t.id, selected: cur === t.id }, t.name))))),
+    nightShowing() ? h('p', { class: 'tip', role: 'note' }, `The phone is dark, so you’re seeing ${nightRef(st).name}. Changes on this page are to your day look.`)
+      : help('By day, the look set on this page; when the phone turns dark, this theme.'),
+  ];
 }
 // Wallpaper (theme-revamp S4; wallpaper.js): a pattern or your own photo behind every page, and how much the page
 // colour dims it. The photo stays on this device; tap it to take a colour from it (or its main colour) for the accent.
@@ -356,9 +372,12 @@ function editColours(st) {
 // Your themes (owner, 16 Oct 2026; my-themes.js): once anything on this page changes the look is Custom, and this card
 // offers to keep it under a name. Saved themes are picked like any other; Export and Import move them as a file.
 // Export: your themes, or with none saved the look you have now, as a file (also at the top of Themes)
-function exportThemes(st) {
-  const mine = cleanMine(st.myThemes);
-  download('my-logbook-themes.json', new Blob([exportText(mine.length ? mine : [{ name: themeLabel(st).slice(0, 40), look: lookOf(st) }])], { type: 'application/json' }));
+async function exportThemes(st) {
+  const mine = cleanMine(st.myThemes), list = mine.length ? mine : [{ id: 'now', name: themeLabel(st).slice(0, 40), look: lookOf(st) }];
+  // an uploaded font goes in the file with its theme (theme-revamp S5), so the theme looks the same on the other phone
+  const fonts = {};
+  for (const t of list) { const f = await themeFonts(t).catch(() => ({})); if (Object.keys(f).length) fonts[t.id] = f; }
+  download('my-logbook-themes.json', new Blob([exportText(list, fonts)], { type: 'application/json' }));
   toast(mine.length ? 'Themes saved as a file' : 'This look saved as a file');
 }
 function myThemesCard(st, custom) {
@@ -366,21 +385,30 @@ function myThemesCard(st, custom) {
   const put = list => { setDisplay({ myThemes: list.length ? list : null }); hooks.render(); };
   const name = h('input', { type: 'text', maxlength: '40', 'aria-label': 'Name for this look', placeholder: 'e.g. Night shift', value: now ? now.name : '' });
   const save = () => {
-    try { put(saveMine(display().myThemes, name.value, display(), cachedTheme())); toast(`Saved as “${name.value.trim()}”`); }
+    try {
+      const list = saveMine(display().myThemes, name.value, display(), cachedTheme());
+      put(list); keepThemeFonts(list[0]).catch(() => {}); toast(`Saved as “${name.value.trim()}”`);
+    }
     catch (err) { toast(err.message); }
   };
   const use = t => {
     const before = display();
     applyDisplay(setDisplay(minePatch(t, display()))); hooks.render();
+    useThemeFonts(t).catch(() => {});   // its own uploaded font, if it has one
     toast(`Theme: ${t.name}`, { action: 'Undo', onaction: () => { applyDisplay(setDisplay(Object.fromEntries([...THEME_KEYS, 'theme'].map(k => [k, before[k] ?? null])))); hooks.render(); } });
   };
   const drop = t => {
     const before = display().myThemes;
     put(cleanMine(before).filter(x => x.id !== t.id));
     toast(`Deleted “${t.name}”`, { action: 'Undo', onaction: () => put(cleanMine(before)) });
+    setTimeout(() => { if (!cleanMine(display().myThemes).some(x => x.id === t.id)) dropThemeFonts(t.id); }, 35000);   // its font copy, once Undo has gone
   };
   const importBtn = fileButton('Import…', '.json,application/json', async file => {
-    try { const r = importText(await file.text(), display().myThemes); put(r.list); toast(`${r.added} theme${r.added === 1 ? '' : 's'} added`); }
+    try {
+      const r = importText(await file.text(), display().myThemes);
+      for (const [id, f] of Object.entries(r.fonts)) await putThemeFonts(id, f).catch(() => {});
+      put(r.list); toast(`${r.added} theme${r.added === 1 ? '' : 's'} added`);
+    }
     catch (err) { toast(err.message); }
   }, 'btn small');
   return h('section', { class: 'card my-themes' },
@@ -393,8 +421,9 @@ function myThemesCard(st, custom) {
         themeSwatch({ look: t.look, mode: t.mode === 'dark' || t.mode === 'oled' ? t.mode : null }), h('span', { class: 'mt' }, h('b', {}, t.name), h('small', {}, t.mode ? `Yours · ${t.mode}` : 'Yours'))),
       h('button', { type: 'button', class: 'small icon-btn', 'aria-label': `Delete ${t.name}`, title: 'Delete', onclick: () => drop(t) }, '×')))) : null,
     h('div', { class: 'bar', style: 'margin:10px 0 0' },
+      h('button', { type: 'button', class: 'small', onclick: () => import('./ui-theme-link.js').then(m => m.shareThemeDialog(now ? { ...now, look: lookOf(st) } : { name: themeLabel(st).slice(0, 40), look: lookOf(st), mode: cachedTheme() })) }, 'Share as a link…'),
       h('button', { type: 'button', class: 'small', onclick: () => exportThemes(st) }, 'Export…'), importBtn),
-    help('Export saves your themes (or, with none saved, the look you have now) as a file to keep or send to someone; Import adds themes from such a file. Only look settings travel, never cases or names.'));
+    help('Share as a link: send the look you have now in WhatsApp or an email; whoever opens it sees it and taps Use. Export saves your themes (or, with none saved, the look you have now) as a file to keep or send to someone; Import adds themes from such a file. Only look settings travel, never cases or names.'));
 }
 
 // Settings → Layout (#layout; theme-revamp S3, 21 Oct 2026): how the app works on this device, where Themes is how it
@@ -451,14 +480,15 @@ export function renderAccessibility() {
           ZOOMS.map(v => h('option', { value: v, selected: String(st.zoom || '1') === v }, `${Math.round(v * 100)}%${v === '1' ? ' (default)' : ''}`)))),
       help('Everything bigger or smaller, the header and tabs too.', 'On a computer: Ctrl + and Ctrl − (⌘ on a Mac), Ctrl 0 for 100%.'),
       pick('Text size', TEXT_SIZES, String(st.textSize || '1'), v => { applyTextSize(v); setDisplay({ textSize: v }); }, 'Only the words: buttons and spacing stay as they are.'),
+      pick('Case text size', CASE_SIZES, String(st.caseSize || '1'), v => { applyCaseSize(v); setDisplay({ caseSize: v === '1' ? null : v }); }, 'The case box and the cases in the Logbook, apart from the rest.'),
       toggle('Bigger tap targets on the Add tab', st.bigTaps, v => applyDisplay(setDisplay({ bigTaps: v || null })), 'Larger chips, tag rows, tick boxes and Save buttons.'),
       h('h3', {}, 'Contrast and motion'),
       lookPick('contrast', 'Contrast', CONTRASTS, 'auto', 'Higher: darker text and stronger lines (lighter in dark mode).'),
       lookPick('motion', 'Motion', MOTIONS, 'auto', 'Reduce: pages, folds and swipes switch at once instead of sliding.'),
       help('Swiping, press and hold, and the tab bar while typing are in ', h('a', { href: '#layout' }, 'Layout'), '.'),
       h('p', { class: 'hint', style: 'margin:10px 0 0' }, 'Everything on this page is saved on this device only.')),
-    resetLink('zoom, text size, bigger tap targets, contrast and motion on this device', () =>
-      applyDisplay(setDisplay({ zoom: null, textSize: null, bigTaps: null, contrast: null, motion: null }))));
+    resetLink('zoom, text size, case text size, bigger tap targets, contrast and motion on this device', () =>
+      applyDisplay(setDisplay({ zoom: null, textSize: null, caseSize: null, bigTaps: null, contrast: null, motion: null }))));
 }
 // Layout → the tab bar's order and hidden tabs (arrangeTabs): ↑ ↓ to move, a switch to show or hide
 function tabArranger() {
