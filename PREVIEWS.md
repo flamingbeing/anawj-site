@@ -1,5 +1,8 @@
 # PR previews
 
+> **Since 21 Oct 2026 (repo split):** the apps moved to their own repos and Workers; this repo is the landing site, the kit
+> at design.anawj.com/v1/ and the old-address forwards (AGENTS.md). Older text below describes the site before that.
+
 Every pull request gets its own copy of the whole site on Cloudflare (Workers Builds with Worker Previews), so a
 change can be checked on a phone before it is merged. anawj.com itself stays on GitHub Pages and only changes on
 merge to `main`, as before. (Cloudflare now steers new projects to Workers rather than Pages: "Start new

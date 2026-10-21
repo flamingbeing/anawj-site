@@ -2,13 +2,23 @@
 // (worker/sites.js) with this checkout standing in for Cloudflare's files: on a PR preview it's on for every page and
 // finds the preview's PR; on a real address it's off until ?feedback=1, and on a live app it never copies screen text.
 // Run from the repo root: node feedback/test/e2e.mjs        SHOTS=<dir> saves phone screenshots
+// The apps it tries live in other repos since the repo split (21 Oct 2026): their pages come from sibling checkouts of
+// hand, rosters and prewarm (SIBLINGS=<dir>, default the folder above this repo; Checks checks them out).
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import worker from '../../worker/sites.js';
+import { SITES } from '../../worker/routes.js';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
+const SIB = path.resolve(process.env.SIBLINGS || path.join(root, '..'));
+const SIBLING = { 'hand-babies/': 'hand', 'ntf-roster/': 'rosters', 'prewarm/': 'prewarm' };
+for (const d of Object.keys(SIBLING)) assert.ok(fs.existsSync(path.join(SIB, SIBLING[d], d)), `needs a checkout of ${SIBLING[d]} in ${SIB}`);
+// two live apps, served by this Worker for the test only (their real Workers are in their own repos)
+SITES['ntfroster.anawj.com'] = { root: 'ntf-roster/' };
+SITES['prewarmstudy.anawj.com'] = { root: 'prewarm/' };
+const fileOf = p => { const d = Object.keys(SIBLING).find(k => p.startsWith(k)); return d ? path.join(SIB, SIBLING[d], p) : path.join(root, p); };
 const MIME = { html: 'text/html; charset=utf-8', js: 'text/javascript', css: 'text/css', json: 'application/json', svg: 'image/svg+xml', gif: 'image/gif', png: 'image/png', webmanifest: 'application/manifest+json' };
 // a page with versions to choose from, as a "show me versions" PR would add (edit/NOTES.md)
 const VARIANT_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
@@ -18,8 +28,8 @@ const VARIANT_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"
 const ASSETS = { async fetch(req) {
   const p = decodeURIComponent(new URL(req.url).pathname).replace(/^\//, '');
   if (p === 'zz-variants/index.html') return new Response(VARIANT_PAGE, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
-  const f = path.join(root, p);
-  if (!f.startsWith(root + path.sep) || !fs.existsSync(f) || !fs.statSync(f).isFile()) return new Response('nope', { status: 404 });
+  const f = fileOf(p);
+  if (f.includes('..') || !fs.existsSync(f) || !fs.statSync(f).isFile()) return new Response('nope', { status: 404 });
   return new Response(fs.readFileSync(f), { headers: { 'Content-Type': MIME[f.split('.').pop()] || 'application/octet-stream' } });
 } };
 const PREVIEW = 'https://claude-try-feedback-anawj-preview.kohwenjun.workers.dev';
@@ -27,7 +37,7 @@ const SHOTS = process.env.SHOTS;
 
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, serviceWorkers: 'block' });
-await ctx.route(/^https:\/\/([a-z0-9-]+\.kohwenjun\.workers\.dev|(ntfroster|prewarmstudy|nuhroster)\.anawj\.com)\//, async route => {
+await ctx.route(/^https:\/\/([a-z0-9-]+\.kohwenjun\.workers\.dev|(ntfroster|prewarmstudy|nuhroster|design)\.anawj\.com)\//, async route => {
   const req = route.request();
   const res = await worker.fetch(new Request(req.url(), { headers: req.headers(), redirect: 'manual' }), { ASSETS });
   const headers = Object.fromEntries(res.headers);
@@ -39,7 +49,7 @@ await ctx.route('https://api.github.com/repos/flamingbeing/anawj-site/pulls?stat
   body: JSON.stringify([{ number: 7, title: 'Something else', head: { ref: 'claude/other' }, html_url: 'https://github.com/flamingbeing/anawj-site/pull/7' },
     { number: 9, title: 'A longer branch name', head: { ref: 'claude/try-feedback-2' }, html_url: 'https://github.com/flamingbeing/anawj-site/pull/9' },
     { number: 412, title: 'Try the feedback button', head: { ref: 'claude/try-feedback' }, html_url: 'https://github.com/flamingbeing/anawj-site/pull/412' }]) }));
-await ctx.route(/^https:\/\/(?!api\.github\.com|[a-z0-9-]+\.kohwenjun\.workers\.dev|(ntfroster|prewarmstudy|nuhroster)\.anawj\.com)/, r => r.abort());
+await ctx.route(/^https:\/\/(?!api\.github\.com|[a-z0-9-]+\.kohwenjun\.workers\.dev|(ntfroster|prewarmstudy|nuhroster|design)\.anawj\.com)/, r => r.abort());
 
 const fb = page => page.locator('[data-anawj-feedback]');
 try {

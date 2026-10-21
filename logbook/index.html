@@ -2,122 +2,45 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>APMES Logbook</title>
-<meta name="description" content="Log anaesthesia cases in seconds and track your APMES case targets.">
-<meta name="theme-color" content="#002f6c">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Logbook">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>This page has moved</title>
 <script>
-  // The logbook now lives at apmes.anawj.com (SUBDOMAINS.md). The same folder is still served at anawj.com/logbook/, so send
-  // visitors on from there (path, query and # kept). Only for the top page, and a no-op on apmes.anawj.com, the PR previews,
-  // localhost and the /edit/ iframe (no loop). A browser with logbook settings saved at the old address stays for a moment,
-  // because what a browser saves belongs to its address: the page offers to download it first (window.LOGBOOK_MOVED_TO, js/moved.js).
-  if (top === self && /^(www\.)?anawj\.com$/.test(location.hostname)) (function () {
-    var to = 'https://apmes.anawj.com' + location.pathname + location.search + location.hash, saved = false;
-    try {
-      for (var i = 0; i < localStorage.length && !saved; i++) { var k = localStorage.key(i); saved = /^(apmes-)?logbook-/.test(k) && !/^apmes-logbook-(demo|moved|install|cloud)/.test(k); }
-      if (localStorage.getItem('apmes-logbook-moved')) saved = false;
-    } catch (e) { /* no storage */ }
-    if (saved && !/[?&]demo\b/.test(location.search)) window.LOGBOOK_MOVED_TO = to; else location.replace(to);
-  })();
-</script>
-<!-- Cascade layers (docs/theme-engine.md): style.css is the base layer, then the look's facets and theme colours, then
-     Fine-tune values (tune), then the resident's custom CSS, so a later layer wins without :root stacking. This comes before the first-paint sheets
-     below so it sets the order. A browser without layers (before Safari 15.4, Chrome 99, Firefox 97) skips the @import
-     and the layered sheets, and gets style.css on its own: the default look. -->
-<style>@layer base, facets, theme, tune, custom; @import url("style.css") layer(base);</style>
-<script>if (!window.CSSLayerBlockRule) document.write('<link rel="stylesheet" href="style.css">');</script>
-<script>
-  // back from Google or Dropbox after a Save to Drive / Dropbox or Sync sign-in (cloud-save.js): keep the answer for
-  // the app (it finishes the save after sign-in) and tidy the address back to the Backup page (or the page Sync left)
-  try { var cq = new URLSearchParams(location.search), cf = new URLSearchParams(location.hash.slice(1)); if (/^dbx-/.test(cq.get('state') || '') || /^gdr-/.test(cf.get('state') || '')) { sessionStorage.setItem('apmes-logbook-cloud-return', JSON.stringify({ search: location.search, hash: location.hash })); var cp = JSON.parse(localStorage.getItem('apmes-logbook-cloud-pending') || '{}') || {}; history.replaceState(null, '', location.pathname + (cp.demo ? '?demo' : '') + '#' + (/^[a-z]{1,20}$/.test(cp.back || '') ? cp.back : 'data')); } } catch (e) {}
-  // this device's display choices that change the layout, before the first paint (ui-settings.js applyLook)
-  try { var dd = JSON.parse(localStorage.getItem('apmes-logbook-display') || '{}') || {}, dc = document.documentElement.classList; if (dd.lineWidth === 'narrow' || dd.lineWidth === 'wide' || dd.lineWidth === 'full') dc.add('lw-' + dd.lineWidth); dc.add(dd.contrast === 'high' ? 'hc' : dd.contrast === 'normal' ? 'hc-off' : 'hc-auto'); dc.add(dd.motion === 'reduce' ? 'rm' : dd.motion === 'full' ? 'rm-off' : 'rm-auto'); if (dd.tabIcons) dc.add('tab-icons'); if (dd.navStyle === 'rail') dc.add('nav-rail'); if (dd.formLayout === 'sections') dc.add('form-sections'); if (dd.rowLayout === 'chat' || dd.rowLayout === 'timeline') dc.add('rows-' + dd.rowLayout); if (dd.rowLayout === 'compact' || dd.rowLayout === 'chat' || (['card', 'compact', 'chat', 'timeline'].indexOf(dd.rowLayout) < 0 && dd.rowShort)) dc.add('rows-short'); if (dd.tabBar === 'top' || dd.tabBar === 'bottom') dc.add('tabs-' + dd.tabBar); if (dd.hideHeader) dc.add('no-header', 'who-alert'); if (dd.caseInverted) dc.add('case-inverted'); if (dd.autoFocus === false) dc.add('no-autofocus'); if (dd.lineHeight) document.documentElement.style.setProperty('--lh', dd.lineHeight); if (['0.9', '1.15', '1.3', '1.5'].indexOf(dd.caseSize) >= 0) document.documentElement.style.setProperty('--cs', dd.caseSize); if ([0, 1, 2, 3].indexOf(dd.borders) >= 0) { dc.add('edges'); if (dd.borders <= 1) dc.add('edges-fill'); document.documentElement.style.setProperty('--edge-mix', [0, 25, 50, 75][dd.borders] + '%'); } if ([0, 1, 3].indexOf(dd.round) >= 0) document.documentElement.style.setProperty('--round', String([0, 0.5, 1, 1.7][dd.round])); if (dd.shadows !== false) dc.add('shadows'); if (dd.bigTaps) dc.add('big-taps'); if (/^[a-z]{1,12}$/.test(dd.iconSet || '')) document.documentElement.dataset.icons = dd.iconSet; if (dd.wallpaper) { dc.add('wall'); var wd = Number(localStorage.getItem('apmes-logbook-wall-dim')); if (wd >= 0 && wd <= 1) document.documentElement.style.setProperty('--wall-dim', String(wd)); var wp = String(localStorage.getItem('apmes-logbook-wall-paint') || '').split(' '); if (/^\d{1,3}%$/.test(wp[0])) document.documentElement.style.setProperty('--wall-scrim', wp[0]); if (/^\d{1,3}%$/.test(wp[1] || '')) { dc.add('wall-frost'); document.documentElement.style.setProperty('--card-alpha', wp[1]); } } } catch (e) {}
-  // the phone's status bar colour, when a theme matches it to the header or the page (display.js paintStatusBar)
-  try { var sb = localStorage.getItem('apmes-logbook-statusbar'); if (sb && sb.length < 40) document.querySelector('meta[name="theme-color"]').setAttribute('content', sb); } catch (e) {}
-  // this device's theme before the first paint (Settings → Themes → Light or dark; light unless chosen)
-  try { var t = localStorage.getItem('apmes-logbook-theme'); document.documentElement.dataset.theme = t === 'dark' || t === 'oled' ? 'dark' : t === 'auto' ? 'auto' : 'light'; if (t === 'oled') document.documentElement.dataset.oled = ''; } catch (e) {}
-  // and its colour (Settings → Themes → Colour; navy unless chosen): the palettes colors.js worked out last time
-  try { var css = localStorage.getItem('apmes-logbook-accent-css-v2'); if (css && css.length < 8000) { var st = document.createElement('style'); st.id = 'accent-css'; st.textContent = css; document.head.appendChild(st); } } catch (e) {}
-  try { var lc = localStorage.getItem('apmes-logbook-look-css-v2'); if (lc && lc.length < 60000) { var ls = document.createElement('style'); ls.id = 'look-css'; ls.textContent = lc; document.head.appendChild(ls); } } catch (e) {}
-</script>
-<!-- fetch the Add tab's modules at once instead of one import at a time (the other pages load on first use, app.js);
-     then the Firebase SDK, or in the demo its stand-in instead -->
-<link rel="modulepreload" href="js/app.js">
-<link rel="modulepreload" href="js/ui-core.js">
-<link rel="modulepreload" href="js/categories.js">
-<link rel="modulepreload" href="js/engine.js">
-<link rel="modulepreload" href="js/keywords.js">
-<link rel="modulepreload" href="js/cloud.js">
-<link rel="modulepreload" href="js/firebase-config.js">
-<link rel="modulepreload" href="js/clean.js">
-<link rel="modulepreload" href="js/reflections.js">
-<link rel="modulepreload" href="js/profile.js">
-<link rel="modulepreload" href="js/ui-log.js">
-<link rel="modulepreload" href="js/suggest.js">
-<link rel="modulepreload" href="js/display.js">
-<link rel="modulepreload" href="js/theme-engine.js">
-<link rel="modulepreload" href="js/ui-notepad.js">
-<link rel="modulepreload" href="js/tags.js">
-<link rel="modulepreload" href="js/sync.js">
-<link rel="modulepreload" href="js/paste-clean.js">
-<link rel="modulepreload" href="js/bin.js">
-<link rel="modulepreload" href="js/notepad.js">
-<link rel="modulepreload" href="js/merge3.js">
-<link rel="modulepreload" href="js/profiles.js">
-<link rel="modulepreload" href="js/store.js">
-<link rel="modulepreload" href="js/writes.js">
-<link rel="modulepreload" href="js/colors.js">
-<link rel="modulepreload" href="js/fonts.js">
-<link rel="modulepreload" href="js/logging.js">
-<link rel="modulepreload" href="js/recovery-store.js">
-<link rel="modulepreload" href="js/share-in.js">
-<link rel="modulepreload" href="js/fmt-bar.js">
-<link rel="modulepreload" href="js/navigation.js">
-<link rel="modulepreload" href="js/transients.js">
-<link rel="modulepreload" href="js/custom-css.js">
-<link rel="modulepreload" href="js/drafts.js">
-<link rel="modulepreload" href="js/settings-rows.js">
-<link rel="modulepreload" href="js/more-cards.js">
-<link rel="modulepreload" href="js/sync-forget.js">
-<link rel="modulepreload" href="js/parts.js">
-<link rel="modulepreload" href="js/device-presets.js">
-<link rel="modulepreload" href="js/eval-link.js">
-<script>
+  // The logbook moved to apmes.anawj.com (21 Oct 2026). What a browser saved here (look, text size, unsent case drafts)
+  // belongs to this old address: if there is any, offer it as a file (Settings -> Settings file at the new address loads
+  // it); otherwise forward at once. Same file as the old copy's moved page (kind apmes-logbook-device, version 1).
   (function () {
-    var pre = function (href, cors) { var l = document.createElement('link'); l.rel = 'modulepreload'; l.href = href; if (cors) l.crossOrigin = 'anonymous'; document.head.appendChild(l); };
-    if (/[?&]demo\b/.test(location.search)) pre('js/demo-backend.js');   // the demo's stand-in for Firebase (cloud.js)
-    else ['app', 'auth', 'firestore'].forEach(function (f) { pre('https://www.gstatic.com/firebasejs/10.12.2/firebase-' + f + '.js', true); });
+    var to = 'https://apmes.anawj.com' + location.pathname + location.search + location.hash, items = {}, n = 0;
+    try {
+      if (!localStorage.getItem('apmes-logbook-moved')) for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i), v = localStorage.getItem(k);
+        if (/^(apmes-)?logbook-/.test(k) && !/^apmes-logbook-(demo|moved|cloud|install)/.test(k) && v.length <= 102400) { items[k] = v; n++; }
+      }
+    } catch (e) { /* no storage */ }
+    if (!n || /[?&]demo\b/.test(location.search)) { location.replace(to); return; }
+    window.MOVED = { to: to, file: { kind: 'apmes-logbook-device', version: 1, exportedAt: new Date().toISOString(), items: items } };
   })();
 </script>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap"></noscript>
 </head>
 <body>
-<header class="top">
-  <div class="brand">
-    <h1>APMES Logbook</h1>
-    <p class="sub" id="sub" hidden></p>
-  </div>
-  <div id="who" class="who"></div>
-</header>
-
-<nav class="tabs" id="tabs" role="tablist" hidden></nav>
-
-<div id="banner" class="banner" hidden></div>
-<main id="app"><section class="card skeleton" aria-label="Loading"><div class="sk-row"><i></i><i></i><i></i></div><div class="sk-box"></div><div class="sk-line"></div><div class="sk-row"><i></i><i></i></div><div class="sk-btn"></div></section></main>
-<div id="toast" role="status" aria-live="polite"></div>
-
-<script type="module" src="js/app.js"></script>
+<h1>The logbook has moved</h1>
+<p>It is now at <b>apmes.anawj.com/logbook</b>. Your cases, reflections and notes are in your account: sign in there as before.</p>
+<p id="saved" hidden>What this browser saved here (look, text size, tab layout, unsent case drafts) stays at this old address. To keep it, download it here, then at the new address open Settings, Settings file, and load it. The file can hold an unsent case draft: keep it private.</p>
+<p><button id="dl" hidden>Download this browser’s choices</button></p>
+<p>Go to <a id="go" href="https://apmes.anawj.com/logbook/">the new address</a>.</p>
+<script>
+  if (window.MOVED) {
+    document.getElementById('saved').hidden = document.getElementById('dl').hidden = false;
+    document.getElementById('dl').onclick = function () {
+      var a = document.createElement('a'), d = new Date().toISOString().slice(0, 10);
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(MOVED.file)], { type: 'application/json' }));
+      a.download = 'logbook-this-device-' + d + '.json'; document.body.append(a); a.click(); a.remove();
+    };
+    var go = document.getElementById('go'); go.href = MOVED.to;
+    go.onclick = function () { try { localStorage.setItem('apmes-logbook-moved', '1'); } catch (e) {} };
+  }
+</script>
+<p hidden>This page has moved to <a href="https://apmes.anawj.com/logbook/">apmes.anawj.com/logbook</a>.</p>
 </body>
 </html>

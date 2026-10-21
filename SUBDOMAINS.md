@@ -1,5 +1,8 @@
 # Subdomains
 
+> **Since 21 Oct 2026 (repo split):** the apps moved to their own repos and Workers; this repo is the landing site, the kit
+> at design.anawj.com/v1/ and the old-address forwards (AGENTS.md). Older text below describes the site before that.
+
 The rule (owner, 13 Oct 2026): apps that save data or sign people in get their own subdomain, so the browser keeps
 their saved data, sign-ins and offline copies apart; one bad page can't reach another app's data. Related static pages
 share a subdomain by topic. `anawj.com` keeps only the status page and a few shared pages. Each new roster gets its own

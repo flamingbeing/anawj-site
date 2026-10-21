@@ -1,12 +1,10 @@
 // Repo checks for mistakes tests don't catch. Run before merging: node tools/check.mjs
 // 1. Each app's sw.js has a plain VERSION (no deploy stamp) and deletes only caches with its own prefix (apps share the anawj.com origin).
 // 2. Every file in an app's SHELL list exists.
-// 3. evals/js/catalogue.js and forms.js match a fresh build from apmes/.
 // Exits 1 on any failure.
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,11 +37,8 @@ for (const app of apps) {
 
 }
 
-try { execFileSync('node', [path.join(ROOT, 'evals/tools/build-data.mjs'), '--check'], { stdio: ['ignore', 'ignore', 'pipe'] }); }
-catch (e) { fail(String(e.stderr || e.message).trim()); }
-
 if (errors.length) {
   console.error(`check: ${errors.length} problem(s)\n- ` + errors.join('\n- '));
   process.exit(1);
 }
-console.log(`check: ok (${apps.join(', ')}; generated files up to date)`);
+console.log(`check: ok (${apps.length ? apps.join(', ') : 'no app folders'})`);
