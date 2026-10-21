@@ -305,8 +305,8 @@ function buildSettingsIndex() {
       out.push({ id, page: t.label, text, hint: hint.replace(/ⓘ/g, '').trim().slice(0, 160) });
     }
   }
-  // the Settings page's own cards (Settings file, Connect Claude: their buttons too) and its Recycle bin
-  for (const card of [settingsFileCard(), connectClaudeCard(), resetAllCard()]) {
+  // the Settings page's own cards (Settings file, Connect an AI assistant: their buttons too) and its Recycle bin
+  for (const card of [settingsFileCard(), connectAiCard(), resetAllCard()]) {
     const text = card.querySelector('h2').textContent.trim();
     out.push({ id: 'settings', page: 'Settings', text, hint: [...card.querySelectorAll('button, a, label'), ...card.querySelectorAll('p')].map(x => x.textContent.trim()).join(' · ').slice(0, 160) });
   }
@@ -389,7 +389,7 @@ function renderSettingsMenu() {
     h('section', { class: 'card more-list settings-menu' }, h('h2', {}, 'Settings'),
       settingsGroups().map(([name, ids]) => [h('h3', {}, name), h('ul', {}, ids.map(item))])),
     settingsFileCard(),
-    connectClaudeCard(),
+    connectAiCard(),
     resetAllCard());
 }
 
@@ -407,14 +407,15 @@ function versionLine() {
   return h('p', { class: 'hint app-ver' }, ver, ' · ', h('button', { type: 'button', class: 'linkish', onclick: latest }, 'Get the latest version'));
 }
 
-// Connect Claude (advanced): the MCP server residents run on their own computer (logbook/mcp/README.md)
+// Connect an AI assistant (advanced): the MCP server residents run on their own computer (logbook/mcp/README.md), for
+// Claude Desktop, Claude Code or Codex
 const MCP_README = 'https://github.com/flamingbeing/anawj-site/tree/main/logbook/mcp#readme';
 const MCP_DOWNLOAD = 'https://github.com/flamingbeing/anawj-site/releases/download/logbook-mcp/apmes-logbook.mcpb';
-function connectClaudeCard() {
+function connectAiCard() {
   return h('section', { class: 'card' },
-    h('h2', {}, 'Connect Claude (advanced)'),
-    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Ask Claude Desktop or Claude Code about your own logbook ("which tags am I behind on?"), or have it log cases (one or a pasted list), suggest tags, plan tomorrow’s list and start draft reflections. A small program on your computer signs in as you; it shows you each change before saving, and never deletes anything.'),
-    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'What it reads or writes goes through Claude: check hospital policy before using it, and keep cases de-identified.'),
+    h('h2', {}, 'Connect an AI assistant (advanced)'),
+    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Ask Claude Desktop, Claude Code or Codex about your own logbook ("which tags am I behind on?"), or have it log cases (one or a pasted list), suggest tags, plan tomorrow’s list, log planned cases once done and start draft reflections. A small program on your computer signs in as you; it shows you each change before saving, and never deletes anything.'),
+    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'What it reads or writes goes through the assistant’s provider: check hospital policy before using it, and keep cases de-identified.'),
     h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Claude Desktop: download the extension and open it; the first question opens a Google sign-in. Claude Code and Codex: see the setup page.'),
     h('div', { class: 'bar', style: 'margin-bottom:0' },
       h('a', { class: 'btn primary', href: MCP_DOWNLOAD, rel: 'noopener', download: '' }, 'Download for Claude Desktop'),

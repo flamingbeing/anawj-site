@@ -57,7 +57,7 @@ const writer = {
   invalidate: () => { invalidated++; },
 };
 const tools = Object.fromEntries(defineTools(async f => { if (f) fresh++; return data; }, writer).map(t => [t.name, t]));
-assert.deepEqual(Object.keys(tools).sort(), ['add_case', 'add_cases', 'get_reflection', 'list_cases', 'list_plan', 'list_reflections', 'missing_targets', 'plan_cases', 'progress', 'save_reflection', 'search_cases', 'suggest_tags', 'update_case']);
+assert.deepEqual(Object.keys(tools).sort(), ['add_case', 'add_cases', 'get_reflection', 'list_cases', 'list_plan', 'list_reflections', 'log_planned', 'missing_targets', 'plan_cases', 'progress', 'save_reflection', 'search_cases', 'suggest_tags', 'update_case']);
 assert.equal(tools.add_case.annotations, ADDS);
 assert.equal(tools.update_case.annotations, REPLACES);
 assert.equal(tools.list_cases.annotations, undefined, 'read tools register as READ_ONLY');

@@ -42,7 +42,7 @@ portfolio content.
 | [docs/screens-logbook.md](docs/screens-logbook.md) | Logbook, Reflections, Analytics, reflection editor, Admin portal, fold-outs |
 | [docs/screens-look.md](docs/screens-look.md) | Look and feel, colour, zoom, fonts, Settings pages: Themes, Layout, Accessibility |
 | [docs/theme-engine.md](docs/theme-engine.md) | The theme engine: every look a theme can set, icon sets, page motion, how to write a theme |
-| [docs/screens-data.md](docs/screens-data.md) | Settings, Markdown, Sync, Drive / Dropbox backup, profiles, CSV, Notes, Connect Claude |
+| [docs/screens-data.md](docs/screens-data.md) | Settings, Markdown, Sync, Drive / Dropbox backup, profiles, CSV, Notes, Connect an AI assistant |
 | [docs/screens-tags.md](docs/screens-tags.md) | Tag editor, labelled parts and case template, pasted lists, the 2000-character limit |
 | [docs/data-and-rules.md](docs/data-and-rules.md) | Data, roles and photos (`firestore.rules`) |
 | [docs/tags-sync-demo.md](docs/tags-sync-demo.md) | Tags and suggestions, sync and cheap reopening, the demo |

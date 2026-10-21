@@ -80,7 +80,7 @@ async function serve() {
   ]);
   const server = new McpServer({ name: 'apmes-logbook', version: VERSION }, {
     instructions: 'The signed-in resident\'s own APMES Logbook: cases, progress against APMES targets, and reflections. '
-      + 'add_case, add_cases, update_case, save_reflection and plan_cases write to it: always call them first without confirm, show the user the preview, '
+      + 'add_case, add_cases, update_case, save_reflection, plan_cases and log_planned write to it: always call them first without confirm, show the user the preview, '
       + 'and call again with confirm: true only after the user agrees. Reflections are saved as drafts only. '
       + 'Case details are de-identified initials and short descriptions; never add names, NRIC or record numbers, and do not try to identify patients.',
   });

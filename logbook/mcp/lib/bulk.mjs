@@ -118,14 +118,41 @@ export function buildPlanItems(rows, date, now = Date.now()) {
   }));
 }
 
-const planLine = p => `- ${[p.date, p.initials].filter(Boolean).join(' · ')}: ${str(p.details).split('\n').join(' / ') || '(no details)'} [${tagList(p.cats)}]`;
+const planLine = p => `- ${[p.date, p.initials].filter(Boolean).join(' · ')}: ${str(p.details).split('\n').join(' / ') || '(no details)'} [${tagList(p.cats)}] (id ${p.id})`;
 
 export function formatPlan(plan, now = new Date()) {
   if (!plan.length) return 'No planned cases. (plan_cases adds some: paste a list for a later day.)';
   const t = today(now);
   const due = plan.filter(p => str(p.date) <= t), later = plan.filter(p => str(p.date) > t);
   const parts = [];
-  if (due.length) parts.push(`Due now (${due.length}; confirm each in the app, Log tab → Planned, once done):\n${due.map(planLine).join('\n')}`);
+  if (due.length) parts.push(`Due now (${due.length}; once done, log them with log_planned or tick each in the app, Log tab → Planned):\n${due.map(planLine).join('\n')}`);
   if (later.length) parts.push(`Later (${later.length}):\n${[...later].sort((a, b) => str(a.date).localeCompare(str(b.date))).map(planLine).join('\n')}`);
   return parts.join('\n\n');
+}
+
+// The planned cases to log now: the given ids (each must be in the plan and due), or every due one. -> plan entries
+export function pickDue(plan, { ids = null, now = new Date() } = {}) {
+  const t = today(now);
+  if (!ids) {
+    const due = plan.filter(p => str(p.date) <= t);
+    if (!due.length) throw new Error('No planned case is due yet (list_plan shows the plan). Nothing was saved.');
+    return due;
+  }
+  return [...new Set(ids)].map(id => {
+    const p = plan.find(x => String(x.id) === id);
+    if (!p) throw new Error(`No planned case with id "${id}" (already logged or removed?). Use list_plan to find ids. Nothing was saved.`);
+    if (str(p.date) > t) throw new Error(`Planned case ${id} is for ${p.date}, not due yet. Nothing was saved.`);
+    return p;
+  });
+}
+
+// plan entries -> cases as the app's Planned card logs them (source 'paste', the planned date, its tags), less the ones
+// already in the logbook (a repeated call after a save that stopped part way)
+export function casesFromPlan(items, existing, now = Date.now()) {
+  const cases = [], dups = [];
+  items.forEach((p, i) => {
+    const c = cleanCase({ date: p.date, initials: p.initials || '', details: str(p.details), cats: sortCodes(p.cats || []), tags: p.tags, source: 'paste', createdAt: now + i }, now + i);
+    if ((existing || []).some(x => sameCase(x, c))) dups.push(String(p.id)); else cases.push({ plan: String(p.id), case: c });
+  });
+  return { cases, dups };
 }

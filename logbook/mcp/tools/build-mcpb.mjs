@@ -50,7 +50,7 @@ async function main() {
     name: 'apmes-logbook',
     display_name: 'APMES Logbook',
     version: pkg.version,
-    description: 'Your own APMES Logbook in Claude: cases, progress against the targets, reflections and planned cases; log cases (one or a pasted list), suggest tags, plan cases and draft reflections.',
+    description: 'Your own APMES Logbook in Claude: cases, progress against the targets, reflections and planned cases; log cases (one or a pasted list), suggest tags, plan cases, log them once done and draft reflections.',
     long_description: 'Signs in as you with Google (a browser window opens the first time you use it) and uses the same Firestore rules as the web app, so it sees and changes only your own logbook. Every change is shown to you first and saved only once you agree; nothing is ever deleted. What it reads or writes goes through Claude: check your hospital\'s policy on AI tools first, and keep cases de-identified. Your sign-in stays on this computer (~/.config/apmes-logbook-mcp/token.json).',
     author: { name: 'APMES Logbook', url: 'https://apmes.anawj.com/logbook/' },
     homepage: 'https://github.com/flamingbeing/anawj-site/tree/main/logbook/mcp#readme',

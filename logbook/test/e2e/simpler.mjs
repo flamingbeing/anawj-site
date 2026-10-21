@@ -69,7 +69,7 @@ try { for (const width of [390, 1280]) {
   await p.evaluate(() => { location.hash = '#logging'; });
   await p.locator('a[data-go=loggingadv]').waitFor();
   await p.evaluate(() => { location.hash = '#settings'; });
-  await p.locator('section:has(h2:text("Connect Claude (advanced)"))').waitFor();
+  await p.locator('section:has(h2:text("Connect an AI assistant (advanced)"))').waitFor();
   await p.locator('[role=tab][data-tab=log]').click(); await p.waitForSelector('textarea.details');
   await p.locator('textarea.details').fill('ZZ 30F fake LSCS spinal');
   assert.doesNotMatch(await p.locator('main').innerText(), /quick picks|still needed|interesting/i);

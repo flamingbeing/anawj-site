@@ -142,7 +142,8 @@ try { for (const width of [390, 1280]) {
   };
   await search('export settings', 'Settings file', 'Settings');
   await search('import settings', 'Settings file', 'Settings');
-  await search('connect claude', 'Connect Claude', 'Settings');
+  await search('connect claude', 'Connect an AI assistant', 'Settings');
+  await search('codex', 'Connect an AI assistant', 'Settings');
   await search('recycle', 'Recycle bin', 'More');
   await search('delete account', 'Delete account', 'Account');
   await search('section 1', 'Portfolio details (Section 1)', 'Account');
