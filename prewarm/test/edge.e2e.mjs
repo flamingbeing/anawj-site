@@ -135,6 +135,7 @@ jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
   await pg.click('#haemolink'); await pg.click('.links.three a:has-text("Pre-op")'); await pg.waitForSelector('details.sect');
+  await pg.locator('details.sect').last().locator('summary').click();
   const last = pg.locator('details.sect').last().locator('.fld').last().locator('input, .chip').first();
   await last.focus(); await pg.keyboard.press('Enter');
   log(!await pg.$('dialog.ask[open]'), 'Enter on the last question: no error, no prompt');
@@ -208,7 +209,7 @@ jobs.push(() => tryit(async () => {
 jobs.push(() => tryit(async () => {
   const { ctx, pg } = await fresh();
   await open(pg, 0);
-  await pg.click('#haemolink'); await pg.click('.links.three a:has-text("Pre-op")'); await pg.waitForSelector('#f-enrol_id');
+  await pg.click('#haemolink'); await pg.click('.links.three a:has-text("Pre-op")'); await pg.click('details.sect[data-pg="study"] summary'); await pg.waitForSelector('#f-enrol_id');
   await pg.fill('#f-enrol_id', 'DEMO-02'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(200);
   log(/already used/.test(await pg.textContent('#toast')) && await pg.inputValue('#f-enrol_id') === 'DEMO-01', 'duplicate Subject ID refused');
   await pg.fill('#f-enrol_id', 'DEMO-01A'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(200);
@@ -646,7 +647,7 @@ jobs.push(() => tryit(async () => {
   await back(); log(await pg.$('.progress') === null, 'no extra tick boxes on the patient page');
   await pg.click('[data-sign="iotemp"]'); await pg.waitForTimeout(300);
   log(/\+✓Intra-op temps/.test(await prog()), 'a section marked complete shows its tick on the list');
-  await back('/data'); await pg.waitForSelector('#f-enrol_id');
+  await back('/data'); await pg.waitForSelector('#f-enrol_id', { state: 'attached' });
   const d0 = await pg.$eval('#f-enrol_id', i => i.disabled);
   await pg.click('[data-sign="periop"]'); await pg.waitForSelector('.sealnote');
   log(!d0 && await pg.$eval('#f-enrol_id', i => i.disabled), 'Perioperative data complete: its boxes lock');
@@ -655,7 +656,7 @@ jobs.push(() => tryit(async () => {
   log(!await pg.$eval('#f-enrol_id', i => i.disabled), 'undone: editable again');
   // data collection complete does not close Perioperative data
   await back(); await pg.waitForSelector('[data-done]'); pg.once('dialog', d => d.accept()); await pg.click('[data-done]'); await pg.waitForTimeout(300);
-  await back('/data'); await pg.waitForSelector('#f-enrol_id');
+  await back('/data'); await pg.waitForSelector('#f-enrol_id', { state: 'attached' });
   log(!await pg.$eval('#f-enrol_id', i => i.disabled), 'data collection complete leaves Perioperative data open');
   await ctx.close();
 }));

@@ -9,8 +9,10 @@ How the patient screen, key times, sign-offs, forms and look work. Part of the n
 - **Consent** (owner, 21 Oct 2026): first on Pre-op, `consent_st` (Extra sheet): 1 = consented, duplicate form given
   to the patient; 0 = declined to participate. A declined patient's home-list line is grey, the ID struck through,
   "Declined to participate". The Screening ID is no longer asked (`NOT_ASKED`); its column stays.
+- **Home list Form view shortcut** (admins): a 44 px icon button at the top right of each patient card (owner, 21 Oct
+  2026), no longer a full-height tile.
 - **Notes** on Intra-op details is a full-width text box (`long: true` fields). On PACU (and the nurse's page) the five
-  comfort answers are one per line (`roomy`); the Pre-warming tab keeps them in one row.
+  comfort answers are two per row with Neutral alone in the middle (`roomy`); the Pre-warming tab keeps them in one row.
 - **Patient comfort** (owner, 20 Oct 2026): the before-surgery question is at the top of the Pre-warming tab, the
   after-surgery one at the top of the PACU page (no separate screen); one line once answered. The no-pre-warming group
   still opens on the Pre-warming tab until the before-surgery answer is in (then on Intra-op); Still to fill links to
@@ -76,7 +78,8 @@ How the patient screen, key times, sign-offs, forms and look work. Part of the n
   no countdown. The "Time now" clock was removed on 20 Oct 2026 (owner). Then the sync chip. The old "Prewarm + 12:34" elapsed timer is gone.
 - **Other data**: a small box beside Form view / Sheet view opens the remaining template pages
   (pre-op, pre-op medication, pre-op investigations, day 1 and 2 chart review and analgesia, discharge) on one page
-  (`#/p/<id>/data`), each a collapsible header (open by default) over every field in template order (`OTHER_PAGES`; no
+  (`#/p/<id>/data`), each a collapsible header (folded except the first unfinished one, owner 21 Oct 2026; Enter past a section's last
+  question unfolds the next) over every field in template order (`OTHER_PAGES`; no
   sign-off). The box has no caption. Keyboard entry on a computer: Enter / ↓ next question, Shift+Enter / ↑ previous;
   on a row of choices ← → move, Enter picks (never clears) and moves on, Space picks or clears; date and time boxes keep
   their own arrow keys. At ≥700 px each label sits beside its box. The main screen stays the op-day bedside screen.

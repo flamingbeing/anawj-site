@@ -814,7 +814,7 @@ function openTarget(t, pad = true) {
 // on the PACU page; one line once answered
 const COMFORT = BY_ID.sat_pre.opts;
 let satEdit = null;
-// roomy (PACU, owner 21 Oct 2026): one answer per line, so the words never split; the Pre-warming tab keeps one row
+// roomy (PACU, owner 21 Oct 2026): two answers per row, Neutral alone, so the words never split; the Pre-warming tab keeps one row
 function comfortHtml(p, id, label, roomy = false) {
   const v = val(p, id);
   if (v != null && satEdit !== id) {
@@ -1500,8 +1500,10 @@ route(/^\/p\/(\w+)\/data(?:\/(day1|day2))?$/, (id, day) => {
   header(sidL(p) + ' · ' + part.title, `#/p/${id}/haemo`);
   topBar(p, defaultSeries(p));
   const get = k => val(p, k);
-  const closed = new Set();
   const filled = pg => FORM[pg].filter(([k]) => val(p, k) != null).length;
+  // sections start folded except the first unfinished one (owner, 21 Oct 2026); each header keeps its "x of y filled"
+  const firstOpen = part.pages.find(pg => filled(pg) < FORM[pg].length);
+  const closed = new Set([...(part.study ? ['study'] : []), ...part.pages.filter(pg => pg !== firstOpen)]);
   const draw = () => {
     const y = window.scrollY;
     const sl = sealedBy(p, SIGN);
@@ -1521,7 +1523,12 @@ route(/^\/p\/(\w+)\/data(?:\/(day1|day2))?$/, (id, day) => {
   const stopOf = el => el.closest('.fld');
   const keyOf = fld => fld.querySelector('[data-f]')?.dataset.f;
   const focusStop = fld => { if (!fld) return; const t = fld.querySelector('input, .chip[aria-pressed="true"]') || fld.querySelector('.chip'); t.focus(); if (t.select && t.type === 'text') t.select(); };
-  const move = (k, by) => { const all = stops(); const i = all.findIndex(f => keyOf(f) === k); focusStop(all[i + by]); };
+  const move = (k, by) => {
+    const all = stops(), i = all.findIndex(f => keyOf(f) === k);
+    // past the last question of a section: unfold the next folded one and carry on there
+    if (!all[i + by] && by > 0) { const nx = all[i]?.closest('details')?.nextElementSibling; if (nx?.matches('details.sect:not([open])')) { nx.open = true; return focusStop(nx.querySelector('.fld')); } }
+    focusStop(all[i + by]);
+  };
   const pick = b => {
     const f = field(b.dataset.f); const v = f.type === 'code' ? +b.dataset.v : b.dataset.v;
     // the group can be corrected, never cleared; it sets the pre-warming due times
