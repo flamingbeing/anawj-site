@@ -75,7 +75,7 @@ export const wantFocus = () => {
   return a !== false && !document.documentElement.classList.contains('no-autofocus') && (a === true || !touchOnly() || Date.now() - gestureAt < 1500 || Date.now() - launchedAt < 15000);
 };
 export const focusLog = () => {
-  const el = (draft.mode === 'bulk' ? ui?.textarea : firstField() === 'initials' ? ui.initials : ui.textarea);
+  const el = (draft.mode === 'bulk' ? ui?.textarea : firstField() === 'initials' ? ui?.initials : ui?.textarea);
   el?.focus({ preventScroll: true });
   if (el && document.activeElement === el) launchedAt = 0;
 };
