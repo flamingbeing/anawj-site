@@ -1,0 +1,384 @@
+{
+ "note": "Theme link format 2 (my-themes.js): keys and lists only grow at the end; links made with them must keep opening as they did. Add to this file, never change what is here.",
+ "keys": [
+  "accent",
+  "colourful",
+  "borders",
+  "flat",
+  "round",
+  "shadows",
+  "fontUi",
+  "fontLog",
+  "headFont",
+  "lineHeight",
+  "btnStyle",
+  "iconBtns",
+  "tabIcons",
+  "pageTitles",
+  "calPlain",
+  "rowShort",
+  "navStyle",
+  "rowLayout",
+  "formLayout",
+  "contrast",
+  "bgTint",
+  "band",
+  "spacing",
+  "tabStyle",
+  "statusBar",
+  "headerStyle",
+  "barBlur",
+  "titleAlign",
+  "tabActiveLabel",
+  "tabIconFill",
+  "tabTone",
+  "listStyle",
+  "typeStyle",
+  "headingTone",
+  "iconSet",
+  "iconWeight",
+  "pageMotion",
+  "sheetStyle",
+  "toastStyle",
+  "fieldStyle",
+  "checkStyle",
+  "switchStyle",
+  "pressStyle",
+  "ftBtn",
+  "ftGap",
+  "ftLine",
+  "ftShadow",
+  "ftCases",
+  "ftDays",
+  "ftLetter",
+  "ftWeight",
+  "wallpaper",
+  "wallDim",
+  "iconTint",
+  "iconTintStrength",
+  "tabIcon",
+  "light.bg",
+  "light.panel",
+  "light.ink",
+  "light.muted",
+  "light.line",
+  "light.accent",
+  "light.accentInk",
+  "light.ok",
+  "light.warn",
+  "light.err",
+  "dark.bg",
+  "dark.panel",
+  "dark.ink",
+  "dark.muted",
+  "dark.line",
+  "dark.accent",
+  "dark.accentInk",
+  "dark.ok",
+  "dark.warn",
+  "dark.err"
+ ],
+ "lists": {
+  "colourful": [
+   "tabs",
+   "all"
+  ],
+  "borders": {
+   "min": 0,
+   "step": 1
+  },
+  "round": {
+   "min": 0,
+   "step": 1
+  },
+  "fontUi": [
+   "default",
+   "system",
+   "atkinson",
+   "lexend",
+   "inter",
+   "nunito",
+   "plex",
+   "sourceserif",
+   "serif",
+   "jetbrains",
+   "mono",
+   "named",
+   "file"
+  ],
+  "fontLog": [
+   "same",
+   "default",
+   "system",
+   "atkinson",
+   "lexend",
+   "inter",
+   "nunito",
+   "plex",
+   "sourceserif",
+   "serif",
+   "jetbrains",
+   "mono",
+   "named",
+   "file"
+  ],
+  "headFont": [
+   "same",
+   "serif",
+   "system",
+   "inter",
+   "lexend",
+   "atkinson",
+   "nunito",
+   "plex",
+   "sourceserif",
+   "jetbrains",
+   "mono"
+  ],
+  "lineHeight": [
+   "0.9",
+   "1",
+   "1.15",
+   "1.3"
+  ],
+  "btnStyle": [
+   "outlined",
+   "filled",
+   "tinted",
+   "plain"
+  ],
+  "navStyle": [
+   "tabs",
+   "rail"
+  ],
+  "rowLayout": [
+   "card",
+   "compact",
+   "chat",
+   "timeline"
+  ],
+  "formLayout": [
+   "page",
+   "sections"
+  ],
+  "contrast": [
+   "auto",
+   "normal",
+   "high"
+  ],
+  "bgTint": [
+   "auto",
+   "white",
+   "grey",
+   "cream",
+   "sepia",
+   "beige",
+   "bluegrey",
+   "iosgrey",
+   "graphite",
+   "navy",
+   "obsidian",
+   "notion",
+   "instagram",
+   "xblack",
+   "spotify",
+   "youtube",
+   "gmail",
+   "materialgrey",
+   "tiktok",
+   "black"
+  ],
+  "band": [
+   "theme",
+   "shades",
+   "nuh",
+   "none"
+  ],
+  "spacing": [
+   "normal",
+   "tight",
+   "compact",
+   "roomy"
+  ],
+  "tabStyle": [
+   "underline",
+   "pill",
+   "plain",
+   "indicator"
+  ],
+  "statusBar": [
+   "accent",
+   "header",
+   "page"
+  ],
+  "headerStyle": [
+   "plain",
+   "filled",
+   "large"
+  ],
+  "titleAlign": [
+   "default",
+   "centre"
+  ],
+  "tabTone": [
+   "accent",
+   "ink"
+  ],
+  "listStyle": [
+   "default",
+   "inset",
+   "edge"
+  ],
+  "typeStyle": [
+   "default",
+   "ios",
+   "material"
+  ],
+  "headingTone": [
+   "accent",
+   "ink"
+  ],
+  "iconSet": [
+   "line",
+   "sharp",
+   "soft",
+   "ios",
+   "material"
+  ],
+  "iconWeight": [
+   "default",
+   "thin",
+   "bold"
+  ],
+  "pageMotion": [
+   "default",
+   "ios",
+   "material",
+   "fade",
+   "none"
+  ],
+  "sheetStyle": [
+   "default",
+   "ios",
+   "material"
+  ],
+  "toastStyle": [
+   "default",
+   "ios",
+   "material"
+  ],
+  "fieldStyle": [
+   "default",
+   "ios",
+   "filled",
+   "outlined"
+  ],
+  "checkStyle": [
+   "default",
+   "round",
+   "square"
+  ],
+  "switchStyle": [
+   "default",
+   "ios",
+   "material"
+  ],
+  "pressStyle": [
+   "default",
+   "highlight",
+   "none"
+  ],
+  "ftBtn": {
+   "min": 32,
+   "step": 2
+  },
+  "ftGap": {
+   "min": 2,
+   "step": 1
+  },
+  "ftLine": {
+   "min": 0,
+   "step": 0.5
+  },
+  "ftShadow": {
+   "min": 0,
+   "step": 1
+  },
+  "ftCases": {
+   "min": 0,
+   "step": 1
+  },
+  "ftDays": {
+   "min": 0,
+   "step": 2
+  },
+  "ftLetter": {
+   "min": -0.03,
+   "step": 0.01
+  },
+  "ftWeight": {
+   "min": 300,
+   "step": 100
+  },
+  "wallpaper": [
+   "dots",
+   "grid",
+   "paper",
+   "gradient"
+  ],
+  "wallDim": {
+   "min": 0,
+   "step": 5
+  },
+  "iconTintStrength": {
+   "min": 10,
+   "step": 10
+  }
+ },
+ "links": [
+  {
+   "link": "hI3OrQ5g",
+   "name": "NUHS",
+   "look": {}
+  },
+  {
+   "link": "oiFGYWtlIGZ1bGx5IGN1c3RvbcBAiRorEBlAmCsA2CD4IJEYGYwFx7nsibG9nIjoicGx1cyJ9wN-vr6yN____0NEBQY2NSlVg4N0Nbc6OB4cKRELDhKZEWGyKhHw8_apGos7-xEsMzy5F_sv_BEAAAA",
+   "name": "Fake fully custom",
+   "mode": "auto",
+   "look": {
+    "colours": {
+     "light": {
+      "bg": "#fafafa",
+      "panel": "#ffffff",
+      "ink": "#101418",
+      "muted": "#4a5560",
+      "line": "#d0d6dc",
+      "accent": "#123456",
+      "accentInk": "#ffffff"
+     },
+     "dark": {
+      "bg": "#0b0e12",
+      "panel": "#161b22",
+      "ink": "#f0f3f6",
+      "muted": "#a8b3bf",
+      "line": "#2c333c",
+      "accent": "#7fb2ff",
+      "accentInk": "#000000"
+     }
+    },
+    "accent": "#123456",
+    "round": 3,
+    "shadows": false,
+    "fontUi": "nunito",
+    "tabIcons": true,
+    "spacing": "roomy",
+    "ftGap": 6,
+    "ftLetter": -0.02,
+    "wallpaper": "dots",
+    "tabIcon": {
+     "log": "plus"
+    }
+   }
+  }
+ ]
+}

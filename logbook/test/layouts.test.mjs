@@ -12,7 +12,7 @@ for (const [key, options] of Object.entries({ navStyle: NAV_STYLES, rowLayout: R
     const d = { [key]: value };
     assert.deepEqual(lookOf(d), d);
     assert.deepEqual(readSettingsFile(JSON.stringify(settingsFile({ settings: d }))).settings, d);
-    assert.equal(minePatch(saveMine([], 'Layout', d)[0])[key], value);
+    assert.equal(minePatch(saveMine([], 'Layout', d)[0], { themeKeep: [] })[key], value);
     checks++;
   }
   for (const invalid of ['unknown', true, 3, [], {}]) {
@@ -20,7 +20,9 @@ for (const [key, options] of Object.entries({ navStyle: NAV_STYLES, rowLayout: R
     assert.equal(readSettingsFile(JSON.stringify(settingsFile({ settings: { [key]: invalid } }))).settings[key], null);
     checks++;
   }
-  assert.equal(themePatch(themeById('nuhs'), { [key]: options[1][0] })[key], null);
+  assert.equal(themePatch(themeById('nuhs'), { [key]: options[1][0], themeKeep: [] })[key], null);
+  // Keep when changing theme (look-schema.js): layout stays unless switched off
+  assert.equal(themePatch(themeById('nuhs'), { [key]: options[1][0] })[key], options[1][0]);
 }
 assert.equal(rowLayoutOf({}), 'card');
 assert.equal(rowLayoutOf({ rowShort: true }), 'compact');
@@ -34,9 +36,14 @@ for (const width of [390, 600, 900, 901, 1200]) for (const tabBar of ['auto', 't
 }
 // X uses compact feed rows; conversation themes keep the chat timestamp layout.
 for (const [id, key, value] of [['x', 'rowLayout', 'compact'], ['notion', 'rowLayout', 'compact'], ['office', 'navStyle', 'rail']]) {
-  const d = themePatch(themeById(id));
+  const d = { ...themePatch(themeById(id), { themeKeep: [] }), themeKeep: [] };
   assert.equal(d[key], value);
   assert.equal(themeState(d).custom, false);
   assert.equal(themeState({ ...d, [key]: 'default' }).custom, true);
+  // with Layout kept (the default), the theme leaves the device's layout alone, and that isn't a change to the theme
+  const kept = { ...themePatch(themeById(id), {}), theme: id };
+  assert.equal(kept[key], null);
+  assert.equal(themeState(kept).custom, false);
+  assert.equal(themeState({ ...kept, [key]: 'chat' }).custom, false);
 }
 console.log(`PASS layouts: ${checks + 18} setting, alias and theme checks`);

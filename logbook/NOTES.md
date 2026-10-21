@@ -29,7 +29,8 @@ portfolio content.
 - Don't bump `sw.js` `VERSION` by hand (the deploy stamps it); new JS files go in `sw.js` SHELL.
 - Only the Add tab's modules load with the app: they must not import a page module statically (`docs/working.md`, "Start-up speed").
 - New options: per device unless they belong to the account, off by default, defaults pixel-identical.
-- Theme links (`#t=`, old `#theme=`) and themes files are input from strangers: read them only through `themeFromLink` / `importText` (checkTheme drops what it rejects; fonts are checked by their first bytes).
+- Theme links (`#t=`) and themes files are input from strangers: read them only through `themeFromLink` / `importText` (checkTheme drops what it rejects; fonts are checked by their first bytes).
+- Look settings: what each may hold is `js/look-schema.js` (one list for themes, files, settings files and links). New settings, choices, tints, fonts or patterns go at the **end** of their list, never reordered or removed, or old theme links change meaning (`test/fixtures/theme-links.json` catches it).
 - Owner preferences (merging, screenshots, planning): "Working with the owner" in the root `AGENTS.md`. Status and decisions: `STATUS.md`.
 
 ## Topic notes (open only the one you need)

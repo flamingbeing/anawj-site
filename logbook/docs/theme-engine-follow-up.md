@@ -14,6 +14,15 @@ The catalogue refresh keeps the current engine and works around its limits. This
 
 Read [theme-engine.md](theme-engine.md) and [the catalogue review](theme-catalogue-review.md) first. Do not start by recolouring the catalogue again. Make the engine safe and expressive, then revisit only themes whose workarounds can be removed.
 
+## Progress
+
+- 21 Oct 2026, first PR: one list of allowed values (`js/look-schema.js`) used by `checkTheme`, `lookOf`, settings files
+  and links (the validation probe below is now refused); theme link format 2 (self-contained, append-only lists held
+  by `test/fixtures/theme-links.json`; the owner said no one used format 1); Keep when changing theme (wallpaper and
+  layout by default, fonts optional). Next, from the owner's feedback the same day: Themes page essentials vs an
+  Advanced theme settings page; a full colour picker (the phone's own picker offers only a few colours); wallpaper
+  that can actually be seen; then the palette resolver and colour roles below, with NUHS looking exactly as now.
+
 ## Observed problems and recommended order
 
 | Priority | Finding and evidence from this session | Recommended implementation and acceptance check |

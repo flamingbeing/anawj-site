@@ -1,7 +1,8 @@
 # Logbook theme engine: how to write a theme
 
 Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). The engine is `js/theme-engine.js` (facets,
-icon sets, page motion); the themes are `js/themes.js` (`THEMES`, `TINTS`, `checkTheme`). Owner, 19 Oct 2026.
+icon sets, page motion); the themes are `js/themes.js` (`THEMES`, `checkTheme`); what each look setting may hold is
+`js/look-schema.js` (`LOOK`, `cleanLook`, `TINTS` and the other lists). Owner, 19 Oct 2026.
 
 ## What a theme is
 
@@ -10,8 +11,15 @@ icon sets, page motion); the themes are `js/themes.js` (`THEMES`, `TINTS`, `chec
   look: { /* any THEME_KEYS: the settings below */ }, band: ['#rrggbb', '#rrggbb', '#rrggbb', '#rrggbb'] /* optional */ }
 ```
 
-Picking a theme sets every key in `THEME_KEYS`: the ones in `look` to its values, the rest back to their defaults.
+Picking a theme sets every key in `THEME_KEYS`: the ones in `look` to its values, the rest back to their defaults,
+apart from the groups the device keeps (Themes → Keep when changing theme, `look-schema.js` `KEEP_GROUPS`: wallpaper
+and layout unless switched off, fonts and text when switched on). So a theme's `rowLayout`, `navStyle` or wallpaper
+only shows on a device that has switched that group off; don't rely on them for a theme's character.
 A theme **never** sets light or dark (no `mode`): give it both palettes and it matches its app either way.
+
+**One list of allowed values** (`look-schema.js` `LOOK`, owner 21 Oct 2026): every setting's kind and values. A new look
+setting gets an entry there (and its key in `display.js` `DISPLAY_KEYS`); `checkTheme`, saved themes and themes files
+(`lookOf`), settings files and theme links all check against it. A value the Themes page can't show is refused.
 
 ### The settings a theme can use
 
@@ -34,13 +42,15 @@ A theme **never** sets light or dark (no `mode`): give it both palettes and it m
   `iconTintStrength` (10-100 in steps of 10), `tabIcon` (`{ tabId: name }`, names from `TAB_ICONS`, keys sorted). The
   app raises the dim by itself if a pattern would bring text on the page under 4.5:1 with the theme's colours.
 - **Fonts** (theme-revamp S5): `fontUi`, `fontLog` (or `same`) and `headFont` must be bundled (`THEME_FONTS`,
-  `HEAD_FONTS`): never `file` or `named`, which stay on their device. Theme links (`#t=`, old `#theme=`) go through
+  `HEAD_FONTS`): never `file` or `named`, which stay on their device. Theme links (`#t=`) go through
   `checkTheme` and lose any setting it rejects.
-- **Short theme links** (my-themes.js `themeLink`; owner, 21 Oct 2026): a link packs the bundled theme it starts from
-  plus only the settings that differ, by their place in `THEME_KEYS`, the colour tokens and a word list built from
-  `FACETS`, `PATTERNS`, `TINTS` and the bundled themes. The link carries a 12-bit fingerprint of those lists, so any
-  change to them (a new key, choice or bundled-theme edit) makes older links say "ask for a new one". That is
-  intended; no format bump is needed. A bundled theme is ~41 characters with the address, a fully custom one ~150.
+- **Theme links, format 2** (my-themes.js `themeLink`; owner, 21 Oct 2026): a bundled theme unchanged is its id; any
+  other look is written out in full, each setting by its place in `LINK_KEYS` and its value by its place in that
+  setting's list (`look-schema.js`), its step from the lowest, or a colour. Nothing depends on the bundled themes'
+  current looks, so editing or adding themes never breaks a link. **`LINK_KEYS` and every list only grow at the end**
+  (a new setting, choice, tint, font or pattern goes last; never reorder or remove), and an int's lowest value and step
+  stay; `test/fixtures/theme-links.json` holds them and some links, and the test fails otherwise. A bundled theme is
+  ~40 characters with the address, a fully custom one ~180. Format 1 links ask for a new one.
 - **Facets** (theme-engine.js `FACETS`; each off by default; the value must be one of its choices):
 
 | Key | Choices | What it changes |

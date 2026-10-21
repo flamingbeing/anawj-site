@@ -11,6 +11,7 @@ import { recentCount as snapRecent } from './logging.js';
 import { OPERATOR_HELP } from './search-ops.js';
 import { DEFAULT_ACCENT, cleanAccent, SWATCHES, COLOUR_TOKENS, cleanColours, colourPalette, colourChecks, checkColours } from './colors.js';
 import { THEMES, FEATURED, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, BANDS, HEAD_FONTS } from './themes.js';
+import { COLOURFUL, KEEP_GROUPS, keepGroups } from './look-schema.js';
 import { FACETS, FACET_GROUPS, facetDefault, FINE_TUNE, TUNE_KEYS, cleanTune, TAB_ICONS, cleanTabIcons, cleanTintStrength } from './theme-engine.js';
 import { WALLPAPERS, cleanWall, dimOf, DIM_MAX, savePhoto, getPhoto, deletePhoto, mainColour, colourAt } from './wallpaper.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS, HEAD_STYLES, mdDate, fileDate } from './markdown.js';
@@ -58,7 +59,6 @@ export const displayPreview = () => h('div', { class: 'display-preview', 'aria-h
 export const advancedLink = (id, label, desc) => h('section', { class: 'card more-list more-settings' },
   h('ul', {}, h('li', {}, h('a', { href: '#' + id, 'data-go': id },
     h('span', { class: 'mt' }, h('b', {}, label), h('small', {}, desc)), h('span', { class: 'chev', 'aria-hidden': 'true' }, '›')))));
-export const COLOURFUL = [['off', 'Off (default)'], ['tabs', 'One colour per tab: the tabs and headings'], ['all', 'One colour per tab: everything in the tab']];
 export const TAB_BARS = [['auto', 'Bottom on phones, top on bigger screens (default)'], ['top', 'Always at the top'], ['bottom', 'Always at the bottom']];
 
 // a ✓ list for two to five choices (settings rows: settings-rows.js); the pages carry class set-page (style.css)
@@ -163,7 +163,8 @@ export function renderThemes() {
       h('h3', {}, 'Inspired'),
       help('Inspired by apps, brands and visual traditions: colours, surfaces, shapes and type.'),
       h('div', { class: 'theme-grid' }, FEATURED.map(id => themeCard(THEMES.find(t => t.id === id), theme, custom))),
-      h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('a', { class: 'btn small', href: '#themesall' }, 'Browse all themes'))),
+      h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('a', { class: 'btn small', href: '#themesall' }, 'Browse all themes')),
+      keepCard(st)),
     myThemesCard(st, custom),
     h('section', { class: 'card' },
       h('h2', {}, 'Colour and light'),
@@ -226,6 +227,18 @@ export function renderThemes() {
     resetLink('the theme and every look setting on this page (light, the NUHS colours, lines, corners, fonts, spacing, the header and custom CSS: switched off, your CSS is kept) on this device', () => {
       applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'nightTheme', 'fontUiName', 'fontLogName', 'appTitle', 'hideHeader', 'customCssOn'].map(k => [k, null])) }));
     }));
+}
+// Keep when changing theme (owner, 21 Oct 2026; look-schema.js KEEP_GROUPS): the settings that stay yours whichever
+// theme you pick, Your themes and the night theme included
+function keepCard(st) {
+  const on = keepGroups(st);
+  return [
+    h('h3', {}, 'Keep when changing theme'),
+    KEEP_GROUPS.map(([g, label, line]) => toggle(label, on.includes(g), v => {
+      setDisplay({ themeKeep: KEEP_GROUPS.map(([k]) => k).filter(k => (k === g ? v : on.includes(k))) }); hooks.render();
+    }, line)),
+    help('Light or dark, text size and zoom always stay: themes never change them.'),
+  ];
 }
 // Day and night (theme-revamp S5; my-themes.js lookNow): on Auto, a theme of its own for when the phone is dark. The
 // rest of this page is the day look; at night it says so, as what's on screen then is the night theme.
