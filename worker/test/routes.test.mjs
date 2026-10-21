@@ -3,16 +3,11 @@ import assert from 'node:assert/strict';
 import { resolve, SITES, kitCors } from '../routes.js';
 
 // shared hosts: one path per app
-assert.deepEqual(resolve('hand.anawj.com', '/cmcj/'), { file: 'cmcj/' });
-assert.deepEqual(resolve('hand.anawj.com', '/cmcj/app.js'), { file: 'cmcj/app.js' });
-assert.deepEqual(resolve('hand.anawj.com', '/babies/'), { file: 'hand-babies/' });
-assert.deepEqual(resolve('hand.anawj.com', '/babies/img/x.png'), { file: 'hand-babies/img/x.png' });
 assert.deepEqual(resolve('apmes.anawj.com', '/logbook/js/app.js'), { file: 'logbook/js/app.js' });
 assert.deepEqual(resolve('apmes.anawj.com', '/evals/'), { file: 'evals/' });
 assert.deepEqual(resolve('apmes.anawj.com', '/people/js/app.js'), { file: 'people/js/app.js' });
 assert.deepEqual(resolve('apmes.anawj.com', '/applicants/js/app.js'), { file: 'applicants/js/app.js' });
 assert.deepEqual(resolve('apmes.anawj.com', '/360/js/app.js'), { file: '360/js/app.js' });
-assert.deepEqual(resolve('hand.anawj.com', '/babies'), { redirect: '/babies/' });
 // anaes.anawj.com: the BIS and OT simulators moved to anantf.com (16 Oct 2026); old links forward, keeping the rest of the path
 assert.deepEqual(resolve('anaes.anawj.com', '/bis/'), { redirect: 'https://anantf.com/bis/' });
 assert.deepEqual(resolve('anaes.anawj.com', '/bis'), { redirect: 'https://anantf.com/bis/' });
@@ -20,22 +15,19 @@ assert.deepEqual(resolve('anaes.anawj.com', '/bis/app.js'), { redirect: 'https:/
 assert.deepEqual(resolve('anaes.anawj.com', '/ot/'), { redirect: 'https://anantf.com/ot/' });
 assert.deepEqual(resolve('anaes.anawj.com', '/ot'), { redirect: 'https://anantf.com/ot/' });
 assert.deepEqual(resolve('x.workers.dev', '/_sites/anaes.anawj.com/ot/'), { redirect: 'https://anantf.com/ot/' });
-assert.deepEqual(resolve('hand.anawj.com', '/handlog/'), { file: 'hand-log/' });
-assert.deepEqual(resolve('hand.anawj.com', '/handlog/js/app.js'), { file: 'hand-log/js/app.js' });
-assert.deepEqual(resolve('hand.anawj.com', '/handlog'), { redirect: '/handlog/' });
 // a shared host serves nothing else: not its root, not other apps' folders, not the repo
-for (const [h, p] of [['hand.anawj.com', '/'], ['hand.anawj.com', '/logbook/'], ['hand.anawj.com', '/hand-babies/'], ['hand.anawj.com', '/hand-log/'], ['hand.anawj.com', '/AGENTS.md'], ['anaes.anawj.com', '/'], ['anaes.anawj.com', '/bis-dsa/'], ['anaes.anawj.com', '/ot-sim/'], ['anaes.anawj.com', '/hand-babies/'],
+for (const [h, p] of [['apmes.anawj.com', '/hand-babies/'], ['apmes.anawj.com', '/AGENTS.md'], ['anaes.anawj.com', '/'], ['anaes.anawj.com', '/bis-dsa/'], ['anaes.anawj.com', '/ot-sim/'], ['anaes.anawj.com', '/hand-babies/'],
   ['apmes.anawj.com', '/'], ['apmes.anawj.com', '/prewarm/'], ['apmes.anawj.com', '/nuh-roster/index.html'], ['apmes.anawj.com', '/logbooks/']]) {
   assert.deepEqual(resolve(h, p), { notFound: true }, h + p);
 }
 // dot segments are resolved by URL parsing before we see them; check the worker's view of them anyway
-for (const raw of ['/cmcj/%2e%2e/logbook/', '/cmcj/../logbook/', '/cmcj/..%2flogbook/']) {
-  const u = new URL(raw, 'https://hand.anawj.com');
-  const r = resolve('hand.anawj.com', u.pathname);
-  assert.ok(r.notFound || (r.file && r.file.startsWith('cmcj/') && !r.file.includes('..')), raw + ' -> ' + JSON.stringify(r));
+for (const raw of ['/%2e%2e/logbook/', '/../logbook/', '/..%2flogbook/']) {
+  const u = new URL(raw, 'https://prewarmstudy.anawj.com');
+  const r = resolve('prewarmstudy.anawj.com', u.pathname);
+  assert.ok(r.notFound || (r.file && r.file.startsWith('prewarm/') && !r.file.includes('..')), raw + ' -> ' + JSON.stringify(r));
 }
-for (const p of ['/cmcj/..%2flogbook/', '/cmcj/%2e%2e%2flogbook/', '/babies/a%5c..%5clogbook/', '/cmcj/a\\b']) {
-  assert.deepEqual(resolve('hand.anawj.com', p), { notFound: true }, p);
+for (const p of ['/..%2flogbook/', '/%2e%2e%2flogbook/', '/a%5c..%5clogbook/', '/a\\b']) {
+  assert.deepEqual(resolve('prewarmstudy.anawj.com', p), { notFound: true }, p);
   assert.deepEqual(resolve('anawj-preview.x.workers.dev', p), { notFound: true }, p);
 }
 
@@ -63,14 +55,14 @@ assert.deepEqual(resolve('anawj-preview.example.workers.dev', '/logbook/'), { fi
 assert.deepEqual(resolve('anawj-preview.example.workers.dev', '/'), { file: '' });
 
 // trying an address on a preview: /_sites/<host>/…
-assert.deepEqual(resolve('x.workers.dev', '/_sites/hand.anawj.com/babies/'), { file: 'hand-babies/' });
+assert.deepEqual(resolve('x.workers.dev', '/_sites/apmes.anawj.com/evals/'), { file: 'evals/' });
 assert.deepEqual(resolve('x.workers.dev', '/_sites/prewarmstudy.anawj.com/'), { file: 'prewarm/' });
-assert.deepEqual(resolve('x.workers.dev', '/_sites/hand.anawj.com/babies'), { redirect: '/_sites/hand.anawj.com/babies/' });
-assert.deepEqual(resolve('x.workers.dev', '/_sites/hand.anawj.com/logbook/'), { notFound: true });
-assert.deepEqual(resolve('x.workers.dev', '/_sites/hand.anawj.com'), { redirect: '/_sites/hand.anawj.com/' });
+assert.deepEqual(resolve('x.workers.dev', '/_sites/apmes.anawj.com/evals'), { redirect: '/_sites/apmes.anawj.com/evals/' });
+assert.deepEqual(resolve('x.workers.dev', '/_sites/apmes.anawj.com/prewarm/'), { notFound: true });
+assert.deepEqual(resolve('x.workers.dev', '/_sites/nuhroster.anawj.com'), { redirect: '/_sites/nuhroster.anawj.com/' });
 assert.deepEqual(resolve('x.workers.dev', '/_sites/nothing.anawj.com/x'), { file: '_sites/nothing.anawj.com/x' });   // unknown host: not a site
 // the real hosts don't take the /_sites/ route
-assert.deepEqual(resolve('hand.anawj.com', '/_sites/nuhroster.anawj.com/'), { notFound: true });
+assert.deepEqual(resolve('apmes.anawj.com', '/_sites/nuhroster.anawj.com/'), { notFound: true });
 
 // the shared design folder: served on every subdomain as it is, and nothing else is shared; the old /design/ is gone
 for (const h of Object.keys(SITES)) {
@@ -99,7 +91,7 @@ assert.ok(!kitCors('logbook/index.html') && !kitCors('prewarm/nuhsdesign/x') && 
 assert.deepEqual(resolve('apmes.anawj.com', '/__/auth/handler'), { file: '__/auth/handler' });
 assert.deepEqual(resolve('apmes.anawj.com', '/__/firebase/init.json'), { file: 'apmes-auth/firebase/init.json' });
 assert.deepEqual(resolve('apmes.anawj.com', '/__/other'), { notFound: true });
-assert.deepEqual(resolve('hand.anawj.com', '/__/auth/handler'), { notFound: true });
+assert.deepEqual(resolve('anaes.anawj.com', '/__/auth/handler'), { notFound: true });
 assert.deepEqual(resolve('apmes.anawj.com', '/apmes/guidebook/dops-expectations.md'), { file: 'apmes/guidebook/dops-expectations.md' });
 assert.deepEqual(resolve('apmes.anawj.com', '/apmes/originals/x'), { notFound: true });
 

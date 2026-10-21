@@ -12,7 +12,6 @@
 export const SITES = {
   // the anaesthesia teaching pages moved to anantf.com on 16 Oct 2026 (the BIS and OT simulators): old links forward
   'anaes.anawj.com': { moved: { '/bis/': 'https://anantf.com/bis/', '/ot/': 'https://anantf.com/ot/' } },
-  'hand.anawj.com': { prefixes: { '/cmcj/': 'cmcj/', '/babies/': 'hand-babies/', '/handlog/': 'hand-log/' } },
   'prewarmstudy.anawj.com': { root: 'prewarm/' },
   'nuhroster.anawj.com': { root: 'nuh-roster/' },
   // NTF anaesthesia monthly duty roster (its own data, so its own host). /__/auth/ and /__/firebase/ are Firebase's
