@@ -21,6 +21,16 @@ Team sharing (Firestore), admin sign-in, locking, the PACU nurse link, updates a
   (`resync2`), and stay hidden from members until then. Lock icon: an inline SVG padlock, no emoji.
   - Lesson: no `get(field, default)` in a read rule that guards a query: Firestore treats fields the query doesn't
     constrain as missing, so the default lets an unfiltered query through. Require the field (`locked == false`).
+- **Share subject link** (owner, 21 Oct 2026; replaced the join-and-open link `#/join/{site}/{code}/p/{id}`, which
+  still works for old links): `#/s/<token>` (24 random characters = the secret), one fixed link per participant, made
+  the first time its Share page opens (`share_token` syncs to every team phone); only a study admin stops it.
+  Firestore `shares/{token}` names the patient `{ site, pid, sid, created, by }`. A phone that opens it signs in
+  anonymously and writes a guest pass `guests/{uid}_{pid}`; the rules (`guestOf`) then let it get and update that one
+  patient by id (not create, lock, delete, list or query), save its email and PayNow and make its PACU link, while the
+  share exists, names the same hospital and the patient is unlocked. Stopping the link (deleting the share) ends every
+  guest's access; the guest phone drops the subject when its listener is refused. The phone keeps the opened subjects
+  in `guest` (local storage) and listens to each one by id (`cloud.watchPatient`); a team member or admin opening the
+  link just goes to the subject. Tests: `test/rules.emulator.mjs`, `test/sync.emulator.mjs`.
 - **PACU nurse link**: on a participant's PACU page a member (or admin) makes a link and QR code
   (`#/nurse/<token>`, 24 random characters = the secret). Firestore `pacu/{token}` holds a copy of that participant's
   PACU answers (`PACU_KEYS` in `js/schema.js`; the rules allow exactly that list, checked by a unit test): anyone

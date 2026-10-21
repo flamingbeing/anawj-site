@@ -19,6 +19,11 @@ rules_version = '2';
 //                   long random token and is the secret. A member (own hospital) or admin makes and stops it; anyone
 //                   signed in (an anonymous sign-in on the nurse's phone) who knows the token reads it and writes ONLY
 //                   the PACU fields listed below. Nobody lists tokens (admins aside).
+//   shares/{token}  the Share subject link (owner, 21 Oct 2026): { site, pid, sid, created, by }. Like pacu/{token}, the
+//                   long random id is the secret; the patient's team (or an admin) makes it, only admins stop it.
+//   guests/{uid}_{pid}  a phone that opened a Share subject link: { token, pid, joinedAt }. It may read and edit that
+//                   one patient (not lock, delete or list anything) while the link exists and the patient is unlocked.
+//                   Stopping the link (deleting shares/{token}) ends every guest's access at once.
 //   forms/blank     the blank paper data collection form (.docx, base64), uploaded by an admin:
 //                   { b64, name, size, setAt, setBy }; members and admins read it (the Form view fills it in).
 //   scanImports/{id}  Firetop's reading of one received scan, waiting for an admin:
@@ -46,6 +51,12 @@ service cloud.firestore {
     function member() { return signedIn() && exists(memberDoc()); }
     function memberSite() { return get(memberDoc()).data.site; }
     function canUse(site) { return admin() || (member() && memberSite() == site); }
+    // a phone that opened this patient's Share subject link, while the link still exists (and is for this hospital)
+    function guestOf(pid, site) {
+      let g = /databases/$(database)/documents/guests/$(request.auth.uid + '_' + pid);
+      let s = /databases/$(database)/documents/shares/$(get(g).data.token);
+      return signedIn() && exists(g) && exists(s) && get(s).data.pid == pid && get(s).data.site == site;
+    }
 
     match /admins/{adminEmail} {
       // a signed-in user may check whether their email is an admin; admins manage the list
@@ -112,10 +123,10 @@ service cloud.firestore {
           && stamp(d, 'emailSent') && stamp(d, 'paid') && stamp(d, 'cleared');
       }
       allow read, delete: if admin();
-      allow create: if canUse(request.resource.data.site) && payShape(request.resource.data)
+      allow create: if (canUse(request.resource.data.site) || guestOf(pid, request.resource.data.site)) && payShape(request.resource.data)
         && (admin() || !request.resource.data.keys().hasAny(['emailSent', 'paid', 'cleared']));
       allow update: if payShape(request.resource.data) && request.resource.data.site == resource.data.site
-        && (admin() || (canUse(resource.data.site)
+        && (admin() || ((canUse(resource.data.site) || guestOf(pid, resource.data.site))
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sid', 'email', 'paynow', 'setAt', 'setBy'])));
     }
 
@@ -132,13 +143,40 @@ service cloud.firestore {
       }
       allow get: if signedIn();
       allow list: if admin();
-      allow create: if canUse(request.resource.data.site) && token.size() >= 20 && token.size() <= 64 && pshape(request.resource.data);
+      allow create: if (canUse(request.resource.data.site) || guestOf(request.resource.data.pid, request.resource.data.site))
+        && token.size() >= 20 && token.size() <= 64 && pshape(request.resource.data);
       // the nurse (or anyone with the link) changes only f; the team may also correct the Subject ID shown
       allow update: if signedIn() && pshape(request.resource.data)
         && request.resource.data.site == resource.data.site && request.resource.data.pid == resource.data.pid
         && request.resource.data.created == resource.data.created
         && (request.resource.data.sid == resource.data.sid || canUse(resource.data.site));
       allow delete: if canUse(resource.data.site);
+    }
+
+    match /shares/{token} {
+      function sshape(d) {
+        return d.keys().hasOnly(['site', 'pid', 'sid', 'created', 'by'])
+          && d.site in sites() && d.pid is string && d.pid.size() <= 40 && d.sid is string && d.sid.size() <= 60
+          && d.created is number && d.by is string && d.by.size() <= 20;
+      }
+      allow get: if signedIn();
+      allow list, delete: if admin();
+      allow create: if (canUse(request.resource.data.site) || guestOf(request.resource.data.pid, request.resource.data.site))
+        && token.size() >= 20 && token.size() <= 64 && sshape(request.resource.data);
+      // the team may correct the Subject ID shown
+      allow update: if canUse(resource.data.site) && sshape(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sid']);
+    }
+
+    match /guests/{gid} {
+      allow create, update: if signedIn() && gid == request.auth.uid + '_' + request.resource.data.pid
+        && request.resource.data.keys().hasOnly(['token', 'pid', 'joinedAt'])
+        && request.resource.data.pid is string && request.resource.data.pid.size() <= 40
+        && request.resource.data.token is string && request.resource.data.joinedAt is number
+        && exists(/databases/$(database)/documents/shares/$(request.resource.data.token))
+        && get(/databases/$(database)/documents/shares/$(request.resource.data.token)).data.pid == request.resource.data.pid;
+      allow get, delete: if signedIn() && gid == request.auth.uid + '_' + resource.data.pid;
+      allow read, delete: if admin();
     }
 
     match /patients/{pid} {
@@ -154,9 +192,13 @@ service cloud.firestore {
       // a locked patient: admins only. Members need locked == false present (their query asks for it); no get() default
       // here: a query that doesn't mention locked would pass it and return locked patients.
       allow read: if admin() || (member() && memberSite() == resource.data.site && resource.data.locked == false);
+      // a Share subject guest: this one patient only, by its id (never a query), while unlocked
+      allow get: if resource.data.locked == false && guestOf(pid, resource.data.site);
       allow create: if canUse(request.resource.data.site) && shape(request.resource.data)
         && (admin() || !('lock' in request.resource.data));
-      allow update: if canUse(resource.data.site) && shape(request.resource.data)
+      allow update: if (canUse(resource.data.site)
+          || (guestOf(pid, resource.data.site) && request.resource.data.get('deleted', null) == resource.data.get('deleted', null)))
+        && shape(request.resource.data)
         && request.resource.data.site == resource.data.site
         && (locked(resource.data)
           ? admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lock', 'locked'])

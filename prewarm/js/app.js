@@ -106,8 +106,14 @@ function set(p, id, v) {
 }
 
 // ---------- sharing
-const shared = { member: null, admin: false, email: '', unwatch: null, stale: false };
-const sharing = () => cloud.enabled && (shared.member || shared.admin);
+const shared = { member: null, admin: false, email: '', uid: null, unwatch: null, stale: false };
+// subjects this phone opened from Share subject links (owner, 21 Oct 2026): patient id -> { token, site }. A phone not on
+// a team sees and edits only these (the rules let it read each one by id, nothing else)
+let guest = read('guest', {});
+const team = () => !!(shared.member || shared.admin);
+const sharing = () => cloud.enabled && (team() || (!!shared.uid && Object.keys(guest).length > 0));
+// shared subjects not already covered by the team's own list
+const guestIds = () => shared.admin ? [] : Object.keys(guest).filter(id => guest[id].site !== shared.member?.site);
 // send changed fields; Firestore keeps them on the phone and sends them when there is signal
 // patients with changes sent but not yet confirmed by the server (no signal), kept across reloads; Log out warns
 let pending = read('pending', {});
@@ -140,10 +146,12 @@ setInterval(showSync, 20000);
 addEventListener('online', () => showSync()); addEventListener('offline', () => showSync());
 function sync(p, ids, withLock = false) {
   if (!sharing()) return;
+  // a phone with only shared subjects can't send its own patients anywhere
+  if (!team() && !guest[p.id]) { setFailed(p.id, 'not shared: join your hospital’s team in Settings'); return; }
   // PACU answers also go to the nurse's link copy, so the nurse's phone sees them (owner, 13 Oct 2026)
   const ptok = pacuToken(p), pk = ptok && !p.lock?.on ? ids.filter(k => PACU_KEYS.includes(k)) : [];
   if (pk.length) cloud.pacuPush(ptok, pacuFields(p, pk)).catch(() => { /* retried by the heal below */ });
-  p.site ||= val(p, 'site') || shared.member?.site || settings.site;
+  p.site ||= val(p, 'site') || guest[p.id]?.site || shared.member?.site || settings.site;
   // no hospital: nothing can be sent. Say so instead of showing "Synced"
   if (!p.site) { setFailed(p.id, 'no hospital: set it in Settings'); return; }
   setFailed(p.id, null);
@@ -256,7 +264,7 @@ async function refreshNow(btn) {
     if (cloud.enabled) {
       // who this phone is: a new admin-list entry or team membership counts without logging out
       const u = await cloud.whoAmI();
-      if (u) { shared.member = await cloud.member(); shared.admin = !u.isAnonymous ? await cloud.isAdmin() : false; shared.email = u.email || ''; }
+      if (u) { shared.member = await cloud.member(); shared.admin = !u.isAnonymous ? await cloud.isAdmin() : false; shared.email = u.email || ''; shared.uid = u.uid; }
     }
     if (cloud.enabled && sharing()) { uploadLocal(); await watch(); if (!(await cloud.flushed(5000))) msg = 'Refreshed, but some changes are still waiting for signal.'; }
     if (swReg) {
@@ -274,10 +282,37 @@ const wireRefresh = () => {
   $('#refreshnow')?.addEventListener('click', e => refreshNow(e.target));
   const el = $('#appver'); if (el && window.caches) caches.keys().then(ks => { const k = ks.find(x => x.startsWith('prewarm-')); if (k && $('#appver')) { const v = k.replace('prewarm-', ''), d = /^(\d{4}-\d{2}-\d{2})-([0-9a-f]+)$/.exec(v); $('#appver').textContent = 'App version ' + (d ? `${d[1]} (${d[2]})` : v); } }).catch(() => {});
 };
+// one record from the server into this phone's copy; true if the phone's copy changed
+function take(r) {
+  const local = patients[r.id];
+  if (!local) { patients[r.id] = { ...r, f: { ...r.f } }; return true; }
+  const m = mergeRecord(local, r);
+  // in place: open screens hold this object
+  if (m.changed) Object.assign(local, m.rec, { site: local.site || r.site });
+  // heal (bug hunt, 12 Oct 2026): the server keeps whichever write arrived last, not the newest; anything this
+  // phone holds newer than the copy it just heard goes back up, so both phones and the server settle on the newest
+  if (!local.lock?.on && !r.lock?.on) {
+    const newer = Object.keys(local.f).filter(k => (local.f[k]?.t || 0) > (r.f?.[k]?.t || 0));
+    if (newer.length) sync(local, newer);
+  }
+  return m.changed;
+}
+// new data on screen: redraw unless someone is typing (a focused link or button is fine)
+function redraw() {
+  saveAll();
+  const h = location.hash.slice(1) || '/';
+  const typing = view.contains(document.activeElement) && document.activeElement.matches('input, textarea, select');
+  if (/^\/$|^\/p\/\w+$|\/sheet$/.test(h) && !typing && !leaveGuard?.()) render();
+  else { shared.stale = true; const b = $('#fresh'); if (b) b.hidden = false; }
+}
+let guestSubs = [];
 async function watch() {
   shared.unwatch?.(); shared.unwatch = null;
+  for (const u of guestSubs) u?.(); guestSubs = [];
   for (const u of pacuSubs.values()) u?.(); pacuSubs.clear();
   if (!sharing()) return;
+  watchGuests();
+  if (!team()) return;
   const seen = new Set();
   let healedAll = false;
   shared.unwatch = await cloud.watchPatients(shared.admin ? null : shared.member.site, (list, meta) => {
@@ -290,25 +325,12 @@ async function watch() {
       delete patients[id]; delete pending[id]; changed = true;
     }
     if (changed) write('pending', pending);
-    for (const r of list) {
-      seen.add(r.id);
-      const local = patients[r.id];
-      if (!local) { patients[r.id] = { ...r, f: { ...r.f } }; changed = true; continue; }
-      const m = mergeRecord(local, r);
-      // in place: open screens hold this object
-      if (m.changed) { Object.assign(local, m.rec, { site: local.site || r.site }); changed = true; }
-      // heal (bug hunt, 12 Oct 2026): the server keeps whichever write arrived last, not the newest; anything this
-      // phone holds newer than the copy it just heard goes back up, so both phones and the server settle on the newest
-      if (!local.lock?.on && !r.lock?.on) {
-        const newer = Object.keys(local.f).filter(k => (local.f[k]?.t || 0) > (r.f?.[k]?.t || 0));
-        if (newer.length) sync(local, newer);
-      }
-    }
+    for (const r of list) { seen.add(r.id); if (take(r)) changed = true; }
     if (meta.server && !healedAll) {
       healedAll = true;
       // patients on this phone the server has never had (made before sign-in finished, or before signal): send whole
       for (const p of Object.values(patients)) {
-        if (seen.has(p.id) || p.lock?.on || !Object.keys(p.f).length) continue;
+        if (seen.has(p.id) || guestIds().includes(p.id) || p.lock?.on || !Object.keys(p.f).length) continue;
         const site = val(p, 'site') || p.site;
         if (!shared.admin && site && site !== shared.member?.site) continue;
         sync(p, Object.keys(p.f));
@@ -319,13 +341,7 @@ async function watch() {
     }
     if (meta.server) { synced(); resyncOnce(); }
     watchPacu();
-    if (!changed) return;
-    saveAll();
-    const h = location.hash.slice(1) || '/';
-    // redraw unless someone is typing (a focused link or button is fine)
-    const typing = view.contains(document.activeElement) && document.activeElement.matches('input, textarea, select');
-    if (/^\/$|^\/p\/\w+$|\/sheet$/.test(h) && !typing && !leaveGuard?.()) render();
-    else { shared.stale = true; const b = $('#fresh'); if (b) b.hidden = false; }
+    if (changed) redraw();
   }, async e => {
     // refused right after a wrong join code (the phone's own copy of the refused join made it look like a member):
     // check with the server; not a member means just stop listening, the join screen already said why
@@ -333,11 +349,32 @@ async function watch() {
     toast(cloud.friendly(e));
   });
 }
+// each subject opened from a Share subject link, one by one (a guest can't ask for a list). The link stopped or the
+// subject locked: refused, so the subject leaves this phone (unless it holds changes the server never took)
+function watchGuests() {
+  for (const id of guestIds()) {
+    cloud.watchPatient(id, (list, meta) => {
+      let changed = false;
+      for (const r of list) if (take(r)) changed = true;
+      if (meta.removed.length && patients[id] && !pending[id]) { delete patients[id]; changed = true; }
+      if (meta.server) synced();
+      watchPacu();
+      if (changed) redraw();
+    }, e => {
+      if (e?.code !== 'permission-denied') return toast(cloud.friendly(e));
+      const p = patients[id], name = p ? sid(p) : 'A shared subject';
+      delete guest[id]; write('guest', guest);
+      if (p && !pending[id] && !failed[id]) delete patients[id];
+      toast(`${name}: its share link was stopped or the subject was locked, so it is no longer on this phone.`);
+      redraw();
+    }).then(u => guestSubs.push(u)).catch(() => {});
+  }
+}
 // Repair (12 Oct 2026): a lock, unlock or delete briefly sent an empty f, which wiped the readings on the server copy.
 // Once, after the phone has the server's latest (so nothing newer is overwritten), send every patient whole again.
 function resyncOnce() {
   // resync2: also gives older records the locked flag the team's query filters on
-  if (read('resync2', false) || !sharing()) return;
+  if (read('resync2', false) || !team()) return;
   write('resync2', true);
   for (const p of Object.values(patients)) {
     const site = val(p, 'site') || p.site;
@@ -369,17 +406,18 @@ if (cloud.enabled && cloud.isAdminLink()) {
   else location.hash = '#/confirm';
 }
 if (cloud.enabled) cloud.onUser(async u => {
-  const before = !!(shared.member || shared.admin);
+  const before = sharing();
   shared.member = u ? await cloud.member() : null;
   shared.admin = u && !u.isAnonymous ? await cloud.isAdmin() : false;
   shared.email = u?.email || '';
+  shared.uid = u?.uid || null;
   if (shared.member) { settings.site = shared.member.site; if (!settings.me && shared.member.initials) settings.me = shared.member.initials; saveSettings(); }
   uploadLocal();
   await watch();
   // changes held over from an earlier visit: the first word from the server sends again anything still newer (watch)
   document.body.dataset.cloud = 'ready';
   // redraw only when sharing changed, so a half-typed join code isn't wiped
-  if (before !== !!(shared.member || shared.admin) && !view.contains(document.activeElement)) render();
+  if (before !== sharing() && !view.contains(document.activeElement)) render();
 });
 let toastTimer;
 function toast(t) { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2600); }
@@ -620,7 +658,7 @@ function home() {
       if (locked) return `<li${sa}><a href="${canLock() ? '#/p/' + p.id : '#/'}" class="locked"${canLock() ? '' : ' data-locked="1"'}>${body}</a></li>`;
       return `<li${sa} class="${acts ? 'rowact' : ''}"><a href="${isDraft(p) ? '#/new/' + p.id : nextHref(p)}"${declined(p) ? ' class="declined"' : isDraft(p) ? ' class="draft"' : ''}${val(p, 'done') ? ` data-done="${esc(val(p, 'done'))}"` : ''}>${body}</a>${acts}</li>`;
     }).join('')}</ul>` : `<p class="muted">No patients yet. Tap <b>New patient</b> on the morning of surgery.</p>`}
-    <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member.site + ' team')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`}</p>${refreshHtml()}`);
+    <p class="muted small">${sharing() ? `Shared with the ${esc(shared.admin ? 'whole study (admin)' : shared.member ? shared.member.site + ' team' : 'study team (only the subjects shared with this phone)')}. Readings sync when there is signal. <b class="syncline">${esc(syncText())}</b>` : `Data stays on this phone. <a href="#/settings">Join your hospital’s team</a> to share patients.`}</p>${refreshHtml()}`);
   $('#psearch')?.addEventListener('input', e => { const q = e.target.value.trim().toLowerCase(); view.querySelectorAll('.list li[data-sid]').forEach(li => { li.hidden = !!q && !li.dataset.sid.includes(q); }); });
   wireRefresh();
   $('#new').onclick = () => go('#/new');
@@ -2371,12 +2409,62 @@ function joinPage(site, code, carriedMe, then = '#/') {
 
 // ---------- share pages (owner, 19 Oct 2026): two buttons at the bottom of every case, each its own link and QR code page.
 // Much of the data is collected by people who aren't study admins (OT juniors, PACU nurses).
-// Share subject: #/join/{site}/{code}/p/{id} opens this subject; a phone not yet on the team joins it first (the join
-// link's code, so no new access and no rules change: once in, the phone sees that hospital's patients like any member).
-const subjectLink = (site, code, id) => joinLink(site, code) + '/p/' + id;
+// Share subject (owner, 21 Oct 2026; was the team's join link): #/s/<token> opens only this subject. shares/{token} names
+// the patient; the phone that opens it takes a guest pass and can then read and edit that one patient (firestore.rules).
+// One fixed link per participant, made the first time the page opens (share_token syncs); only a study admin stops it.
+const shareToken = p => p.f.share_token?.v || null;
+const shareUrl = token => `${location.origin}${location.pathname}${/[?&]emulator/.test(location.search) ? '?emulator' : ''}#/s/${token}`;
+async function makeShareLink(p) {
+  const site = p.site || val(p, 'site') || guest[p.id]?.site || shared.member?.site || settings.site;
+  if (!site) return toast('Set this patient’s hospital first.');
+  const abc = 'abcdefghijkmnpqrstuvwxyz23456789', b = crypto.getRandomValues(new Uint8Array(24));
+  const token = Array.from(b, x => abc[x % 32]).join(''); // 24 characters of 5 bits: not guessable
+  p.site ||= site;
+  // the patient first: the link can only be opened once the server has it
+  if (Object.keys(p.f).length) sync(p, Object.keys(p.f));
+  try {
+    await Promise.race([cloud.shareCreate(token, { site, pid: p.id, sid: sid(p).slice(0, 60), created: Date.now(), by: (settings.me || '').slice(0, 20) }),
+      new Promise((_, no) => setTimeout(() => no({ code: 'unavailable' }), 8000))]);
+  } catch (e) { return toast(cloud.friendly(e)); }
+  set(p, 'share_token', token);
+}
+async function stopShareLink(p) {
+  const token = shareToken(p); if (!token) return;
+  try { await Promise.race([cloud.shareStop(token), new Promise((_, no) => setTimeout(() => no({ code: 'unavailable' }), 8000))]); }
+  catch (e) { return toast(cloud.friendly(e)); }
+  set(p, 'share_token', null);
+}
+// old links (#/join/{site}/{code}/p/{id}, before 21 Oct 2026) still join the team and open the subject
 route(/^\/join\/([A-Z]+)\/([^/]+)\/p\/(\w+)$/, (site, enc, id) => {
   if (shared.admin && cloud.enabled) { history.replaceState(null, '', location.pathname + location.search + '#/open/' + id); return render(); }
   joinPage(site, decodeURIComponent(enc), '', '#/open/' + id);
+});
+route(/^\/s\/(\w{20,64})$/, token => {
+  header('Opening the subject', '#/');
+  if (!cloud.enabled) return paint('<p class="note">Share links need the team connection, which isn’t available in demo mode.</p>');
+  paint('<p class="muted">Opening the shared subject…</p>');
+  const here = location.hash;
+  const fail = msg => { if (location.hash === here) paint(`<div class="stack"><p class="note">${esc(msg)}</p><a class="primary big" href="#/">Patients</a></div>`); };
+  (async () => {
+    try {
+      await cloud.ensureSignedIn();
+      const u = await cloud.whoAmI();
+      shared.uid = u?.uid || null;
+      if (u && !team()) { shared.member = await cloud.member(); shared.admin = !u.isAnonymous ? await cloud.isAdmin() : false; }
+      const s = await cloud.shareGet(token);
+      if (!s) return fail('This share link was stopped. Ask the study team for a new one.');
+      if (!SITES.includes(s.site) || !/^\w{1,40}$/.test(String(s.pid))) return fail('This share link doesn’t work. Ask the study team for a new one.');
+      // the team's own list already has it (an admin, or this hospital's member): just open it
+      if (!shared.admin && shared.member?.site !== s.site) {
+        await Promise.race([cloud.guestJoin(token, s.pid), new Promise((_, no) => setTimeout(() => no({ code: 'unavailable' }), 10000))]);
+        guest[s.pid] = { token, site: s.site }; write('guest', guest);
+        await watch();
+      }
+      if (location.hash !== here) return;
+      history.replaceState(null, '', location.pathname + location.search + '#/open/' + s.pid);
+      render();
+    } catch (e) { fail(e?.code === 'unavailable' ? 'No connection. Open the link again with signal.' : cloud.friendly(e, 'pacu').replace('link', 'share link')); }
+  })();
 });
 // the subject may not be on this phone yet (just joined, or a teammate's new patient): wait for the team's data
 route(/^\/open\/(\w+)$/, id => {
@@ -2384,7 +2472,7 @@ route(/^\/open\/(\w+)$/, id => {
   const show = () => { history.replaceState(history.state, '', location.pathname + location.search + '#/p/' + id); render(); };
   if (patients[id] && !isGone(patients[id])) return show();
   header('Opening the subject', '#/');
-  paint(`<p class="muted">Getting the team’s patients…</p>`);
+  paint(`<p class="muted">Getting the subject…</p>`);
   const t0 = Date.now(), iv = setInterval(() => {
     if (patients[id] && !isGone(patients[id])) { clearInterval(iv); show(); }
     else if (Date.now() - t0 > 20000) {
@@ -2395,33 +2483,39 @@ route(/^\/open\/(\w+)$/, id => {
   cleanup.push(() => clearInterval(iv));
 });
 // both pages also open from the home list's Share and PACU buttons (/h: back goes to the list)
-route(/^\/p\/(\w+)\/share(\/h)?$/, async (id, h) => {
+route(/^\/p\/(\w+)\/share(\/h)?$/, (id, h) => {
   const p = patients[id]; if (!p) return go('#/');
-  const here = location.hash;
   header(sidL(p) + ' · Share subject', h ? '#/' : (isDraft(p) ? '#/new/' : '#/p/') + id);
+  const here = location.hash;
+  let making = false, stopped = false;
   const box = body => paint(`<div class="paculink"><h2>Share subject</h2>${body}</div>`);
-  if (!cloud.enabled) return box('<p class="muted small">Not available in demo mode.</p>');
-  if (!sharing()) return box('<p class="muted small">Join your hospital’s team (Settings) to share a subject.</p>');
-  const site = p.site || val(p, 'site') || shared.member?.site;
-  if (!site) return box('<p class="muted small">Set this patient’s hospital first.</p>');
-  let code = shared.member?.site === site ? shared.member.code : null;
-  if (shared.admin) {
-    box('<p class="muted">Loading…</p>');
-    try { code = (await cloud.codes())[site]?.code || null; } catch (e) { return box(`<p class="note">${esc(cloud.friendly(e))}</p>`); }
-    if (location.hash !== here) return;
-  }
-  if (!code) return box(`<p class="muted small">${site} has no join code yet. ${shared.admin ? 'Make one on the <a href="#/admin">Study admin</a> screen first.' : 'Ask a study admin.'}</p>`);
-  const url = subjectLink(site, code, id);
-  box(`<div class="qr">${qrSvg(url, 'QR code of the subject link')}</div>
-    <input class="pacuurl" id="suburl" readonly value="${esc(url)}" aria-label="Subject link">
-    <div class="sharerow"><button class="primary" id="subshare">Share link</button><button class="secondary" id="subcopy">Copy link</button></div>
-    <p class="muted small">Opens ${esc(sid(p))} in the app. A phone not on the ${site} team joins it first (it asks for initials) and then sees ${site}’s patients, like the team’s join link. Share it only with people collecting data for this study.</p>`);
-  const copy = () => (navigator.clipboard?.writeText(url) || Promise.reject()).then(() => toast('Link copied'), () => { $('#suburl')?.select(); toast('Select the link and copy it'); });
-  $('#subcopy').onclick = copy;
-  $('#subshare').onclick = async () => {
-    try { if (navigator.share) { await navigator.share({ title: 'Prewarming study: ' + sid(p), text: `Prewarming study: tap to open ${sid(p)}`, url }); return; } } catch (err) { if (err?.name === 'AbortError') return; }
-    copy();
+  const draw = () => {
+    if (!cloud.enabled) return box('<p class="muted small">Not available in demo mode.</p>');
+    if (!sharing()) return box('<p class="muted small">Join your hospital’s team (Settings) to share a subject.</p>');
+    if (making) return box('<p class="muted">Making the link…</p>');
+    const tk = shareToken(p);
+    if (!tk && stopped) return box(`<p class="muted small">The link was stopped: it and its QR code no longer open ${esc(sid(p))}.</p><button class="secondary" data-share-make>Make a new link</button>`);
+    if (!tk) return box(`<p class="muted small">The link couldn’t be made just now (no signal?). It opens only this subject, so someone collecting data can fill it in on their own phone.</p><button class="secondary" data-share-make>Try again</button>`);
+    const url = shareUrl(tk);
+    box(`<div class="qr">${qrSvg(url, 'QR code of the subject link')}</div>
+      <input class="pacuurl" id="suburl" readonly value="${esc(url)}" aria-label="Subject link">
+      <div class="sharerow"><button class="primary" id="subshare">Share link</button><button class="secondary" id="subcopy">Copy link</button></div>
+      <p class="muted small">Opens only ${esc(sid(p))} in the app: whoever opens it can see and fill in this subject, and no other patient. It stays the same for this subject${shared.admin ? '' : '; only a study admin can stop it'}. Share it only with people collecting data for this study.</p>
+      ${shared.admin ? '<button class="link" data-share-stop>Stop this link (admin)</button>' : ''}`);
+    const copy = () => (navigator.clipboard?.writeText(url) || Promise.reject()).then(() => toast('Link copied'), () => { $('#suburl')?.select(); toast('Select the link and copy it'); });
+    $('#subcopy').onclick = copy;
+    $('#subshare').onclick = async () => {
+      try { if (navigator.share) { await navigator.share({ title: 'Prewarming study: ' + sid(p), text: `Prewarming study: tap to open ${sid(p)}`, url }); return; } } catch (err) { if (err?.name === 'AbortError') return; }
+      copy();
+    };
   };
+  const make = () => { making = true; draw(); makeShareLink(p).finally(() => { making = false; if (location.hash === here) draw(); }); };
+  if (!shareToken(p) && cloud.enabled && sharing()) make(); else draw();
+  view.onclick = e => {
+    if (e.target.closest('[data-share-make]')) return void make();
+    if (e.target.closest('[data-share-stop]') && confirm('Stop the Share subject link?\n\nThe link and its QR code stop working, and phones that opened it lose this subject. A new one can be made.')) stopShareLink(p).then(() => { stopped = !shareToken(p); draw(); });
+  };
+  cleanup.push(() => { view.onclick = null; });
 });
 // Share to PACU: the PACU nurse link (it used to sit at the bottom of the PACU page)
 // one fixed link per participant (owner, 21 Oct 2026): made the first time this page opens, then the same link every

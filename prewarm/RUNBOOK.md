@@ -11,7 +11,8 @@ One page for the team. Address: **prewarmstudy.anawj.com** (install it to the ho
    team (or a private window) and tap something; it should say "Saved to the team". Then send it to the PACU nurse.
 5. New patient: Subject ID, group. Check the hospital shows on the patient line.
 6. **Someone else collecting (e.g. an OT junior):** **Share subject** at the bottom of the case gives a link and QR code
-   that opens this patient; a phone not on the team joins it first (initials), then sees the hospital's patients.
+   that opens only this patient: whoever opens it sees and fills in this subject and no other patient, without joining
+   the team. Only a study admin can stop the link (on the same page).
 
 ## During the case
 - Readings: tap the box, type three digits (366 = 36.6), the pad moves to the next box, Save. Grey numbers are only
