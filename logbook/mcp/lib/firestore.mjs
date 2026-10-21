@@ -93,6 +93,19 @@ export function makeFirestore({ projectId, getIdToken, fetch = globalThis.fetch,
       return decodeDoc(body);
     },
 
+    // Changes only the named top-level fields of a document (creating it if needed), leaving the rest as they are.
+    async patchFields(segments, data) {
+      const q = new URLSearchParams();
+      for (const k of Object.keys(data)) q.append('updateMask.fieldPaths', k);
+      const body = await call(`${docUrl(segments)}?${q}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: encodeFields(data) }),
+      });
+      if (!body) throw new FirestoreError('Firestore error 404: not saved', 404);
+      return decodeDoc(body);
+    },
+
     async listCollection(segments) {
       const out = [];
       let pageToken = '';
@@ -136,6 +149,8 @@ export function makeLogbookSource({ firestore, email }) {
     saveReflection: r => firestore.setDoc([...own, 'reflections', String(r.id)], r),
     // a new case's copy for the response sheet (rules: the entry carries this user's email and logbook rid; one
     // already there is refused, as in the app)
+    // the planned cases (logbook.plan) only; email goes too, as the rules want it on the logbook document
+    savePlan: plan => firestore.patchFields(own, { email: me, plan, updatedAt: Date.now() }),
     queueSheetRow: e => firestore.setDoc(['sheetOutbox', String(e.id)], e, { mustNotExist: true }),
     // the residents rule lets a user read only the entry carrying their own email
     async resident() {

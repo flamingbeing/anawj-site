@@ -1,17 +1,21 @@
 // The MCP tools, each a zod input shape and a handler returning text.
 // getData(fresh) -> { email, cases, reflections, logbook, resident }; fresh skips the one-minute cache.
-// writer -> { saveCase, saveReflection, queueSheetRow, invalidate }: with it, the write tools are added too. Both are
+// writer -> { saveCase, saveReflection, savePlan, queueSheetRow, invalidate }: with it, the write tools are added too. Both are
 // injected so tests need no network.
 
 import { z } from 'zod';
 import {
   MAX_LIMIT, DEFAULT_LIMIT, filterCases, searchCases, formatCaseList, resolveYear, formatProgress,
-  formatMissing, filterReflections, formatReflectionList, formatReflection, catName,
+  formatMissing, filterReflections, formatReflectionList, formatReflection, catName, normCase, formatCase,
 } from './logbook.mjs';
 import {
   buildNewCase, buildCaseUpdate, sameCase, describeCase, describeCaseChange, buildReflection, describeReflection,
-  outboxEntry, outboxOn,
+  outboxEntry, outboxOn, today,
 } from './write.mjs';
+import {
+  MAX_ROWS, MAX_PLAN, parseList, rowsFromCases, checkRows, buildCases, describeRows, suggester, formatSuggestions,
+  untaggedReport, planOf, buildPlanItems, formatPlan,
+} from './bulk.mjs';
 
 const limit = z.number().int().min(1).max(MAX_LIMIT).optional().describe(`Most rows to return (default ${DEFAULT_LIMIT}, max ${MAX_LIMIT})`);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
@@ -96,6 +100,35 @@ export function defineTools(getData, writer = null) {
         return formatMissing(d.cases, d.reflections, resolveYear({ year: args.year, resident: d.resident, logbook: d.logbook }));
       },
     },
+    {
+      name: 'suggest_tags',
+      title: 'Suggest APMES tags',
+      description: 'APMES tag suggestions from the app\'s own keyword engine (with your shorthand from the Tag editor). Give text, or a case_id for one case; with neither, lists your cases that have no APMES tag, each with suggestions. Nothing is changed: tag a case with update_case.',
+      shape: { text: z.string().min(1).max(2000).optional().describe('Case details to suggest tags for'), case_id: z.string().min(1).max(200).optional().describe('One of your cases (id from list_cases)'), limit },
+      async run(args) {
+        const d = await getData();
+        if (args.text && args.case_id) throw new Error('Give text or case_id, not both.');
+        const sug = suggester(d.logbook);
+        if (args.text) return `Suggested tags (most likely first): ${formatSuggestions(sug(args.text, { limit: 8 }))}`;
+        if (args.case_id) {
+          const c = d.cases.find(x => String(x.id) === args.case_id);
+          if (!c) throw new Error(`No case with id "${args.case_id}". Use list_cases or search_cases to find ids.`);
+          const n = normCase(c);
+          return `${formatCase(n)}\nSuggested tags it doesn't have yet: ${formatSuggestions(sug(n.details, { limit: 8 }), n.cats)}`;
+        }
+        return untaggedReport(d.cases, d.logbook, { limit: args.limit });
+      },
+    },
+    {
+      name: 'list_plan',
+      title: 'Planned cases',
+      description: 'Your planned cases (a list pasted for a later day, waiting to be confirmed in the app once done): due now and later.',
+      shape: {},
+      async run() {
+        const d = await getData();
+        return formatPlan(planOf(d.logbook));
+      },
+    },
   ];
   return writer ? tools.concat(writeTools(getData, writer)) : tools;
 }
@@ -178,6 +211,70 @@ function writeTools(getData, writer) {
         await writer.saveReflection(r);
         writer.invalidate();
         return `Saved draft reflection ${r.id}${existing ? '' : ' (give this id to change it again)'}:\n\n${describeReflection(r)}`;
+      },
+    },
+    {
+      name: 'add_cases',
+      title: 'Add a list of cases',
+      annotations: ADDS,
+      description: `Add several cases at once (up to ${MAX_ROWS}), like the app's Paste a list: give the pasted list as text (read with your own Pasted list format; confident tags are ticked) or the cases one by one. Each also goes to the Google Form response sheet. Preview first; to change a row's tags, call again with cases instead of text. Save with confirm: true once the user agrees. Cases already there (same date, initials and details) are skipped.`,
+      shape: {
+        text: z.string().min(1).max(60000).optional().describe('The pasted list (e.g. an OT list): cases separated by empty lines; a date at the start of a case sets its date'),
+        cases: z.array(z.object({ date: date.optional(), initials: initials.optional(), details, tags: tags.optional() })).min(1).max(MAX_ROWS).optional().describe('The cases one by one, in place of text'),
+        date: date.optional().describe('YYYY-MM-DD for cases with no date of their own; default today'),
+        confirm,
+      },
+      async run(args) {
+        if (!!args.text === !!args.cases) throw new Error('Give text (a pasted list) or cases, one of the two.');
+        const d = await fresh();
+        const rows = checkRows(args.text ? parseList(args.text, d.logbook, { date: args.date }) : rowsFromCases(args.cases, { date: args.date }));
+        const { cases, dups } = buildCases(rows, d.cases);
+        if (!args.confirm) {
+          return `${rows.length} case${rows.length === 1 ? '' : 's'} read${dups.length ? ` (${dups.length} already there, skipped)` : ''}:\n\n${describeRows(rows, dups)}${cases.length ? PREVIEW('add_cases') : '\n\nNothing new to save.'}`;
+        }
+        if (!cases.length) return 'Nothing saved: every case is already in the logbook.';
+        const rid = d.logbook && d.logbook.rid;
+        let saved = 0, queued = 0;
+        const problems = [];
+        for (const c of cases) {
+          try { await writer.saveCase(c); saved++; }
+          catch (e) { problems.push(`Stopped after ${saved} of ${cases.length}: ${e.message}. Calling add_cases again with the same arguments saves the rest (saved ones are skipped).`); break; }
+          const entry = outboxOn() && rid ? outboxEntry(c, { email: d.email, rid }) : null;
+          if (entry) {
+            try { await writer.queueSheetRow(entry); queued++; }
+            catch (e) { problems.push(`Case ${c.id} saved but not queued for the response sheet (${e.message}).`); }
+          }
+        }
+        writer.invalidate();
+        return [`Saved ${saved} case${saved === 1 ? '' : 's'}${dups.length ? ` (${dups.length} already there, skipped)` : ''}.`,
+          queued ? `Queued ${queued} for the response sheet.` : '', ...problems].filter(Boolean).join('\n');
+      },
+    },
+    {
+      name: 'plan_cases',
+      title: 'Plan cases for a later day',
+      annotations: ADDS,
+      description: `Add cases to your plan for a day (today or later; default tomorrow), like the app's Paste a list → Plan for later: they wait on the app's Log tab that day to be confirmed once done. Give the list as text or the cases one by one. Preview first; save with confirm: true once the user agrees. The plan holds at most ${MAX_PLAN}.`,
+      shape: {
+        text: z.string().min(1).max(60000).optional().describe('The pasted list (e.g. tomorrow\'s OT list): cases separated by empty lines'),
+        cases: z.array(z.object({ initials: initials.optional(), details, tags: tags.optional() })).min(1).max(MAX_ROWS).optional().describe('The cases one by one, in place of text'),
+        date: date.optional().describe('YYYY-MM-DD, today or later; default tomorrow'),
+        confirm,
+      },
+      async run(args) {
+        if (!!args.text === !!args.cases) throw new Error('Give text (a pasted list) or cases, one of the two.');
+        const t = today();
+        const day = args.date || today(new Date(Date.now() + 86_400_000));
+        if (day < t) throw new Error('A plan is for today or a later day; use add_cases for cases already done. Nothing was saved.');
+        const d = await fresh();
+        const rows = checkRows(args.text ? parseList(args.text, d.logbook, { date: day }) : rowsFromCases(args.cases, { date: day }))
+          .map(r => ({ ...r, date: day }));
+        const plan = planOf(d.logbook);
+        if (plan.length + rows.length > MAX_PLAN) throw new Error(`The plan holds at most ${MAX_PLAN}; it has ${plan.length} already. Confirm or remove some in the app first. Nothing was saved.`);
+        if (!args.confirm) return `Plan for ${day}, ${rows.length} case${rows.length === 1 ? '' : 's'}:\n\n${describeRows(rows)}${PREVIEW('plan_cases')}`;
+        await writer.savePlan([...plan, ...buildPlanItems(rows, day)]);
+        writer.invalidate();
+        return `Planned ${rows.length} case${rows.length === 1 ? '' : 's'} for ${day}. They wait on the app's Log tab that day: tick each one once done.`;
       },
     },
   ];

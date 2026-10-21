@@ -94,6 +94,11 @@ await wsrc.saveReflection({ id: 'r9', headingId: 'lscs', status: 'draft' });
 assert.ok(wcalls[1].url.endsWith('/logbooks/res%40example.com/reflections/r9'));
 await wsrc.queueSheetRow({ id: 'c9', email: 'res@example.com', rid: '2024001', details: 'x', cats: [], createdAt: 5 });
 assert.ok(wcalls[2].url.endsWith('/documents/sheetOutbox/c9?currentDocument.exists=false'));
+// the plan: only plan, email and updatedAt change on the logbook document (an update mask), the rest stays
+await wsrc.savePlan([{ id: 'p1', date: '2030-01-01', details: 'x', cats: [] }]);
+assert.equal(wcalls[3].url, 'https://firestore.googleapis.com/v1/projects/apmes-logbook/databases/(default)/documents/logbooks/res%40example.com'
+  + '?updateMask.fieldPaths=email&updateMask.fieldPaths=plan&updateMask.fieldPaths=updatedAt');
+assert.deepEqual(Object.keys(JSON.parse(wcalls[3].init.body).fields), ['email', 'plan', 'updatedAt']);
 await assert.rejects(() => deny.setDoc(['logbooks', 'a@b.c', 'cases', 'x'], { id: 'x' }), /refused access/);
 
 console.log('firestore.test.mjs: ok');

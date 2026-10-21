@@ -409,12 +409,16 @@ function versionLine() {
 
 // Connect Claude (advanced): the MCP server residents run on their own computer (logbook/mcp/README.md)
 const MCP_README = 'https://github.com/flamingbeing/anawj-site/tree/main/logbook/mcp#readme';
+const MCP_DOWNLOAD = 'https://github.com/flamingbeing/anawj-site/releases/download/logbook-mcp/apmes-logbook.mcpb';
 function connectClaudeCard() {
   return h('section', { class: 'card' },
     h('h2', {}, 'Connect Claude (advanced)'),
-    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Ask Claude Desktop or Claude Code about your own logbook ("which tags am I behind on?"), or have it log cases and start draft reflections. A small program on your computer signs in as you; it shows you each change before saving, and never deletes anything.'),
+    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Ask Claude Desktop or Claude Code about your own logbook ("which tags am I behind on?"), or have it log cases (one or a pasted list), suggest tags, plan tomorrow’s list and start draft reflections. A small program on your computer signs in as you; it shows you each change before saving, and never deletes anything.'),
     h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'What it reads or writes goes through Claude: check hospital policy before using it, and keep cases de-identified.'),
-    h('div', { class: 'bar', style: 'margin-bottom:0' }, h('a', { class: 'btn', href: MCP_README, target: '_blank', rel: 'noopener' }, 'How to set it up ›')));
+    h('p', { class: 'hint', style: 'margin:0 0 6px' }, 'Claude Desktop: download the extension and open it; the first question opens a Google sign-in. Claude Code and Codex: see the setup page.'),
+    h('div', { class: 'bar', style: 'margin-bottom:0' },
+      h('a', { class: 'btn primary', href: MCP_DOWNLOAD, rel: 'noopener', download: '' }, 'Download for Claude Desktop'),
+      h('a', { class: 'btn', href: MCP_README, target: '_blank', rel: 'noopener' }, 'How to set it up ›')));
 }
 
 // Settings export / import: preferences, tags, shorthand, tag groups, formats as one small file

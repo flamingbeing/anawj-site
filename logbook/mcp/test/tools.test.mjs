@@ -14,7 +14,7 @@ const data = {
   reflections: [{ id: 'r1', headingId: 'lscs', status: 'complete', title: 'Made-up title', date: '2026-01-05', initials: 'AB' }],
 };
 const tools = Object.fromEntries(defineTools(async () => data).map(t => [t.name, t]));
-assert.deepEqual(Object.keys(tools).sort(), ['get_reflection', 'list_cases', 'list_reflections', 'missing_targets', 'progress', 'search_cases']);
+assert.deepEqual(Object.keys(tools).sort(), ['get_reflection', 'list_cases', 'list_plan', 'list_reflections', 'missing_targets', 'progress', 'search_cases', 'suggest_tags']);
 assert.ok(Object.keys(tools).every(n => !/add|set|write|delete|update|create/.test(n)), 'no write tools');
 assert.equal(READ_ONLY.readOnlyHint, true);
 

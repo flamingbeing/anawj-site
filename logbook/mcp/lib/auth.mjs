@@ -99,7 +99,7 @@ export function authUrl({ clientId, redirectUri, challenge, state }) {
   return `https://accounts.google.com/o/oauth2/v2/auth?${q}`;
 }
 
-function openBrowser(url, log) {
+export function openBrowser(url, log) {
   const [cmd, args] = process.platform === 'darwin' ? ['open', [url]]
     : process.platform === 'win32' ? ['cmd', ['/c', 'start', '""', `"${url}"`]]   // quoted: & is literal
     : ['xdg-open', [url]];

@@ -1,0 +1,56 @@
+# The APMES Logbook Claude Desktop extension (logbook/mcp, README "Install"). On a PR: run the MCP tests and build the
+# .mcpb (kept as a run artifact, to try before merging). On main: the same, then put it on the release "logbook-mcp"
+# as apmes-logbook.mcpb, replacing the old one, so the download link never changes:
+#   https://github.com/flamingbeing/anawj-site/releases/download/logbook-mcp/apmes-logbook.mcpb
+# The bundle also carries the app code the server imports (logbook/js), hence those paths too.
+name: Logbook MCP extension
+
+on:
+  pull_request:
+    paths: ['logbook/mcp/**', 'logbook/js/**', '.github/workflows/logbook-mcpb.yml']
+  push:
+    branches: [main]
+    paths: ['logbook/mcp/**', 'logbook/js/**', '.github/workflows/logbook-mcpb.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: logbook-mcpb-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # the release upload (main only)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: MCP tests
+        working-directory: logbook/mcp
+        run: npm ci --no-audit --no-fund && npm test
+      - name: Build the extension
+        run: |
+          node logbook/mcp/tools/build-mcpb.mjs "$RUNNER_TEMP/stage"
+          npx -y @anthropic-ai/mcpb@2.1.2 validate "$RUNNER_TEMP/stage/manifest.json"
+          npx -y @anthropic-ai/mcpb@2.1.2 pack "$RUNNER_TEMP/stage" "$RUNNER_TEMP/apmes-logbook.mcpb"
+      - name: Keep it with the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: apmes-logbook-mcpb
+          path: ${{ runner.temp }}/apmes-logbook.mcpb
+          retention-days: 14
+      - name: Publish to the logbook-mcp release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(node -p "require('./logbook/mcp/package.json').version")
+          notes="APMES Logbook extension for Claude Desktop, version $v (built from ${GITHUB_SHA::8}). Open the .mcpb file to install it; setup: https://github.com/${GITHUB_REPOSITORY}/tree/main/logbook/mcp#readme"
+          if gh release view logbook-mcp >/dev/null 2>&1; then
+            gh release edit logbook-mcp --title "APMES Logbook for Claude Desktop" --notes "$notes" --latest=false
+          else
+            gh release create logbook-mcp --target "$GITHUB_SHA" --title "APMES Logbook for Claude Desktop" --notes "$notes" --latest=false
+          fi
+          gh release upload logbook-mcp "$RUNNER_TEMP/apmes-logbook.mcpb" --clobber
