@@ -30,6 +30,10 @@ export const SITES = {
   // The beta copy of apmes (PREVIEWS.md, "Beta"): served by the anawj-beta Worker from the beta branch. Same folders,
   // but the apps pick the test Firebase project on beta- hosts (firebase-config.js), so nothing here touches live data.
   // Its sign-in helper pages use their own init.json (apmes-auth-beta/: the test project apmes-logbook-beta).
+  // The NUHS design kit for every app, also in other repos (repo split, 21 Oct 2026): /v1/ is nuhsdesign/ and
+  // /v1/feedback/ the feedback button's script. Kit files carry a CORS header (kitCors), so pages on other hosts
+  // can load them. A new kit version that breaks pages goes in /v2/ beside it; /v1/ stays as it is.
+  'design.anawj.com': { prefixes: { '/v1/feedback/': 'feedback/', '/v1/': 'nuhsdesign/' } },
   'beta-apmes.anawj.com': { prefixes: { '/logbook/': 'logbook/', '/evals/': 'evals/', '/people/': 'people/', '/applicants/': 'applicants/', '/360/': '360/', '/apmes/guidebook/': 'apmes/guidebook/', '/__/auth/': '__/auth/', '/__/firebase/': 'apmes-auth-beta/firebase/' } },
 };
 
@@ -38,6 +42,11 @@ export const SITES = {
 // /feedback/ is the feedback button's script (feedback/overlay.js; no data), which sites.js adds to pages when it's on.
 // These are the only folders shared between subdomains.
 export const SHARED = ['/nuhsdesign/', '/feedback/'];
+
+// The kit's files (the design folder and the feedback script, no data) may be read by pages on any host:
+// Access-Control-Allow-Origin: * for those files only.
+export const KIT = ['nuhsdesign/', 'feedback/'];
+export const kitCors = file => KIT.some(dir => String(file || '').startsWith(dir));
 
 // The feedback button (edit/NOTES.md): on PR previews (any *.workers.dev host) it is on for every page; on the real
 // addresses only in a browser that turned it on with ?feedback=1 (a cookie; ?feedback=0 turns it off).

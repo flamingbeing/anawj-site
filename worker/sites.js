@@ -2,7 +2,7 @@
 // files (the static assets, bound as ASSETS) and decides which folder an address may see (routes.js). No data, no
 // storage: just files, plus one owner-only API on ask.anawj.com (ask.js), the only part with secrets.
 // wrangler.jsonc: "run_worker_first" sends every request here.
-import { resolve, feedback, FEEDBACK_COOKIE } from './routes.js';
+import { resolve, feedback, FEEDBACK_COOKIE, kitCors } from './routes.js';
 import { handleAsk, ASK_HOST } from './ask.js';
 import { handleGuest, GUEST_HOST, GUEST_PATH } from './guest.js';
 import { handleScan, SCAN_HOST, SCAN_PREFIX } from './scan.js';
@@ -49,6 +49,7 @@ export default {
       res = new Response(i < 0 ? html + tag : html.slice(0, i) + tag + html.slice(i), { status: 200, headers });
     } else res = new Response(res.body, res);
     res.headers.set('X-Robots-Tag', NOINDEX);
+    if (kitCors(file)) res.headers.set('Access-Control-Allow-Origin', '*');
     if (fb.set != null) res.headers.append('Set-Cookie', `${FEEDBACK_COOKIE}=${fb.set ? '1; Max-Age=2592000' : '; Max-Age=0'}; Path=/; Secure; SameSite=Lax`);
     return res;
   },

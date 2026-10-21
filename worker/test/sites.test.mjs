@@ -51,6 +51,14 @@ for (const h of ['hand.anawj.com', 'apmes.anawj.com', 'prewarmstudy.anawj.com', 
   r = await get(`https://${h}/nuhsdesign/..%2flogbook/index.html`); assert.equal(r.status, 404, h);
   r = await get(`https://${h}/design/tokens.css`); assert.equal(r.status, 404, h);
 }
+// design.anawj.com/v1/: the kit, with a CORS header so pages on other hosts can load it (other files get none)
+for (const u of ['https://design.anawj.com/v1/tokens.css', 'https://design.anawj.com/v1/app.js', 'https://design.anawj.com/v1/feedback/overlay.js',
+  'https://anawj-preview.example.workers.dev/_sites/design.anawj.com/v1/tokens.css', 'https://hand.anawj.com/nuhsdesign/tokens.css']) {
+  r = await get(u); assert.equal(r.status, 200, u); assert.equal(r.headers.get('Access-Control-Allow-Origin'), '*', u);
+}
+r = await get('https://design.anawj.com/v1'); assert.equal(r.status, 301); assert.equal(r.headers.get('Location'), 'https://design.anawj.com/v1/');
+r = await get('https://design.anawj.com/logbook/'); assert.equal(r.status, 404);
+r = await get('https://hand.anawj.com/babies/'); assert.equal(r.headers.get('Access-Control-Allow-Origin'), null);
 // apmes.anawj.com also serves Firebase's sign-in helper pages at /__/auth/ (handler is handler.html, as on GitHub Pages)
 r = await get('https://apmes.anawj.com/__/auth/handler?apiKey=x&mode=y'); assert.equal(r.status, 200);
 r = await get('https://apmes.anawj.com/__/auth/handler.js'); assert.equal(r.status, 200);
