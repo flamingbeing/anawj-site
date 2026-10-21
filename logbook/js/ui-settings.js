@@ -139,7 +139,7 @@ export function renderThemesAll() {
       h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('button', { type: 'button', class: 'small', onclick: async () => {
         const m = await import('./ui-feedback.js'); m.setFeedbackDraft?.('Theme suggestion: '); location.hash = '#feedback';
       } }, 'Suggest a theme')),
-      help('In the style of other apps: their colours, corners and type, never their logos.')));
+      help('Inspired by apps, brands and visual traditions: colours, surfaces, shapes and type.')));
 }
 export function renderThemes() {
   const st = display(), { theme, custom } = themeState(st);
@@ -161,7 +161,7 @@ export function renderThemes() {
       h('h3', {}, 'Classic'),
       h('div', { class: 'theme-grid' }, THEMES.filter(t => t.group === 'classic').map(t => themeCard(t, theme, custom))),
       h('h3', {}, 'Inspired'),
-      help('In the style of other apps: their colours, corners and type, never their logos.'),
+      help('Inspired by apps, brands and visual traditions: colours, surfaces, shapes and type.'),
       h('div', { class: 'theme-grid' }, FEATURED.map(id => themeCard(THEMES.find(t => t.id === id), theme, custom))),
       h('div', { class: 'bar', style: 'margin:8px 0 0' }, h('a', { class: 'btn small', href: '#themesall' }, 'Browse all themes'))),
     myThemesCard(st, custom),

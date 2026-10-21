@@ -6,7 +6,7 @@ icon sets, page motion); the themes are `js/themes.js` (`THEMES`, `TINTS`, `chec
 ## What a theme is
 
 ```js
-{ id: 'whatsapp', name: 'WhatsApp-style', group: 'inspired', desc: 'One short line (≤ 90 characters)',
+{ id: 'whatsapp', name: 'WhatsApp', group: 'inspired', desc: 'One short line (≤ 90 characters)',
   look: { /* any THEME_KEYS: the settings below */ }, band: ['#rrggbb', '#rrggbb', '#rrggbb', '#rrggbb'] /* optional */ }
 ```
 
@@ -92,7 +92,7 @@ paths in the app's style; never copy an icon font's or a company's artwork.
 
 ## Rules for Inspired themes (checked by `checkTheme`, run over every theme in test/theme-engine.test.mjs)
 
-- The name is "<App>-style"; colours, shapes, motion and type only: **no logos, artwork, slogans or bundled brand
+- Names omit the “-style” suffix; colours, shapes, motion and type only: **no logos, artwork, slogans or bundled brand
   fonts** (system font stacks are fine). No celebrity themes.
 - Text stays readable: ink and muted on bg and panel, and accentInk on accent, at 4.5:1 in light and dark
   (`checkColours`); the tests refuse a theme that fails.
@@ -109,8 +109,8 @@ Its CSS competes with style.css by specificity; give it `wins: true` (facets lay
 
 ## Inspired catalogue
 
-The catalogue has 67 Inspired looks: the original 17 and 50 additional apps. `FEATURED` stays at eight; additions
-appear in Browse all themes. Each look owns a complete light and dark palette, uses system font stacks, and resets
+The catalogue has 92 Inspired looks: the original 67 plus 25 visual traditions. See [the catalogue review](theme-catalogue-review.md) for the inventory, references, changes and limitations. `FEATURED` stays at eight; additions
+appear in Browse all themes. Each look owns a complete light and dark palette, uses system or bundled open font stacks, and resets
 unused facets through `themePatch` (off/default values are omitted). Pixel now has a fixed lavender Material You
 reference palette, rather than keeping a previous accent behind its own colour overrides.
 
@@ -133,8 +133,8 @@ Reference systems checked for role and platform conventions (20 Oct 2026):
 - [LINE messenger colour guide](https://designsystem.line.me/LDSM/foundation/color/line-color-guide-ex-en)
 - [Discord colour reference](https://discord.com/branding)
 
-`test/themes.test.mjs` checks all 50 names, palette completeness and contrast (including OLED), sanitisation and
-export/import for every Inspired look. `test/e2e/inspired-themes.mjs` renders all 67 in light and dark at 390 px,
+`test/themes.test.mjs` checks the original names and all 25 additions, palette completeness and contrast (including OLED), sanitisation and
+export/import for every Inspired look. `test/e2e/inspired-themes.mjs` renders all 92 in light and dark at 390 px,
 checks effective tokens, system tab paths, neutral chrome, phone overflow, persistence and reset. Set `E2E_OUT` to
 save representative viewport screenshots. The original app-style suite checks that defaults stay pixel-identical.
 
@@ -142,4 +142,8 @@ save representative viewport screenshots. The original app-style suite checks th
 
 `node logbook/test/theme-engine.test.mjs`, `node logbook/test/themes.test.mjs`, `node logbook/test/e2e/app-style.mjs`
 (also runs `layouts.mjs`), `node logbook/test/e2e/my-themes.mjs`, and `node logbook/test/e2e/a11y.mjs` after UI changes.
-Catalogue browser coverage: `node logbook/test/e2e/inspired-themes.mjs`.
+Catalogue browser coverage: `node logbook/test/e2e/inspired-themes.mjs` and `node logbook/test/e2e/theme-catalogue.mjs` (Add/List, dialogs, toasts, desktop/phone, picker reloads and a 320px regression).
+
+## Engine follow-up
+
+Observed engine limits, reproducible cases, priorities and acceptance criteria for the next session: [theme-engine-follow-up.md](theme-engine-follow-up.md).

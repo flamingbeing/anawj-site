@@ -27,7 +27,7 @@ try {
         ui.hooks.render();
         const root = document.documentElement, style = getComputedStyle(root);
         const tokens = Object.fromEntries(['bg', 'panel', 'ink', 'muted', 'line', 'accent', 'accent-ink'].map(k => [k, style.getPropertyValue('--' + k).trim()]));
-        return { tokens, mode: root.dataset.theme, icons: root.dataset.icons,
+        return { tokens, status: Object.fromEntries(['ok', 'warn', 'err'].map(k => [k, style.getPropertyValue('--' + k).trim()])), mode: root.dataset.theme, icons: root.dataset.icons,
           logPath: document.querySelector('.tabs button[data-tab="logbook"] .ico path')?.getAttribute('d'),
           heading: getComputedStyle(document.querySelector('.top h1')).color,
           activeTab: getComputedStyle(document.querySelector('.tabs button[aria-selected="true"]')).color,
@@ -36,6 +36,10 @@ try {
       }, { id: theme.id, side });
       const tokens = { ...theme.look.colours[side], 'accent-ink': theme.look.colours[side].accentInk };
       delete tokens.accentInk;
+      for (const k of ['ok', 'warn', 'err']) {
+        if (tokens[k]) assert.equal(actual.status[k], tokens[k], `${theme.id} ${side}: ${k} status token`);
+        delete tokens[k];
+      }
       assert.deepEqual(actual.tokens, tokens, `${theme.id} ${side}: effective palette`);
       assert.equal(actual.mode, side, `${theme.id}: keeps appearance choice`);
       assert.equal(actual.icons, theme.look.iconSet, theme.id);
@@ -56,13 +60,13 @@ try {
   // Reload uses the same palette, then choosing NUHS removes all the Inspired styling again.
   await page.reload();
   await page.locator('main .seg button', { hasText: /^List$/ }).first().waitFor();
-  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()), '#12251f');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()), THEMES.at(-1).look.colours.dark.bg);
   await page.evaluate(async () => {
     const d = await import('./js/display.js'), t = await import('./js/themes.js');
     d.applyDisplay(d.setDisplay(t.themePatch(t.themeById('nuhs'))));
   });
   assert.equal(await page.locator('#look-css').textContent(), '');
   assert.deepEqual(errors, []);
-  console.log('PASS Inspired themes: 67 looks, light and dark, palettes, layout and reload');
+  console.log('PASS Inspired themes: 92 looks, light and dark, palettes, layout and reload');
   await context.close();
 } finally { await browser.close(); }
