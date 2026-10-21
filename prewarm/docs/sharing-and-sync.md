@@ -31,6 +31,14 @@ Team sharing (Firestore), admin sign-in, locking, the PACU nurse link, updates a
   PACU edits to the link copy), so both directions settle on the newest write. `pacu_token` is a field on the patient.
   Anyone holding the link can edit those PACU answers until the link is stopped. Tests: `rules.emulator.mjs` (24
   checks), `sync.emulator.mjs` (a third phone opens the link). Rules deploy on merge to main.
+- **Email and PayNow** (owner, 21 Oct 2026; `js/pay.js`): a button under the Induction room tab's readings opens
+  `#/p/<id>/pay` (not shown for a declined patient). The team types the email and a PayNow mobile (8 digits, 8 or 9;
+  +65 and spaces dropped) and saves to `payments/<patient id>` (merge, no read: the rules let team phones write but not
+  read). The patient record keeps only when and by whom (`pay_saved`, `pay_cleared`; kept on Reset), never the values,
+  so they never reach the export, Form view or the team's other phones. Admins see the values on the same page and in
+  Settings › Email and PayNow (`#/payments`, still to pay first; done ones folded), tick **Email sent** and **Payment
+  sent** (`{ t, by }`), and **Delete email and PayNow** once Payment sent is ticked; the ticks stay. Offline, the save
+  waits in Firestore's queue on that phone and goes when there is signal (as readings do).
 - **Never send an empty `f`**: `setDoc(…, { f: {} }, { merge: true })` replaces the server's
   `f` with an empty map (an empty map is a leaf in the merge). Lock / unlock / delete sent one and wiped the server
   copy's readings; push now omits an empty `f`, lock sends the full record, and each phone resends all its patients

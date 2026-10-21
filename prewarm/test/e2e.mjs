@@ -56,6 +56,16 @@ try {
   await page.click('.chip[data-sat="sat_pre"][data-v="2"]');
   assert.match(await page.textContent('.comfort.done:has([data-satedit="sat_pre"])'), /Neutral/);
   assert.match(await page.textContent('.comfort.done:has([data-satedit="consent_st"])'), /Consented, copy given/);
+  // Email and PayNow: a button on the Induction room tab opens their own page; saved, the button says so (never the values)
+  await page.waitForTimeout(800); // the tap guard after an answer
+  await page.click('a.paybtn'); await page.waitForSelector('#payemail');
+  await axe('email and PayNow');
+  await page.fill('#paynow', '6123 4567'); await page.click('#payf button[type=submit]');
+  await toastSaysE(/8 digits/);
+  await page.fill('#payemail', 'pt@example.com'); await page.fill('#paynow', '9123 4567'); await page.click('#payf button[type=submit]');
+  await page.waitForSelector('a.paybtn');
+  assert.match(await page.textContent('a.paybtn'), /Saved/);
+  assert.ok(!(await page.evaluate(() => JSON.stringify(localStorage))).includes('pt@example.com'), 'the email is never kept in the patient record');
   assert.equal(await page.$('.chip[data-sat="sat_post"]'), null, 'post-op comfort is not on the temperatures screen');
   assert.equal(await page.$('.links a[href$="/form/satis"]'), null, 'no separate satisfaction screen');
   assert.match(await page.textContent('.tabs2 [aria-selected="true"]'), /Induction room/);

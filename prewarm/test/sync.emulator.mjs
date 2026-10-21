@@ -227,6 +227,25 @@ try {
   await a.click('.list a'); await a.click('.textlinks a[href$="/form"]');
   await a.waitForSelector('#doc section.docx', { timeout: 20000 });
   assert.match(await a.textContent('#doc'), /SYNC-01|S\s*Y\s*N\s*C/);
+  // email and PayNow: phone A saves them and can't read them back; the admin sees them, ticks both, then deletes them
+  const payPid = a.url().match(/#\/p\/(\w+)/)[1];
+  await a.goto(`${BASE}#/p/${payPid}/pay`); await a.waitForSelector('#payemail');
+  await a.fill('#payemail', 'pt@example.com'); await a.fill('#paynow', '+65 9123 4567'); await a.click('#payf button[type=submit]');
+  await toastSays(a, /Saved for the study admins/);
+  await a.waitForSelector('a.paybtn'); assert.match(await a.textContent('a.paybtn'), /Saved by AA/);
+  await a.goto(`${BASE}#/p/${payPid}/pay`); await a.waitForSelector('#payemail');
+  assert.equal(await a.inputValue('#payemail'), '', 'the team phone never shows them again');
+  await ad.evaluate(() => { location.hash = '#/payments'; });
+  await ad.waitForSelector('.paylist', { timeout: 15000 });
+  assert.match(await ad.textContent('.paylist'), /SYNC-01[\s\S]*pt@example\.com[\s\S]*PayNow 91234567/);
+  assert.ok(await ad.$eval('[data-payclear]', x => x.disabled), 'Delete waits for Payment sent');
+  await ad.check(`[data-paytick="emailSent"][data-pid="${payPid}"]`); await ad.waitForFunction(() => /Email sent\s*\d/.test(document.querySelector('.paylist').textContent), null, { timeout: 15000 });
+  await ad.check(`[data-paytick="paid"][data-pid="${payPid}"]`); await ad.waitForFunction(() => document.querySelector('[data-payclear]') && !document.querySelector('[data-payclear]').disabled, null, { timeout: 15000 });
+  ad.once('dialog', d => d.accept());
+  await ad.click('[data-payclear]'); await toastSays(ad, /Email and PayNow deleted/);
+  await ad.waitForFunction(() => /Nothing waiting/.test(document.querySelector('main').textContent), null, { timeout: 15000 });
+  await ad.click('#showdone'); assert.doesNotMatch(await ad.textContent('.paylist'), /pt@example|9123/, 'deleted for good');
+  assert.match(await ad.textContent('.paylist'), /deleted/);
   // QR code and join link for WH
   await ad.evaluate(() => { location.hash = '#/admin'; });
   await ad.click('[data-qr="WH"]');
@@ -395,7 +414,7 @@ try {
   await bb.waitForSelector('#code', { timeout: 15000 });
 
   assert.deepEqual(errors, []);
-  console.log('prewarm sync: ok (two phones, PACU nurse link, share subject link, join code, readings both ways, admin email-link and password sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, lock, offline edits heal, open reading asks, reload offline, same reading on both, log out)');
+  console.log('prewarm sync: ok (two phones, PACU nurse link, share subject link, join code, readings both ways, admin email-link and password sign-in, managing admins, codes, join link and QR, blank Word form upload and Form view, email and PayNow (team writes, admin ticks and deletes), lock, offline edits heal, open reading asks, reload offline, same reading on both, log out)');
 } finally {
   await b.close();
 }

@@ -1,7 +1,7 @@
 // Firestore rules checks for prewarm/firestore.rules against the local emulator (fake accounts, demo project only).
 // Run with tools/test-rules.sh (it starts the emulator and runs this from prewarm/).
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, collection, query, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, getDocs, collection, query, where } from 'firebase/firestore';
 import fs from 'node:fs';
 const env = await initializeTestEnvironment({ projectId: 'demo-prewarm', firestore: { rules: fs.readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8085 } });
 const ADMIN = 'lead@example.com';
@@ -176,6 +176,40 @@ await t('admin approves a pending import', assertSucceeds(review(adm)));
 await t('an approved import cannot be changed again', assertFails(review(adm, { status: 'rejected' })));
 await t('admin deletes an import', assertSucceeds(deleteDoc(doc(adm, 'scanImports', 'scan1'))));
 await t('member cannot delete an import', assertFails(deleteDoc(doc(a, 'scanImports', 'scan1'))));
+
+// email and PayNow (owner, 21 Oct 2026): the team writes, only admins read, tick and delete
+const PAY = { site: 'NUH', pid: 'p1', sid: 'S-01', email: 'pt@example.com', paynow: '91234567', setAt: 1, setBy: 'AB' };
+const payDoc = db => doc(db, 'payments', 'p1');
+const d = anonUser('phoneD');
+await t('an SGH phone joins', assertSucceeds(join(d, 'phoneD', 'SGH', 'SGH-CODE-1')));
+await t('the SGH phone reads its own entry', assertSucceeds(getDoc(doc(d, 'members', 'phoneD'))));
+await t('member saves email and PayNow', assertSucceeds(setDoc(payDoc(a), PAY, { merge: true })));
+await t('member cannot read them back', assertFails(getDoc(payDoc(a))));
+await t('member cannot list them', assertFails(getDocs(collection(a, 'payments'))));
+await t('another hospital cannot read them', assertFails(getDoc(payDoc(d))));
+await t('stranger cannot read them', assertFails(getDoc(payDoc(stranger))));
+await t('unverified admin email cannot read them', assertFails(getDoc(payDoc(unv))));
+await t('another hospital cannot write them', assertFails(setDoc(payDoc(d), { ...PAY, paynow: '80000000' }, { merge: true })));
+await t('another hospital cannot create one for its own site under the id', assertFails(setDoc(doc(d, 'payments', 'p1'), { ...PAY, site: 'SGH' }, { merge: true })));
+await t('member replaces them', assertSucceeds(setDoc(payDoc(a), { ...PAY, paynow: '81234567', setAt: 2 }, { merge: true })));
+await t('member cannot tick Payment sent', assertFails(setDoc(payDoc(a), { paid: { t: 1, by: 'AB' } }, { merge: true })));
+await t('member cannot create with a tick', assertFails(setDoc(doc(a, 'payments', 'p2'), { ...PAY, pid: 'p2', paid: { t: 1, by: 'AB' } })));
+await t('member cannot move it to another hospital', assertFails(setDoc(payDoc(a), { site: 'SGH' }, { merge: true })));
+await t('id and pid must match', assertFails(setDoc(doc(a, 'payments', 'p3'), PAY)));
+await t('no extra fields', assertFails(setDoc(doc(a, 'payments', 'p4'), { ...PAY, pid: 'p4', nric: 'x' })));
+await t('member cannot delete', assertFails(deleteDoc(payDoc(a))));
+await t('an SGH phone saves for an SGH patient', assertSucceeds(setDoc(doc(d, 'payments', 'q1'), { ...PAY, site: 'SGH', pid: 'q1' }, { merge: true })));
+await t('admin reads them', assertSucceeds(getDoc(payDoc(adm))));
+await t('admin lists them', assertSucceeds(getDocs(collection(adm, 'payments'))));
+await t('admin ticks Email sent', assertSucceeds(updateDoc(payDoc(adm), { emailSent: { t: 5, by: ADMIN } })));
+await t('admin ticks Payment sent', assertSucceeds(updateDoc(payDoc(adm), { paid: { t: 6, by: ADMIN } })));
+await t('a tick must be { t, by }', assertFails(updateDoc(payDoc(adm), { paid: true })));
+await t('member cannot untick', assertFails(setDoc(payDoc(a), { ...PAY }, { merge: false })));
+await t('admin cannot move it to another hospital', assertFails(updateDoc(payDoc(adm), { site: 'SGH' })));
+await env.withSecurityRulesDisabled(async ctx => { if (!(await getDoc(doc(ctx.firestore(), 'payments', 'p1'))).data().paid) throw new Error('tick lost'); });
+await t('admin deletes the email and PayNow', assertSucceeds(updateDoc(payDoc(adm), { email: deleteField(), paynow: deleteField(), cleared: { t: 7, by: ADMIN } })));
+await env.withSecurityRulesDisabled(async ctx => { const d = (await getDoc(doc(ctx.firestore(), 'payments', 'p1'))).data(); if (d.email || d.paynow || !d.paid || !d.emailSent) throw new Error('not cleared as expected'); });
+await t('admin deletes the entry', assertSucceeds(deleteDoc(payDoc(adm))));
 
 await env.cleanup();
 console.log(`prewarm rules: ${n - fail}/${n} checks passed`);

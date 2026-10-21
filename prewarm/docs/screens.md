@@ -8,6 +8,8 @@ How the patient screen, key times, sign-offs, forms and look work. Part of the n
   order they're filled in (BP/HR/BIS, intra-op details, PACU, satisfaction, form view).
 - **Induction room tab** (owner, 21 Oct 2026; was the Pre-warming tab): general induction-room things plus the
   pre-warming temperatures. Start on a new patient opens it, in every group. The internal route stays `prewarm`.
+- **Email and PayNow** button under the Induction room tab's readings (owner, 21 Oct 2026): its own page; details in
+  [sharing-and-sync.md](sharing-and-sync.md).
 - **Consent** (owner, 21 Oct 2026): first on the Induction room tab (moved from Pre-op), `consent_st` (Extra sheet):
   1 = consented, duplicate form given to the patient; 0 = declined to participate. Shown in place of the comfort
   question until answered (one card tall, so Save stays on screen); once consented, the comfort question shows with
