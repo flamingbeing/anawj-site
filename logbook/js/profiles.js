@@ -8,20 +8,20 @@ import { expandParts } from './logging.js';
 
 export const PROFILE_IDS = ['logbook', 'basic', 'advanced', 'personal', 'faculty'];
 
-// [key, label, group]. Case tab parts are 'case:<part>' (CASE_PARTS in ui-log.js; their switches live there and in
-// the Case tab group; these labels are for the lists of changes); 'case:still' is an APMES one too. Groups: extras (what Basic leaves out), case, apmes.
+// [key, label, group]. Add tab parts are 'case:<part>' (CASE_PARTS in ui-log.js; their switches live there and in
+// the Add tab group; these labels are for the lists of changes); 'case:still' is an APMES one too. Groups: extras (what Basic leaves out), case, apmes.
 export const SWITCHES = [
   ['grid', 'The Logbook grid view', 'extras'],
   ['analytics', 'Analytics trends, forecasts, Gone quiet, reflection to-dos and links to cases', 'extras'],
   ['reflExtras', 'Figures and references in reflections', 'extras'],
   ['reflect', 'Reflect buttons, ☆ Interesting and reflection headings in Analytics', 'extras'],
-  ['case:interesting', 'Interesting on the Case tab', 'case'],
-  ['case:sugg', 'Suggested tags as you type on the Case tab', 'case'],
-  ['case:recent', 'Quick picks (Same as last, tag groups) on the Case tab', 'case'],
-  ['case:groupsave', 'Save as a tag group on the Case tab', 'case'],
-  ['case:plan', 'Plan for later on the Case tab', 'case'],
+  ['case:interesting', 'Interesting on the Add tab', 'case'],
+  ['case:sugg', 'Suggested tags as you type on the Add tab', 'case'],
+  ['case:recent', 'Quick picks (Same as last, tag groups) on the Add tab', 'case'],
+  ['case:groupsave', 'Save as a tag group on the Add tab', 'case'],
+  ['case:plan', 'Plan for later on the Add tab', 'case'],
   ['targets', 'Counts against the APMES targets', 'apmes'],
-  ['case:still', 'Still needed (on the Case tab)', 'apmes'],
+  ['case:still', 'Still needed (on the Add tab)', 'apmes'],
   ['totals', 'Programme totals (the Totals tab, You and your year)', 'apmes'],
   ['portfolio', 'Portfolio export and Section 1 details', 'apmes'],
   ['year', 'Residency year', 'apmes'],
@@ -32,13 +32,13 @@ export const SWITCHES = [
 ];
 export const SWITCH_KEYS = SWITCHES.map(([k]) => k);
 export const switchLabel = key => (SWITCHES.find(([k]) => k === key) || [key, key])[1];
-// (Basic leaves out every optional Case tab part, Still needed too)
+// (Basic leaves out every optional Add tab part, Still needed too)
 const EXTRAS = SWITCHES.filter(s => s[2] === 'extras' || s[0].startsWith('case:')).map(([k]) => k);
 // the items older copies of the app let a Basic profile turn back on (settings.basicOn)
 const BASIC_ITEMS = EXTRAS;
 const APMES = SWITCHES.filter(s => s[2] === 'apmes').map(([k]) => k);
 
-// what each profile turns off (everything else is on). Basic: the extras and the optional Case tab parts;
+// what each profile turns off (everything else is on). Basic: the extras and the optional Add tab parts;
 // logbook only: Basic without reflections; Personal: the APMES parts, with the extras on.
 // Full Analytics in every profile (owner, 15 Oct 2026): Personal still leaves out the APMES parts, and Basic: logbook
 // only the reflection parts, as their own switches.
@@ -56,7 +56,7 @@ const PRESET_ON = {};
 // a profile's default for a switch (true for anything it doesn't govern, like 'case:parsed')
 export const presetOn = (mode, key) => (OPT_IN.includes(key) ? (PRESET_ON[mode] || []).includes(key) : !(PRESET_OFF[mode] || []).includes(key));
 
-// The Case tab part 'quick' was split into 'sugg' and 'recent' (logging.js expandParts): an older 'quick' in
+// The Add tab part 'quick' was split into 'sugg' and 'recent' (logging.js expandParts): an older 'quick' in
 // caseHide, basicOn or `show` stands for both.
 const OLD_PART = { 'case:sugg': 'case:quick', 'case:recent': 'case:quick' };
 const hideList = st => expandParts((st && st.caseHide) || []);
@@ -76,11 +76,11 @@ export function shownIn(st, mode, key) {
 
 // One switch saved: the settings patch. `show` carries only the changed key: the cloud merges the map key by key
 // (saveLogbook writes each show key on its own, mergeFields), so another device's newer switches are never written over,
-// and mergeSettings does the same here and in demo mode. caseHide (Case tab parts off) and basicOn (Basic's items
+// and mergeSettings does the same here and in demo mode. caseHide (Add tab parts off) and basicOn (Basic's items
 // turned on) are kept in step, so an older copy of the app on another device shows the same until it updates. Only that
 // way round: once a switch is in `show`, an older copy changing only caseHide or basicOn is not seen here (shownIn
 // reads `show` first) until the switch is set again or a profile is picked. A known limit, healed when it updates.
-// parts: every Case tab part in order (caseHide's order).
+// parts: every Add tab part in order (caseHide's order).
 export function switchPatch(st, key, on, parts = []) {
   const patch = { show: { [key]: !!on } };
   // the old combined part ('case:quick', both of these): the other of the two keeps its value, and 'quick' goes
@@ -159,7 +159,7 @@ export function mergeSettings(cur, patch) {
   return out;
 }
 
-// Picking a profile: its mode, and every switch back to that profile's default (the Case tab parts no profile
+// Picking a profile: its mode, and every switch back to that profile's default (the Add tab parts no profile
 // governs, like 'case:parsed', stay as they were)
 export function applyPatch(st, mode) {
   const governed = SWITCH_KEYS.filter(k => k.startsWith('case:')).map(k => k.slice(5));

@@ -18,7 +18,7 @@ try { for (const width of [390, 1280]) {
   await group('tips').getByLabel('Show tips and help text').uncheck();
   await p.waitForFunction(() => document.body.classList.contains('no-help'));
   await group('case').getByLabel('Plan for later').uncheck();
-  await group('apmes').getByLabel('Still needed (on the Case tab)').uncheck();
+  await group('apmes').getByLabel('Still needed (on the Add tab)').uncheck();
   await p.waitForFunction(async () => { const { settings } = await import('./js/ui-core.js'); return (settings().caseHide || []).length === 2; });
   await group('logbook').getByLabel('Copy and Reflect buttons on each case').uncheck();
   await group('bar').getByLabel('Notes on the tab bar').check();
@@ -122,7 +122,7 @@ try { for (const width of [390, 1280]) {
   // everything back on, one by one, is Advanced again
   await p.evaluate(() => { location.hash = '#showhide'; });
   for (const el of await p.locator('.showhide input[data-extra]').all()) await el.check();
-  await group('apmes').getByLabel('Still needed (on the Case tab)').check();
+  await group('apmes').getByLabel('Still needed (on the Add tab)').check();
   for (const el of await group('case').locator('input[role=switch]').all()) await el.check();
   await group('bar').getByLabel('Reflections on the tab bar').check();
   await group('bar').getByLabel('Analytics on the tab bar').check();

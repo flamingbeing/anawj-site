@@ -61,7 +61,7 @@ try { for (const width of [390, 1280]) {
   assert.equal(rec.uid, 'demo-uid'); assert.equal(rec.status, 'new'); assert.equal(rec.screen, 'logbook');
   assert.ok(!JSON.stringify(rec).includes('demo@example.com'), 'email stored');
   assert.ok(rec.ua.length <= 200 && rec.version.length > 0);
-  // Send more: a fresh form; a second one sent from the Case tab (newer)
+  // Send more: a fresh form; a second one sent from the Add tab (newer)
   await p.getByRole('button', { name: 'Send more feedback' }).click();
   assert.equal(await p.getByLabel('Your feedback').inputValue(), '');
   await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');

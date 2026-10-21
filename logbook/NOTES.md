@@ -27,7 +27,7 @@ portfolio content.
 - Everything in one go: `tools/test-logbook.sh` (`quick` skips the full e2e). Rules: `tools/test-rules.sh`. Accessibility
   after UI changes: `node logbook/test/e2e/a11y.mjs`. Details: [docs/working.md](docs/working.md).
 - Don't bump `sw.js` `VERSION` by hand (the deploy stamps it); new JS files go in `sw.js` SHELL.
-- Only the Case tab's modules load with the app: they must not import a page module statically (`docs/working.md`, "Start-up speed").
+- Only the Add tab's modules load with the app: they must not import a page module statically (`docs/working.md`, "Start-up speed").
 - New options: per device unless they belong to the account, off by default, defaults pixel-identical.
 - Owner preferences (merging, screenshots, planning): "Working with the owner" in the root `AGENTS.md`. Status and decisions: `STATUS.md`.
 
@@ -36,7 +36,7 @@ portfolio content.
 | File | What is in it |
 |---|---|
 | [docs/words.md](docs/words.md) | The words the app uses (tags, tag groups, case summary, Interesting, ...) |
-| [docs/screens-logging.md](docs/screens-logging.md) | Case tab, logging preferences, Enter key, case parts, two panes |
+| [docs/screens-logging.md](docs/screens-logging.md) | Add tab, logging preferences, Enter key, case parts, two panes |
 | [docs/screens-logbook.md](docs/screens-logbook.md) | Logbook, Reflections, Analytics, reflection editor, Admin portal, fold-outs |
 | [docs/screens-look.md](docs/screens-look.md) | Look and feel, colour, zoom, fonts, Settings pages: Themes, Layout, Accessibility |
 | [docs/theme-engine.md](docs/theme-engine.md) | The theme engine: every look a theme can set, icon sets, page motion, how to write a theme |

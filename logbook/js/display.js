@@ -1,5 +1,5 @@
 // This device's display settings (Settings → Themes, Layout, Accessibility): stored, applied to the page
-// and the tab bar's arrangement. Split from ui-settings.js so the Case tab (ui-log.js, ui-notepad.js) and app.js can
+// and the tab bar's arrangement. Split from ui-settings.js so the Add tab (ui-log.js, ui-notepad.js) and app.js can
 // start without loading the settings pages (they load on first use).
 
 import { S, h, toast, modal, hooks, profile, facultyRole, shows } from './ui-core.js';
@@ -243,7 +243,7 @@ export function applyLook(d = {}) {
   // the case box's keyboard and the reflection editor's spelling (Logging / Reflections pages; read by ui-log.js, ui-reflect.js)
   c.toggle('box-caps-off', d.boxCaps === false); c.toggle('box-correct', d.boxCorrect === true); c.toggle('box-spell-off', d.boxSpell === false);
   c.toggle('refl-spell-off', d.reflSpell === false);
-  // pinned while scrolling: the case box (Case tab) and the search card (Logbook)
+  // pinned while scrolling: the case box (Add tab) and the search card (Logbook)
   c.toggle('pin-box', !!d.pinBox); c.toggle('pin-search', !!d.pinSearch);
   // Borders: softer lines (--edge, style.css); at Borderless / Faint fields, buttons and chips get a light fill instead
   // Flat (the slider's far end, owner 13 Oct 2026): borderless, and the page cards melt into the page
@@ -251,7 +251,7 @@ export function applyLook(d = {}) {
   c.toggle('flat', !!d.flat);
   c.toggle('edges', soft); c.toggle('edges-fill', bl <= 1);
   if (soft) document.documentElement.style.setProperty('--edge-mix', BORDER_MIX[bl] + '%'); else document.documentElement.style.removeProperty('--edge-mix');
-  // corners, card shadows instead of lines, bigger tap targets on the Case tab
+  // corners, card shadows instead of lines, bigger tap targets on the Add tab
   const rl = roundLevel(d);
   if (rl !== 2) document.documentElement.style.setProperty('--round', String(ROUNDS[rl][1])); else document.documentElement.style.removeProperty('--round');
   c.toggle('shadows', d.shadows !== false);   // soft shadows by default (owner, 12 Oct 2026); false = lines
@@ -310,7 +310,7 @@ export const roundLevel = d => (Number.isInteger(d.round) && d.round >= 0 && d.r
 // The tab bar (Layout, per device): the order of its tabs and which are hidden. More always stays
 // (Settings live there), at least two and at most seven (MAX_BAR, More included) stay on the bar; hidden main tabs
 // are listed first on the More page. Every page in the More list can go on the bar too (Admin portal: admins only).
-export const BAR_TABS = [['caselogs', 'Case logs'], ['log', 'Case'], ['logbook', 'Logbook'], ['totals', 'Totals'], ['notes', 'Notes'], ['reflect', 'Reflections'], ['progress', 'Analytics'],
+export const BAR_TABS = [['caselogs', 'Case logs'], ['log', 'Add'], ['logbook', 'Logbook'], ['totals', 'Totals'], ['notes', 'Notes'], ['reflect', 'Reflections'], ['progress', 'Analytics'],
   ['account', 'Account'], ['settings', 'Settings'], ['recovery', 'Recover'], ['data', 'Export / Import'], ['admin', 'Admin portal'], ['more', 'More']];
 // Totals: programme residents, faculty, PDs and admins, with the totals switch on (off in Personal)
 export const barTabs = () => BAR_TABS.filter(([id]) => (id !== 'admin' || S.admin) && (id !== 'caselogs' || facultyRole()) && (id !== 'totals' || ((facultyRole() || S.resident) && shows('totals'))));
@@ -376,4 +376,4 @@ export function applyCustomCss(d = display()) {
 // Settings → Accessibility (#access; owner, 13 Oct 2026): size, contrast and motion (the gestures moved to Layout in
 // theme-revamp S3). All this device's.
 export const IPHONE_APP = () => (/iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)) && (navigator.standalone === true || matchMedia('(display-mode: standalone)').matches);
-export const START_TABS = [['log', 'Case'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics']];
+export const START_TABS = [['log', 'Add'], ['logbook', 'Logbook'], ['reflect', 'Reflections'], ['progress', 'Analytics']];

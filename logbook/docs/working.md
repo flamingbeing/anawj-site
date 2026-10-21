@@ -8,7 +8,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md).
 - New JS files go in `sw.js` SHELL. No hand bump of `VERSION` (13 Oct 2026): the deploy stamps it with a hash of the
   SHELL files (`tools/stamp-versions.mjs`), so installed phones update whenever those files change. Change the base
   (`logbook-v40`) only when the service worker's own logic changes.
-- Start-up speed (13 Oct 2026): only the Case tab's modules load with the app (`index.html` modulepreloads exactly
+- Start-up speed (13 Oct 2026): only the Add tab's modules load with the app (`index.html` modulepreloads exactly
   those); every other page's module loads the first time it opens, then the rest in idle moments (`app.js`, "pages
   that load on first use": `MODS`, `page()`, `warmUp()`). So: the Case-tab modules (`ui-log.js`, `ui-notepad.js`,
   `ui-core.js`, `cloud.js` and what they import) must not import a page module statically. Device display settings
@@ -17,7 +17,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md).
   even before those pages' code loads: anything a lazy module keeps on the device needs an eager wipe); the field
   whitelists in `clean.js` (the demo backend loads only in `?demo`, the Firebase SDK only outside it). A new page:
   `page(['mod'], m => m.mod.renderX())` in TABS. `#app[data-page]` names the page once drawn (tests wait on it).
-  `logbook/test/e2e/lazy-load.mjs` checks the Case tab's modules, every page, every page offline with the
+  `logbook/test/e2e/lazy-load.mjs` checks the Add tab's modules, every page, every page offline with the
   service worker, the sign-out wipe before warm-up and the reload after a failed load. A failed module import
   stays failed until the page reloads (the browser keeps it), so the "didn’t load" card's button reloads, and the
   warm-up stops at its first failure. Version skew (an old page loading a newer module after an update): the
@@ -40,7 +40,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md).
   localStorage `apmes-logbook-demo-small`, so the demo keeps its six seeded cases and skips the big sample
   logbook (`demo-seed.js`); counts in the steps start from those six. Navigation goes through the `tab()`
   helper: Settings pages (`display`, `logging`, `tags`, `reflset`, `sharefmt`, `bin` = the Recycle bin dialog),
-  `data` (Export / Import), `totals` (by hash, under Analytics). On a wide screen the Case tab is two panes.
+  `data` (Export / Import), `totals` (by hash, under Analytics). On a wide screen the Add tab is two panes.
 - Owner preferences (merging, screenshots, planning, new options): see "Working with the owner" in `AGENTS.md`.
   Logbook calls so far: no tag renames (APMES tag names stay), no raw regex, no swipe actions on cases, no tag
   numbers on screen, no What's new, frictionless logging first.
@@ -78,7 +78,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md).
   merged promptly so the other side's branch doesn't drift. Claude Code watches the PRs it opens and acts on
   every comment, review and failure there: a comment on one of its open PRs wakes it, so don't post on it
   unless you mean to reach it (or the owner has stopped it first). Pass work across with a PR link via the owner.
-- After a big batch, a review pass pays: three reviewers in parallel, one per area (Case tab; Logbook search,
+- After a big batch, a review pass pays: three reviewers in parallel, one per area (Add tab; Logbook search,
   Excel and upload; settings, account, reflections), each asked for concrete scenarios and to reproduce in the
   demo, found ~16 real bugs in Oct 2026 (#117). Verify each finding before fixing; add a unit test when the
   logic is pure.

@@ -1079,7 +1079,7 @@ details.refl-foot { margin: 4px 4px 12px; }
 .gl-strip .st-med { position: absolute; top: 2px; height: 14px; width: 2px; margin-left: -1px; background: var(--accent); }
 .gl-strip .st-you { position: absolute; top: 3px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--ink); border: 2px solid var(--panel); }
 .gl-cap { font-size: calc(12px * var(--fs, 1)); color: var(--muted); font-weight: 400; }
-/* Case tab, two panes on wide screens (tablets, unfolded foldables, computers): case, quick picks and
+/* Add tab, two panes on wide screens (tablets, unfolded foldables, computers): case, quick picks and
    Save on the left; all tags on the right, scrolling on their own. Phones keep one column. */
 .log-card.panes .lp-left, .log-card.panes .lp-right { display: contents; }
 @media (min-width: 840px) and (min-height: 500px) {
@@ -1107,7 +1107,7 @@ textarea.details, ul.cases .t, .refl-editor textarea, .refl-editor input[type="t
 .font-sample { margin: 4px 0 0; padding: 6px 10px; border-radius: calc(8px * var(--round, 1)); background: var(--row-alt); border: 1px solid var(--edge, var(--line)); font-size: calc(16px * var(--fs, 1)); }
 
 /* Settings → Display (per device; ui-settings.js applyDisplay sets these on <html>) */
-/* line width: narrow keeps lines short on wide screens (the Case tab's two panes keep their width); wide uses the screen */
+/* line width: narrow keeps lines short on wide screens (the Add tab's two panes keep their width); wide uses the screen */
 html.lw-narrow main:not(:has(.log-card.panes)) { max-width: 760px; }
 html.lw-wide main:not(:has(.log-card.panes)) { max-width: 1400px; }
 html.lw-full main:not(:has(.log-card.panes)) { max-width: none; }
@@ -1153,7 +1153,7 @@ html.no-header:not(.who-alert) .top { display: none; }
 html.no-header:not(.who-alert) main { padding-top: max(8px, env(safe-area-inset-top, 0px)); }
 html.no-header:not(.who-alert).tabs-top .tabs { padding-top: env(safe-area-inset-top, 0px); }
 @media (min-width: 601px) { html.no-header:not(.who-alert):not(.tabs-bottom) .tabs { padding-top: env(safe-area-inset-top, 0px); } }
-/* the Case tab upside down on phones (Settings → Display): all tags at the top, then quick picks and the date, the
+/* the Add tab upside down on phones (Settings → Display): all tags at the top, then quick picks and the date, the
    case box last, next to the keyboard and Save. lp-left / lp-right are display: contents here, so their children
    are the card's own flex items */
 @media (max-width: 600px) {
@@ -1187,10 +1187,10 @@ html.colourful body[data-bar="logbook"] { --heading: var(--t-logbook); }
 html.colourful body[data-bar="reflect"] { --heading: var(--t-reflect); }
 html.colourful body[data-bar="progress"] { --heading: var(--t-progress); }
 html.colourful body[data-bar="more"] { --heading: var(--t-more); }
-/* parts of the Case tab people hide (Settings → Logging → Case tab; ui-log.js CASE_PARTS) */
+/* parts of the Add tab people hide (Settings → Logging → Add tab; ui-log.js CASE_PARTS) */
 .log-card.hide-interesting .reflect-tag, .log-card.hide-parsed .parsed, .log-card.hide-groupsave .group-save,
 .log-card.hide-sugg .sugg-row, .log-card.hide-recent .quick-rest, .log-card.hide-sugg.hide-recent .quick-label { display: none; }
-/* pinned while scrolling (Settings → Display, per device): the case box on the Case tab, the search card on the
+/* pinned while scrolling (Settings → Display, per device): the case box on the Add tab, the search card on the
    Logbook. --pin-top = what is already stuck at the top (the tab bar when it sits at the top of a phone) */
 :root { --pin-top: 0px; }
 @media (max-width: 600px) { html.tabs-top { --pin-top: 55px; } }
@@ -1252,7 +1252,7 @@ html.shadows .display-preview { border-color: var(--accent); }
 html.shadows section.card, html.shadows details.card, html.shadows .display-preview { border-color: transparent; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 14px rgba(0,0,0,.07); }
 html.shadows[data-theme="dark"] section.card, html.shadows[data-theme="dark"] details.card { box-shadow: 0 1px 2px rgba(0,0,0,.5), 0 4px 14px rgba(0,0,0,.45); }
 @media (prefers-color-scheme: dark) { html.shadows[data-theme="auto"] section.card, html.shadows[data-theme="auto"] details.card { box-shadow: 0 1px 2px rgba(0,0,0,.5), 0 4px 14px rgba(0,0,0,.45); } }
-/* Bigger tap targets on the Case tab (Advanced display, per device) */
+/* Bigger tap targets on the Add tab (Advanced display, per device) */
 html.big-taps .log-card .chip { min-height: 44px; padding: 8px 14px; }
 html.big-taps .log-card .picker li { min-height: 52px; }
 html.big-taps .log-card .picker li .tick { width: 26px; height: 26px; }
@@ -1550,7 +1550,7 @@ button.chip-toggle[aria-pressed="true"] { background: var(--accent-soft); border
 .lb-daynote-view > :first-child { margin-top: 4px; }
 .lb-daynote-add { margin: 6px 0 2px; }
 .lb-daynote-add .linkish { background: none; border: 0; padding: 0 2px; min-height: 32px; color: var(--accent); font-weight: 600; }
-/* the Case tab's box for today's note (Settings → Notes) */
+/* the Add tab's box for today's note (Settings → Notes) */
 details.day-note-box { margin: 10px 0 0; }
 details.day-note-box > summary { cursor: pointer; color: var(--muted); font-weight: 600; min-height: 32px; line-height: 32px; width: fit-content; }
 .day-note-box .day-note-text { width: 100%; font-family: var(--font-log, inherit); }
@@ -1614,7 +1614,7 @@ html:not(.rows-short) ul.cases .c-tags > * { max-width: 100%; }
 .row-menu-list a.btn .ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .case-links a.btn { text-decoration: none; }
 /* touch screens: the small targets reach 44px (the calendar's arrows, the view switches, the header's back link, the
-   demo chip, the Case tab's sync link), with padding rather than a new look; Compact mode keeps its tighter sizes */
+   demo chip, the Add tab's sync link), with padding rather than a new look; Compact mode keeps its tighter sizes */
 @media (pointer: coarse), (max-width: 600px) {
   body:not(.compact) button.icon-btn { min-width: 44px; }
   body:not(.compact) .back-row .back-link, body:not(.compact) .note-editor .note-back { min-height: 44px; }

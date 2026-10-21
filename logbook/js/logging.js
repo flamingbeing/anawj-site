@@ -1,5 +1,5 @@
-// Small pure helpers for the Case tab (ui-log.js): which suggestions count as confident, ticking them
-// automatically, the Case tab parts people hide, and the recent cases for "Same as last". Tested in
+// Small pure helpers for the Add tab (ui-log.js): which suggestions count as confident, ticking them
+// automatically, the Add tab parts people hide, and the recent cases for "Same as last". Tested in
 // test/logging.test.mjs.
 
 import { withParents, sortCodes, STRONG } from './engine.js';
@@ -30,7 +30,7 @@ export function rejectCodes({ auto = [], rejected = [] }, codes) {
   return { auto: auto.filter(c => !gone.has(c)), rejected: [...new Set([...rejected, ...codes])] };
 }
 
-// Case tab parts (settings.caseHide; Basic re-enables them in settings.basicOn as 'case:<part>'). 'quick' once
+// Add tab parts (settings.caseHide; Basic re-enables them in settings.basicOn as 'case:<part>'). 'quick' once
 // hid all the quick picks; it was split into 'sugg' (the suggestion row) and 'recent' (Same as last and tag
 // groups), so a profile can keep the suggestions. An older 'quick' still means both, and is rewritten as the
 // two on the next change.

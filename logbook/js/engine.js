@@ -220,7 +220,7 @@ const NOT_INITIALS = new Set(['GA', 'LA', 'RA', 'MAC', 'ETT', 'LMA', 'ASA', 'OT'
 export const cleanInitials = s => String(s || '').toUpperCase().replace(/[^A-Z.\-]/g, '').slice(0, 20);
 
 // Patient identifiers don't belong in a logbook: an NRIC/FIN (S1234567A) or a long number (a hospital or phone
-// number). The Case tab asks before saving one (ui-core.js okNoIds); the Google Form inbox removes them (form-inbox.js).
+// number). The Add tab asks before saving one (ui-core.js okNoIds); the Google Form inbox removes them (form-inbox.js).
 export const ID_RE = /\b[STFGM]\d{7}[A-Z]\b|\b\d{7,}\b/i;
 
 // "AB 34F LSCS spinal" / "AB/34F ..." -> { initials: 'AB', details: '34F LSCS spinal' }. Leading 2–4 letters,

@@ -73,7 +73,7 @@ export const MOVED_SETTINGS = [
   ['display', 'Display', 'layout', ''], ['display', 'Compact mode', 'themes', 'Spacing'], ['display', 'Open the app on', 'layout'],
   ['displayadv', 'Advanced display', 'themes', ''], ['displayadv', 'Look', 'themes', 'Shape and type'],
   ...['Tab bar', 'Tabs on the bar', 'Logbook rows', 'Fewer buttons on Logbook rows', 'Copy button on each Logbook row', 'Copy button for each day',
-    'Page', 'Page width', 'Case tab layout', 'Case tab upside down', 'Pin the case box', 'Pin the search box'].map(t => ['displayadv', t, 'layout']),
+    'Page', 'Page width', 'Add tab layout', 'Add tab upside down', 'Pin the case box', 'Pin the search box'].map(t => ['displayadv', t, 'layout']),
   ...['Gestures', 'Swipe left or right', 'Swipe from the left edge', 'Press and hold a Logbook row', 'Keyboard', 'Hide the tab bar while typing'].map(t => ['access', t, 'layout']),
 ];
 // (page, find) -> [page, find]: short names (Page) only as they are, longer ones also as the start of the option (a

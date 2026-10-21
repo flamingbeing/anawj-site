@@ -48,7 +48,7 @@
   try { var css = localStorage.getItem('apmes-logbook-accent-css-v2'); if (css && css.length < 8000) { var st = document.createElement('style'); st.id = 'accent-css'; st.textContent = css; document.head.appendChild(st); } } catch (e) {}
   try { var lc = localStorage.getItem('apmes-logbook-look-css-v2'); if (lc && lc.length < 60000) { var ls = document.createElement('style'); ls.id = 'look-css'; ls.textContent = lc; document.head.appendChild(ls); } } catch (e) {}
 </script>
-<!-- fetch the Case tab's modules at once instead of one import at a time (the other pages load on first use, app.js);
+<!-- fetch the Add tab's modules at once instead of one import at a time (the other pages load on first use, app.js);
      then the Firebase SDK, or in the demo its stand-in instead -->
 <link rel="modulepreload" href="js/app.js">
 <link rel="modulepreload" href="js/ui-core.js">

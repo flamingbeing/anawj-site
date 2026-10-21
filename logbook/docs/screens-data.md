@@ -80,12 +80,12 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   (`settingsGroups`): give a new page its group. Settings search indexes every page, Profile and the Tag editor included (`SEARCH_PAGES`).
 - **Profile** page (Settings → Profile, was Profiles or hide items; `#showhide`, `renderShowHide` in `ui-settings.js`):
   the profile card, then every switch that shows or hides part of the app, grouped Extras / APMES / Tips and help /
-  Case tab / Reflections / Logbook / Header and tabs, each group with its own "Reset this group" (back to the
+  Add tab / Reflections / Logbook / Header and tabs, each group with its own "Reset this group" (back to the
   profile's defaults; the other groups stay). The same settings as on their own pages. e2e: `simpler.mjs`, `profiles.mjs`.
 - **Profiles are presets of switches** (owner, 13 Oct 2026: "changing profiles simply toggles a bunch of switches";
   `js/profiles.js`, pure, `test/profiles.test.mjs`). `settings.mode` (the whole account; `PROFILES`, `profile()`,
   `shows(key)` / `basicHides(key)`, `setShown`, `caseShown` / `setCaseShown` in `ui-core.js`) is the base; each switch
-  (`SWITCHES`: extras `grid`, `analytics`, `reflExtras`, `reflect`; Case tab parts `case:<part>`; APMES `targets`,
+  (`SWITCHES`: extras `grid`, `analytics`, `reflExtras`, `reflect`; Add tab parts `case:<part>`; APMES `targets`,
   `case:still`, `totals`, `portfolio`, `year`, `reflHeadings`, `saveToast`, `apmesTitle`) is its saved value in
   `settings.show`, else the profile's default (`presetOn`). Older accounts' lists still count: `caseHide` (parts off,
   kept in step on every save) and `basicOn` (items a Basic profile hid, turned back on). So an account with only `mode`
@@ -117,7 +117,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
     (`defaultTitle`; a name typed in Themes → Header and tab bar still wins).
   - **Personal** (generic logging outside APMES): the APMES switches off, the extras on, Notes on the tab bar
     (`PROFILE_ON`), own tags kept (tags are never touched by a profile).
-  - **Basic**: hides the optional Case tab parts but "what the box was read as" (quick picks, ☆, Still needed, tag
+  - **Basic**: hides the optional Add tab parts but "what the box was read as" (quick picks, ☆, Still needed, tag
     group saving, Plan for later), the Logbook Grid, Analytics trends / forecasts / Gone quiet / to-dos / links,
     reflection Figures and References (shown anyway when a reflection has some); Analytics off the bar (in More).
     Search operators are not hidden (already off by default; a setting).
@@ -192,10 +192,10 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
     the existing one (never a second copy with the same id), straight in Edit; when the offline cache hasn't got it,
     it waits up to 3 s for the server's list, and a server copy arriving before anything is typed replaces the blank
     one. Two copies saved apart (two devices) are merged (`mergeDayNote`: the other copy's text plus what was added
-    here) instead of a write conflict; ordinary notes keep the conflict. The Case tab box and the editor share one
+    here) instead of a write conflict; ordinary notes keep the conflict. The Add tab box and the editor share one
     copy. A daily note's date can't be changed (it's found by its day). Ways in: the Logbook day's "+ Daily
     note" / preview card (`dayNoteCard`; Done goes back to the Logbook), Notes' "Today's note" button and "Daily notes"
-    chip, the manifest shortcut `./#today`, and the Case tab box (Settings → Notes, `settings.dayNoteOnCase`, off).
+    chip, the manifest shortcut `./#today`, and the Add tab box (Settings → Notes, `settings.dayNoteOnCase`, off).
     It sorts first in its day and has no heading in Copy / Share / Send and the Markdown export.
   - Daily notes don't count towards `MAX_NOTES` (2,000; `cappedNotes`; backup restore and bin restore follow). The
     rules allow 100 days in `meta/noteIndex`, so the doc holds the latest 100 days and the cases of the latest-changed

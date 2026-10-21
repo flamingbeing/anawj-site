@@ -131,7 +131,7 @@ assert.equal(lookCss({}), '');   // nothing set: no CSS at all, Normal is today'
 const tc = tuneCss({ ftGap: 4, ftBtn: 99, ftDays: 12 });
 assert.ok(tc.startsWith('@layer tune {') && tc.includes('gap: 4px') && tc.includes('margin-top: 12px') && !tc.includes('99px'));
 assert.ok(lookCss({ ftGap: 4 }).includes('@layer tune'));
-assert.ok(tuneCss({ ftBtn: 32 }).includes('max(32px, 44px)'));   // Bigger taps keeps 44 px on the Case tab
+assert.ok(tuneCss({ ftBtn: 32 }).includes('max(32px, 44px)'));   // Bigger taps keeps 44 px on the Add tab
 assert.deepEqual(checkTheme({ ...themeById('nuhs'), look: { ...themeById('nuhs').look, ftGap: 6, ftLetter: 0.01 } }), []);
 assert.match(checkTheme({ ...themeById('nuhs'), look: { ftGap: 40 } }).join(), /ftGap: 40 is out of range/);
 assert.match(checkTheme({ ...themeById('nuhs'), look: { compact: true } }).join(), /look.compact: not a look setting/);

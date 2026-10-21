@@ -2014,7 +2014,7 @@ async function run(label, ctxOpts) {
     await nap(300);
   });
 
-  await step('settings: week start, Case tab parts, case box keyboard, pinned box and search, borderless', async () => {
+  await step('settings: week start, Add tab parts, case box keyboard, pinned box and search, borderless', async () => {
     await tab('loggingadv');
     const check = l => p.locator('label.check', { hasText: l }).locator('input');
     await choose('First day of the week', '0'); await nap(300);
@@ -2134,7 +2134,7 @@ async function run(label, ctxOpts) {
     await configure('newline');
   });
   await step('logging: separate initials box, optional autodetection and month shorthand', async () => {
-    if (phone) { await tab('layout'); await p.getByLabel('Case tab upside down (phones)', { exact: true }).check(); }
+    if (phone) { await tab('layout'); await p.getByLabel('Add tab upside down (phones)', { exact: true }).check(); }
     // Settings → Advanced logging → Separate initials box (device)
     const setSeparate = async on => { await tab('loggingadv'); await p.getByLabel('Separate initials box', { exact: true }).setChecked(on); };
     await setSeparate(true);
@@ -2172,14 +2172,14 @@ async function run(label, ctxOpts) {
     assert(!(await p.locator('.parsed').innerText()).includes('Age/sex'), 'disabled age preview');
     assert(await p.locator('.sugg-row [title*="from the age"]').count() === 0, 'disabled age suggestions');
     await p.reload(); await p.waitForSelector('textarea.details');
-    // (a touch phone doesn't open the keyboard as the app opens: only on going to the Case tab, ui-log.js wantFocus)
+    // (a touch phone doesn't open the keyboard as the app opens: only on going to the Add tab, ui-log.js wantFocus)
     const touch = await p.evaluate(() => matchMedia('(hover: none) and (pointer: coarse)').matches);
     if (touch) assert(await summary.evaluate(el => el !== document.activeElement), 'the keyboard opened as the app started on a phone');
     else assert(await summary.evaluate(el => el === document.activeElement), 'the case box not focused on reload');
     assert(await p.getByLabel('Patient initials', { exact: true }).count() === 0, 'initials box setting not retained on reload');
     assert(!(await p.locator('.parsed').innerText()).includes('Age/sex'), 'disabled age detection not retained');
     await tab('loggingadv');
-    const keyboard = p.getByLabel('Open the keyboard when the Case tab opens (this device)', { exact: true });
+    const keyboard = p.getByLabel('Open the keyboard when the Add tab opens (this device)', { exact: true });
     await keyboard.uncheck();
     await tab('log');
     assert(await p.evaluate(() => !document.activeElement.matches('input, textarea')), 'first field overrode the keyboard-off setting');
@@ -2192,7 +2192,7 @@ async function run(label, ctxOpts) {
     await summary.fill('AB 80M hernia'); await debounced();
     assert(await p.locator('.sugg-row [data-code="21"]').count() === 1, 'geriatric detection not restored');
     await summary.fill('');
-    if (phone) { await tab('layout'); await p.getByLabel('Case tab upside down (phones)', { exact: true }).uncheck(); await tab('log'); }
+    if (phone) { await tab('layout'); await p.getByLabel('Add tab upside down (phones)', { exact: true }).uncheck(); await tab('log'); }
   });
   await step('navigation: demo Account, browser Back/Forward and app Back agree', async () => {
     const q = await ctx.newPage();

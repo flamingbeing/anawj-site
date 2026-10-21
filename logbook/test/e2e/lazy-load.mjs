@@ -1,4 +1,4 @@
-// Fake data only. Lazy loading (app.js "pages that load on first use"): the Case tab opens with only its own modules
+// Fake data only. Lazy loading (app.js "pages that load on first use"): the Add tab opens with only its own modules
 // (no Settings, Reflections, Logbook or Analytics code, no Firebase SDK in the demo); every page then opens, from a
 // link or straight from the address; the Logbook's view hooks work before its code has loaded; and with the service
 // worker, the app still opens every page offline after a reload; sign-out wipes reflection drafts before that page's
@@ -24,10 +24,10 @@ try {
     p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     const asked = []; p.on('request', r => asked.push(r.url()));
 
-    // the Case tab: its own modules only, and the demo never asks for the Firebase SDK
+    // the Add tab: its own modules only, and the demo never asks for the Firebase SDK
     await p.goto(base + '?demo#log'); await p.waitForSelector('textarea.details');
     const first = (await loaded(p)).map(name);
-    for (const m of LAZY) assert.ok(!first.includes(m), `${m} loaded with the Case tab`);
+    for (const m of LAZY) assert.ok(!first.includes(m), `${m} loaded with the Add tab`);
     assert.ok(first.includes('ui-log') && first.includes('display') && first.includes('demo-backend'));
     assert.equal(asked.filter(u => /gstatic\.com\/firebasejs/.test(u)).length, 0, 'Firebase SDK fetched in the demo');
     // typing works at once

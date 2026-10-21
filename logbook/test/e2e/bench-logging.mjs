@@ -1,4 +1,4 @@
-// Fake data only. A small benchmark for the Case tab's hot paths (not part of the test loop): typing 200 characters
+// Fake data only. A small benchmark for the Add tab's hot paths (not part of the test loop): typing 200 characters
 // into the case box, tapping 20 tags and saving 50 cases, with 2000 cases logged. It reports the main thread's busy
 // time (script + style + layout, from Chrome's Performance metrics), so waiting for frames and timers doesn't count.
 // Run with a server on PORT: PORT=8080 node logbook/test/e2e/bench-logging.mjs [runs]

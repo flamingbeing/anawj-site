@@ -618,7 +618,7 @@ function calendarView(rows, flagsOf, repaint) {
   return h('div', {},
     h('div', { class: 'bar lb-calbar' },
       h('button', { class: 'small icon-btn', 'aria-label': 'Previous month', onclick: () => shift(-1) }, '‹'),
-      // tap the month's name to pick another month (a month picker sits invisibly over it, like the Case tab's date chip)
+      // tap the month's name to pick another month (a month picker sits invisibly over it, like the Add tab's date chip)
       h('label', { class: 'grow lb-monthpick', title: 'Pick a month' }, h('strong', {}, `${MONTHS[m - 1]} ${y}`),
         h('span', { class: 'muted', style: 'font-weight:400;font-size:calc(13px * var(--fs, 1))' }, ` · ${monthN} case${monthN === 1 ? '' : 's'}`),
         !MONTH_INPUT ? null : h('input', { type: 'month', 'aria-label': 'Pick a month', value: view.month, onclick: e => { try { e.target.showPicker(); } catch { /* the native tap opens it */ } },

@@ -23,7 +23,7 @@ import { wipeSyncDevice } from './sync-forget.js';
 
 // ---------- pages that load on first use ----------
 
-// Only the Case tab's code loads with the app (index.html preloads it); every other page's module loads the first
+// Only the Add tab's code loads with the app (index.html preloads it); every other page's module loads the first
 // time it is opened, or in idle time soon after the first paint (warmUp), so a phone shows the case box sooner. The
 // service worker keeps them all (sw.js SHELL), so this works offline too.
 const MODS = {
@@ -60,7 +60,7 @@ const page = (names, draw) => () => {
     err => { console.warn(err); if (wait.isConnected) fill(wait, h('section', { class: 'card' }, h('p', {}, 'This page didn’t load. Check the connection, then reload.'), h('div', { class: 'bar', style: 'margin-bottom:0' }, h('button', { onclick: () => location.reload() }, 'Reload')))); });
   return wait;
 };
-// the rest, one module at a time in idle moments once the Case tab is up, so changing tab stays instant
+// the rest, one module at a time in idle moments once the Add tab is up, so changing tab stays instant
 let warmed = false;
 function warmUp() {
   if (warmed) return; warmed = true;
@@ -121,7 +121,7 @@ const icon = id => {
 const TABS = [
   // Faculty / PCs profile (faculty, PDs and admins): residents' compiled case logs, from the counts summaries (in More)
   { id: 'caselogs', label: 'Case logs', render: page(['caselogs'], m => m.caselogs.renderCaseLogs()), faculty: true, desc: 'Residents’ case logs: counts per tag against the targets' },
-  { id: 'log', label: 'Case', render: renderLog },
+  { id: 'log', label: 'Add', render: renderLog },
   { id: 'logbook', label: 'Logbook', render: page(['logbook'], m => m.logbook.renderLogbook()) },
   // Programme totals, its own tab (owner, 15 Oct 2026): the first tab in Faculty / PCs, after the Logbook for residents
   { id: 'totals', label: 'Totals', moreLabel: 'Programme totals', render: page(['progress'], m => m.progress.renderTotals()), desc: 'Every resident’s case counts per tag, by residency year' },
@@ -146,14 +146,14 @@ const TABS = [
   { id: 'themes', label: 'Themes', render: page(['settings'], m => m.settings.renderThemes()), hidden: true, under: 'settings', unlisted: true, desc: 'Ready-made looks, colour, light or dark, fonts, spacing, the header, custom CSS' },
   { id: 'themesall', label: 'Browse all themes', render: page(['settings'], m => m.settings.renderThemesAll()), hidden: true, under: 'themes', unlisted: true, desc: 'Every theme, search, suggest a theme' },
   { id: 'access', label: 'Accessibility', render: page(['settings'], m => m.settings.renderAccessibility()), hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion' },
-  { id: 'layout', label: 'Layout', render: page(['settings'], m => m.settings.renderLayout()), hidden: true, under: 'settings', unlisted: true, desc: 'The start tab, the tab bar, Logbook row buttons, page width, the Case tab, gestures' },
-  { id: 'loggingadv', label: 'Advanced logging', render: page(['settings'], m => m.settings.renderLoggingAdvanced()), hidden: true, under: 'logging', unlisted: true, desc: 'Case tab parts, labelled parts and a case template, the keyboard, search, the week, undo, tips' },
+  { id: 'layout', label: 'Layout', render: page(['settings'], m => m.settings.renderLayout()), hidden: true, under: 'settings', unlisted: true, desc: 'The start tab, the tab bar, Logbook row buttons, page width, the Add tab, gestures' },
+  { id: 'loggingadv', label: 'Advanced logging', render: page(['settings'], m => m.settings.renderLoggingAdvanced()), hidden: true, under: 'logging', unlisted: true, desc: 'Add tab parts, labelled parts and a case template, the keyboard, search, the week, undo, tips' },
   { id: 'sendto', label: 'Send to', render: page(['send'], m => m.send.renderSendSettings()), hidden: true, under: 'settings', unlisted: true, desc: 'Obsidian, WhatsApp, UpNote or any app with a link' },
   { id: 'sync', label: 'Sync', render: page(['sync'], m => m.sync.renderSyncSettings()), hidden: true, under: 'settings', unlisted: true, desc: 'One Markdown file per day in Google Drive, Dropbox or GitHub' },
   { id: 'sharefmt', label: 'Markdown', render: page(['settings'], m => m.settings.renderMarkdownSettings()), hidden: true, under: 'settings', unlisted: true, desc: 'How Copy, Share and the notes export read' },
   { id: 'showhide', label: 'Profile', render: page(['settings'], m => m.settings.renderShowHide()), hidden: true, under: 'settings', unlisted: true, desc: 'Basic, Advanced, Personal…, and everything you can show or hide' },
   { id: 'logging', label: 'Logging', render: page(['settings'], m => m.settings.renderLogging()), hidden: true, under: 'settings', unlisted: true, desc: 'Suggestions, the Enter key, dates, after Save; more under Advanced' },
-  { id: 'notesset', label: 'Notes', render: renderNoteSettings, hidden: true, under: 'settings', unlisted: true, desc: 'Daily note on the Case tab, pasting, formatting buttons, shared text' },
+  { id: 'notesset', label: 'Notes', render: renderNoteSettings, hidden: true, under: 'settings', unlisted: true, desc: 'Daily note on the Add tab, pasting, formatting buttons, shared text' },
   // something shared to the installed app: where it goes (ui-share-in.js); no back link, it's a step of its own
   { id: 'share', label: 'Shared with the app', render: page(['shareIn'], m => m.shareIn.renderShare()), hidden: true, unlisted: true },
   // from Reflections → More tools
@@ -615,10 +615,10 @@ function changeScreen(id, scroll = 0) {
   S.tab = id;
   window.scrollTo(0, 0);
   render();
-  // the inverted Case tab always opens at the bottom, where the case box is (not where it was left)
+  // the inverted Add tab always opens at the bottom, where the case box is (not where it was left)
   requestAnimationFrame(() => { if (S.tab === id) window.scrollTo(0, id === 'log' && invertedCase() ? document.documentElement.scrollHeight : scroll); });
 }
-// Settings → Layout: the Case tab upside down, on a phone-width screen
+// Settings → Layout: the Add tab upside down, on a phone-width screen
 const invertedCase = () => document.documentElement.classList.contains('case-inverted') && matchMedia('(max-width: 600px)').matches;
 const navigation = createNavigation({ history, location,
   parents: Object.fromEntries(TABS.filter(t => t.under).map(t => [t.id, t.under])),
@@ -703,7 +703,7 @@ function render() {
   const drawn = !app.querySelector('.lazy-wait');
   if (drawn) app.dataset.page = tab.id; else delete app.dataset.page;
   if (findAfterRender) { if (drawn) showFound(); }   // (kept until the page is drawn)
-  // the inverted Case tab (Settings → Layout, phones) opens at the bottom, where the case box is
+  // the inverted Add tab (Settings → Layout, phones) opens at the bottom, where the case box is
   else if (lastRendered !== 'log' && invertedCase()) requestAnimationFrame(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const tabFade = !dir && tabChangeMotion(lastRendered, tab.id);
   lastRendered = tab.id;
@@ -1172,7 +1172,7 @@ async function onUser(user) {
   S.tab = tabFromHash() || (START_TABS.some(([v]) => v === start) && onBar.includes(start) ? start : onBar.find(id => id !== 'more') || 'log');
   navigation.initialize(S.tab);
   if (wantToday) { wantToday = false; setTimeout(() => { if (S.user === user) openDayNote(); }, 0); }
-  // a POST share: the Case tab (or the chooser it forwards to) draws again once the service worker's copy is read
+  // a POST share: the Add tab (or the chooser it forwards to) draws again once the service worker's copy is read
   if (sharedIn) sharedIn.then(() => { if (S.user === user && (S.tab === 'log' || S.tab === 'share')) render(); });
   // Settings → Backup: a one-tap reminder when the last Drive / Dropbox backup is over a week old (if asked for)
   // (their code loads only when one is asked for)
@@ -1303,8 +1303,8 @@ function registerSW() {
 
 if (cloud.onSyncError) cloud.onSyncError(err => toast('A change could not be synced: ' + (err.message || err)));
 
-// shared to the installed app (Android share sheet; share-in.js): the text waits for the Case tab, as it always did
-// (its paste-a-list), whether it came the old GET way or as a POST (text or files, received by sw.js). The Case tab
+// shared to the installed app (Android share sheet; share-in.js): the text waits for the Add tab, as it always did
+// (its paste-a-list), whether it came the old GET way or as a POST (text or files, received by sw.js). The Add tab
 // sends it on to the chooser only when Settings → Notes → Ask is on or files came (ui-log.js takeShared). Tidy the
 // address.
 const sharedIn = (() => {

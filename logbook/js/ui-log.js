@@ -50,8 +50,8 @@ const boxAge = details => { const { age } = settings().detectAgeSex !== false ? 
 const ageOff = () => !!draft.noAge && splitAge(draftParts().details).age === draft.noAge;
 // Settings → Advanced logging → Separate initials box (device firstField 'initials'; an older 'date' counts as off)
 const firstField = () => (display().firstField === 'initials' ? 'initials' : 'details');
-// The Case tab opening the keyboard by itself (Logging → Advanced: "Open the keyboard when the Case tab opens"). On a
-// touch screen only right after a tap or key (going to the Case tab), never as the app opens or when a live update
+// The Add tab opening the keyboard by itself (Logging → Advanced: "Open the keyboard when the Add tab opens"). On a
+// touch screen only right after a tap or key (going to the Add tab), never as the app opens or when a live update
 // draws the page again (the keyboard would cover it before anything was tapped), unless set to "Also when the app
 // opens" (autoFocus true). Computers keep focusing it as before.
 let gestureAt = 0;
@@ -158,7 +158,7 @@ function toggleTagIn(cats, tags, key) {
 const looseTags = (cats, tags) => (tags || []).filter(k => !(cats || []).some(code => subcatsOf(code).some(e => e.k === k)));
 function dropCat(list, code) { return list.filter(c => c !== code && BY_CODE[c]?.parent !== code); }
 const toggleCat = (list, code) => (list.includes(code) ? dropCat(list, code) : addCat(list, code));
-// The user's own changes to the ticked categories on the Case tab go through here: what they take off is
+// The user's own changes to the ticked categories on the Add tab go through here: what they take off is
 // remembered for this case, so "Tick confident suggestions automatically" leaves it off.
 function setCats(next) {
   const gone = draft.cats.filter(c => !next.includes(c));
@@ -301,7 +301,7 @@ const refocus = () => { if (ui.textarea && matchMedia('(pointer: fine)').matches
 // The list follows your tag set (Settings → Tag editor): section headers, categories and your own tags,
 // indented under what they sit in; hidden ones only turn up in a search. getTags / toggleTag handle your
 // tags (left out: categories only).
-// onEmptyEnter: Enter in the empty search box (the Case tab saves the case).
+// onEmptyEnter: Enter in the empty search box (the Add tab saves the case).
 export function catPicker({ get, toggle, getTags = null, toggleTag = null, placeholder = 'Search tags', collapsed = false, onEmptyEnter = null }) {
   let q = '', hl = -1, items = [], showAll = !collapsed;
   const listId = 'tags-' + uid();
@@ -424,7 +424,7 @@ export function catPicker({ get, toggle, getTags = null, toggleTag = null, place
 
 // ---------- the Log screen ----------
 
-// Parts of the Case tab people can hide (Settings → Logging, settings.caseHide); tags can always be picked from All tags
+// Parts of the Add tab people can hide (Settings → Logging, settings.caseHide); tags can always be picked from All tags
 export const CASE_PARTS = [
   ['interesting', 'Interesting'],
   ['parsed', 'What the box was read as (initials · details)'],
@@ -713,7 +713,7 @@ function renderOne(card) {
       h('div', { class: 'box-wrap' }, boxMarks, textarea, pasteBtn(textarea), clearBtn), boxGrab(textarea), tooLong, parsed, tagRow,
       // suggestions first, then the last case and your own templates
       h('div', { class: 'chiplabel quick-label' }, 'Quick picks'), sugg, templates,
-      // Settings → Notes → Show the daily note on the Case tab (off by default)
+      // Settings → Notes → Show the daily note on the Add tab (off by default)
       settings().dayNoteOnCase ? dayNoteBox() : null),
     h('div', { class: 'lp-right' },
     h('div', { class: 'bar cat-head' }, h('div', { class: 'chiplabel grow' }, 'All tags'),
@@ -948,7 +948,7 @@ function applyTemplate(t) {
   keepPlace(ui.templates, () => { saveDraft(); paintSel(); }); refocus();
 }
 
-// Same as last chips on the Case tab (settings.recentCount, 1 to 5)
+// Same as last chips on the Add tab (settings.recentCount, 1 to 5)
 export const RECENT_COUNTS = [[1, '1 (default)'], [2, '2'], [3, '3'], [5, '5']];
 const recentCount = () => snapRecent(settings().recentCount);
 const clip = (t, n) => (t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t);
@@ -1220,13 +1220,13 @@ async function planBulk() {
     const items = rows.map(r => ({ id: uid(), date, initials: cleanInitials(r.initials), details: r.details.trim(), cats: sortCodes(r.cats), ...withTags(r) }));
     await savePlan([...plan(), ...items].slice(-100));
     bulkRows = null; if (draft.bulk === bulkText) draft.bulk = ''; saveDraft();
-    toast(`Planned ${items.length} case${items.length === 1 ? '' : 's'} for ${fmtDate(date)}: confirm them on the Case tab that day`);
+    toast(`Planned ${items.length} case${items.length === 1 ? '' : 's'} for ${fmtDate(date)}: confirm them on the Add tab that day`);
     m.close(); hooks.render();
   };
   const t = isoPlus(1), w = nextWorkingDay();
   const pick = h('input', { type: 'date', min: todayISO(), value: t, 'aria-label': 'Plan for date' });
   const m = modal('Plan for later', [
-    h('p', { class: 'hint' }, `${rows.length} case${rows.length === 1 ? '' : 's'}. On that day they wait on the Case tab: tick each one when it is done.`),
+    h('p', { class: 'hint' }, `${rows.length} case${rows.length === 1 ? '' : 's'}. On that day they wait on the Add tab: tick each one when it is done.`),
     h('div', { class: 'bar' },
       h('button', { class: 'primary', onclick: () => put(t) }, `Tomorrow (${fmtDate(t).replace(/ \d{4}$/, '')})`),
       w !== t ? h('button', { onclick: () => put(w) }, `Next working day (${fmtDate(w).replace(/ \d{4}$/, '')})`) : null),

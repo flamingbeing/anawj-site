@@ -137,7 +137,7 @@ function materialCard() {
   return section('material', 'Reflection material', n ? `${n} ☆ case${n === 1 ? '' : 's'} for ${by.size} heading${by.size === 1 ? '' : 's'} still short` : 'No ☆ Interesting cases for the headings still short',
     by.size ? h('ul', { class: 'an-list' }, [...by].map(([id, list]) => h('li', {}, h('b', {}, HEADING_BY_ID[id].name), ': ',
       list.slice(0, 5).map((c, i) => [i ? ', ' : '', h('a', { href: '#reflect', class: 'an-link', onclick: e => { e.preventDefault(); reflectOnCase(c); } }, `${c.initials || 'Case'} ${fmtDate(c.date)}`)]),
-      list.length > 5 ? ` and ${list.length - 5} more` : ''))) : h('p', { class: 'empty' }, 'Star cases with ☆ Interesting on the Case tab; the ones that fit a heading you still need show here.'));
+      list.length > 5 ? ` and ${list.length - 5} more` : ''))) : h('p', { class: 'empty' }, 'Star cases with ☆ Interesting on the Add tab; the ones that fit a heading you still need show here.'));
 }
 function milestonesCard(targetsOn) {
   const list = milestones(S.cases, tagTarget(targetsOn));

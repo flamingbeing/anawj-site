@@ -17,7 +17,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md).
   hidden "Export info" sheet only deletes cases dated within it. Unit tests in export-opts and engine tests.
 - Search date words keep the rest of the query as typed (OR / AND, case-sensitive); a bare SAT/MON/SUN is a
   search word (initials), only full day names or "last sat" are dates.
-- Case tab: Shift+Enter never saves; Undo of a save restores ☆ Interesting; a picked day survives a reload
+- Add tab: Shift+Enter never saves; Undo of a save restores ☆ Interesting; a picked day survives a reload
   (12 h); "+ Add" (calendar) keeps a case being typed; Same as last keeps line 1 (initials, age).
 - Settings file: only known keys, each cleaned to the shape the app reads (a bad savedSearches broke the
   Logbook tab on every device); rYear / rYearAY / importMap / sharedSeen never travel.

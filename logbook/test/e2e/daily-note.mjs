@@ -1,5 +1,5 @@
 // Fake data only. Daily notes (one note a day): the Logbook day's preview and "+ Daily note", Notes' "Today's note"
-// and Daily notes chip, the #today shortcut, the day's Copy text, the Case tab box (Settings → Notes); the paste
+// and Daily notes chip, the #today shortcut, the day's Copy text, the Add tab box (Settings → Notes); the paste
 // cleaner and Clean up; the full formatting bar; things shared to the app (GET, the chooser, the service worker's POST).
 import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
@@ -138,7 +138,7 @@ try { for (const width of [390, 1280]) {
   await p.getByRole('button', { name: 'Done' }).click();
   await p.goto(base + '?demo#notesset');
   await p.getByRole('heading', { name: 'Notes', exact: true }).waitFor();
-  for (const name of ['Show the daily note on the Case tab', 'Clean rich text when pasting', 'Formatting buttons in notes', 'Ask what to do with shared text']) assert.equal(await p.getByRole('switch', { name }).isChecked(), false);
+  for (const name of ['Show the daily note on the Add tab', 'Clean rich text when pasting', 'Formatting buttons in notes', 'Ask what to do with shared text']) assert.equal(await p.getByRole('switch', { name }).isChecked(), false);
   await p.getByRole('switch', { name: 'Clean rich text when pasting' }).check();
   await p.getByRole('switch', { name: 'Formatting buttons in notes' }).check();
   await p.waitForFunction(async () => { const { settings } = await import('./js/ui-core.js'); return settings().pasteClean === true; });
@@ -170,7 +170,7 @@ try { for (const width of [390, 1280]) {
   await saved(p);
   await p.getByRole('button', { name: 'Done' }).click();
 
-  // the Case tab's box (Settings → Notes, off by default): today's note, saving as you type
+  // the Add tab's box (Settings → Notes, off by default): today's note, saving as you type
   await p.goto(base + '?demo#log');
   await p.locator('textarea.details').waitFor();
   assert.equal(await p.locator('.day-note-box').count(), 0);
@@ -180,19 +180,19 @@ try { for (const width of [390, 1280]) {
   const box = p.getByLabel('Today’s note');
   await p.waitForFunction(() => document.querySelector('.day-note-text') && !document.querySelector('.day-note-text').disabled);
   assert.equal(await box.inputValue(), 'Fake day: case tab');
-  await box.fill('Fake day: case tab\nmore from the Case tab');
+  await box.fill('Fake day: case tab\nmore from the Add tab');
   await p.waitForFunction(() => document.querySelector('.day-note-box .notes-status')?.textContent === 'Saved', null, { timeout: 8000 });
-  assert.equal((await dayNote(p, iso)).body, 'Fake day: case tab\nmore from the Case tab');
+  assert.equal((await dayNote(p, iso)).body, 'Fake day: case tab\nmore from the Add tab');
   // a re-render keeps the box open with what's in it
   await p.evaluate(async () => (await import('./js/ui-core.js')).hooks.render());
   assert.equal(await p.locator('.day-note-box').getAttribute('open'), '');
-  assert.equal(await box.inputValue(), 'Fake day: case tab\nmore from the Case tab');
+  assert.equal(await box.inputValue(), 'Fake day: case tab\nmore from the Add tab');
   // Open in Notes straight after typing: the editor has what was typed, and goes on saving the same note
-  await box.fill('Fake day: case tab\nmore from the Case tab\ntyped in box');
+  await box.fill('Fake day: case tab\nmore from the Add tab\ntyped in box');
   await p.getByRole('button', { name: 'Open in Notes' }).click();
   await p.locator('.note-editor').waitFor();
-  assert.equal(await p.getByLabel('Note text').inputValue(), 'Fake day: case tab\nmore from the Case tab\ntyped in box');
-  await p.getByLabel('Note text').fill('Fake day: case tab\nmore from the Case tab\ntyped in box\ntyped in editor');
+  assert.equal(await p.getByLabel('Note text').inputValue(), 'Fake day: case tab\nmore from the Add tab\ntyped in box');
+  await p.getByLabel('Note text').fill('Fake day: case tab\nmore from the Add tab\ntyped in box\ntyped in editor');
   // a title added in the editor: the box takes the new copy, so its next line saves (no conflict)
   await p.getByLabel('Note title').fill('Fake title');
   await saved(p);
@@ -205,7 +205,7 @@ try { for (const width of [390, 1280]) {
   await p.waitForFunction(() => document.querySelector('.day-note-box .notes-status')?.textContent === 'Saved', null, { timeout: 8000 });
   const both = await dayNote(p, iso);
   assert.equal(both.title, 'Fake title');
-  assert.equal(both.body, 'Fake day: case tab\nmore from the Case tab\ntyped in box\ntyped in editor\nsecond box line');
+  assert.equal(both.body, 'Fake day: case tab\nmore from the Add tab\ntyped in box\ntyped in editor\nsecond box line');
   // only the title changed on another device: the box takes that copy too (not only when the text differs)
   await p.evaluate(async iso => {
     const { S, hooks } = await import('./js/ui-core.js'); const cloud = await import('./js/demo-backend.js');
