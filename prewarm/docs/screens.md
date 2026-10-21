@@ -6,6 +6,11 @@ How the patient screen, key times, sign-offs, forms and look work. Part of the n
   compact grid (tap an empty one = now; tap a set one to change or clear it), then all temperatures with a
   Pre-warming / Intra-op switch (opens on Intra-op once the patient is in OT), then links to the other forms in the
   order they're filled in (BP/HR/BIS, intra-op details, PACU, satisfaction, form view).
+- **Consent** (owner, 21 Oct 2026): first on Pre-op, `consent_st` (Extra sheet): 1 = consented, duplicate form given
+  to the patient; 0 = declined to participate. A declined patient's home-list line is grey, the ID struck through,
+  "Declined to participate". The Screening ID is no longer asked (`NOT_ASKED`); its column stays.
+- **Notes** on Intra-op details is a full-width text box (`long: true` fields). On PACU (and the nurse's page) the five
+  comfort answers are one per line (`roomy`); the Pre-warming tab keeps them in one row.
 - **Patient comfort** (owner, 20 Oct 2026): the before-surgery question is at the top of the Pre-warming tab, the
   after-surgery one at the top of the PACU page (no separate screen); one line once answered. The no-pre-warming group
   still opens on the Pre-warming tab until the before-surgery answer is in (then on Intra-op); Still to fill links to

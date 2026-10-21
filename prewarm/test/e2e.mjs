@@ -299,6 +299,8 @@ try {
   await page.click('.chip[data-f="nd_dis"][data-v="1"]');
   await page.click('.chip[data-f="nd_psy"][data-v="2"]');
   assert.equal(await page.inputValue('#f-pacu_nudesc'), '3');
+  // from the top: mid-scroll, axe counts a chip half under the sticky top bar as too small
+  await page.evaluate(() => scrollTo(0, 0));
   await axe('pacu'); await shot('pacu');
 
   // settings and export
