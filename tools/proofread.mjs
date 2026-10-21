@@ -80,7 +80,7 @@ for (const f of files.filter(f => f.endsWith('.md'))) {
 // ---- 3. live addresses
 if (args.has('--live')) {
   const LIVE = ['https://anawj.com/', 'https://prewarmstudy.anawj.com/', 'https://ntfroster.anawj.com/',
-    'https://nuhroster.anawj.com/', 'https://hand.anawj.com/babies/', 'https://hand.anawj.com/cmcj/', 'https://anawj.com/privacy/', 'https://anawj.com/edit/'];
+    'https://nuhroster.anawj.com/', 'https://hand.anawj.com/babies/', 'https://hand.anawj.com/cmcj/', 'https://anawj.com/privacy/'];
   for (const u of LIVE) {
     try {
       const r = await fetch(u, { redirect: 'manual', signal: AbortSignal.timeout(20000) });

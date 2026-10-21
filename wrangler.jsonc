@@ -17,7 +17,7 @@
   },
   // previews are off everywhere (repo split, 21 Oct 2026); checks run locally with `npx wrangler@4 dev --local`
   "preview_urls": false,
-  // variables set in the Cloudflare dashboard survive each deploy (Ask Claude's settings; edit/NOTES.md). Secrets always do.
+  // variables set in the Cloudflare dashboard survive each deploy (old Ask Claude settings). Secrets always do.
   "keep_vars": true,
   // required by `wrangler preview` (Worker Previews), even when empty: previews use the same settings
   "previews": {},

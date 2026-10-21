@@ -1,6 +1,6 @@
 // Feedback button: comment on any page where it lives, including PR previews and the subdomain apps, without the
 // page editor's frame. The Worker (worker/sites.js) adds this script to HTML pages on PR previews (always) and on the
-// subdomains when that browser has turned it on with ?feedback=1 (?feedback=0 turns it off). See edit/NOTES.md.
+// subdomains when that browser has turned it on with ?feedback=1 (?feedback=0 turns it off). Rules for applying page edits: owner-tools page-edits.md.
 // It only reads the page; it never saves app data. Comments stay in this browser until sent (a PR comment or a
 // "Page edits:" issue, the same format as the page editor).
 (() => {
@@ -160,7 +160,7 @@
   render();
 
   // ---- versions to choose from (a "show me versions" comment, built on a PR preview): the page lists them in
-  // <meta name="anawj-variants" content="a,b,c"> and shows the one named by ?variant= (edit/NOTES.md)
+  // <meta name="anawj-variants" content="a,b,c"> and shows the one named by ?variant= (owner-tools page-edits.md)
   const VARIANTS = (document.querySelector('meta[name="anawj-variants"]')?.content || '').split(',').map(v => v.trim()).filter(Boolean);
   const current = () => { const v = new URLSearchParams(location.search).get('variant'); return VARIANTS.includes(v) ? v : VARIANTS[0]; };
   if (VARIANTS.length > 1) {
