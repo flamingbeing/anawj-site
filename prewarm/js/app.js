@@ -66,7 +66,9 @@ applySize(settings.zoom);
 if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
 
 if (DEMO && !Object.keys(patients).length) {
-  const p = newRecord(Date.now() - 3600e3);
+  // started an hour or two ago, but never before today's midnight: a start yesterday would make POD1 due on the demo
+  const ago = ms => Math.max(Date.now() - ms, new Date(new Date().toDateString()).getTime());
+  const p = newRecord(ago(3600e3));
   const now = new Date(), hm = m => { const d = new Date(now.getTime() - m * 60e3); return d.toTimeString().slice(0, 5); };
   setVal(p, 'enrol_id', 'DEMO-01', 'DM'); setVal(p, 'arm', 1, 'DM'); setVal(p, 'pw_gown', hm(30), 'DM'); setVal(p, 'pw_start', hm(22), 'DM');
   [[0, 36.6, 33.0, 32.1, 31.6, 30.9], [5, 36.6, 33.6, 32.6, 31.9, 31.1], [10, 36.7, 34.1, 33.0, 32.2, 31.4], [15, 36.7, 34.5, 33.4, 32.4, 31.6]].forEach(([m, ...t]) => {
@@ -75,7 +77,7 @@ if (DEMO && !Object.keys(patients).length) {
   });
   patients[p.id] = p;
   // a second patient already in OT, induction 50 min ago
-  const q = newRecord(Date.now() - 7200e3);
+  const q = newRecord(ago(7200e3));
   setVal(q, 'enrol_id', 'DEMO-02', 'DM'); setVal(q, 'arm', 2, 'DM'); setVal(q, 'pw_gown', hm(95), 'DM'); setVal(q, 'pw_start', hm(90), 'DM'); setVal(q, 'ev_wstop', hm(80), 'DM');
   setVal(q, 'ev_ot', hm(65), 'DM'); setVal(q, 'io_knife', hm(50), 'DM'); setVal(q, 'io_flip', hm(42), 'DM'); setVal(q, 'io_under_start', hm(40), 'DM');
   [['base', 36.4], [0, 36.3], [5, 36.2], [10, 36.1], [15, 36.0], [20, 35.9], [25, 35.9], [30, 35.8], [35, 35.8], [40, 35.9], [45, 35.9]].forEach(([m, core], i) => {
