@@ -70,7 +70,7 @@ async function run(label, ctxOpts) {
   const SETTINGS_PAGES = ['themes', 'layout', 'access', 'logging', 'tags', 'reflset', 'sharefmt'];
   const tab = async t => {
     // a settings page's Advanced page: open the page, then its Advanced link
-    if (t === 'loggingadv') { await tab(t.replace('adv', '')); await p.locator(`a[data-go="${t}"]`).click(); await nap(350); return; }
+    if (t === 'loggingadv' || t === 'themesadv') { await tab(t.replace('adv', '')); await p.locator(`a[data-go="${t}"]`).click(); await nap(350); return; }
     // the recycle bin: Recover → Recently deleted (15 Oct 2026)
     if (t === 'bin') { await p.evaluate(() => { location.hash = '#recovery'; }); await p.locator('.recover-sec[data-sec=deleted][open] .bin-view').waitFor(); await nap(350); return; }
     if (SETTINGS_PAGES.includes(t)) { await tab('settings'); await p.locator(`.more-list a[data-go="${t}"]`).click(); }
@@ -157,7 +157,7 @@ async function run(label, ctxOpts) {
       assert(p.url().endsWith('#settings'), 'hash rewritten: ' + p.url());
       assert(await p.locator('.acct').count() === 0, 'portfolio details on Settings');
       assert(await p.locator('.more-list a[data-go="bin"]').count() === 0, 'the recycle bin is on Recover now, not in Settings');
-      await tab('themes');
+      await tab('themesadv');
       assert(await p.locator('fieldset.pick legend', { hasText: /^Spacing$/ }).count() === 1, 'no Spacing (the old Compact mode) on Themes');
       await tab('account');
       await p.waitForSelector('.acct', { timeout: 6000 });
@@ -1734,9 +1734,9 @@ async function run(label, ctxOpts) {
     await hit.click();
     await p.waitForURL(/#loggingadv$/);
     await p.locator('fieldset.pick.flash', { hasText: 'Undo window' }).waitFor();
-    await tab('themes');
+    await tab('themesadv');
     await p.locator('input[type=range][aria-label="Line strength"]').fill('0'); await nap(150);
-    await tab('themes');
+    await tab('themesadv');
     assert(await p.locator('.display-preview .row-btn').count() >= 1, 'no Display preview');
     await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
     await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);
@@ -1744,7 +1744,7 @@ async function run(label, ctxOpts) {
   });
 
   await step('display: corners, shadows, bigger tap targets; tab bar order and hidden tabs (listed on More)', async () => {
-    await tab('themes');
+    await tab('themesadv');
     await p.locator('input[type=range][aria-label="Corners"]').fill('0');
     await choose('Card style', 'outlined'); await nap(150);
     assert(await p.evaluate(() => !document.documentElement.classList.contains('shadows')), 'shadows not off');
@@ -1760,7 +1760,7 @@ async function run(label, ctxOpts) {
     await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
     await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);
     assert(await p.locator('.tabs button').count() === 6, 'reset did not bring the tab back');
-    await tab('themes');
+    await tab('themesadv');
     await p.locator('.reset-row button', { hasText: 'Reset this page' }).click();
     await p.locator('dialog[open] button', { hasText: /^Reset$/ }).click(); await nap(300);
     assert(await p.evaluate(() => !document.documentElement.style.getPropertyValue('--round') && document.documentElement.classList.contains('shadows')), 'display reset left corners or turned the default shadows off');
@@ -1812,7 +1812,7 @@ async function run(label, ctxOpts) {
     await choose('Page width', 'full'); await nap(150);
     try {
       assert(await p.evaluate(() => document.documentElement.classList.contains('lw-full')), 'Full page width not applied');
-      await tab('themes'); await p.getByLabel('Hide the header (the app name bar)').check(); await nap(150);
+      await tab('themesadv'); await p.getByLabel('Hide the header (the app name bar)').check(); await nap(150);
       await tab('more');
       await until(async () => !(await p.locator('header.top').isVisible()), 'header still shown in the demo');
       assert(await p.locator('main a.btn', { hasText: 'Leave demo' }).count() === 1, 'no Leave demo by Sign out');
@@ -1821,7 +1821,7 @@ async function run(label, ctxOpts) {
       await p.locator('dialog[open]').getByRole('button', { name: 'Cancel' }).click(); await nap(150);
       await shot3('more-demo-no-header');
     } finally {
-      await tab('themes');
+      await tab('themesadv');
       await p.getByLabel('Hide the header (the app name bar)').uncheck();
       await tab('layout'); await choose('Page width', 'normal'); await nap(150);
     }
@@ -1870,10 +1870,10 @@ async function run(label, ctxOpts) {
   await step('clean looks: Flat, button style, icons, plain calendar, page titles, shorter rows, press and hold', async () => {
     const eq = (x, y, m) => assert(x === y, `${m}: ${x}`);
     const cls = k => p.evaluate(k => document.documentElement.classList.contains(k), k);
-    await tab('themes');
+    await tab('themesadv');
     await choose('Card style', 'flat'); await nap(150);
     assert(await cls('flat') && await cls('edges-fill'), 'Flat not applied');
-    await tab('themes');
+    await tab('themesadv');
     await choose('Button style', 'tinted');
     const sw = l => p.getByLabel(l, { exact: true });
     for (const l of ['Icons instead of words on common buttons', 'Plain calendar', 'Page titles in the header', 'Shorter Logbook rows']) await sw(l).check();
@@ -1905,8 +1905,8 @@ async function run(label, ctxOpts) {
     } finally {
       for (let i = 0; i < 3 && await p.locator('dialog[open]').count(); i++) { await p.keyboard.press('Escape'); await nap(200); }
       await tab('layout'); await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click(); await nap(200);
-      await tab('themes'); await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click(); await nap(200);
-      await tab('themes'); await choose('Card style', 'raised'); await nap(150);
+      await tab('themesadv'); await p.getByRole('button', { name: 'Reset this page' }).click(); await p.locator('dialog[open]').getByRole('button', { name: 'Reset' }).click(); await nap(200);
+      await tab('themesadv'); await choose('Card style', 'raised'); await nap(150);
     }
     for (const k of ['flat', 'btn-tinted', 'icon-btns', 'cal-plain', 'page-titles', 'rows-short', 'row-hold']) assert(!(await cls(k)), k + ' not reset');
     eq(await p.locator('.top h1').textContent(), 'APMES Logbook', 'app name not back');
@@ -1943,10 +1943,11 @@ async function run(label, ctxOpts) {
     assert(await p.evaluate(() => (localStorage.getItem('apmes-logbook-look-css-v2') || '').includes('#d9c7a7')), 'look not cached for the first paint');
     await p.reload({ waitUntil: 'networkidle' }); await nap(300);
     eq(await s1(), '#d9c7a7', 'band lost after reload');
-    await tab('themes');
+    await tab('themesadv');
     await choose('Top band', 'nuh'); await nap(200);
     eq(await s1(), nuh, 'Top band: the NUH stripe not applied');
     eq(await p.locator('.theme-now b').textContent(), 'Custom (based on Paper)', 'a change did not make it custom');
+    await tab('themes');   // (the colour and the themes are on Themes; Top band on Advanced theme settings)
     await p.locator('.swatch[aria-label="Lavender"]').click(); await nap(200);
     eq(await p.locator('.swatch[aria-label="Lavender"]').getAttribute('aria-pressed'), 'true', 'swatch not marked');
     await p.locator('.theme-card', { hasText: 'OLED' }).click(); await nap(300);
@@ -1962,7 +1963,7 @@ async function run(label, ctxOpts) {
   });
 
   await step('compact mode is per device and persists after reload', async () => {
-    await tab('themes');
+    await tab('themesadv');
     // the old Compact mode is Spacing: Tight on Themes (theme-revamp S3: Display is gone)
     await choose(/^Spacing$/, 'compact');
     await nap(600);
@@ -1982,7 +1983,7 @@ async function run(label, ctxOpts) {
     await nap(300);
     await shot3('log-compact');
     await p.locator('textarea.details').fill('');
-    await tab('themes');
+    await tab('themesadv');
     assert(await p.locator('fieldset.pick', { has: p.locator('legend', { hasText: /^Spacing$/ }) }).locator('input[value=compact]').isChecked(), 'Tight not picked after reload');
     const w = await p.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
     assert(w[0] <= w[1], 'compact h-scroll');
@@ -1994,7 +1995,7 @@ async function run(label, ctxOpts) {
     const old = await p.evaluate(() => [document.body.classList.contains('compact'), JSON.parse(localStorage.getItem('apmes-logbook-display')).spacing, 'compact' in JSON.parse(localStorage.getItem('apmes-logbook-display'))]);
     assert(old[0] && old[1] === 'compact' && !old[2], 'old compact: true not moved to Tight: ' + old);
     // Themes → Fine-tune: unset by default, a slider changes the live page, Reset puts it back
-    await tab('themes');
+    await tab('themesadv');
     const gapRow = p.locator('[data-tune="ftGap"]');
     assert((await gapRow.textContent()).includes('Not set'), 'Fine-tune gap set by default');
     const gapOf = () => p.evaluate(() => getComputedStyle(document.querySelector('.bar')).columnGap);
@@ -2006,7 +2007,7 @@ async function run(label, ctxOpts) {
     await p.getByRole('button', { name: 'Reset Fine-tune' }).click();
     await nap(300);
     const g0 = await gapOf(); assert(g0 === before, 'Reset Fine-tune left the gap: ' + g0);
-    await tab('themes');
+    await tab('themesadv');
     await choose(/^Spacing$/, 'normal');
     await nap(300);
     assert(!(await p.evaluate(() => document.body.classList.contains('compact'))), 'Spacing: Normal did not turn Tight off');
@@ -2022,7 +2023,7 @@ async function run(label, ctxOpts) {
     await tab('layout');
     await check('Pin the case box').check(); await check('Pin the search box').check(); await nap(200);
     // Card style Flat: lines gone, fields filled
-    await tab('themes');
+    await tab('themesadv');
     await choose('Card style', 'flat'); await nap(200);
     try {
       await tab('logbook');
@@ -2050,7 +2051,7 @@ async function run(label, ctxOpts) {
       await check('Suggested tags as you type').check(); await check('Quick picks').check(); await check('Autocorrect').uncheck(); await nap(300);
       await tab('layout');
       await check('Pin the case box').uncheck(); await check('Pin the search box').uncheck(); await nap(200);
-      await tab('themes');
+      await tab('themesadv');
       await choose('Card style', 'raised'); await nap(200);
     }
   });

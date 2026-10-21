@@ -83,14 +83,14 @@ try {
   await p.evaluate(async () => { const D = await import('./js/display.js'); D.applyDisplay(D.setDisplay({ iconTint: '#c2417a' })); });
   const strokes = await p.evaluate(() => [...document.querySelectorAll('.tabs button')].map(b => [b.getAttribute('aria-selected'), getComputedStyle(b.querySelector('.ico')).stroke, getComputedStyle(b).color]));
   for (const [sel, stroke, colour] of strokes) if (sel === 'true') assert.equal(stroke, colour, 'the current tab keeps its colour'); else assert.notEqual(stroke, colour, 'tinted');
-  await p.evaluate(() => { location.hash = '#themes'; });
+  await p.evaluate(() => { location.hash = '#themesadv'; });
   await p.locator('details.tab-icons').evaluate(d => { d.open = true; });
   await p.getByLabel('Icon for Logbook').selectOption('heart');
   const { TAB_ICONS } = await import('../../js/theme-engine.js');
   await p.waitForFunction(d => document.querySelector('.tabs [data-tab="logbook"] path')?.getAttribute('d') === d, TAB_ICONS.heart[1]);
 
   // a reload: the photo is still there (first paint has the class), the tab icon too
-  await p.reload(); await p.waitForSelector('section.wallpaper');
+  await p.reload(); await p.waitForSelector('section.card.fine-tune');
   assert.ok(await p.evaluate(() => document.documentElement.classList.contains('wall')));
   await p.waitForFunction(() => /blob:/.test(getComputedStyle(document.documentElement, '::before').backgroundImage));
   assert.equal(await p.locator('.tabs [data-tab="logbook"] path').getAttribute('d'), TAB_ICONS.heart[1]);

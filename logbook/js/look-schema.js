@@ -54,11 +54,29 @@ export const KEEP_GROUPS = [
 ];
 export const keepGroups = d => (Array.isArray(d?.themeKeep) ? KEEP_GROUPS.filter(([g]) => d.themeKeep.includes(g)) : KEEP_GROUPS.filter(g => g[3])).map(([g]) => g);
 
+// The Themes pages (TE S2, owner 21 Oct 2026: the essentials first, the rest on Advanced theme settings): each card,
+// its page and its title, in page order. Every setting below names its card (section), so the two pages can't drift;
+// cards with no look settings (the theme list, Your themes, Custom CSS) are listed too, to place them.
+export const THEME_CARDS = [
+  ['themes', 'themes', 'Themes'], ['mine', 'themes', 'Your themes'], ['colour', 'themes', 'Colour and light'], ['wallpaper', 'themes', 'Wallpaper'],
+  ['shape', 'themesadv', 'Shape and type'], ['tune', 'themesadv', 'Fine-tune'], ['header', 'themesadv', 'Header and tab bar'], ['rows', 'themesadv', 'Rows and forms'],
+  ['details', 'themesadv', 'App-style details'], ['colours', 'themesadv', 'More colour'], ['edit', 'themesadv', 'Edit colours'], ['css', 'themesadv', 'Custom CSS'],
+  ['access', 'access', 'Accessibility'],
+];
+export const cardsOn = page => THEME_CARDS.filter(c => c[1] === page).map(([id]) => id);
+const SECTIONS = {
+  colour: ['accent', 'bgTint'], colours: ['colourful', 'band'], edit: ['colours'], wallpaper: ['wallpaper', 'wallDim'],
+  shape: ['borders', 'flat', 'round', 'shadows', 'fontUi', 'fontLog', 'headFont', 'lineHeight', 'btnStyle', 'iconBtns', 'calPlain'],
+  header: ['tabIcons', 'pageTitles'], rows: ['navStyle', 'rowLayout', 'rowShort', 'formLayout'], details: ['iconTint', 'iconTintStrength', 'tabIcon'],
+  access: ['contrast'],
+};
+const sectionOf = f => Object.keys(SECTIONS).find(c => SECTIONS[c].includes(f.key)) || (f.kind === 'tune' ? 'tune' : f.facet || f.kind === 'bool' ? (f.group === 'shape' ? 'shape' : 'details') : null);
+
 // One entry per setting, in the order themes list them. kind: enum (values), bool (true or unset), off (false or
 // unset: Soft shadows), int (min..max in steps), tune (Fine-tune numbers, theme-engine.js), colour (#rrggbb),
 // colours (the full colour tokens, colors.js), icons (a tab's icon, theme-engine.js). keep: its KEEP_GROUPS group.
 const values = list => list.map(([v]) => v);
-const facetOf = f => (f.bool ? { key: f.key, kind: 'bool' } : { key: f.key, kind: 'enum', values: values(f.choices), facet: true });
+const facetOf = f => (f.bool ? { key: f.key, kind: 'bool', group: f.group } : { key: f.key, kind: 'enum', values: values(f.choices), facet: true, group: f.group });
 const KEEPS = {
   wallpaper: ['wallpaper', 'wallDim'],
   layout: ['navStyle', 'rowLayout', 'rowShort', 'formLayout', 'tabIcons', 'tabActiveLabel', 'iconBtns', 'pageTitles', 'calPlain', 'tabIcon'],
@@ -91,7 +109,7 @@ export const LOOK = [
   { key: 'iconTint', kind: 'colour' },
   { key: 'iconTintStrength', kind: 'int', min: 10, max: 100, step: 10 },
   { key: 'tabIcon', kind: 'icons' },
-].map(f => ({ ...f, keep: Object.keys(KEEPS).find(g => KEEPS[g].includes(f.key)) || null }));
+].map(f => ({ ...f, keep: Object.keys(KEEPS).find(g => KEEPS[g].includes(f.key)) || null, section: sectionOf(f) }));
 export const LOOK_KEYS = LOOK.map(f => f.key);
 export const lookField = k => LOOK.find(f => f.key === k);
 

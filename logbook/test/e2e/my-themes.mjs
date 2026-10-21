@@ -19,18 +19,28 @@ try { for (const width of [390, 1280]) {
   assert.equal(await now(), 'NUHS');
   assert.equal(await card.locator('.tip').count(), 0, 'nothing to save yet');
   assert.equal(await card.getByRole('button', { name: 'Export…' }).count(), 1, 'Export is there before anything is saved (it saves the look you have)');
-  // Full palette editor: live checks reject a failing pair without changing saved settings.
+  // Full palette editor (Advanced theme settings): live checks reject a failing pair without changing saved settings.
+  // Each colour opens the colour sheet (TE S2): a typed hex stays exactly as typed, its contrast shows as it changes.
+  await p.evaluate(() => { location.hash = '#themesadv'; });
   const editor = () => p.locator('section.card').filter({ has: p.getByRole('heading', { name: 'Edit colours', exact: true }) });
-  const token = (mode, name) => editor().getByLabel(`${mode} ${name}`, { exact: true });
-  await token('Light', 'ink').fill('#ffffff');
+  const sheet = p.locator('dialog.colour-sheet[open]');
+  const token = async (mode, name, hex) => {
+    await editor().getByRole('button', { name: `${mode} ${name}`, exact: true }).click();
+    await sheet.getByLabel('Hex colour').fill(hex);
+    const said = await sheet.getByRole('status').innerText();
+    await sheet.getByRole('button', { name: 'Use this colour' }).click();
+    await sheet.waitFor({ state: 'detached' });
+    return said;
+  };
+  assert.match(await token('Light', 'ink', '#ffffff'), /ink on bg: 1\.\d+:1 \(needs 4\.5:1\)/, 'the sheet says the contrast as it changes');
   assert.match(await editor().getByRole('status').innerText(), /ink on bg: 1\./);
   await editor().getByRole('button', { name: 'Save colours', exact: true }).click();
   assert.match(await editor().getByRole('status').innerText(), /Colours not saved.*Light ink on bg/);
   assert.equal(await p.evaluate(async () => (await import('./js/display.js')).display().colours ?? null), null);
   await editor().getByRole('button', { name: 'Reset ink', exact: true }).click();
-  await token('Light', 'bg').fill('#ffffff');
+  await token('Light', 'bg', '#ffffff');
   await editor().getByRole('button', { name: 'Dark', exact: true }).click();
-  await token('Dark', 'line').fill('#556677');
+  await token('Dark', 'line', '#556677');
   await editor().getByRole('button', { name: 'Save colours', exact: true }).click();
   assert.match(await now(), /Custom/);
   const palettes = { light: { bg: '#ffffff' }, dark: { line: '#556677' } };
@@ -42,7 +52,7 @@ try { for (const width of [390, 1280]) {
   await p.reload();
   assert.equal(await cssVar('bg'), '#ffffff');
   await p.unroute('**/logbook/js/app.js');
-  await p.reload(); await card.waitFor();
+  await p.reload(); await editor().waitFor();
   for (const mode of ['dark', 'oled', 'auto']) {
     await p.emulateMedia({ colorScheme: 'dark' });
     await p.evaluate(async mode => (await import('./js/display.js')).applyTheme(mode), mode);
@@ -58,10 +68,11 @@ try { for (const width of [390, 1280]) {
     await editor().scrollIntoViewIfNeeded();
     await p.screenshot({ path: process.env.E2E_OUT + '/colours-phone.png' });
   }
-  // change something: Custom, and the card asks to save it
+  // change something (Advanced theme settings): Custom, and the card on Themes asks to save it
   await p.locator('input[type=range][aria-label="Corners"]').fill('0');
   await p.getByRole('radio', { name: /Outlined: thin lines/ }).check({ force: true });
   await poll(async () => /Custom/.test(await now()), 'custom');
+  await p.evaluate(() => { location.hash = '#themes'; }); await card.waitFor();
   await card.locator('.tip', { hasText: 'it’s now Custom' }).waitFor();
   await card.getByLabel('Name for this look').fill('Fake square');
   await card.getByRole('button', { name: 'Save this look' }).click();

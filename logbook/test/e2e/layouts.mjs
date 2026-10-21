@@ -40,7 +40,7 @@ try { for (const width of [390, 1200]) {
   await apply({ formLayout: 'page' });
   assert.equal(await p.locator('.case-section').count(), 0);
   assert.equal(await p.locator('textarea.details').inputValue(), 'ZQ layout draft'); passed++;
-  await tab('themes');
+  await tab('themesadv');
   const layout = p.locator('section.card').filter({ has: p.getByRole('heading', { name: 'Rows and forms', exact: true }) });
   assert.equal(await layout.getByRole('radio').count(), 8);
   await layout.locator('input[value=chat]').check();
