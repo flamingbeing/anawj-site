@@ -699,7 +699,8 @@ route(/^\/new$/, () => {
     if (!arm) return toast('Choose the randomisation group.');
     if (Object.values(patients).some(p => !isGone(p) && String(val(p, 'enrol_id')).toLowerCase() === id.toLowerCase())) return toast('That Subject ID is already on this phone.');
     const p = newRecord(); set(p, 'enrol_id', id); set(p, 'arm', arm); if (settings.site) set(p, 'site', settings.site); patients[p.id] = p; saveAll();
-    go('#/p/' + p.id);
+    // Start opens the Induction room tab for every group, no pre-warming too (owner, 21 Oct 2026)
+    go('#/p/' + p.id + '/prewarm');
   };
 });
 
@@ -812,18 +813,33 @@ function openTarget(t, pad = true) {
   pendingOpen = { ...t, at: Date.now() };
   if (location.hash === hash) render(); else go(hash);
 }
-// patient comfort (owner, 20 Oct 2026): the before-surgery question sits on the Pre-warming tab, the after-surgery one
+// patient comfort (owner, 20 Oct 2026): the before-surgery question sits on the Induction room tab, the after-surgery one
 // on the PACU page; one line once answered
 const COMFORT = BY_ID.sat_pre.opts;
+// consent (owner, 21 Oct 2026): first on the Induction room tab, same look as comfort; Declined on the left, Consented on
+// the right, in short words (the export keeps the code)
+const CONSENT = [[0, 'Declined to participate'], [1, 'Consented, copy given']];
 let satEdit = null;
-// roomy (PACU, owner 21 Oct 2026): two answers per row, Neutral alone, so the words never split; the Pre-warming tab keeps one row
-function comfortHtml(p, id, label, roomy = false) {
-  const v = val(p, id);
+// roomy (PACU, owner 21 Oct 2026): two answers per row, Neutral alone, so the words never split; the Induction room tab keeps one row
+function comfortHtml(p, id, label, roomy = false, aside = '') {
+  const v = val(p, id), opts = id === 'consent_st' ? CONSENT : COMFORT;
   if (v != null && satEdit !== id) {
-    return `<div class="comfort done"><span>${label}: <b>${esc(COMFORT.find(o => String(o[0]) === String(v))?.[1] || v)}</b></span><button class="link" data-satedit="${id}">Change</button><button class="link" data-satclear="${id}">Clear</button></div>`;
+    return `<div class="comfort done"><span>${label}: <b>${esc(opts.find(o => String(o[0]) === String(v))?.[1] || v)}</b></span><button class="link" data-satedit="${id}">Change</button><button class="link" data-satclear="${id}">Clear</button></div>`;
   }
-  return `<div class="comfort"><span class="lab">${label}<small>ask the patient</small></span>
+  // one row, short words, so Save stays on screen on a phone; the full wording shows once answered
+  if (opts === CONSENT) return `<div class="comfort consent"><span class="lab">${label}</span>
+    ${opts.map(([ov, ol]) => `<button class="chip" data-sat="${id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${String(ov) === '0' ? 'Declined' : ol}</button>`).join('')}</div>`;
+  return `<div class="comfort"><span class="lab">${label}${aside || '<small>ask the patient</small>'}</span>
     <div class="seg comfort5${roomy ? ' roomy' : ''}">${COMFORT.map(([ov, ol]) => `<button class="chip" data-sat="${id}" data-v="${ov}" aria-pressed="${String(v) === String(ov)}">${roomy ? ol : ol.replace('omfortable', 'omfort&shy;able')}</button>`).join('')}</div></div>`;
+}
+// the top of the Induction room tab, one card tall so Save stays on screen: consent first; once consented, the
+// before-surgery comfort question with the consent answer on its label line; a declined patient is asked nothing more
+function inductionAsks(p) {
+  const c = val(p, 'consent_st');
+  if (c == null || satEdit === 'consent_st' || declined(p)) return comfortHtml(p, 'consent_st', 'Consent');
+  if (val(p, 'sat_pre') == null || satEdit === 'sat_pre') return comfortHtml(p, 'sat_pre', 'Comfortable before surgery?', false,
+    `<span class="consentok">✓ Consented <button class="link" data-satedit="consent_st">Change</button></span>`);
+  return comfortHtml(p, 'consent_st', 'Consent') + comfortHtml(p, 'sat_pre', 'Comfortable before surgery?');
 }
 // true when the tap was a comfort answer, Change or Clear
 function comfortTap(p, t, draw, put = (k, v) => set(p, k, v)) {
@@ -831,16 +847,17 @@ function comfortTap(p, t, draw, put = (k, v) => set(p, k, v)) {
   // an answer can be changed, not cleared by tapping it again; the row collapses, so taps pause a moment
   if (sat) { put(sat.dataset.sat, +sat.dataset.v); satEdit = null; draw(); lockTaps(); return true; }
   const sc = t.closest('[data-satclear]');
-  if (sc) { if (confirm('Clear this comfort answer?')) { put(sc.dataset.satclear, null); satEdit = null; draw(); } return true; }
+  if (sc) { if (confirm(sc.dataset.satclear === 'consent_st' ? 'Clear the consent answer?' : 'Clear this comfort answer?')) { put(sc.dataset.satclear, null); satEdit = null; draw(); } return true; }
   const se = t.closest('[data-satedit]');
   if (se) { satEdit = se.dataset.satedit; draw(); return true; }
   return false;
 }
-// the no-pre-warming group opens on the Pre-warming tab until the before-surgery comfort answer is in
-const defaultSeries = p => val(p, 'ev_ot') || val(p, 'io_knife') || (noWarming(p) && val(p, 'sat_pre') != null) ? 'iotemp' : 'prewarm';
+// every group opens on the Induction room tab until the patient is in OT (owner, 21 Oct 2026: consent is asked there)
+const defaultSeries = p => val(p, 'ev_ot') || val(p, 'io_knife') ? 'iotemp' : 'prewarm';
 route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s, key) => {
   const p = patients[id]; if (!p) return go('#/');
-  // the no-pre-warming group keeps the Pre-warming tab, which says so and asks the before-surgery comfort question (owner, 12 and 20 Oct 2026)
+  // the no-pre-warming group keeps the Induction room tab, which says so and asks consent and the before-surgery comfort
+  // question (owner, 12, 20 and 21 Oct 2026); the tab was Pre-warming until 21 Oct 2026
   if (!s) s = defaultSeries(p);
   const noPw = s === 'prewarm' && noWarming(p);
   const sealed = () => sealedBy(p, noPw ? null : s);
@@ -1066,7 +1083,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     return `<div class="nav2">${btn(pts[i - 1], 'prev', '‹', 'Previous')}<div class="mid">${main ? tabsHtml() : ''}${strip()}</div>${btn(pts[i + 1], 'next', '›', 'Next')}</div>`;
   }
   function tabsHtml() {
-    return `<div class="tabs2" role="tablist">${['prewarm', 'iotemp'].map(x => `<a role="tab" aria-selected="${x === s}" href="#/p/${id}/${x}">${x === 'prewarm' ? 'Pre-warming' : 'Intra-op'}</a>`).join('')}</div>`;
+    return `<div class="tabs2" role="tablist">${['prewarm', 'iotemp'].map(x => `<a role="tab" aria-selected="${x === s}" href="#/p/${id}/${x}">${x === 'prewarm' ? 'Induction room' : 'Intra-op'}</a>`).join('')}</div>`;
   }
   function draw() {
     const clean = base == null || snap() === base;
@@ -1083,7 +1100,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     const due = dueOf(p, s, pt);
     const grp = s === 'prewarm' ? `<span class="badge">${GROUPS.find(g => String(g[0]) === String(val(p, 'arm')))?.[1] || 'Group not set'}</span>` : '';
     const reading = noPw ? `<div class="nav2"><span></span><div class="mid">${tabsHtml()}</div><span></span></div>
-      <p class="note nopw">No pre-warming: this patient is in the no pre-warming group. Intra-op temperatures are on the Intra-op tab.</p>` : `${navHtml()}
+      <p class="note nopw">No pre-warming: this patient is in the no pre-warming group, so there are no temperatures to take here. Intra-op temperatures are on the Intra-op tab.</p>` : `${navHtml()}
       <div class="tp"><div><b>${pt.label}</b> ${grp}</div><div class="due" id="due">${due != null ? 'due ' + fromMin(Math.round(due)) : pt.key === 'base' ? (s === 'prewarm' ? '' : 'on arrival in OT') : pt.min != null ? `<span class="hint">Log ${s === 'prewarm' ? 'Prewarm on' : 'Induction'} first</span>` : ''}</div></div>
       <div class="${sealed() ? 'sealed' : ''}">${isSaved ? `<p class="muted small tight">Taken ${esc(savedAt(p, s, pt.key))}${p.f['at_' + s + '_' + pt.key]?.by ? ' (saved by ' + esc(p.f['at_' + s + '_' + pt.key].by) + ')' : ''} <button class="link" data-attime>Change time</button>. Changes save when you tap Save.</p>` : ''}
       <div class="board">${cols.map(card).join('')}</div>
@@ -1092,7 +1109,7 @@ route(/^\/p\/(\w+)(?:\/(?:read\/)?(prewarm|iotemp|haemo)(?:\/(\w+))?)?$/, (id, s
     // three parts (owner, 12 Oct 2026): key times; the tab bar and its readings (swipe changes tab here only);
     // the other forms, Still to fill and Mark complete, the same on both tabs
     paint(`<section class="third top" aria-label="Key times">${val(p, 'done') ? `<p class="ok-box donetop">✓ Data collection complete <small>${esc(val(p, 'done'))}</small></p>` : ''}${timesHtml()}</section>
-      <section class="third mid">${ptabsHtml()}${s === 'prewarm' ? comfortHtml(p, 'sat_pre', 'Comfortable before surgery?') : ''}${reading}
+      <section class="third mid">${ptabsHtml()}${s === 'prewarm' ? inductionAsks(p) : ''}${reading}
       ${s === 'haemo' && vitalsCollected(p) ? '<p class="okline small">✓ Vital signs data collected: ticked on the paper form</p>' : ''}
       ${s === 'haemo' && settings.hide.haemo15 ? `<p class="muted small">Only baseline is entered here; the 15-min rows come from the monitor download. Turn them on in Settings.</p>` : ''}
       ${main && noPw ? '' : signoffHtml(p, s)}</section>
@@ -1606,7 +1623,6 @@ const OTHER_PAGES = ['preop', 'meds', 'bloods', 'pod1', 'pod1an', 'pod2', 'pod2a
 // nor the Screening ID on Pre-op (owner, 21 Oct 2026): its column stays, blank for new patients
 const NOT_ASKED = new Set(['pre_dl', 'd2_dl', 'screen_id']);
 for (const pg of OTHER_PAGES) FORM[pg] = PAGES.find(x => x.id === pg).fields.filter(f => f.id !== 'enrol_id' && !NOT_ASKED.has(f.id)).map(f => [f.id]);
-FORM.preop.unshift(['consent_st']);
 // Reset a subject: clears every time, reading and answer, keeping the Subject ID, group and hospital (asks twice)
 const KEEP_ON_RESET = new Set(['enrol_id', 'arm', 'site', 'restored']);
 function resetSubject(p) {
