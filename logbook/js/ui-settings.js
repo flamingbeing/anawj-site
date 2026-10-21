@@ -11,7 +11,8 @@ import { recentCount as snapRecent } from './logging.js';
 import { OPERATOR_HELP } from './search-ops.js';
 import { DEFAULT_ACCENT, cleanAccent, SWATCHES, COLOUR_TOKENS, cleanColours, colourPalette, colourChecks, checkColours } from './colors.js';
 import { THEMES, FEATURED, THEME_KEYS, themePatch, themeState, themeLabel, TINTS, BANDS, HEAD_FONTS } from './themes.js';
-import { FACETS, FACET_GROUPS, facetDefault, FINE_TUNE, TUNE_KEYS, cleanTune } from './theme-engine.js';
+import { FACETS, FACET_GROUPS, facetDefault, FINE_TUNE, TUNE_KEYS, cleanTune, TAB_ICONS, cleanTabIcons, cleanTintStrength } from './theme-engine.js';
+import { WALLPAPERS, cleanWall, dimOf, DIM_MAX, savePhoto, getPhoto, deletePhoto, mainColour, colourAt } from './wallpaper.js';
 import { cleanMarkdown, storedMarkdown, mdCase, mdDay, reflectionPath, reflectionNote, CASE_FILLINS, REFL_FILLINS, FM_FIELDS, HEAD_STYLES, mdDate, fileDate } from './markdown.js';
 import { checkCss } from './custom-css.js';
 import { cleanMine, saveMine, minePatch, matchMine, exportText, importText, lookOf } from './my-themes.js';
@@ -21,7 +22,7 @@ import { PHOTO_BUDGET_KB, PHOTO_NOTE, photoUsageKb, fmtMb } from './reflections.
 import { partsSettings } from './ui-parts.js';
 import { labelsOn } from './parts.js';
 import { NAV_STYLES, ROW_LAYOUTS, FORM_LAYOUTS, rowLayoutOf, deviceOn, deviceChanges, deviceReset, DEVICE_SWITCHES } from './device-presets.js';
-import { applyThemeLook, applyTheme, cachedTheme, TEXT_SIZES, ZOOMS, applyTextSize, applyZoom, applyAccent, display, setDisplay, applyDisplay, LINE_WIDTHS, LINE_HEIGHTS, CONTRASTS, MOTIONS, BUTTON_STYLES, defaultTitle, BORDERS, ROUNDS, roundLevel, BAR_TABS, barTabs, MAX_BAR, arrangeTabs, setTabOnBar, borderLevel, cleanTitle, IPHONE_APP, START_TABS, CARD_STYLES, cardStyle, cardPatch } from './display.js';
+import { applyThemeLook, applyTheme, cachedTheme, TEXT_SIZES, ZOOMS, applyTextSize, applyZoom, applyAccent, display, setDisplay, applyDisplay, LINE_WIDTHS, LINE_HEIGHTS, CONTRASTS, MOTIONS, BUTTON_STYLES, defaultTitle, BORDERS, ROUNDS, roundLevel, BAR_TABS, barTabs, MAX_BAR, arrangeTabs, applyWallpaper, photoChanged, wallDim, setTabOnBar, borderLevel, cleanTitle, IPHONE_APP, START_TABS, CARD_STYLES, cardStyle, cardPatch } from './display.js';
 import { resetLink, help, toggle } from './settings-rows.js';
 // (the display helpers are still exported from here: the e2e tests import them from this file)
 export * from './display.js';
@@ -175,6 +176,7 @@ export function renderThemes() {
         h('select', { 'aria-label': 'Background', onchange: e => { applyDisplay(setDisplay({ bgTint: e.target.value === 'auto' ? null : e.target.value })); hooks.render(); } },
           Object.entries(TINTS).map(([k, t]) => h('option', { value: k, selected: (st.bgTint || 'auto') === k }, t.label)))),
       look('band', 'Top band', BANDS, 'theme', 'The four-colour strip along the top. NUHS keeps the NUH stripe; other themes bring their own.')),
+    wallpaperCard(st),
     h('section', { class: 'card' },
       h('h2', {}, 'Shape and type'),
       pick('Card style', CARD_STYLES, cardStyle(st), v => { applyDisplay(setDisplay(cardPatch(v))); hooks.render(); }, 'How cards and lists stand off the page. How strong the lines are: Line strength, just below.'),
@@ -216,13 +218,80 @@ export function renderThemes() {
     h('section', { class: 'card' },
       h('h2', {}, 'App-style details'),
       help('Finer touches that make the logbook feel like other phone apps. Each is its own setting and off until you choose it.'),
-      FACET_GROUPS.filter(([g, title]) => title).map(([g, title]) => [h('h3', {}, title), facetsOf(g)]),
+      FACET_GROUPS.filter(([g, title]) => title).map(([g, title]) => [h('h3', {}, title), facetsOf(g), g === 'icons' ? iconExtras(st) : null]),
       DEVICE_NOTE()),
     editColours(st),
     customCssCard(),
     resetLink('the theme and every look setting on this page (light, the NUHS colours, lines, corners, fonts, spacing, the header and custom CSS: switched off, your CSS is kept) on this device', () => {
       applyTheme('light'); applyDisplay(setDisplay({ ...Object.fromEntries([...THEME_KEYS, 'theme', 'themeMode', 'fontUiName', 'fontLogName', 'appTitle', 'hideHeader', 'customCssOn'].map(k => [k, null])) }));
     }));
+}
+// Wallpaper (theme-revamp S4; wallpaper.js): a pattern or your own photo behind every page, and how much the page
+// colour dims it. The photo stays on this device; tap it to take a colour from it (or its main colour) for the accent.
+function wallpaperCard(st) {
+  const w = cleanWall(st.wallpaper) || 'none';
+  const say = () => { const { dim, floor } = wallDim(); const n = Math.round(dim * 100);
+    return Math.round(floor * 100) > dimOf(display()) ? `${n}% (raised so text stays easy to read${floor >= 0.9 ? '; this picture is too busy to show much' : ''})` : `${n}%`; };
+  const note = h('span', { class: 'hint', style: 'margin:0', 'aria-live': 'polite' }, say());
+  const dim = h('input', { type: 'range', min: '0', max: String(DIM_MAX), step: '5', value: String(dimOf(st)), 'aria-label': 'Dim the wallpaper', 'aria-valuetext': `${dimOf(st)}%`,
+    oninput: e => { const v = Number(e.target.value); e.target.setAttribute('aria-valuetext', `${v}%`); applyWallpaper(setDisplay({ wallDim: v })); note.textContent = say(); } });
+  const thumb = h('img', { class: 'wall-thumb', alt: 'Your wallpaper photo. Tap it to use a colour from it.', hidden: true });
+  const fileNote = h('span', { class: 'hint' });
+  const useColour = (c, how) => { if (!c) return toast('No clear colour there'); applyDisplay(setDisplay({ accent: c === DEFAULT_ACCENT ? null : c })); toast(`Colour ${how}: ${c}`); hooks.render(); };
+  thumb.onclick = e => { const r = thumb.getBoundingClientRect(); useColour(colourAt(thumb, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height), 'from the photo'); };
+  const mainBtn = h('button', { type: 'button', class: 'small', hidden: true }, 'Use its main colour');
+  const removeBtn = h('button', { type: 'button', class: 'small linkish', hidden: true, onclick: async () => {
+    await deletePhoto(); photoChanged(null); applyDisplay(setDisplay({ wallpaper: null, wallDim: null })); hooks.render(); toast('Photo removed from this device');
+  } }, 'Remove');
+  const showRec = rec => {
+    for (const el of [thumb, mainBtn, removeBtn]) el.hidden = !rec;
+    fileNote.textContent = rec ? rec.name : 'No photo chosen yet.';
+    if (rec) { if (thumb.src) URL.revokeObjectURL(thumb.src); thumb.src = URL.createObjectURL(rec.blob); mainBtn.onclick = () => useColour(mainColour(rec.samples), 'from the photo'); }
+  };
+  const fileBtn = fileButton('Choose a photo…', 'image/*', async file => {
+    try { const rec = await savePhoto(file); photoChanged(rec); applyDisplay(setDisplay({ wallpaper: 'photo' })); showRec(rec); note.textContent = say(); toast('Wallpaper kept on this device'); }
+    catch (err) { toast(err.message); }
+  }, 'btn small');
+  const photoRow = h('div', { hidden: w !== 'photo', style: 'margin:6px 0 0' }, h('div', { class: 'bar', style: 'margin:0' }, fileBtn, mainBtn, removeBtn), fileNote, thumb,
+    h('p', { class: 'hint', style: 'margin:2px 0 0' }, 'Kept on this device only, made smaller first, never uploaded or synced. Tap the photo to make the colour you tap your colour.'));
+  if (w === 'photo') getPhoto().then(showRec);
+  return h('section', { class: 'card wallpaper' },
+    h('h2', {}, 'Wallpaper'),
+    pick('Wallpaper', WALLPAPERS, w, v => { applyDisplay(setDisplay({ wallpaper: v === 'none' ? null : v })); hooks.render(); },
+      'Behind every page. Cards stay solid, so what’s in them reads as before.'),
+    photoRow,
+    h('div', { class: 'field', style: 'margin-top:10px', hidden: w === 'none' }, h('label', { class: 'field', style: 'margin:0' }, 'Dim', dim), note,
+      help('The page colour laid over the wallpaper. It goes up by itself when the picture would make text on the page hard to read.')),
+    DEVICE_NOTE());
+}
+// Icons (App-style details; theme-revamp S4): a tint for every icon and an icon of your choice for each tab
+function iconExtras(st) {
+  const tint = cleanAccent(st.iconTint);
+  const strength = cleanTintStrength(st.iconTintStrength) ?? 100;
+  const sNote = h('span', { class: 'hint', style: 'margin:0' }, `${strength}%`);
+  const chosen = cleanTabIcons(st.tabIcon);
+  const setIcon = (id, v) => { const t = { ...chosen }; if (v === 'default') delete t[id]; else t[id] = v; applyDisplay(setDisplay({ tabIcon: Object.keys(t).length ? cleanTabIcons(t) : null })); hooks.paintTabs?.(); hooks.render(); };
+  const svg = d => { const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); el.setAttribute('viewBox', '0 0 24 24'); el.setAttribute('class', 'ico'); el.setAttribute('aria-hidden', 'true');
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d || ''); el.append(p); return el; };
+  const tabPath = id => (chosen[id] ? TAB_ICONS[chosen[id]][1] : document.querySelector(`.tabs [data-tab="${id}"] path`)?.getAttribute('d'));
+  const { shown } = arrangeTabs(barTabs().map(([k]) => k), st);
+  return [
+    h('div', { class: 'field', style: 'margin-top:10px' }, 'Icon tint',
+      h('div', { class: 'bar', style: 'margin:4px 0 0' },
+        h('input', { type: 'color', value: tint || '#6d4fc2', 'aria-label': 'Icon tint colour', onchange: e => { applyDisplay(setDisplay({ iconTint: cleanAccent(e.target.value) })); hooks.render(); } }),
+        tint ? h('button', { type: 'button', class: 'small linkish', onclick: () => { applyDisplay(setDisplay({ iconTint: null, iconTintStrength: null })); hooks.render(); } }, 'Off') : h('span', { class: 'hint', style: 'margin:0' }, 'Off')),
+      help('One colour mixed into every icon (not the tab you’re on), as iPhone’s tinted icons. It is made deep or light enough to show in light and dark.')),
+    tint ? h('div', { class: 'field', style: 'margin-top:6px' }, h('label', { class: 'field', style: 'margin:0' }, 'Tint strength',
+      h('input', { type: 'range', min: '10', max: '100', step: '10', value: String(strength), 'aria-label': 'Tint strength', 'aria-valuetext': `${strength}%`,
+        oninput: e => { const v = Number(e.target.value); e.target.setAttribute('aria-valuetext', `${v}%`); sNote.textContent = `${v}%`; applyThemeLook(setDisplay({ iconTintStrength: v === 100 ? null : v })); } })), sNote) : null,
+    h('details', { class: 'tab-icons', style: 'margin-top:10px', open: Object.keys(chosen).length > 0 }, h('summary', {}, 'An icon for each tab'),
+      shown.map(id => h('div', { class: 'tab-icon-row', 'data-tab-icon': id }, svg(tabPath(id)),
+        h('label', { class: 'field' }, BAR_TABS.find(([k]) => k === id)?.[1] || id,
+          h('select', { 'aria-label': `Icon for ${BAR_TABS.find(([k]) => k === id)?.[1] || id}`, onchange: e => setIcon(id, e.target.value) },
+            h('option', { value: 'default', selected: !chosen[id] }, 'Its own (default)'),
+            Object.entries(TAB_ICONS).map(([k, [label]]) => h('option', { value: k, selected: chosen[id] === k }, label)))))),
+      help('The tabs on your bar; a theme can choose them too.')),
+  ];
 }
 // Fine-tune (theme-revamp S2): a slider for each single size (theme-engine.js FINE_TUNE), unset until moved; the
 // page changes as it moves (the tune layer of the look's style sheet). Reset puts them all back to unset.
@@ -302,7 +371,7 @@ function myThemesCard(st, custom) {
   };
   const use = t => {
     const before = display();
-    applyDisplay(setDisplay(minePatch(t))); hooks.render();
+    applyDisplay(setDisplay(minePatch(t, display()))); hooks.render();
     toast(`Theme: ${t.name}`, { action: 'Undo', onaction: () => { applyDisplay(setDisplay(Object.fromEntries([...THEME_KEYS, 'theme'].map(k => [k, before[k] ?? null])))); hooks.render(); } });
   };
   const drop = t => {

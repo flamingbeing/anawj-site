@@ -203,6 +203,21 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
 - Layout keeps how it works (start tab, tab bar, row buttons, Case tab, gestures); Themes holds every look: light or
   dark, colour, Colourful, background tint, Top band, card style, line strength, corners, spacing, buttons, the header,
   tab bar style, heading font, fonts, line spacing, row and form layouts, custom CSS (theme-revamp S3).
+- **Wallpaper and icons** (theme-revamp S4, 21 Oct 2026; `wallpaper.js`, unit tests `wallpaper.test.mjs`, e2e
+  `wallpaper.mjs`): a **Wallpaper** card on Themes after Colour and light: None / Dots / Grid / Paper lines / Soft
+  gradient / Your own photo, and a Dim slider (0-90%, unset = 40% for a photo, none for a pattern). style.css draws
+  `html.wall::before` (the picture: `--wall`, from the look CSS for a pattern, set inline by display.js for the photo)
+  and `::after` (the page colour at `--wall-dim`); the body turns see-through and cards stay solid. The dim never goes
+  under `minDim`: the lowest dim at which ink, muted and accent text on the page reach 4.5:1 on every wallpaper colour
+  (32 × 32 samples of a photo, a pattern's strongest colour) with the palette in use now; worked out again on light /
+  dark / OLED / colour changes, and the note says when it was raised. The photo is made at most 1600 px (JPEG) and kept
+  in IndexedDB `apmes-logbook-wall` on this device only (never in settings files, saved themes or the account); a theme
+  or saved theme without a wallpaper keeps it (`keepPhoto`); Reset all clears it (Undo puts it back). Colours from the
+  photo: "Use its main colour" (`mainColour`, the hue covering most of it) or tap the photo (`colourAt`) sets the accent,
+  so colors.js makes the palettes. App-style details → Icons also has **Icon tint** (`iconTint`, `iconTintStrength`:
+  mixed into every icon except the current tab and filled buttons, made readable for light and dark first) and **An
+  icon for each tab** (`tabIcon`, names in `TAB_ICONS`). All off by default, per device; themes may set a pattern, the
+  dim, the tint and tab icons, never a photo.
 - **Sizes** (theme-revamp S2, 21 Oct 2026): Spacing is Normal / Snug (`tight`) / Tight (`compact`, the old Compact mode,
   still drawn by the `body.compact` rules in style.css) / Roomy. (The Display switch "Compact mode (Tight spacing)" went in
   S3: Spacing: Tight is the one place.) The old `compact: true` key is folded to `spacing: 'compact'` wherever it turns up (device, account

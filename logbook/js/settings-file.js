@@ -10,9 +10,10 @@ import { cleanExportOpts } from './export-opts.js';
 import { cleanDestinations } from './destinations.js';
 import { SWITCH_KEYS } from './profiles.js';
 import { cleanSync } from './sync-md.js';
-import { cleanColours } from './colors.js';
+import { cleanColours, cleanAccent } from './colors.js';
 import { cleanMine } from './my-themes.js';
-import { FACET_KEYS, cleanFacet, TUNE_KEYS, cleanTune } from './theme-engine.js';
+import { FACET_KEYS, cleanFacet, TUNE_KEYS, cleanTune, cleanTintStrength, cleanTabIcons } from './theme-engine.js';
+import { cleanPattern, cleanDim } from './wallpaper.js';
 import { cleanLayout } from './analytics.js';
 import { cleanLabels, cleanCaseTemplate } from './parts.js';
 import { cleanListFormat } from './list-format.js';
@@ -32,6 +33,9 @@ const OBJECTS = {
   // the theme engine's facets: only their listed choices (theme-engine.js)
   ...Object.fromEntries(FACET_KEYS.map(k => [k, v => cleanFacet(k, v)])),
   ...Object.fromEntries(TUNE_KEYS.map(k => [k, v => cleanTune(k, v)])),   // Fine-tune: numbers in range
+  // Wallpaper (wallpaper.js): a pattern only (a photo never leaves its device), the dim; the icon tint and tab icons
+  wallpaper: v => cleanPattern(v), wallDim: v => cleanDim(v), iconTint: v => cleanAccent(v), iconTintStrength: v => cleanTintStrength(v),
+  tabIcon: v => { const t = cleanTabIcons(v); return Object.keys(t).length ? t : null; },
   tagSet: v => (v == null ? null : cleanTagSet(v)),
   shareFormat: v => cleanFormat(v),
   markdown: v => { try { return storedMarkdown(v); } catch { return null; } },

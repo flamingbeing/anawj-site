@@ -29,6 +29,10 @@ A theme **never** sets light or dark (no `mode`): give it both palettes and it m
   `ftBtn` button height 32-56 px, `ftGap` gaps 2-16 px, `ftLine` line weight 0-3 px, `ftShadow` card shadow 0-4,
   `ftCases` space between cases 0-20 px, `ftDays` space between days 0-32 px, `ftLetter` letter spacing -0.03 to 0.08 em,
   `ftWeight` text weight 300-600. Their CSS sits in the `tune` layer, after the theme and before custom CSS.
+- **Wallpaper and icons** (theme-revamp S4): `wallpaper` (a pattern: dots, grid, paper, gradient; never `photo`, which
+  stays on its device), `wallDim` (0-90 in steps of 5), `iconTint` (#rrggbb; made readable for light and dark),
+  `iconTintStrength` (10-100 in steps of 10), `tabIcon` (`{ tabId: name }`, names from `TAB_ICONS`, keys sorted). The
+  app raises the dim by itself if a pattern would bring text on the page under 4.5:1 with the theme's colours.
 - **Facets** (theme-engine.js `FACETS`; each off by default; the value must be one of its choices):
 
 | Key | Choices | What it changes |
