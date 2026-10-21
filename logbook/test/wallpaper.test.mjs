@@ -2,7 +2,7 @@
 // pattern CSS, the dim floor that keeps text on the page at 4.5:1, the main colour of a photo, and what themes,
 // saved themes and settings files may hold.
 import assert from 'node:assert/strict';
-import { PATTERNS, WALLPAPERS, patternCss, patternSamples, cleanWall, cleanPattern, cleanDim, dimOf, minDim, mainColour, cssHex, hexOf, textNeed } from '../js/wallpaper.js';
+import { PATTERNS, WALLPAPERS, patternCss, patternSamples, cleanWall, cleanPattern, cleanDim, dimOf, minDim, mainColour, cssHex, hexOf, textNeed, cleanInk, inkOf, scrimFor, frostAlpha, FROST } from '../js/wallpaper.js';
 import { lightPalette, darkPalette, contrast, mix, DEFAULT_ACCENT } from '../js/colors.js';
 import { TAB_ICONS, cleanTabIcons, tabIconPath, iconTintCss, cleanTintStrength } from '../js/theme-engine.js';
 import { THEMES, THEME_KEYS, checkTheme, lookCss, themePatch, themeState, themeById, keepPhoto } from '../js/themes.js';
@@ -115,4 +115,26 @@ const got = file({ wallpaper: 'photo', wallDim: 45, iconTint: 'blue', iconTintSt
 assert.equal(got.wallpaper, null); assert.equal(got.wallDim, 45); assert.equal(got.iconTint, null); assert.equal(got.iconTintStrength, 20); assert.deepEqual(got.tabIcon, { log: 'pen' });
 assert.equal(file({ wallpaper: 'dots' }).wallpaper, 'dots');
 
+// TE S3: pattern strength, the text backing, see-through cards
+{
+  assert.equal(inkOf({}), 6); assert.equal(inkOf({ wallInk: 24 }), 24); assert.equal(cleanInk(7), null); assert.equal(cleanInk(42), null);
+  assert.match(patternCss({ wallpaper: 'dots', wallInk: 30 }), /\) 30%/); assert.match(patternCss({ wallpaper: 'dots' }), /\) 6%/);
+  const pal = { bg: light.bg, ink: light.ink, muted: light.muted, accent: light.accent };
+  assert.equal(patternSamples('dots', pal, 36)[1], mix(pal.bg, pal.ink, 0.36));
+  // the backing with the dim reaches the floor, and none when the dim already does
+  assert.equal(scrimFor(0.5, 0.6), 0); assert.equal(scrimFor(0, 0), 0); assert.equal(scrimFor(0.9, 0), 0.9);
+  for (const [f, d] of [[0.9, 0.4], [0.75, 0.15], [1, 0.3], [0.35, 0.3]]) { const s = scrimFor(f, d); assert.ok(1 - (1 - d) * (1 - s) >= f - 1e-9 && s - 0.05 < (f - d) / (1 - d), `${f} ${d}: ${s}`); }
+  // see-through cards: at least 80%, more over a busy picture, every text on the card at 4.5:1
+  const lp = lightPalette(DEFAULT_ACCENT), dp = darkPalette(DEFAULT_ACCENT, true);
+  for (const p of [lp, dp]) {
+    const cp = { bg: p.bg, panel: p.panel, ink: p.ink, muted: p.muted, accent: p.accent };
+    assert.equal(frostAlpha([p.bg], 0, cp), FROST);
+    for (const dim of [0, 0.4]) {
+      const a = frostAlpha(busy, dim, cp);
+      assert.ok(a >= FROST && a <= 1);
+      for (const s of busy) for (const t of ['ink', 'muted']) assert.ok(contrast(cp[t], mix(mix(s, cp.bg, dim), cp.panel, a)) >= textNeed(contrast(cp[t], cp.panel)) - 1e-9, `${t} on ${s} under ${a}`);
+    }
+  }
+  assert.equal(frostAlpha([], 0, { bg: '#ffffff', panel: '#ffffff' }), FROST);
+}
 console.log('wallpaper tests passed');

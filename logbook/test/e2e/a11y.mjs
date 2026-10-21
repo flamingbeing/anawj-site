@@ -17,6 +17,8 @@ const ALL_DARK = process.env.A11Y_DARK === 'all';
 const VERBOSE = !!process.env.A11Y_VERBOSE;
 // A11Y_WALL=<dots|grid|paper|gradient>: every screen with that wallpaper behind it (Themes → Wallpaper)
 const WALL = process.env.A11Y_WALL || '';
+// with it, A11Y_INK=<6..36> its strength and A11Y_FROST=1 see-through cards (TE S3)
+const WALL_LOOK = { wallInk: Number(process.env.A11Y_INK) || null, wallFrost: process.env.A11Y_FROST ? true : null };
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 const FAIL = new Set(['serious', 'critical']);
 
@@ -260,7 +262,7 @@ try {
     const screens = SCREENS.filter(([name, , dark]) => (!ONLY || ONLY.test(name)) && (theme === 'light' || dark || ALL_DARK));
     if (!screens.length) continue;
     const ctx = await b.newContext({ viewport, colorScheme: theme, serviceWorkers: 'block' });
-    await ctx.addInitScript(([t, wall]) => { try { localStorage.setItem('apmes-logbook-demo-small', '1'); localStorage.setItem('apmes-logbook-theme', t); if (wall && !localStorage.getItem('apmes-logbook-display')) localStorage.setItem('apmes-logbook-display', JSON.stringify({ v: 2, wallpaper: wall })); } catch { /* none */ } }, [theme, WALL]);
+    await ctx.addInitScript(([t, wall, look]) => { try { localStorage.setItem('apmes-logbook-demo-small', '1'); localStorage.setItem('apmes-logbook-theme', t); if (wall && !localStorage.getItem('apmes-logbook-display')) localStorage.setItem('apmes-logbook-display', JSON.stringify({ v: 2, wallpaper: wall, ...look })); } catch { /* none */ } }, [theme, WALL, WALL_LOOK]);
     for (const [name, open] of screens) {
       // a fresh page per screen, so a dialog or editor left open never leaks into the next check
       const p = await ctx.newPage();

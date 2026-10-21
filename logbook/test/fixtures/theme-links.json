@@ -76,7 +76,9 @@
   "dark.accentInk",
   "dark.ok",
   "dark.warn",
-  "dark.err"
+  "dark.err",
+  "wallInk",
+  "wallFrost"
  ],
  "lists": {
   "colourful": [
@@ -333,6 +335,10 @@
   "iconTintStrength": {
    "min": 10,
    "step": 10
+  },
+  "wallInk": {
+   "min": 6,
+   "step": 6
   }
  },
  "links": [

@@ -9,7 +9,7 @@
 import { cleanAccent, cleanColours } from './colors.js';
 import { FONTS } from './fonts.js';
 import { FACETS, FINE_TUNE, cleanTune, cleanTabIcons } from './theme-engine.js';
-import { PATTERNS, DIM_MAX } from './wallpaper.js';
+import { PATTERNS, DIM_MAX, INK_MIN, INK_MAX, INK_STEP } from './wallpaper.js';
 import { NAV_STYLES, ROW_LAYOUTS, FORM_LAYOUTS } from './device-presets.js';
 
 // Background tints: the page ground (and for some the cards and text) in light and dark
@@ -48,7 +48,7 @@ export const COLOURFUL = [['off', 'Off (default)'], ['tabs', 'One colour per tab
 // unless switched off (a device's themeKeep: the groups that are on, [] for none). Light or dark, text size and zoom
 // are never part of a theme, so they always stay.
 export const KEEP_GROUPS = [
-  ['wallpaper', 'Wallpaper', 'The pattern or photo and its dim.', true],
+  ['wallpaper', 'Wallpaper', 'The pattern or photo, its dim and strength, and see-through cards.', true],
   ['layout', 'Layout', 'Navigation, Logbook rows, the case form, tab bar icons and labels, icon buttons, page titles, the plain calendar.', true],
   ['type', 'Fonts and text', 'The fonts, heading font, line spacing, letter spacing and text weight.', false],
 ];
@@ -65,7 +65,7 @@ export const THEME_CARDS = [
 ];
 export const cardsOn = page => THEME_CARDS.filter(c => c[1] === page).map(([id]) => id);
 const SECTIONS = {
-  colour: ['accent', 'bgTint'], colours: ['colourful', 'band'], edit: ['colours'], wallpaper: ['wallpaper', 'wallDim'],
+  colour: ['accent', 'bgTint'], colours: ['colourful', 'band'], edit: ['colours'], wallpaper: ['wallpaper', 'wallDim', 'wallInk', 'wallFrost'],
   shape: ['borders', 'flat', 'round', 'shadows', 'fontUi', 'fontLog', 'headFont', 'lineHeight', 'btnStyle', 'iconBtns', 'calPlain'],
   header: ['tabIcons', 'pageTitles'], rows: ['navStyle', 'rowLayout', 'rowShort', 'formLayout'], details: ['iconTint', 'iconTintStrength', 'tabIcon'],
   access: ['contrast'],
@@ -78,7 +78,7 @@ const sectionOf = f => Object.keys(SECTIONS).find(c => SECTIONS[c].includes(f.ke
 const values = list => list.map(([v]) => v);
 const facetOf = f => (f.bool ? { key: f.key, kind: 'bool', group: f.group } : { key: f.key, kind: 'enum', values: values(f.choices), facet: true, group: f.group });
 const KEEPS = {
-  wallpaper: ['wallpaper', 'wallDim'],
+  wallpaper: ['wallpaper', 'wallDim', 'wallInk', 'wallFrost'],
   layout: ['navStyle', 'rowLayout', 'rowShort', 'formLayout', 'tabIcons', 'tabActiveLabel', 'iconBtns', 'pageTitles', 'calPlain', 'tabIcon'],
   type: ['fontUi', 'fontLog', 'headFont', 'lineHeight', 'ftLetter', 'ftWeight'],
 };
@@ -109,6 +109,9 @@ export const LOOK = [
   { key: 'iconTint', kind: 'colour' },
   { key: 'iconTintStrength', kind: 'int', min: 10, max: 100, step: 10 },
   { key: 'tabIcon', kind: 'icons' },
+  // new settings go last: theme links name a setting by its place in this list
+  { key: 'wallInk', kind: 'int', min: INK_MIN, max: INK_MAX, step: INK_STEP },   // pattern strength (TE S3)
+  { key: 'wallFrost', kind: 'bool' },   // see-through cards (TE S3)
 ].map(f => ({ ...f, keep: Object.keys(KEEPS).find(g => KEEPS[g].includes(f.key)) || null, section: sectionOf(f) }));
 export const LOOK_KEYS = LOOK.map(f => f.key);
 export const lookField = k => LOOK.find(f => f.key === k);
