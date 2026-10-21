@@ -98,6 +98,6 @@ assert.equal(r.status, 404);
 const ASSETS = { fetch: async () => new Response('nope', { status: 404 }) };
 r = await worker.fetch(req('/scan-api/whoami', { jwt: good }), { ASSETS });
 assert.equal(r.status, 503, 'prewarm host: routed to the scan handler (not set up here)');
-r = await worker.fetch(new Request('https://hand.anawj.com/scan-api/whoami'), { ASSETS });
+r = await worker.fetch(new Request('https://nuhroster.anawj.com/scan-api/whoami'), { ASSETS });
 assert.equal(r.status, 404);
 console.log('scan route tests passed');

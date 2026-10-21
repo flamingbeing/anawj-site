@@ -17,7 +17,7 @@ patient data, real evaluation data, secrets or tokens.** Anything private goes i
 | NTF monthly roster | `ntf-roster/` | `ntfroster.anawj.com` | `NOTES.md`, `SPEC.md` |
 | NUH junior monthly | `nuh-junior-monthly/` | `nuhjuniormonthly.anawj.com` | `NOTES.md` |
 | Prewarming study | `prewarm/` | `prewarmstudy.anawj.com` | `NOTES.md`, `PLAN.md` |
-| Hand surgery pages | `hand-babies/`, `hand-log/`, `cmcj/` | `hand.anawj.com/<babies, handlog, cmcj>/` | each `NOTES.md` |
+| Hand surgery pages | `hand-babies/`, `hand-log/`, `cmcj/` | `hand.anawj.com` (served from the `hand` repo since 21 Oct 2026; these folders are old copies) | the `hand` repo |
 | Page editor | `edit/` | `anawj.com/edit/` | `edit/NOTES.md` |
 | Ask Claude | `ask/`, `worker/ask.js` | `ask.anawj.com` | `edit/NOTES.md` |
 | Programme documents | `apmes/` | not served (guidebook only) | `apmes/README.md` |

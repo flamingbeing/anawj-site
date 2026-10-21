@@ -12,10 +12,8 @@ notes; every step is done.
 |---|---|---|
 | `anawj.com/` | `index.html` | Status page only. Stays on GitHub Pages. |
 | `anaes.anawj.com/bis/`, `/ot/` | (none) | Forwards to `anantf.com/bis/` and `anantf.com/ot/`: the BIS to DSA and OT simulators moved to the anantf site on 16 Oct 2026. `anawj.com/bis-dsa/` and `/ot-sim/` are stub pages forwarding there too. |
-| `hand.anawj.com/cmcj/` | `cmcj/` | Static, hand surgery. |
-| `hand.anawj.com/babies/` | `hand-babies/` | Static, hand surgery. The old `hand/` redirect goes. |
-| `hand.anawj.com/handlog/` | `hand-log/` | Hand DOPS/Mini-CEX log; data on the phone only, no sign-in (owner, 13 Oct 2026). |
 | `prewarmstudy.anawj.com/` | `prewarm/` | **Real study data.** The name is a reminder that it holds sensitive data and stays isolated. `/scan-api/` is the scan upload (`worker/scan.js`), behind Cloudflare Access. |
+| `hand.anawj.com` | (own repo `hand`) | Moved to its own repo and Worker on 21 Oct 2026; the old folders here stay until the landing step. |
 | `nuhroster.anawj.com/` | `nuh-roster/` | Own Firebase project `nuh-roster`. |
 | `nuhjuniormonthly.anawj.com/` | `nuh-junior-monthly/` | NUH junior monthly roster helper (15 Oct 2026). Data in the browser. |
 | `ntfroster.anawj.com/` | `ntf-roster/` | NTF anaesthesia monthly duty roster (15 Oct 2026). Data in the browser until its own Firebase project `ntf-roster` exists. |
@@ -56,7 +54,7 @@ deploys it on every merge to `main` (build command `node tools/stamp-versions.mj
 - `apmes.anawj.com` serves Firebase's sign-in helper pages (`/__/auth/`, `/__/firebase/`; `apmes-auth/firebase/init.json`)
   and just `apmes/guidebook/` from `apmes/`.
 - Any other address (PR previews, the copy of main) serves the whole repo. To try a subdomain on a preview, use
-  `<preview>/_sites/hand.anawj.com/babies/`.
+  `<preview>/_sites/apmes.anawj.com/evals/`.
 - No data or storage in the Worker. The one API is owner-only, on `ask.anawj.com` (`worker/ask.js`); its secrets live
   in Cloudflare, never in the repo; previews never answer it.
 - Tests: `node worker/test/routes.test.mjs` and `node worker/test/sites.test.mjs`.
