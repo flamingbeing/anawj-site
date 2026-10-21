@@ -1695,12 +1695,14 @@ function typedValue(f, raw) {
   if (f.temp && (+v < 25 || +v > 45) && !confirm(`${f.label} ${v} °C looks unusual. Keep it?`)) return null;
   return v;
 }
+const noFirst = opts => opts.some(o => o[1] === 'No') ? [...opts].sort((a, b) => (b[1] === 'No') - (a[1] === 'No')) : opts;
 function fieldHtml(f, get) {
   if (!f || !isShown(f, get)) return '';
   const v = get(f.id), idA = 'f-' + f.id;
   const hint = f.hint ? `<small class="muted">${esc(f.hint)}</small>` : '';
   if (f.type === 'code' || f.type === 'word') {
-    const opts = f.type === 'word' ? f.opts.map(o => [o, f.id === 'io_tech' ? 'GA (' + o + ')' : o]) : f.opts;
+    // No always on the left, Yes on the right (owner, 20 Oct 2026); only the order on screen changes, not the stored codes
+    const opts = noFirst(f.type === 'word' ? f.opts.map(o => [o, f.id === 'io_tech' ? 'GA (' + o + ')' : o]) : f.opts);
     // short answers (Yes / No, 0 1 2) share a row with their label; long ones (GA (Inhalational)) keep their own line
     const cls = opts.every(([, l]) => String(l).length <= 4) && opts.length <= 3 ? ' short' : opts.some(([, l]) => String(l).length > 10) ? ' longopt' : '';
     return `<div class="fld${cls}"><span class="lab">${esc(f.label)}</span>${hint}<div class="seg ${opts.length > 4 ? 'many' : ''}">${opts.map(([ov, ol]) =>
@@ -2024,29 +2026,26 @@ route(/^\/scanimports$/, () => {
 route(/^\/settings$/, () => {
   header('Settings', '#/');
   const tog = (grp, k, l, d = '') => `<label class="tog"><input type="checkbox" data-g="${grp}" data-k="${k}" ${grp === 'hide' ? (settings.hide[k] ? '' : 'checked') : settings[grp][k] ? 'checked' : ''}><span>${l}${d ? `<small>${d}</small>` : ''}</span></label>`;
-  paint(`<div class="stack">
-    ${readyHtml()}
-    <label class="lab" for="me">Your initials</label><input id="me" value="${esc(settings.me)}" maxlength="6" autocapitalize="characters" autocomplete="off">
+  // grouped into cards by what people come for (owner, 20 Oct 2026): you and your team, alerts, data, then the rarer ones
+  const group = (title, body) => `<section class="setcard"><h2>${title}</h2>${body}</section>`;
+  paint(`<div class="stack settings">
+    ${cloud.enabled ? `<section class="setcard">${readyHtml()}</section>` : ''}
+    ${group('You and your team', `<label class="lab" for="me">Your initials</label><input id="me" value="${esc(settings.me)}" maxlength="6" autocapitalize="characters" autocomplete="off">
     <small class="muted">Saved with each reading as “entered by”.</small>
-    <h2>Screen size</h2>
-    <div class="seg sizes" role="group" aria-label="Screen size">${SIZES.map(([k, l]) => `<button type="button" class="chip" data-zoom="${k}" aria-pressed="${String(settings.zoom || '1') === k}">${l}</button>`).join('')}</div>
-    <small class="muted">Makes text and buttons bigger or smaller on this phone.</small>
-    <h2>Hospital and sharing</h2>
+    <h3>Hospital and sharing</h3>
     ${sharingHtml()}
-    ${cloud.enabled ? refreshHtml() : ''}
-    <h2>When a reading is due</h2>
-    <p class="muted small">Works while the app is open on screen.</p>
-    ${tog('remind', 'haemo', 'BP, HR, BIS due alarm', 'Off by default: the countdown still shows')}
+    ${cloud.enabled ? refreshHtml() : ''}`)}
+    ${group('When a reading is due', `<p class="muted small">Works while the app is open on screen.</p>
     ${tog('remind', 'banner', 'Banner')}${tog('remind', 'vibrate', 'Vibrate', 'Android only')}${tog('remind', 'beep', 'Short beep')}${tog('remind', 'awake', 'Keep the screen on during readings')}
-    <button class="secondary" id="test">Test the alert</button>
-    <h2>Export</h2>
-    <a class="secondary" href="#/export">Export Excel</a>
-    <h2>Scan pages (beta)</h2>
-    <label class="tog"><input type="checkbox" id="scanon" ${settings.scan ? 'checked' : ''}><span>Show Scan pages<small>Photograph the paper form’s pages. Pages stay on this phone for now.</small></span></label>
+    ${tog('remind', 'haemo', 'BP, HR, BIS due alarm', 'Off by default: the countdown still shows')}
+    <button class="secondary" id="test">Test the alert</button>`)}
+    ${group('Data', `<a class="secondary" href="#/export">Export Excel</a>
+    <a class="secondary" href="#/delete">Delete participants</a>`)}
+    ${group('Screen size', `<div class="seg sizes" role="group" aria-label="Screen size">${SIZES.map(([k, l]) => `<button type="button" class="chip" data-zoom="${k}" aria-pressed="${String(settings.zoom || '1') === k}">${l}</button>`).join('')}</div>
+    <small class="muted">Makes text and buttons bigger or smaller on this phone.</small>`)}
+    ${group('Scan pages (beta)', `<label class="tog"><input type="checkbox" id="scanon" ${settings.scan ? 'checked' : ''}><span>Show Scan pages<small>Photograph the paper form’s pages. Pages stay on this phone for now.</small></span></label>
     ${settings.scan ? '<a class="secondary" href="#/scan">Scan pages</a>' : ''}
-    ${settings.scan && shared.admin ? '<a class="secondary" href="#/scanimports">Scan imports (approve)</a>' : ''}
-    <h2>Participants</h2>
-    <a class="secondary" href="#/delete">Delete participants</a></div>`);
+    ${settings.scan && shared.admin ? '<a class="secondary" href="#/scanimports">Scan imports (approve)</a>' : ''}`)}</div>`);
   wireRefresh();
   $('#scanon').onchange = e => { settings.scan = e.target.checked; saveSettings(); render(); };
   view.querySelectorAll('[data-zoom]').forEach(b => b.onclick = () => {

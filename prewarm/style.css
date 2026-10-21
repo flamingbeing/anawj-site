@@ -290,6 +290,11 @@ main .ptabs a { min-height: 34px; font-size: 15px; }
 .tog { display: flex; gap: 10px; align-items: flex-start; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 10px 12px; cursor: pointer; }
 .tog input { width: 20px; height: 20px; min-height: 0; padding: 0; margin: 2px 0 0; flex: none; accent-color: var(--navy); }
 .tog small { display: block; color: var(--muted); }
+/* Settings: one card per group; toggles inside a card are plain rows */
+.setcard { display: grid; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px; }
+.setcard h2, .setcard p { margin: 0; }
+.setcard h3 { font-size: 14px; font-weight: 700; color: var(--navy); margin: 6px 0 0; }
+.setcard .tog { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 10px 0 0; }
 .coderow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .codebig { display: grid; justify-items: start; gap: 0; min-height: var(--tap); padding: 4px 10px; border: 1px dashed var(--line); border-radius: var(--r); background: var(--chip); color: var(--navy); font-size: 22px; font-weight: 700; letter-spacing: .06em; font-variant-numeric: tabular-nums; cursor: pointer; text-align: left; }
 .codebig small { font-size: 11px; font-weight: 400; letter-spacing: 0; color: var(--muted); }
