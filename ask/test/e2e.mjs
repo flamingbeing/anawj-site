@@ -1,11 +1,10 @@
-// Browser test of Ask Claude (ask/index.html) at phone size, served through the real Worker as ask.anawj.com, with its
+// Browser test of Ask Claude (ask/index.html) at phone size, served from ask/ as ask.anawj.com (owner-tools serves it live), with its
 // API (worker/ask.js; tested in worker/test/ask.test.mjs) stood in for: prefilled from the address, the privacy check,
 // sending, and following the ask to its PR and preview. Run from the repo root: node ask/test/e2e.mjs
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import worker from '../../worker/sites.js';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const ASSETS = { async fetch(req) {
@@ -23,7 +22,7 @@ await ctx.route('https://ask.anawj.com/api/ask**', async route => {
   return route.fulfill({ json: drafted ? { issue: 501, pr: 502, prUrl: 'https://github.com/flamingbeing/anawj-site/pull/502', preview: 'https://page-edits-issue-501-anawj-preview.kohwenjun.workers.dev/_sites/hand.anawj.com/babies/' } : { issue: 501, pr: null } });
 });
 await ctx.route(/^https:\/\/ask\.anawj\.com\/(?!api\/)/, async route => {
-  const res = await worker.fetch(new Request(route.request().url()), { ASSETS });
+  const res = await ASSETS.fetch(new Request('https://ask.anawj.com/ask' + new URL(route.request().url()).pathname.replace(/\/$/, '/index.html')));
   await route.fulfill({ status: res.status, headers: Object.fromEntries(res.headers), body: Buffer.from(await res.arrayBuffer()) });
 });
 await ctx.route(/^https:\/\/(?!ask\.anawj\.com)/, r => r.abort());

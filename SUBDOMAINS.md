@@ -26,7 +26,7 @@ notes; every step is done.
 | `anawj.com/privacy/` | `privacy/` | Stays: the Google sign-in consent screen points here. |
 | `anawj.com/prewarm-update/` | `prewarm-update/` | Stays until no phone runs the old prewarm worker, then becomes a redirect. |
 | `anawj.com/edit/` (decided in step 5) | `edit/` | Stays on `anawj.com`: see "The page editor" below. |
-| `ask.anawj.com/` | `ask/` | Ask Claude, the owner's page; behind Cloudflare Access; its API `/api/ask` is `worker/ask.js` (`edit/NOTES.md`). |
+| `ask.anawj.com/` | (owner-tools repo) | Ask Claude moved to the owner-tools Worker (21 Oct 2026); this Worker no longer serves the host. `ask/` and `worker/ask.js` here are the old copies. |
 
 An app that moves to another site: give its host a `moved` entry in `worker/routes.js` (`{ moved: { '/bis/': 'https://anantf.com/bis/' } }`;
 the rest of the path and the query are kept), leave a noindex stub `index.html` that forwards at its old GitHub Pages folder, and
