@@ -7,9 +7,9 @@ import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs');
 const base = `http://localhost:${process.env.PORT || 8080}/logbook/`;
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {});
-// every page the demo admin can open (its id is the address: #display …)
+// every page the demo admin can open (its id is the address: #layout …)
 const PAGES = ['log', 'logbook', 'reflect', 'progress', 'notes', 'more', 'caselogs', 'totals', 'points', 'account', 'settings', 'recovery', 'data',
-  'reflimport', 'themes', 'display', 'access', 'displayadv', 'loggingadv', 'sendto', 'sync', 'sharefmt', 'showhide', 'logging', 'notesset', 'reflset',
+  'reflimport', 'themes', 'layout', 'access', 'loggingadv', 'sendto', 'sync', 'sharefmt', 'showhide', 'logging', 'notesset', 'reflset',
   'export', 'choose', 'admin', 'admintotals', 'adminresidents', 'adminadv', 'tags', 'feedback', 'feedbackinbox'];
 const LAZY = ['ui-settings', 'ui-reflect', 'ui-logbook', 'ui-progress', 'ui-admin', 'ui-caselogs', 'ui-account', 'ui-sync', 'ui-send', 'portfolio', 'cloud-save', 'markdown', 'ui-parts', 'ui-feedback'];
 const loaded = p => p.evaluate(() => performance.getEntriesByType('resource').map(e => e.name).filter(n => /\.js(\?|$)/.test(n)));
@@ -47,7 +47,7 @@ try {
       assert.equal(await p.locator('#app .lazy-wait').count(), 0, id);
     }
     // a lazy page straight from the address (a reload, a shortcut)
-    for (const id of ['display', 'reflect', 'admin']) {
+    for (const id of ['layout', 'reflect', 'admin']) {
       await p.goto(base + '?demo#' + id);
       await p.waitForFunction(x => document.getElementById('app').dataset.page === x, id);
     }

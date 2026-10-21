@@ -50,7 +50,7 @@ try {
   const db = await p.locator('dialog[open]').boundingBox(); assert.ok(db.y + db.height > 830, 'the iOS sheet sits at the bottom');
   await p.getByRole('button', { name: 'Cancel' }).click();
   // a page change with Material motion fades in without errors (then back, as it was)
-  await p.evaluate(() => { location.hash = '#display'; }); await p.waitForTimeout(400); await p.goBack();
+  await p.evaluate(() => { location.hash = '#layout'; }); await p.waitForTimeout(400); await p.goBack();
   await p.locator('section.card', { hasText: 'App-style details' }).waitFor();
   await apply(Object.fromEntries(Object.keys(ENGINE).map(k => [k, null])));
   await p.evaluate(async () => { const c = await import('./js/ui-core.js'); c.clearToast(); c.hooks.render(); window.scrollTo(0, 0); });
@@ -74,6 +74,9 @@ try {
   // cascade layers (index.html): the order first, style.css as the base layer, every look sheet in a layer, no :root
   // stacking anywhere; the look survives a reload (first paint from the cache)
   await apply({ accent: '#7c3aed', colourful: 'all', customCssOn: true, customCss: '.top h1 { letter-spacing: 1px; }' });
+  // (custom CSS never applies on Themes and Browse all, where it is edited: read the sheets from the Logbook)
+  assert.equal(await p.evaluate(() => document.getElementById('user-css')?.textContent || ''), '', 'custom CSS on Browse all themes');
+  await p.evaluate(() => { location.hash = '#logbook'; }); await p.waitForFunction(() => document.getElementById('app').dataset.page === 'logbook');
   await p.evaluate(async () => (await import('./js/display.js')).applyCustomCss());
   const sheets = await p.evaluate(() => {
     const first = document.styleSheets[0], kinds = s => [...s.cssRules].map(r => r.constructor.name);
@@ -86,6 +89,7 @@ try {
   assert.equal(sheets.base, 'base'); assert.ok(sheets.baseRules > 500, 'style.css loaded into the base layer');
   for (const k of ['look', 'accent', 'tabs', 'user']) assert.ok(sheets[k].length && sheets[k].every(n => n === 'CSSLayerBlockRule'), k + ' sheet is layered');
   assert.equal(sheets.stacked, false, 'no :root stacking');
+  await p.evaluate(() => { location.hash = '#themesall'; }); await p.locator('.theme-row').first().waitFor();
   const bg = () => p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bg').trim());
   const themed = await bg();
   await p.reload(); await p.locator('.theme-row').first().waitFor();

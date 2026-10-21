@@ -1,4 +1,4 @@
-// Colour theme from one accent colour (Settings → Display → Colour): the light and dark palettes are
+// Colour theme from one accent colour (Settings → Themes → Colour): the light and dark palettes are
 // worked out here so text and buttons stay readable whatever is picked. Pure, unit-tested.
 //
 // Light: the accent is darkened until white text on it (and it as text on white) reaches 4.5:1.
@@ -86,7 +86,7 @@ export function schemeCss(accent) {
   ].join('\n');
 }
 
-// One colour per tab, everything in it (Settings → Display → Colourful): the same palettes as the colour picker,
+// One colour per tab, everything in it (Settings → Themes → Colourful): the same palettes as the colour picker,
 // scoped to the pages of one tab (scope: 'body[data-bar="log"]'), for light, dark, OLED and auto
 export function tabSchemeCss(accent, scope) {
   const c = cleanAccent(accent) || DEFAULT_ACCENT;

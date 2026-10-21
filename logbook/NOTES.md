@@ -38,7 +38,7 @@ portfolio content.
 | [docs/words.md](docs/words.md) | The words the app uses (tags, tag groups, case summary, Interesting, ...) |
 | [docs/screens-logging.md](docs/screens-logging.md) | Case tab, logging preferences, Enter key, case parts, two panes |
 | [docs/screens-logbook.md](docs/screens-logbook.md) | Logbook, Reflections, Analytics, reflection editor, Admin portal, fold-outs |
-| [docs/screens-look.md](docs/screens-look.md) | Look and feel, colour, zoom, fonts, Display options, Settings pages, Themes |
+| [docs/screens-look.md](docs/screens-look.md) | Look and feel, colour, zoom, fonts, Settings pages: Themes, Layout, Accessibility |
 | [docs/theme-engine.md](docs/theme-engine.md) | The theme engine: every look a theme can set, icon sets, page motion, how to write a theme |
 | [docs/screens-data.md](docs/screens-data.md) | Settings, Markdown, Sync, Drive / Dropbox backup, profiles, CSV, Notes, Connect Claude |
 | [docs/screens-tags.md](docs/screens-tags.md) | Tag editor, labelled parts and case template, pasted lists, the 2000-character limit |

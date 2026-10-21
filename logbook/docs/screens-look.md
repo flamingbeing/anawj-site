@@ -1,6 +1,20 @@
-# Logbook screens: look and feel, Display, Settings pages, Themes
+# Logbook screens: look and feel, Settings pages, Themes, Layout
 
 Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where things are (screens), part 3, with Themes.
+
+- **Look settings: Themes / Layout / Accessibility** (theme-revamp S3, 21 Oct 2026). Display (`#display`) and Advanced
+  display (`#displayadv`) are gone. **Themes** (`#themes`) holds every look: it opens with "Themes are kept on this
+  device only" and Export (`exportThemes`: Your themes, or this look, as a file), then the themes, Your themes, Colour
+  and light, Shape and type (now also Line strength, Button style, Icons instead of words, Plain calendar), Fine-tune,
+  Header and tab bar (name in the header, page titles, hide header, icons only), Rows and forms (navigation, row and form
+  layout, Shorter Logbook rows), App-style details, colours, Custom CSS. **Layout** (`#layout`, `renderLayout`) is how it
+  works: start tab, tab bar place, order and hidden tabs, Logbook row buttons, page width, the Case tab, gestures (swipe,
+  edge back, press and hold) and the tab bar while typing. **Accessibility** (`#access`): zoom, text size, bigger taps,
+  contrast, motion. The old Compact switch is Themes → Spacing: Tight. Custom CSS never applies on Themes, Browse all or
+  Layout (`CSS_FREE`, display.js). Old links land on the new page: `#display` → Layout, `#displayadv` → Themes, and a
+  copied `?find=` link goes to the page the setting is on now (`MOVED_SETTINGS` / `movedSetting` in navigation.js, unit
+  tested; e2e `settings-pages.mjs` checks each setting is on exactly one page). Older lines below that say Display or
+  Advanced display mean these pages.
 
 - **Look and feel** (owner's Apple-apps review, 13 Oct 2026): line icons from `ui-core.js` (`ic(name)` inside text and
   buttons, `rowIcon` on Logbook rows), never emoji; empty lists use `emptyState(icon, title, hint, button)`; buttons,
@@ -116,15 +130,12 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   `--lb-top-h` so List's month headings stick under it; on Reflections `.refl-top` sticks at minus the height of its
   title and counts (`--refl-hide`, `pinHead` in ui-reflect.js) so only the search row stays, and an open topic's name
   sticks under it (`--refl-top-h`) while its reflections scroll; not in edit mode). All in the settings file.
-- **Settings pages: everyday first, Advanced below** (owner, Oct 2026). Display (`#display`): light/dark, colour,
-  Colourful, compact, Borders, Corners, shadows, the start tab; then a link row to **Advanced display**
-  (`#displayadv`, `renderDisplayAdvanced`, under headings: Header and tab bar · Logbook rows · Text · Case tab layout;
-  custom CSS last, never applied on either Display page). Accessibility (`#access`): zoom, text size, bigger taps,
-  contrast, motion, gestures. Logging (`#logging`): suggestions, age/gender detection, common tags first, Enter key,
+- **Settings pages: everyday first, Advanced below** (owner, Oct 2026). Look pages: Themes, Layout, Accessibility (see
+  the top of this file). Logging (`#logging`): suggestions, age/gender detection, common tags first, Enter key,
   date for a new case, After Save; then **Advanced logging** (`#loggingadv`, `renderLoggingAdvanced`, under headings:
   Case tab · Keyboard in the case box · Search · Dates and Undo · Help). Sub-pages are TABS entries `under` their page
   (Back trail and the bar's tab follow); `advancedLink` in ui-settings.js draws the row. New options go on the
-  Advanced page unless most people would change them. e2e: `tab('displayadv')` / `tab('loggingadv')`, and
+  Advanced page unless most people would change them. e2e: `tab('layout')` / `tab('loggingadv')`, and
   `choose(legend, value)` for a ✓ list.
 - **Borders** (Display, per device `borders`: 0 Borderless, 1 Faint, 2 Light, 3 Soft, null = Normal; a range input):
   every border in style.css (and the reflection editor's inline ones) uses `var(--edge, var(--line))`; `html.edges`
@@ -179,7 +190,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   `adoptDisplay` in ui-settings.js), light / dark in `apmes-logbook-theme`. A device with none starts from the
   account's old `settings` values (and corrects that from the server copy in the same visit). Kept at sign-out;
   wiped by Reset demo. The settings file carries this device's display values and imports them to the device.
-- **Settings**: a menu of Display (incl. the tab the app opens on; a #hash still wins),
+- **Settings**: a menu of Themes, Layout (incl. the tab the app opens on; a #hash still wins), Accessibility,
   Logging, Tag editor (`#tags`), Reflections (`#reflset`: new reflections in the export, photo sizes), Markdown (`#sharefmt`), Recycle bin;
   then a "Settings file" card: export / import settings, tags, tag groups, formats as JSON (`settings-file.js`, tested; never cases or portfolio).
 
@@ -189,12 +200,12 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   and changing any afterwards shows "Custom (based on …)". Classic themes are cards; Inspired ones ("Obsidian-style",
   colours, corners and type only, never logos, paid fonts or brand names beyond "-style") are a searchable list.
   No celebrity or brand palettes (owner). New ideas come in through "Suggest a theme" (private feedback).
-- Display keeps layout (compact, start tab, header and tab bar, rows); Themes holds looks: light or dark, colour
-  swatches (NUH, muted, pastel, Custom), Colourful, background tint, Top band, card style, corners, spacing, tab
-  bar style, heading font, fonts, line spacing. Advanced display keeps the fine controls (line strength, button style).
+- Layout keeps how it works (start tab, tab bar, row buttons, Case tab, gestures); Themes holds every look: light or
+  dark, colour, Colourful, background tint, Top band, card style, line strength, corners, spacing, buttons, the header,
+  tab bar style, heading font, fonts, line spacing, row and form layouts, custom CSS (theme-revamp S3).
 - **Sizes** (theme-revamp S2, 21 Oct 2026): Spacing is Normal / Snug (`tight`) / Tight (`compact`, the old Compact mode,
-  still drawn by the `body.compact` rules in style.css) / Roomy. The Display switch "Compact mode (Tight spacing)" sets
-  the same value. The old `compact: true` key is folded to `spacing: 'compact'` wherever it turns up (device, account
+  still drawn by the `body.compact` rules in style.css) / Roomy. (The Display switch "Compact mode (Tight spacing)" went in
+  S3: Spacing: Tight is the one place.) The old `compact: true` key is folded to `spacing: 'compact'` wherever it turns up (device, account
   copy, settings file, Your themes; display.js `migrateDisplay`, theme-engine.js `foldCompact`), so nobody's look
   changes. **Fine-tune** card on Themes: eight sliders (`FINE_TUNE`: button height, gaps, line weight, shadow, space
   between cases, space between days, letter spacing, text weight), unset by default, per device, themes may set

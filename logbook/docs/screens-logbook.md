@@ -4,7 +4,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
 
 - **Logbook** (`ui-logbook.js`): Calendar (default; opens on today, "No cases yet today" when empty) | List | Grid.
   Calendar days all share one layout (number on top, a reserved spot for the count) so nothing shifts. Calendar day:
-  + Add (opens Log on that date), Share, Copy (off unless switched on: Advanced display → Copy button for each day). Rows: slim tag pills (short names, full name on hover) on the
+  + Add (opens Log on that date), Share, Copy (off unless switched on: Layout → Copy button for each day). Rows: slim tag pills (short names, full name on hover) on the
   left, Copy and Reflect on the right at one fixed size (icons only at ≤ 600 px; labels on bigger screens); Reflect is
   filled with a ✓ once the case has a reflection (opens it). No swipe actions. Filter (Show, Search in; then Dates | Tags | More toggles, each open while in use; More = fuzzy, case sensitive, Save search, Tag N cases; saved searches one slim scrolling row): has all of / has none of
   tags, dates, flag, search scope, fuzzy; Reset (everything); × in the search box clears just the text; saved searches (text, filters, "Search in"; not fuzzy); Tag N cases (bulk add/remove). Search text

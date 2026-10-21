@@ -75,8 +75,8 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
   owner filled `GOOGLE_CLIENT_ID` and `DROPBOX_APP_KEY` (both public) in Oct 2026. Dropbox stays in development
   mode until the owner applies for production (its icons are 64 and 256 px from `icons/icon-512.png`).
 - **Settings menu** (`renderSettingsMenu`, `SETTINGS_GROUPS` in `app.js`; owner, 13 Oct 2026): every page kept, in
-  groups Profile / Look / Logging / Reflections / Notes and sharing / Data / Advanced (Advanced display and Advanced
-  logging also listed there). A Settings page (`under: 'settings'`) no group names still shows, under "Other"
+  groups Profile / Look (Themes, Layout, Accessibility) / Logging / Reflections / Notes and sharing / Data / Advanced
+  (Advanced logging also listed there; Advanced display went in theme-revamp S3). A Settings page (`under: 'settings'`) no group names still shows, under "Other"
   (`settingsGroups`): give a new page its group. Settings search indexes every page, Profile and the Tag editor included (`SEARCH_PAGES`).
 - **Profile** page (Settings → Profile, was Profiles or hide items; `#showhide`, `renderShowHide` in `ui-settings.js`):
   the profile card, then every switch that shows or hides part of the app, grouped Extras / APMES / Tips and help /
@@ -106,7 +106,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
     `evalRequest` ("Request an evaluation from a case", APMES group; a case's ⋯ menu and edit page open the evals app's
     new request with the date and initials only, `js/eval-link.js`). The APMES group's reset says it turns it off.
   - **Device presets** (`js/device-presets.js`): device options a profile turns on, the device's own value first.
-    `hideTabsTyping` (Accessibility → Hide the tab bar while typing) is on in Personal only. The profile sheet lists them
+    `hideTabsTyping` (Layout → Hide the tab bar while typing) is on in Personal only. The profile sheet lists them
     as "Turns on / off (this device)", and Apply clears the device's own values for them (`deviceReset`), so the device
     follows the new profile; one switched by hand after makes the profile "Custom".
   - **APMES switches** (account, on in every profile but Personal): targets (counts against targets in All tags,
@@ -114,7 +114,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md). Where th
     totals (Compare with your intake, You and your year), portfolio export and Section 1 (Export / Import cards,
     Account card), residency year (Account card, Analytics year), reflection headings (Analytics card, "Which
     heading?" step, Reflections list grouped by month), the "now 4/10" save toast, APMES in the default app name
-    (`defaultTitle`; a name typed in Advanced display still wins).
+    (`defaultTitle`; a name typed in Themes → Header and tab bar still wins).
   - **Personal** (generic logging outside APMES): the APMES switches off, the extras on, Notes on the tab bar
     (`PROFILE_ON`), own tags kept (tags are never touched by a profile).
   - **Basic**: hides the optional Case tab parts but "what the box was read as" (quick picks, ☆, Still needed, tag

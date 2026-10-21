@@ -56,7 +56,7 @@ Part of the logbook working notes; index in [../NOTES.md](../NOTES.md).
   - How a new option is built here: per device (`DISPLAY_KEYS`, html classes from `applyLook`, first paint in
     index.html) unless it belongs to the account; "Reset this page" and the settings file must cover it; defaults
     must stay pixel-identical (screenshot-diff a worktree of origin/main served on another port).
-  - Everyday choices on a settings page, the rest on its Advanced page (`#displayadv`, `#loggingadv`, `#adminadv`).
+  - Everyday choices on a settings page, the rest on its Advanced page (`#loggingadv`, `#adminadv`; look settings are split by Themes / Layout instead).
   - Watch for `.bar .grow { min-width: 160px }`: it wraps toolbars on phones (Unlink, Save / Retry). Buttons centre
     their content (`justify-content: center`), which shifted calendar days.
   - Show only what helps: owner prefers a ✓ on rows over calendar badges, small text over cards for guidance.

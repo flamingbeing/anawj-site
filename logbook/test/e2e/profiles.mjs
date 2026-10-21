@@ -26,7 +26,7 @@ try { for (const width of [390, 1280]) {
   // the Settings menu, in groups; every page still there
   await goHash('settings');
   assert.deepEqual(await p.locator('.settings-menu h3').allInnerTexts().then(x => x.map(t => t.toLowerCase())), ['profile', 'look', 'logging', 'reflections', 'notes and sharing', 'advanced']);
-  for (const id of ['showhide', 'themes', 'display', 'access', 'logging', 'tags', 'reflset', 'sharefmt', 'sendto', 'displayadv', 'loggingadv']) assert.equal(await p.locator(`.settings-menu a[data-go=${id}]`).count(), 1, id);
+  for (const id of ['showhide', 'themes', 'layout', 'access', 'logging', 'tags', 'reflset', 'sharefmt', 'sendto', 'loggingadv']) assert.equal(await p.locator(`.settings-menu a[data-go=${id}]`).count(), 1, id);
   // search finds the profile page's switches and the tag editor now
   await p.getByLabel('Search settings').fill('residency year');
   await p.locator('.settings-search li', { hasText: 'Residency year' }).filter({ hasText: 'Profile' }).waitFor();

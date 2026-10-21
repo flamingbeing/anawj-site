@@ -16,7 +16,7 @@ export function createNavigation({ history, location, parents, allowed, onNaviga
   function initialize(tab) {
     const existing = read();
     if (existing && existing.tab === tab) { active = existing; return; }
-    // A direct link gets a finite parent trail: Display -> Settings -> More -> exit.
+    // A direct link gets a finite parent trail: Layout -> Settings -> More -> exit.
     // The main tabs get no artificial entry, so Back at the start can leave normally.
     const chain = [tab], seen = new Set(chain);
     while (parents[chain[0]] && allowed(parents[chain[0]]) && !seen.has(parents[chain[0]])) {
@@ -62,4 +62,24 @@ export function createNavigation({ history, location, parents, allowed, onNaviga
     else if (parent) go(parent, { replace: true });
   }
   return { initialize, go, sync, remember, back, backTarget };
+}
+
+// Display and Advanced display became Themes (how it looks) and Layout (how it works), and the gestures and keyboard
+// left Accessibility for Layout (theme-revamp S3, 21 Oct 2026). Old links, bookmarks and copied links to a setting
+// (#displayadv?find=Page%20width) land on its new page; a renamed setting is found by its new name.
+export const PAGE_MOVES = { display: 'layout', displayadv: 'themes' };
+// [old page, the setting as it was found there, new page, the find there ('' just opens the page)]
+export const MOVED_SETTINGS = [
+  ['display', 'Display', 'layout', ''], ['display', 'Compact mode', 'themes', 'Spacing'], ['display', 'Open the app on', 'layout'],
+  ['displayadv', 'Advanced display', 'themes', ''], ['displayadv', 'Look', 'themes', 'Shape and type'],
+  ...['Tab bar', 'Tabs on the bar', 'Logbook rows', 'Fewer buttons on Logbook rows', 'Copy button on each Logbook row', 'Copy button for each day',
+    'Page', 'Page width', 'Case tab layout', 'Case tab upside down', 'Pin the case box', 'Pin the search box'].map(t => ['displayadv', t, 'layout']),
+  ...['Gestures', 'Swipe left or right', 'Swipe from the left edge', 'Press and hold a Logbook row', 'Keyboard', 'Hide the tab bar while typing'].map(t => ['access', t, 'layout']),
+];
+// (page, find) -> [page, find]: short names (Page) only as they are, longer ones also as the start of the option (a
+// switch's text runs on into its hint)
+export function movedSetting(page, want = '') {
+  const m = MOVED_SETTINGS.find(([from, t]) => from === page && (want === t || (t.length > 8 && want.startsWith(t))));
+  if (m) return [m[2], m.length > 3 ? m[3] : want];
+  return [PAGE_MOVES[page] || page, want];
 }

@@ -64,7 +64,7 @@ try { for (const width of [390, 1280]) {
       const r = await p.locator('.datebar .mode-seg button').filter({ hasText: name }).first().boundingBox();
       assert.ok(r.height >= 44, `the Case | List switch is ${r.height} high`);
     }
-    await p.goto(base + '?demo#display'); await p.getByRole('heading', { name: 'Display', exact: true }).first().waitFor();
+    await p.goto(base + '?demo#layout'); await p.getByRole('heading', { name: 'Layout', exact: true }).first().waitFor();
     const back = await p.locator('.back-row .back-link').first().boundingBox();
     assert.ok(back.height >= 44, `the back link is ${back.height} high`);
     console.log(`PASS tap targets ${label(width)}`);
@@ -224,7 +224,7 @@ try { for (const width of [390, 1280]) {
     assert.equal(await p.locator('#tabs').isVisible(), true);
     assert.equal(await p.evaluate(() => document.body.classList.contains('typing-nobar')), false);
     await p.setViewportSize({ width, height: 844 });
-    await p.goto(base + '?demo#access');
+    await p.goto(base + '?demo#layout');
     const sw = p.getByRole('switch', { name: 'Hide the tab bar while typing' });
     assert.equal(await sw.isChecked(), false);
     await tap(sw);

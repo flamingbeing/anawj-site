@@ -1,4 +1,4 @@
-// Fonts (Settings → Display, per device): one for the interface and one for logging (the case box, case text in
+// Fonts (Settings → Themes, per device): one for the interface and one for logging (the case box, case text in
 // the Logbook, the reflection editor). Bundled fonts (fonts/, SIL Open Font License) load only when chosen and are
 // then cached for offline use by the service worker. Your own font: a font installed on this device, by name (not
 // every browser allows it: Safari mostly doesn't), or a font file kept on this device only (IndexedDB).

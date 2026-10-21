@@ -15,6 +15,7 @@ import { fromQuery, keepShared, readInbox } from './share-in.js';
 import { purgeExpired } from './bin.js';
 import { profile, ic } from './ui-core.js';
 import { deviceOn, barAtBottom } from './device-presets.js';
+import { PAGE_MOVES, movedSetting } from './navigation.js';
 import { notesChanged } from './ui-notepad.js';
 import { finePrint, signOutCard } from './more-cards.js';
 import { wipeSyncDevice } from './sync-forget.js';
@@ -106,7 +107,7 @@ const ICONS = {
   more: 'M5 12h.01M12 12h.01M19 12h.01M4 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
 };
 // the Advanced pages (Settings menu) use their parent page's icon
-ICONS.displayadv = ICONS.display; ICONS.loggingadv = ICONS.logging;
+ICONS.layout = 'M3 4h18v16H3zM3 9h18M9 9v11'; ICONS.loggingadv = ICONS.logging;
 const icon = id => {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'ico'); svg.setAttribute('aria-hidden', 'true');
@@ -141,11 +142,10 @@ const TABS = [
   { id: 'search', label: 'Search', render: page(['search'], m => m.search.renderSearch()), hidden: true, unlisted: true },
   { id: 'reflimport', label: 'Import reflections from Word', render: () => renderReflImport(), hidden: true, under: 'data', unlisted: true },
   // Settings' own pages (not in the More list)
-  { id: 'themes', label: 'Themes', render: page(['settings'], m => m.settings.renderThemes()), hidden: true, under: 'settings', unlisted: true, desc: 'Ready-made looks, colour, light or dark, the top band' },
+  { id: 'themes', label: 'Themes', render: page(['settings'], m => m.settings.renderThemes()), hidden: true, under: 'settings', unlisted: true, desc: 'Ready-made looks, colour, light or dark, fonts, spacing, the header, custom CSS' },
   { id: 'themesall', label: 'Browse all themes', render: page(['settings'], m => m.settings.renderThemesAll()), hidden: true, under: 'themes', unlisted: true, desc: 'Every theme, search, suggest a theme' },
-  { id: 'display', label: 'Display', render: page(['settings'], m => m.settings.renderDisplay()), hidden: true, under: 'settings', unlisted: true, desc: 'Compact mode (Tight spacing), the screen it opens on; more under Advanced' },
-  { id: 'access', label: 'Accessibility', render: page(['settings'], m => m.settings.renderAccessibility()), hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion, swipe gestures' },
-  { id: 'displayadv', label: 'Advanced display', render: page(['settings'], m => m.settings.renderDisplayAdvanced()), hidden: true, under: 'display', unlisted: true, desc: 'The header and tab bar, Logbook rows, fonts, custom CSS' },
+  { id: 'access', label: 'Accessibility', render: page(['settings'], m => m.settings.renderAccessibility()), hidden: true, under: 'settings', unlisted: true, desc: 'Zoom, text size, bigger taps, contrast, motion' },
+  { id: 'layout', label: 'Layout', render: page(['settings'], m => m.settings.renderLayout()), hidden: true, under: 'settings', unlisted: true, desc: 'The start tab, the tab bar, Logbook row buttons, page width, the Case tab, gestures' },
   { id: 'loggingadv', label: 'Advanced logging', render: page(['settings'], m => m.settings.renderLoggingAdvanced()), hidden: true, under: 'logging', unlisted: true, desc: 'Case tab parts, labelled parts and a case template, the keyboard, search, the week, undo, tips' },
   { id: 'sendto', label: 'Send to', render: page(['send'], m => m.send.renderSendSettings()), hidden: true, under: 'settings', unlisted: true, desc: 'Obsidian, WhatsApp, UpNote or any app with a link' },
   { id: 'sync', label: 'Sync', render: page(['sync'], m => m.sync.renderSyncSettings()), hidden: true, under: 'settings', unlisted: true, desc: 'One Markdown file per day in Google Drive, Dropbox or GitHub' },
@@ -179,7 +179,7 @@ const menuItem = (id, label, desc, onclick) => h('li', {}, h('a', { href: '#' + 
 
 function renderMore() {
   const items = visibleTabs().filter(t => t.under === 'more' && !t.unlisted);
-  // tabs hidden from the bar (Advanced display) come first, so they are one tap away
+  // tabs hidden from the bar (Layout) come first, so they are one tap away
   // (Faculty / PCs: Case logs, then Analytics, then the person's own tabs; other profiles: Case logs last)
   const rank = facultyMode() ? id => ['caselogs', 'progress'].indexOf(id) + 1 || 9 : id => (id === 'caselogs' ? 9 : 0);
   const hidden = arrangeTabs(barCandidates(), display()).hidden.filter(id => !TABS.find(t => t.id === id).hidden)
@@ -280,7 +280,7 @@ function installCard() {
 // Search in Settings (owner): the options of every settings page and its Advanced page, read from the pages
 // themselves (each is drawn once, off screen, the first time someone types), so the index never goes stale.
 // A result opens its page and scrolls to the option, which flashes.
-const SEARCH_PAGES = ['showhide', 'themes', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'tags', 'reflset', 'notesset', 'sharefmt', 'sendto', 'sync', 'account'];
+const SEARCH_PAGES = ['showhide', 'themes', 'layout', 'access', 'logging', 'loggingadv', 'tags', 'reflset', 'notesset', 'sharefmt', 'sendto', 'sync', 'account'];
 const SEARCH_MODS = ['settings', 'send', 'sync', 'account'];   // the modules those pages are drawn from
 let settingsIndex = null, findAfterRender = '';
 const optionText = n => {
@@ -368,11 +368,11 @@ function settingsSearch() {
 // Logging, Reflections, Notes and sharing, Data, Advanced. Search finds any option on any page.
 const SETTINGS_GROUPS = [
   ['Profile', ['showhide']],
-  ['Look', ['themes', 'display', 'access']],
+  ['Look', ['themes', 'layout', 'access']],
   ['Logging', ['logging', 'tags']],
   ['Reflections', ['reflset']],
   ['Notes and sharing', ['notesset', 'sharefmt', 'sendto', 'sync']],
-  ['Advanced', ['displayadv', 'loggingadv']],
+  ['Advanced', ['loggingadv']],
 ];
 // the groups, then any Settings page none of them names (so a new page is never left out of the menu)
 function settingsGroups() {
@@ -559,25 +559,26 @@ const banner = document.getElementById('banner');
 const visibleTabs = () => TABS.filter(t => (!t.admin || S.admin) && (!t.owner || S.owner) && (!t.faculty || facultyRole()) && (t.id !== 'totals' || ((facultyRole() || S.resident) && !basicHides('totals'))));
 // the tabs that can sit on the bar: the main ones, and the pages in the More list (bar: true), when put there
 const barCandidates = () => visibleTabs().filter(t => !t.hidden || t.bar).map(t => t.id);
-const TAB_ALIASES = { reflections: 'reflect' };
+const TAB_ALIASES = { reflections: 'reflect', ...PAGE_MOVES };
 const tabFromHash = () => {
   // a link to a heading on a page: #logging?find=Teach%20it%20from%20an%20example (the same find as a Settings search result)
   const [raw, query = ''] = location.hash.replace(/^#/, '').split('?');
-  const id = TAB_ALIASES[raw] || raw;
-  if (!visibleTabs().some(t => t.id === id)) return null;
   let want = '';
   try { want = new URLSearchParams(query).get('find') || ''; } catch { /* a malformed link just opens the page */ }
-  if (want) findAfterRender = want;
+  const [moved, find] = movedSetting(raw, want);
+  const id = TAB_ALIASES[moved] || moved;
+  if (!visibleTabs().some(t => t.id === id)) return null;
+  if (find) findAfterRender = find;
   if (id !== raw || query) history.replaceState(history.state, '', location.pathname + location.search + '#' + id);   // old links: #reflections → #reflect; the find is used once, so the address stays #logging
   return id;
 };
 
 function paintTabs() {
-  // the bar's tab this page sits under, however deep (Settings → Display is under More)
+  // the bar's tab this page sits under, however deep (Settings → Layout is under More)
   let cur = TABS.find(t => t.id === S.tab);
   while (cur && cur.under) cur = TABS.find(t => t.id === cur.under);
-  document.body.dataset.bar = cur ? cur.id : S.tab;   // Settings → Display → Colourful: the page takes its tab's colour
-  // Advanced display → the tab bar's order and hidden tabs (this device); a page on the bar (Settings) is selected
+  document.body.dataset.bar = cur ? cur.id : S.tab;   // Settings → Themes → Colourful: the page takes its tab's colour
+  // Layout → the tab bar's order and hidden tabs (this device); a page on the bar (Settings) is selected
   // for its own pages too, and anything else off the bar under More
   const bar = visibleTabs(), { shown, sel } = barTabOf(S.tab);
   // same tabs as before: only move the selection, so the bar never blinks while changing tab (swipe included)
@@ -610,7 +611,7 @@ function changeScreen(id, scroll = 0) {
   // the inverted Case tab always opens at the bottom, where the case box is (not where it was left)
   requestAnimationFrame(() => { if (S.tab === id) window.scrollTo(0, id === 'log' && invertedCase() ? document.documentElement.scrollHeight : scroll); });
 }
-// Settings → Display: the Case tab upside down, on a phone-width screen
+// Settings → Layout: the Case tab upside down, on a phone-width screen
 const invertedCase = () => document.documentElement.classList.contains('case-inverted') && matchMedia('(max-width: 600px)').matches;
 const navigation = createNavigation({ history, location,
   parents: Object.fromEntries(TABS.filter(t => t.under).map(t => [t.id, t.under])),
@@ -673,10 +674,10 @@ function render() {
   paintTabs();
   const tab = visibleTabs().find(t => t.id === S.tab) || TABS[0];
   S.tab = tab.id;
-  applyCustomCss();   // never on the Display page, so a bad rule can always be fixed there
+  applyCustomCss();   // never on Themes or Layout, so a bad rule can always be fixed there
   const y = window.scrollY;
   // every page without its own place on the tab bar gets a way back (owner, 13 Oct 2026): "‹ Settings" in the
-  // header, in place of the app's name, or at the top of the page when the header is hidden (Advanced display)
+  // header, in place of the app's name, or at the top of the page when the header is hidden (Themes)
   const parent = parentOf(tab);
   const backTo = parent && navigation.backTarget(parent);
   const back = backTo ? h('p', { class: 'back-row' }, h('a', { class: 'back-link', href: '#' + backTo,
@@ -686,7 +687,7 @@ function render() {
   const inHeader = back && brand && !document.documentElement.classList.contains('no-header');
   if (inHeader) brand.prepend(back);
   document.body.classList.toggle('header-back', !!inHeader);
-  // Advanced display → Page titles in the header: the page's name ("Logbook") instead of the app's
+  // Themes → Page titles in the header: the page's name ("Logbook") instead of the app's
   setPageLabel(tab.label);
   const dir = slideDirection(lastRendered, tab.id);
   fill(app, inHeader ? null : back, tab.render());
@@ -695,7 +696,7 @@ function render() {
   const drawn = !app.querySelector('.lazy-wait');
   if (drawn) app.dataset.page = tab.id; else delete app.dataset.page;
   if (findAfterRender) { if (drawn) showFound(); }   // (kept until the page is drawn)
-  // the inverted Case tab (Settings → Display, phones) opens at the bottom, where the case box is
+  // the inverted Case tab (Settings → Layout, phones) opens at the bottom, where the case box is
   else if (lastRendered !== 'log' && invertedCase()) requestAnimationFrame(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const tabFade = !dir && tabChangeMotion(lastRendered, tab.id);
   lastRendered = tab.id;
@@ -801,7 +802,7 @@ document.addEventListener('click', e => {
   }));
 });
 
-// Swipe left or right to change tab (Advanced display, and Show or hide → Header and tabs; on unless switched off on
+// Swipe left or right to change tab (Layout, and Show or hide → Header and tabs; on unless switched off on
 // this device: html.swipe-tabs). Like a deck of cards: the page follows the finger and the next tab's page comes in
 // beside it as you drag (a still copy of that page from when it was last left, `snaps`; a plain loading card for a
 // tab not opened yet). Letting go after a quick swipe (≥ 70 px, mostly sideways, < 0.7 s) or past a third of the
@@ -931,7 +932,7 @@ document.addEventListener('touchend', async e => {
 // its counts in place; other screens re-render when nothing is being edited (pendingRender: declared above render()).
 // Settings pages that show no case data: drawing them again would only throw away what is half filled in there (a
 // sync place being added, a search being typed)
-const CASE_FREE = new Set(['settings', 'showhide', 'themes', 'themesall', 'display', 'displayadv', 'access', 'logging', 'loggingadv', 'reflset', 'sendto', 'sync']);
+const CASE_FREE = new Set(['settings', 'showhide', 'themes', 'themesall', 'layout', 'access', 'logging', 'loggingadv', 'reflset', 'sendto', 'sync']);
 hooks.casesChanged = () => {
   paintWho();
   if (S.tab === 'log') return logCasesChanged();
@@ -981,7 +982,7 @@ function paintWho() {
     ? h('span', { class: 'sync wait', title: navigator.onLine ? 'Saving to the server…' : 'Saved on this phone; will sync when there is signal' }, navigator.onLine ? '⟳ Saving' : '⏳ Will sync')
     : S.casesSynced ? h('span', { class: 'sync ok', title: 'All your cases are saved to the server' }, '✓ Synced') : null;
   subEl.textContent = flags;   // kept (hidden) for tests
-  // a hidden header (Settings → Display) shows again while there is something to say: not synced, offline, demo, signed out
+  // a hidden header (Settings → Themes) shows again while there is something to say: not synced, offline, demo, signed out
   document.documentElement.classList.toggle('who-alert', !S.user || !navigator.onLine || !!S.pending);
   if (!S.user) { fill(whoEl, flag); return; }
   document.body.dataset.cases = String(S.cases.length);   // not shown; read by tests
@@ -1157,7 +1158,7 @@ async function onUser(user) {
     fill(app, h('p', { class: 'empty' }, 'Could not load your logbook: ' + err.message), h('p', { class: 'empty' }, h('button', { onclick: () => onUser(user) }, 'Try again')));
     return;
   }
-  // the tab chosen in Settings → Display, unless the address names one (a link, a shortcut, a reload)
+  // the tab chosen in Settings → Layout, unless the address names one (a link, a shortcut, a reload)
   const start = display().startTab || 'log';
   // a start tab hidden from the bar gives way to the first tab on it
   const onBar = arrangeTabs(barCandidates(), display()).shown;
@@ -1246,7 +1247,7 @@ function keyboardCheck() {
   // a keyboard takes at least ~120px (also small and landscape keyboards, where 25% was too much to ask)
   const typing = !!typingEl(document.activeElement) && fullH - vh > 120;
   document.body.classList.toggle('typing', typing);
-  // Accessibility → Hide the tab bar while typing (this device; off unless switched on, on in the Personal profile):
+  // Layout → Hide the tab bar while typing (this device; off unless switched on, on in the Personal profile):
   // the bar at the bottom goes while the keyboard is up, so the box and its Save bar keep that room
   document.body.classList.toggle('typing-nobar', typing && barAtBottom({ width: window.innerWidth, tabBar: display().tabBar, navStyle: display().navStyle }) && deviceOn(display(), S.logbook ? profile() : '', 'hideTabsTyping'));
   // how far the keyboard covers the bottom of the layout viewport (iOS also scrolls the visible area
@@ -1311,7 +1312,7 @@ const sharedIn = (() => {
 let wantToday = location.hash === '#today';
 if (wantToday) history.replaceState(null, '', location.pathname + location.search + '#notes');
 addEventListener('hashchange', () => { if (location.hash === '#today' && S.user) { history.replaceState(history.state, '', location.pathname + location.search + '#notes'); openDayNote(); } });
-applyTheme(cachedTheme());   // this device's choice (Settings → Display → Theme)
+applyTheme(cachedTheme());   // this device's choice (Settings → Themes → Light or dark)
 applyTextSize(cachedTextSize());
 applyZoom(cachedZoom());
 // Interface zoom from the keyboard, like a notes app or a browser: Ctrl/Cmd + (or =), Ctrl/Cmd −, Ctrl/Cmd 0
@@ -1322,7 +1323,7 @@ addEventListener('keydown', e => {
   e.preventDefault();   // instead of the browser's own zoom, so the setting and the screen agree
   const v = stepZoom(dir);
   toast(`Zoom ${Math.round(v * 100)}%`, { ms: 1200 });
-  if (S.tab === 'display' || S.tab === 'themes' || S.tab === 'themesall') render();
+  if (S.tab === 'access' || S.tab === 'themes' || S.tab === 'themesall') render();
 });
 if (cachedCompact()) document.body.classList.add('compact');   // first paint; corrected once the logbook loads
 paintWho();

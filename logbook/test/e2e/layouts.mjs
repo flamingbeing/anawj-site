@@ -41,7 +41,7 @@ try { for (const width of [390, 1200]) {
   assert.equal(await p.locator('.case-section').count(), 0);
   assert.equal(await p.locator('textarea.details').inputValue(), 'ZQ layout draft'); passed++;
   await tab('themes');
-  const layout = p.locator('section.card').filter({ has: p.getByRole('heading', { name: 'Layout', exact: true }) });
+  const layout = p.locator('section.card').filter({ has: p.getByRole('heading', { name: 'Rows and forms', exact: true }) });
   assert.equal(await layout.getByRole('radio').count(), 8);
   await layout.locator('input[value=chat]').check();
   assert.ok(await p.locator('html.rows-chat').count());
