@@ -76,7 +76,7 @@ for (const [k, m] of Object.entries(PAGE_MOTIONS)) if (m.ms) for (const dir of [
 
 // every theme passes the check, and one with colours of its own still reads as itself (not Custom)
 for (const t of THEMES) assert.deepEqual(checkTheme(t), [], t.id);
-assert.ok(checkTheme({ id: 'x2', name: 'Thing', group: 'inspired', desc: 'd', look: {} }).some(p => /-style/.test(p)));
+assert.ok(checkTheme({ id: 'x2', name: ' ', group: 'inspired', desc: 'd', look: {} }).some(p => /name:/.test(p)));
 assert.ok(checkTheme({ id: 'x3', name: 'A-style', group: 'inspired', desc: 'd', look: { headerStyle: 'huge' } }).some(p => /headerStyle/.test(p)));
 assert.ok(checkTheme({ id: 'x4', name: 'A-style', group: 'inspired', desc: 'd', look: { colours: { light: { ink: '#ffffff', bg: '#ffffff' } } } }).some(p => /colours/.test(p)));
 const own = { id: 'own', name: 'Own-style', group: 'inspired', desc: 'd', look: { colours: { light: { bg: '#fafafa' } } } };

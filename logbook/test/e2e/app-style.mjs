@@ -61,14 +61,14 @@ try {
   // an inspired theme brings its details along, and Undo takes them away
   assert.equal(await p.locator('.theme-grid').nth(1).locator('.theme-card').count(), 8, 'eight Inspired themes on the page');
   assert.equal(await p.locator('.theme-list').count(), 0, 'no scrolling list on the Themes page');
-  await p.locator('.theme-card', { hasText: 'Apple-style' }).click();
+  await p.locator('.theme-card', { hasText: 'Apple' }).click();
   assert.match(await p.evaluate(() => document.getElementById('look-css').textContent), /#34c759/);
   // Browse all themes: every theme, searchable, with Suggest a theme
   await p.getByRole('link', { name: 'Browse all themes' }).click();
   await p.locator('.theme-find').fill('Spotify');
   assert.equal(await p.locator('.theme-list .theme-row').count(), 1, 'search narrows the list');
   await p.getByRole('button', { name: 'Suggest a theme' }).waitFor();
-  await p.locator('.theme-row', { hasText: 'Spotify-style' }).click();
+  await p.locator('.theme-row', { hasText: 'Spotify' }).click();
   assert.match(await p.evaluate(() => document.getElementById('look-css').textContent), /#121212/);
   assert.equal(await p.evaluate(() => document.documentElement.dataset.theme), 'light', 'a theme leaves Light or dark alone');
   // cascade layers (index.html): the order first, style.css as the base layer, every look sheet in a layer, no :root

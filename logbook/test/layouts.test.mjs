@@ -33,7 +33,7 @@ for (const width of [390, 600, 900, 901, 1200]) for (const tabBar of ['auto', 't
   checks++;
 }
 // X uses compact feed rows; conversation themes keep the chat timestamp layout.
-for (const [id, key, value] of [['x', 'rowLayout', 'compact'], ['notion', 'rowLayout', 'timeline'], ['office', 'navStyle', 'rail']]) {
+for (const [id, key, value] of [['x', 'rowLayout', 'compact'], ['notion', 'rowLayout', 'compact'], ['office', 'navStyle', 'rail']]) {
   const d = themePatch(themeById(id));
   assert.equal(d[key], value);
   assert.equal(themeState(d).custom, false);
