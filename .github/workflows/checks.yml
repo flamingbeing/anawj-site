@@ -34,7 +34,8 @@ jobs:
 
   # kept under the old name, so anything that waits on "browser" still works
   browser:
-    runs-on: ubuntu-latest
+    # pinned: Playwright 1.56.1 can't install Chromium on Ubuntu 26.04 (what ubuntu-latest became on 22 Oct 2026)
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
