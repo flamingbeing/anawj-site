@@ -35,7 +35,11 @@ if (!vault) {
   go.hidden = false;
   document.getElementById('what').textContent = vault + (file ? ' / ' + file : '');
   msg.textContent = 'Opening Obsidian… if nothing happens, tap the button.';
-  location.href = uri;
+  location.replace(uri);
+  // Once Obsidian has taken over, try to close this tab (browsers allow it only for tabs a script opened, so it may stay).
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { msg.textContent = 'Opened. You can close this tab.'; setTimeout(() => window.close(), 300); }
+  });
 }
 </script>
 </body>
