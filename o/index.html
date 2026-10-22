@@ -12,7 +12,6 @@
    the vault and file sit after the # so they are never sent to the server. */
 body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#000;color:#ececef;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;padding:16px}
 a{display:inline-block;min-height:48px;padding:12px 28px;border-radius:24px;background:#6ea3ff;color:#08111f;font-weight:600;font-size:20px;text-decoration:none}
-a#plain{background:transparent;border:1px solid #3a3a42;color:#ececef;font-size:16px;min-height:44px;padding:10px 24px}
 a[hidden]{display:none}
 button{min-height:44px;padding:10px 24px;border:1px solid #3a3a42;border-radius:22px;background:transparent;color:#ececef;font:inherit;font-size:16px}
 p{margin:0;color:#9a9aa2;font-size:14px;word-break:break-all}
@@ -22,13 +21,10 @@ p{margin:0;color:#9a9aa2;font-size:14px;word-break:break-all}
 <body>
 <p id="msg">Opening Obsidian…</p>
 <a id="go" href="#" hidden>Open in Obsidian</a>
-<a id="plain" href="#" hidden>Open without pulling</a>
 <p id="what"></p>
 <button id="close" type="button">Close</button>
 <script>
-// Only vault and file are forwarded, re-encoded, so this page can only ever build an obsidian:// link: by default an
-// Advanced URI one that opens the note and runs Git: Pull (needs the Advanced URI plugin); #pull=0 or the second
-// button gives the plain open link.
+// Only vault and file are forwarded, re-encoded, so this page can only ever build an obsidian://open link.
 const q = new URLSearchParams(location.hash.slice(1)), vault = q.get('vault'), file = q.get('file');
 const msg = document.getElementById('msg'), go = document.getElementById('go');
 if (!vault) {
@@ -36,19 +32,7 @@ if (!vault) {
 } else {
   const p = new URLSearchParams({ vault });
   if (file) p.set('file', file);
-  const enc = x => x.toString().replace(/\+/g, '%20');   // Obsidian wants %20, not +
-  const plain = 'obsidian://open?' + enc(p);
-  const pull = q.get('pull') !== '0';
-  let uri = plain;
-  if (pull) {
-    const a = new URLSearchParams({ vault });
-    if (file) a.set('filepath', file);
-    a.set('commandid', 'obsidian-git:pull');
-    uri = 'obsidian://adv-uri?' + enc(a);
-    const pl = document.getElementById('plain');
-    pl.href = plain;
-    pl.hidden = false;
-  }
+  const uri = 'obsidian://open?' + p.toString().replace(/\+/g, '%20');   // Obsidian wants %20, not +
   go.href = uri;
   go.hidden = false;
   document.getElementById('what').textContent = vault + (file ? ' / ' + file : '');
