@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<title>Open in Obsidian</title>
+<style>
+/* Forwards anawj.com/o/#vault=NAME&file=PATH to the Obsidian app (chat apps open only https links). Holds no data;
+   the vault and file sit after the # so they are never sent to the server. */
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#000;color:#ececef;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;padding:16px}
+a{display:inline-block;min-height:48px;padding:12px 28px;border-radius:24px;background:#6ea3ff;color:#08111f;font-weight:600;font-size:20px;text-decoration:none}
+a[hidden]{display:none}
+p{margin:0;color:#9a9aa2;font-size:14px;word-break:break-all}
+:focus-visible{outline:2px solid #fff;outline-offset:2px}
+</style>
+</head>
+<body>
+<p id="msg">Opening Obsidian…</p>
+<a id="go" href="#" hidden>Open in Obsidian</a>
+<p id="what"></p>
+<script>
+// Only vault and file are forwarded, re-encoded, so this page can only ever build an obsidian://open link.
+const q = new URLSearchParams(location.hash.slice(1)), vault = q.get('vault'), file = q.get('file');
+const msg = document.getElementById('msg'), go = document.getElementById('go');
+if (!vault) {
+  msg.textContent = 'Use /o/#vault=NAME&file=PATH';
+} else {
+  const p = new URLSearchParams({ vault });
+  if (file) p.set('file', file);
+  const uri = 'obsidian://open?' + p.toString().replace(/\+/g, '%20');   // Obsidian wants %20, not +
+  go.href = uri;
+  go.hidden = false;
+  document.getElementById('what').textContent = vault + (file ? ' / ' + file : '');
+  msg.textContent = 'Opening Obsidian… if nothing happens, tap the button.';
+  location.href = uri;
+}
+</script>
+</body>
+</html>

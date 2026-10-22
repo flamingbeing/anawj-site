@@ -12,6 +12,7 @@ Since the repo split (21 Oct 2026) every app lives in its own group repo with it
 |---|---|---|
 | Home page (server up or down, no app links) | `index.html` | `anawj.com` |
 | Privacy page | `privacy/` | `anawj.com/privacy/` |
+| Obsidian link forwarder (opens a note in the phone app; no data, not linked) | `o/` | `anawj.com/o/#vault=NAME&file=PATH` |
 | Old-address forwards | `<old folder>/index.html`, `404.html`, `moved.json` | `anawj.com/<old folder>/...` |
 | NUHS design kit | `nuhsdesign/` | `design.anawj.com/v1/` |
 | Feedback button | `feedback/` | `design.anawj.com/v1/feedback/` |
