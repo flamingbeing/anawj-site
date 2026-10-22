@@ -16,6 +16,7 @@ Since the repo split (21 Oct 2026) every app lives in its own group repo with it
 | Old-address forwards | `<old folder>/index.html`, `404.html`, `moved.json` | `anawj.com/<old folder>/...` |
 | NUHS design kit | `nuhsdesign/` | `design.anawj.com/v1/` |
 | Feedback button | `feedback/` | `design.anawj.com/v1/feedback/` |
+| App icon set for every group repo | `tools/app-icons/` | not served on its own; copied into each app |
 | Site-wide session notes | `status/` | not served |
 
 Where the apps went (`moved.json` is the list the forwards use): `apmes` (logbook, evals, people, applicants, 360,
