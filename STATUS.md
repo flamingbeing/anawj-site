@@ -8,6 +8,9 @@ Last updated: 2026-10-21.
 
 ## Recently done
 
+- 23 Oct: **site icons** (NUHS family, from `tools/app-icons/`): favicon, apple-touch icon and theme colour on the home,
+  privacy, Obsidian-link and 404 pages (`icons/`), favicon on every forward stub, and the kit page's own icon
+  (`nuhsdesign/icons/`, served at `design.anawj.com/v1/icons/`).
 - 23 Oct: **app icon set** in `tools/app-icons/` (33 icons in three families, renderer with safe-zone checks and a
   review sheet); the apps take them up from their own repos.
 - 21 Oct: **landing only** (repo split, last step): every app folder removed (they live in their group repos: apmes,
