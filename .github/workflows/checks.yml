@@ -63,3 +63,5 @@ jobs:
         run: |
           export PLAYWRIGHT_PATH="$(npm root -g)/playwright/index.mjs" SIBLINGS="$PWD/.sib"
           node feedback/test/e2e.mjs
+      - name: App icons (family rules, maskable safe zone)
+        run: PLAYWRIGHT_PATH="$(npm root -g)/playwright/index.mjs" node tools/app-icons/render.mjs

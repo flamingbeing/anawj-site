@@ -8,6 +8,8 @@ Last updated: 2026-10-21.
 
 ## Recently done
 
+- 23 Oct: **app icon set** in `tools/app-icons/` (33 icons in three families, renderer with safe-zone checks and a
+  review sheet); the apps take them up from their own repos.
 - 21 Oct: **landing only** (repo split, last step): every app folder removed (they live in their group repos: apmes,
   rosters, prewarm, hand, owner-tools); old `anawj.com/<folder>/` addresses forward to the new hosts (`moved.json`,
   `404.html`); the Worker serves only design.anawj.com and the anaes forwards; previews off; the page editor retired;

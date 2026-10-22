@@ -1,0 +1,42 @@
+{
+  "families": {
+    "nuhs": { "name": "NUHS", "bg": "#002f6c", "colours": ["#002f6c", "#ffffff", "#e57200", "#e4002b", "#178fd7", "#00a9e0", "#d9e2ee"] },
+    "ntf": { "name": "NTF", "bg": "#272722", "colours": ["#272722", "#fffaf0", "#7c4640", "#8f8574"] },
+    "home": { "name": "Home", "bg": "#3a6390", "colours": ["#3a6390", "#ffffff", "#e8eef5"] }
+  },
+  "apps": [
+    { "id": "logbook", "name": "Logbook", "family": "nuhs", "repo": "apmes" },
+    { "id": "evals", "name": "Evals", "family": "nuhs", "repo": "apmes" },
+    { "id": "people", "name": "People", "family": "nuhs", "repo": "apmes" },
+    { "id": "360", "name": "CCC 360", "family": "nuhs", "repo": "apmes" },
+    { "id": "applicants", "name": "Applicants", "family": "nuhs", "repo": "apmes" },
+    { "id": "nuh-roster", "name": "NUH roster", "family": "nuhs", "repo": "rosters" },
+    { "id": "nuh-junior-monthly", "name": "NUH junior monthly", "family": "nuhs", "repo": "rosters" },
+    { "id": "prewarm", "name": "Prewarm", "family": "nuhs", "repo": "prewarm" },
+    { "id": "prewarm-update", "name": "Prewarm update", "family": "nuhs", "repo": "prewarm" },
+    { "id": "hand-babies", "name": "Hand assessment", "family": "nuhs", "repo": "hand" },
+    { "id": "hand-log", "name": "Hand log", "family": "nuhs", "repo": "hand" },
+    { "id": "cmcj", "name": "Thumb CMC", "family": "nuhs", "repo": "hand" },
+    { "id": "ask", "name": "Ask Claude", "family": "nuhs", "repo": "owner-tools" },
+    { "id": "anawj", "name": "anawj.com pages", "family": "nuhs", "repo": "anawj-site" },
+    { "id": "nuhsdesign", "name": "NUHS kit", "family": "nuhs", "repo": "anawj-site" },
+    { "id": "ntf-home", "name": "NTF home", "family": "ntf", "repo": "anantf-site" },
+    { "id": "ntf-roster", "name": "NTF roster", "family": "ntf", "repo": "rosters" },
+    { "id": "bis", "name": "BIS", "family": "ntf", "repo": "anantf-site" },
+    { "id": "eeg", "name": "EEG", "family": "ntf", "repo": "anantf-site" },
+    { "id": "tci", "name": "TCI", "family": "ntf", "repo": "anantf-site" },
+    { "id": "tci-pump", "name": "TCI pump", "family": "ntf", "repo": "anantf-site" },
+    { "id": "exams", "name": "Exams", "family": "ntf", "repo": "anantf-site" },
+    { "id": "blocks", "name": "Blocks", "family": "ntf", "repo": "anantf-site" },
+    { "id": "blocks-calculator", "name": "LA calculator", "family": "ntf", "repo": "anantf-site" },
+    { "id": "ot", "name": "OT simulator", "family": "ntf", "repo": "anantf-site" },
+    { "id": "popliteal", "name": "Popliteal", "family": "ntf", "repo": "anantf-site" },
+    { "id": "mo", "name": "For new MOs", "family": "ntf", "repo": "anantf-site" },
+    { "id": "mo-guide", "name": "MO guide", "family": "ntf", "repo": "anantf-site" },
+    { "id": "qbank", "name": "Question bank", "family": "ntf", "repo": "anantf-site" },
+    { "id": "babymo", "name": "Baby MO test", "family": "ntf", "repo": "anantf-site" },
+    { "id": "pantry", "name": "Pantry", "family": "home", "repo": "pantry" },
+    { "id": "kakihome", "name": "Kakihome", "family": "home", "repo": "kakihome" },
+    { "id": "homekit", "name": "Home kit", "family": "home", "repo": "hi" }
+  ]
+}
