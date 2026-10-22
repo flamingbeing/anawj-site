@@ -22,13 +22,14 @@ p{margin:0;color:#9a9aa2;font-size:14px;word-break:break-all}
 <body>
 <p id="msg">Opening Obsidian…</p>
 <a id="go" href="#" hidden>Open in Obsidian</a>
-<a id="plain" href="#" hidden>Open without pulling</a>
+<a id="plain" href="#" hidden>Pull only (new note)</a>
 <p id="what"></p>
 <button id="close" type="button">Close</button>
 <script>
 // Only vault and file are forwarded, re-encoded, so this page can only ever build an obsidian:// link: by default an
-// Advanced URI one that opens the note and runs Git: Pull (needs the Advanced URI plugin); #pull=0 or the second
-// button gives the plain open link.
+// Advanced URI one that opens the note and runs Git: Pull (needs the Advanced URI plugin). A note not yet on the
+// phone fails with "file not found" before the pull runs, so the second button runs the pull alone; #pull=0 gives the
+// plain open link.
 const q = new URLSearchParams(location.hash.slice(1)), vault = q.get('vault'), file = q.get('file');
 const msg = document.getElementById('msg'), go = document.getElementById('go');
 if (!vault) {
@@ -46,7 +47,7 @@ if (!vault) {
     a.set('commandid', 'obsidian-git:pull');
     uri = 'obsidian://adv-uri?' + enc(a);
     const pl = document.getElementById('plain');
-    pl.href = plain;
+    pl.href = 'obsidian://adv-uri?vault=' + encodeURIComponent(vault) + '&commandid=obsidian-git%3Apull';
     pl.hidden = false;
   }
   go.href = uri;
