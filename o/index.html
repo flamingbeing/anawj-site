@@ -13,6 +13,7 @@
 body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#000;color:#ececef;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;padding:16px}
 a{display:inline-block;min-height:48px;padding:12px 28px;border-radius:24px;background:#6ea3ff;color:#08111f;font-weight:600;font-size:20px;text-decoration:none}
 a[hidden]{display:none}
+button{min-height:44px;padding:10px 24px;border:1px solid #3a3a42;border-radius:22px;background:transparent;color:#ececef;font:inherit;font-size:16px}
 p{margin:0;color:#9a9aa2;font-size:14px;word-break:break-all}
 :focus-visible{outline:2px solid #fff;outline-offset:2px}
 </style>
@@ -21,6 +22,7 @@ p{margin:0;color:#9a9aa2;font-size:14px;word-break:break-all}
 <p id="msg">Opening Obsidian…</p>
 <a id="go" href="#" hidden>Open in Obsidian</a>
 <p id="what"></p>
+<button id="close" type="button">Close</button>
 <script>
 // Only vault and file are forwarded, re-encoded, so this page can only ever build an obsidian://open link.
 const q = new URLSearchParams(location.hash.slice(1)), vault = q.get('vault'), file = q.get('file');
@@ -41,6 +43,14 @@ if (!vault) {
     if (document.hidden) { msg.textContent = 'Opened. You can close this tab.'; setTimeout(() => window.close(), 300); }
   });
 }
+// Close button: window.close() works only for tabs a script opened, so fall back to going back, then to a hint.
+document.getElementById('close').addEventListener('click', () => {
+  window.close();
+  setTimeout(() => {
+    if (history.length > 1) history.back();
+    else msg.textContent = 'Your browser blocks closing this tab; close it yourself.';
+  }, 200);
+});
 </script>
 </body>
 </html>
