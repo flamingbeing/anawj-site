@@ -10,6 +10,7 @@
     { "id": "people", "name": "People", "family": "nuhs", "repo": "apmes" },
     { "id": "360", "name": "CCC 360", "family": "nuhs", "repo": "apmes" },
     { "id": "applicants", "name": "Applicants", "family": "nuhs", "repo": "apmes" },
+    { "id": "guide", "name": "Guidebook", "family": "nuhs", "repo": "apmes" },
     { "id": "nuh-roster", "name": "NUH roster", "family": "nuhs", "repo": "rosters" },
     { "id": "nuh-junior-monthly", "name": "NUH junior monthly", "family": "nuhs", "repo": "rosters" },
     { "id": "prewarm", "name": "Prewarm", "family": "nuhs", "repo": "prewarm" },
