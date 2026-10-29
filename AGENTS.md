@@ -49,8 +49,9 @@ PR creation returned (never a guess), and report with the link.
 node tools/check.mjs
 for f in worker/test/*.test.mjs feedback/test/*.test.mjs; do node "$f"; done
 node tools/proofread.mjs
-node feedback/test/e2e.mjs   # needs checkouts of hand, rosters and prewarm beside this repo (SIBLINGS=<dir>)
 ```
+
+The feedback-button browser test (`feedback/test/e2e.mjs`, needs hand, rosters and prewarm checked out beside this repo, `SIBLINGS=<dir>`) runs on GitHub only ("Checks", `browser` job); run it locally only when fixing it.
 
 ## Showing and saving work
 
